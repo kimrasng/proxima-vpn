@@ -77,6 +77,8 @@ CREATE TABLE IF NOT EXISTS nodes (
     memory_usage        REAL NOT NULL DEFAULT 0,
     disk_usage          REAL NOT NULL DEFAULT 0,
     load_avg            REAL NOT NULL DEFAULT 0,
+    network_in          REAL NOT NULL DEFAULT 0,
+    network_out         REAL NOT NULL DEFAULT 0,
     last_seen           TIMESTAMPTZ,
     last_ping_at        TIMESTAMPTZ,
     created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -162,5 +164,16 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 	if err != nil {
 		return fmt.Errorf("running schema migration: %w", err)
 	}
+
+	migrations := []string{
+		`ALTER TABLE nodes ADD COLUMN IF NOT EXISTS network_in REAL NOT NULL DEFAULT 0`,
+		`ALTER TABLE nodes ADD COLUMN IF NOT EXISTS network_out REAL NOT NULL DEFAULT 0`,
+	}
+	for _, m := range migrations {
+		if _, err := pool.Exec(ctx, m); err != nil {
+			return fmt.Errorf("running migration %q: %w", m, err)
+		}
+	}
+
 	return nil
 }
