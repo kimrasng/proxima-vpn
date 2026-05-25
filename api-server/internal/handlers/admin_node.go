@@ -89,7 +89,7 @@ func (h *AdminNodeHandler) GetMetricsHistory(c *fiber.Ctx) error {
 		context.Background(),
 		`SELECT cpu_usage, memory_usage, disk_usage, load_avg, network_in, network_out, recorded_at
 		 FROM node_metrics_history
-		 WHERE node_id = $1 AND recorded_at >= NOW() - ($2 || ' hours')::interval
+		 WHERE node_id = $1 AND recorded_at >= NOW() - make_interval(hours => $2)
 		 ORDER BY recorded_at ASC`,
 		id, hours,
 	)
