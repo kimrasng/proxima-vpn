@@ -22,7 +22,7 @@ jobs:
           CGO_ENABLED: 0
         run: |
           cd node-agent
-          go build -o ../node-agent-${{ matrix.goos }}-${{ matrix.goarch }} ./cmd/main.go
+          go build -ldflags "-X main.version=${{ github.ref_name }}" -o ../node-agent-${{ matrix.goos }}-${{ matrix.goarch }} ./cmd/main.go
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
