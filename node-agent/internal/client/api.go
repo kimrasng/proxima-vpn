@@ -34,7 +34,7 @@ func NewAPIClient(cfg *config.AgentConfig) *APIClient {
 
 // RegisterRequest is the payload for node registration.
 type RegisterRequest struct {
-	Token       string `json:"token"`
+	Token       string `json:"reg_token"`
 	IP          string `json:"ip"`
 	Port        int    `json:"port"`
 	XrayVersion string `json:"xray_version"`
