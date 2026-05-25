@@ -97,6 +97,20 @@
       "ipReadOnly": "IP (read-only)",
       "portReadOnly": "Port (read-only)"
     },
+    "nodeDetail": {
+      "title": "Node Detail",
+      "fetchError": "Failed to load node",
+      "refresh": "Refresh",
+      "manageInbounds": "Manage Inbounds",
+      "back": "Back to Nodes",
+      "lastRefreshed": "Last refreshed",
+      "autoRefresh": "auto-refreshes every 30s",
+      "overview": "Overview",
+      "performance": "Performance",
+      "network": "Network",
+      "xrayVersion": "Xray Version",
+      "createdAt": "Created At"
+    },
     "nodeGroups": {
       "title": "Node Group Management",
       "create": "Create Group",

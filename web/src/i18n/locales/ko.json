@@ -97,6 +97,20 @@
       "ipReadOnly": "IP (읽기 전용)",
       "portReadOnly": "포트 (읽기 전용)"
     },
+    "nodeDetail": {
+      "title": "노드 상세",
+      "fetchError": "노드 정보를 불러오는데 실패했습니다",
+      "refresh": "새로고침",
+      "manageInbounds": "인바운드 관리",
+      "back": "노드 목록으로",
+      "lastRefreshed": "마지막 갱신",
+      "autoRefresh": "30초마다 자동 갱신",
+      "overview": "개요",
+      "performance": "성능",
+      "network": "네트워크",
+      "xrayVersion": "Xray 버전",
+      "createdAt": "생성일"
+    },
     "nodeGroups": {
       "title": "노드 그룹 관리",
       "create": "그룹 생성",

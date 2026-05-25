@@ -16,6 +16,7 @@ import AdminAnnouncements from "./pages/admin/Announcements";
 import Settings from "./pages/admin/Settings";
 import TwoFactor from "./pages/admin/TwoFactor";
 import NodeInbounds from "./pages/admin/NodeInbounds";
+import NodeDetail from "./pages/admin/NodeDetail";
 import UserTemplates from "./pages/admin/UserTemplates";
 
 import Login from "./pages/auth/Login";
@@ -50,6 +51,7 @@ export const router = createBrowserRouter([
     children: [
       { path: "/admin/dashboard", element: <Dashboard /> },
       { path: "/admin/nodes", element: <Nodes /> },
+      { path: "/admin/nodes/:nodeId", element: <NodeDetail /> },
       { path: "/admin/nodes/:nodeId/inbounds", element: <NodeInbounds /> },
       { path: "/admin/node-groups", element: <NodeGroups /> },
       { path: "/admin/plans", element: <Plans /> },

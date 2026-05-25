@@ -210,7 +210,7 @@ export default function Nodes() {
           items={nodes}
           columnDefinitions={[
             { id: "name", header: t("admin.nodes.col.name"), cell: (item) => (
-              <Button variant="inline-link" onClick={() => navigate(`/admin/nodes/${item.id}/inbounds`)}>
+              <Button variant="inline-link" onClick={() => navigate(`/admin/nodes/${item.id}`)}>
                 {item.name}
               </Button>
             ) },

@@ -98,6 +98,20 @@
       "ipReadOnly": "IP（只读）",
       "portReadOnly": "端口（只读）"
     },
+    "nodeDetail": {
+      "title": "节点详情",
+      "fetchError": "加载节点信息失败",
+      "refresh": "刷新",
+      "manageInbounds": "管理入站",
+      "back": "返回节点列表",
+      "lastRefreshed": "最后刷新",
+      "autoRefresh": "每30秒自动刷新",
+      "overview": "概览",
+      "performance": "性能",
+      "network": "网络",
+      "xrayVersion": "Xray 版本",
+      "createdAt": "创建时间"
+    },
     "nodeGroups": {
       "title": "节点组管理",
       "addGroup": "添加分组",
