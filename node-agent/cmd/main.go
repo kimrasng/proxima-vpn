@@ -183,7 +183,7 @@ func heartbeatLoop(ctx context.Context, apiClient *client.APIClient) {
 			return
 		case <-ticker.C:
 			m := stats.CollectSysMetrics()
-			if err := apiClient.SendHeartbeat(ctx, m.CPU, m.Memory, m.Disk, m.LoadAvg); err != nil {
+			if err := apiClient.SendHeartbeat(ctx, m.CPU, m.Memory, m.Disk, m.LoadAvg, m.NetworkIn, m.NetworkOut); err != nil {
 				log.Printf("heartbeat: %v", err)
 			}
 		}

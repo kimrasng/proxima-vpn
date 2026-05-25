@@ -111,6 +111,8 @@ type heartbeatRequest struct {
 	MemoryUsage float64 `json:"memory_usage"`
 	DiskUsage   float64 `json:"disk_usage"`
 	LoadAvg     float64 `json:"load_avg"`
+	NetworkIn   float64 `json:"network_in"`
+	NetworkOut  float64 `json:"network_out"`
 }
 
 func (h *NodeAgentHandler) Heartbeat(c *fiber.Ctx) error {
@@ -127,9 +129,10 @@ func (h *NodeAgentHandler) Heartbeat(c *fiber.Ctx) error {
 		context.Background(),
 		`UPDATE nodes
 		 SET cpu_usage = $1, memory_usage = $2, disk_usage = $3, load_avg = $4,
-		     last_seen = NOW(), status = 'online'
-		 WHERE id = $5`,
-		req.CPUUsage, req.MemoryUsage, req.DiskUsage, req.LoadAvg, nodeID,
+		     network_in = $5, network_out = $6, last_seen = NOW(), status = 'online'
+		 WHERE id = $7`,
+		req.CPUUsage, req.MemoryUsage, req.DiskUsage, req.LoadAvg,
+		req.NetworkIn, req.NetworkOut, nodeID,
 	)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{

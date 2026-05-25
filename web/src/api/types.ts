@@ -36,6 +36,8 @@ export interface Node {
   memory_usage?: number;
   disk_usage?: number;
   load_avg?: number;
+  network_in?: number;
+  network_out?: number;
   xray_version?: string;
   created_at: string;
 }

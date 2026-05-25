@@ -74,6 +74,13 @@ type nodeListItem struct {
 	Port        int        `json:"port"`
 	Status      string     `json:"status"`
 	XrayVersion string     `json:"xray_version"`
+	CPUUsage    *float64   `json:"cpu_usage"`
+	MemoryUsage *float64   `json:"memory_usage"`
+	DiskUsage   *float64   `json:"disk_usage"`
+	LoadAvg     *float64   `json:"load_avg"`
+	NetworkIn   *float64   `json:"network_in"`
+	NetworkOut  *float64   `json:"network_out"`
+	LastSeen    *time.Time `json:"last_seen"`
 	CreatedAt   time.Time  `json:"created_at"`
 	UpdatedAt   time.Time  `json:"updated_at"`
 	LastPingAt  *time.Time `json:"last_ping_at"`
@@ -91,7 +98,9 @@ type nodeListItem struct {
 func (h *AdminNodeHandler) ListNodes(c *fiber.Ctx) error {
 	rows, err := h.db.Query(
 		context.Background(),
-		`SELECT id, name, country, region, ip::text, port, status, xray_version, created_at, updated_at, last_ping_at
+		`SELECT id, name, country, region, ip::text, port, status, xray_version,
+		        cpu_usage, memory_usage, disk_usage, load_avg, network_in, network_out,
+		        last_seen, created_at, updated_at, last_ping_at
 		 FROM nodes WHERE status != 'pending' ORDER BY created_at DESC`,
 	)
 	if err != nil {
@@ -106,7 +115,9 @@ func (h *AdminNodeHandler) ListNodes(c *fiber.Ctx) error {
 		var n nodeListItem
 		if err := rows.Scan(
 			&n.ID, &n.Name, &n.Country, &n.Region, &n.IP, &n.Port,
-			&n.Status, &n.XrayVersion, &n.CreatedAt, &n.UpdatedAt, &n.LastPingAt,
+			&n.Status, &n.XrayVersion,
+			&n.CPUUsage, &n.MemoryUsage, &n.DiskUsage, &n.LoadAvg, &n.NetworkIn, &n.NetworkOut,
+			&n.LastSeen, &n.CreatedAt, &n.UpdatedAt, &n.LastPingAt,
 		); err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 				"error": "failed to scan node",
@@ -134,11 +145,17 @@ func (h *AdminNodeHandler) GetNode(c *fiber.Ctx) error {
 	var n nodeListItem
 	err := h.db.QueryRow(
 		context.Background(),
-		`SELECT id, name, country, region, ip::text, port, status, xray_version, created_at, updated_at, last_ping_at
+		`SELECT id, name, country, region, ip::text, port, status, xray_version,
+		        cpu_usage, memory_usage, disk_usage, load_avg, network_in, network_out,
+		        last_seen, created_at, updated_at, last_ping_at
 		 FROM nodes WHERE id = $1`,
 		id,
-	).Scan(&n.ID, &n.Name, &n.Country, &n.Region, &n.IP, &n.Port,
-		&n.Status, &n.XrayVersion, &n.CreatedAt, &n.UpdatedAt, &n.LastPingAt)
+	).Scan(
+		&n.ID, &n.Name, &n.Country, &n.Region, &n.IP, &n.Port,
+		&n.Status, &n.XrayVersion,
+		&n.CPUUsage, &n.MemoryUsage, &n.DiskUsage, &n.LoadAvg, &n.NetworkIn, &n.NetworkOut,
+		&n.LastSeen, &n.CreatedAt, &n.UpdatedAt, &n.LastPingAt,
+	)
 	if err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 			"error": "node not found",

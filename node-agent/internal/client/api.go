@@ -64,10 +64,12 @@ type StatsPayload struct {
 
 // HeartbeatPayload is the payload for heartbeat.
 type HeartbeatPayload struct {
-	CPU     float64 `json:"cpu"`
-	Memory  float64 `json:"memory"`
-	Disk    float64 `json:"disk"`
-	LoadAvg float64 `json:"load_avg"`
+	CPU        float64 `json:"cpu_usage"`
+	Memory     float64 `json:"memory_usage"`
+	Disk       float64 `json:"disk_usage"`
+	LoadAvg    float64 `json:"load_avg"`
+	NetworkIn  float64 `json:"network_in"`
+	NetworkOut float64 `json:"network_out"`
 }
 
 // Register registers this node with the main server.
@@ -137,12 +139,14 @@ func (c *APIClient) GetConfig(ctx context.Context) ([]byte, error) {
 }
 
 // SendHeartbeat sends system metrics to the server.
-func (c *APIClient) SendHeartbeat(ctx context.Context, cpu, memory, disk, loadAvg float64) error {
+func (c *APIClient) SendHeartbeat(ctx context.Context, cpu, memory, disk, loadAvg, networkIn, networkOut float64) error {
 	payload := HeartbeatPayload{
-		CPU:     cpu,
-		Memory:  memory,
-		Disk:    disk,
-		LoadAvg: loadAvg,
+		CPU:        cpu,
+		Memory:     memory,
+		Disk:       disk,
+		LoadAvg:    loadAvg,
+		NetworkIn:  networkIn,
+		NetworkOut: networkOut,
 	}
 
 	body, err := json.Marshal(payload)

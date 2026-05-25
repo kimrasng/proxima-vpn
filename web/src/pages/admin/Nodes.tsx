@@ -39,6 +39,13 @@ function formatRelativeTime(dateStr: string | undefined | null): string {
   return `${days}d ago`;
 }
 
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(1024));
+  return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${units[i]}`;
+}
+
 function getUsageStatus(value: number): "success" | "warning" | "error" {
   if (value < 50) return "success";
   if (value <= 80) return "warning";
@@ -66,6 +73,7 @@ export default function Nodes() {
   const [tokenData, setTokenData] = useState<GenerateTokenResponse | null>(null);
   const [deleteModal, setDeleteModal] = useState<Node | null>(null);
   const [editModal, setEditModal] = useState<Node | null>(null);
+  const [metricsModal, setMetricsModal] = useState<Node | null>(null);
   const [editForm, setEditForm] = useState<{ name: string; country: string; region: string }>({ name: "", country: "", region: "" });
   const [editSuccess, setEditSuccess] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
@@ -248,6 +256,34 @@ export default function Nodes() {
                 ),
             },
             {
+              id: "disk",
+              header: t("admin.nodes.col.disk"),
+              cell: (item) =>
+                item.disk_usage != null ? (
+                  <ProgressBar
+                    value={item.disk_usage}
+                    status={getUsageStatus(item.disk_usage) === "error" ? "error" : "in-progress"}
+                    variant="standalone"
+                    additionalInfo={`${item.disk_usage.toFixed(1)}%`}
+                  />
+                ) : (
+                  <Box color="text-status-inactive">—</Box>
+                ),
+            },
+            {
+              id: "network",
+              header: t("admin.nodes.col.network"),
+              cell: (item) =>
+                item.network_in != null && item.network_out != null ? (
+                  <SpaceBetween size="xxxs">
+                    <Box fontSize="body-s">↓ {formatBytes(item.network_in)}</Box>
+                    <Box fontSize="body-s">↑ {formatBytes(item.network_out)}</Box>
+                  </SpaceBetween>
+                ) : (
+                  <Box color="text-status-inactive">—</Box>
+                ),
+            },
+            {
               id: "lastSeen",
               header: t("admin.nodes.col.lastSeen"),
               cell: (item) => (
@@ -261,6 +297,12 @@ export default function Nodes() {
               header: t("admin.nodes.col.actions"),
               cell: (item) => (
                 <SpaceBetween direction="horizontal" size="xs">
+                  <Button
+                    variant="inline-link"
+                    onClick={() => setMetricsModal(item)}
+                  >
+                    {t("admin.nodes.details")}
+                  </Button>
                   <Button
                     variant="inline-link"
                     disabled={item.status === "pending"}
@@ -277,6 +319,91 @@ export default function Nodes() {
           ]}
           empty={<Box textAlign="center">{t("admin.nodes.empty")}</Box>}
         />
+
+        <Modal
+          visible={metricsModal !== null}
+          onDismiss={() => setMetricsModal(null)}
+          header={metricsModal ? `${metricsModal.name} — ${t("admin.nodes.metricsTitle")}` : ""}
+          size="large"
+          footer={
+            <Box float="right">
+              <Button variant="primary" onClick={() => setMetricsModal(null)}>{t("admin.nodes.close")}</Button>
+            </Box>
+          }
+        >
+          {metricsModal && (
+            <SpaceBetween size="l">
+              <ColumnLayout columns={2} variant="text-grid">
+                <div>
+                  <Box variant="awsui-key-label">{t("admin.nodes.col.status")}</Box>
+                  <StatusIndicator type={getStatusIndicatorType(metricsModal.status)}>
+                    {metricsModal.status}
+                  </StatusIndicator>
+                </div>
+                <div>
+                  <Box variant="awsui-key-label">{t("admin.nodes.col.lastSeen")}</Box>
+                  <Box>{metricsModal.last_seen ? new Date(metricsModal.last_seen).toLocaleString() : "—"}</Box>
+                </div>
+                <div>
+                  <Box variant="awsui-key-label">IP</Box>
+                  <Box>{metricsModal.ip}:{metricsModal.port}</Box>
+                </div>
+                <div>
+                  <Box variant="awsui-key-label">Xray</Box>
+                  <Box>{metricsModal.xray_version ?? "—"}</Box>
+                </div>
+              </ColumnLayout>
+
+              <ColumnLayout columns={2} variant="text-grid">
+                <div>
+                  <Box variant="awsui-key-label">{t("admin.nodes.col.cpu")}</Box>
+                  {metricsModal.cpu_usage != null ? (
+                    <ProgressBar
+                      value={metricsModal.cpu_usage}
+                      status={getUsageStatus(metricsModal.cpu_usage) === "error" ? "error" : "in-progress"}
+                      additionalInfo={`${metricsModal.cpu_usage.toFixed(1)}%`}
+                    />
+                  ) : <Box color="text-status-inactive">—</Box>}
+                </div>
+                <div>
+                  <Box variant="awsui-key-label">{t("admin.nodes.col.memory")}</Box>
+                  {metricsModal.memory_usage != null ? (
+                    <ProgressBar
+                      value={metricsModal.memory_usage}
+                      status={getUsageStatus(metricsModal.memory_usage) === "error" ? "error" : "in-progress"}
+                      additionalInfo={`${metricsModal.memory_usage.toFixed(1)}%`}
+                    />
+                  ) : <Box color="text-status-inactive">—</Box>}
+                </div>
+                <div>
+                  <Box variant="awsui-key-label">{t("admin.nodes.col.disk")}</Box>
+                  {metricsModal.disk_usage != null ? (
+                    <ProgressBar
+                      value={metricsModal.disk_usage}
+                      status={getUsageStatus(metricsModal.disk_usage) === "error" ? "error" : "in-progress"}
+                      additionalInfo={`${metricsModal.disk_usage.toFixed(1)}%`}
+                    />
+                  ) : <Box color="text-status-inactive">—</Box>}
+                </div>
+                <div>
+                  <Box variant="awsui-key-label">Load Avg (1m)</Box>
+                  <Box>{metricsModal.load_avg != null ? metricsModal.load_avg.toFixed(2) : "—"}</Box>
+                </div>
+              </ColumnLayout>
+
+              <ColumnLayout columns={2} variant="text-grid">
+                <div>
+                  <Box variant="awsui-key-label">{t("admin.nodes.networkIn")}</Box>
+                  <Box>{metricsModal.network_in != null ? formatBytes(metricsModal.network_in) : "—"}</Box>
+                </div>
+                <div>
+                  <Box variant="awsui-key-label">{t("admin.nodes.networkOut")}</Box>
+                  <Box>{metricsModal.network_out != null ? formatBytes(metricsModal.network_out) : "—"}</Box>
+                </div>
+              </ColumnLayout>
+            </SpaceBetween>
+          )}
+        </Modal>
 
         <Modal
           visible={tokenModal}
