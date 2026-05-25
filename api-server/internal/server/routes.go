@@ -192,6 +192,10 @@ func (s *Server) registerRoutes() {
 	s.app.Static("/scripts", "/app/scripts", fiber.Static{
 		Browse: false,
 	})
+
+	s.app.Static("/downloads", "/app/downloads", fiber.Static{
+		Browse: false,
+	})
 }
 
 func (s *Server) parseAdminExpiry() time.Duration {
