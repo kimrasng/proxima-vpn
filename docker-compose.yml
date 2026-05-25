@@ -1,0 +1,65 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-vpnuser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-vpnpass}
+      POSTGRES_DB: ${POSTGRES_DB:-vpnpanel}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-vpnuser} -d ${POSTGRES_DB:-vpnpanel}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    command: >
+      sh -c '[ -n "$$REDIS_PASSWORD" ] && exec redis-server --requirepass "$$REDIS_PASSWORD" || exec redis-server'
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+    volumes:
+      - redis_data:/data
+
+  api:
+    build:
+      context: .
+      dockerfile: api-server/Dockerfile
+    ports:
+      - "2053:2053"
+    env_file: .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgres://vpnuser:vpnpass@db:5432/vpnpanel}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      JWT_SECRET: ${JWT_SECRET}
+      PANEL_URL: ${PANEL_URL:-http://localhost:8080}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    depends_on:
+      - api
+
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    depends_on:
+      - api
+
+volumes:
+  pg_data:
+  redis_data:

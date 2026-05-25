@@ -1,0 +1,70 @@
+name: Release
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  node-agent:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        goos: [linux]
+        goarch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+      - name: Build
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: 0
+        run: |
+          cd node-agent
+          go build -o ../node-agent-${{ matrix.goos }}-${{ matrix.goarch }} ./cmd/main.go
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: node-agent-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: node-agent-${{ matrix.goos }}-${{ matrix.goarch }}
+
+  docker:
+    runs-on: ubuntu-latest
+    needs: node-agent
+    steps:
+      - uses: actions/checkout@v4
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push API
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: api-server/Dockerfile
+          push: true
+          tags: ghcr.io/${{ github.repository }}/api:${{ github.ref_name }},ghcr.io/${{ github.repository }}/api:latest
+      - name: Build and push Web
+        uses: docker/build-push-action@v5
+        with:
+          context: ./web
+          file: web/Dockerfile
+          push: true
+          tags: ghcr.io/${{ github.repository }}/web:${{ github.ref_name }},ghcr.io/${{ github.repository }}/web:latest
+
+  release:
+    runs-on: ubuntu-latest
+    needs: [node-agent, docker]
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            node-agent-linux-amd64/node-agent-linux-amd64
+            node-agent-linux-arm64/node-agent-linux-arm64

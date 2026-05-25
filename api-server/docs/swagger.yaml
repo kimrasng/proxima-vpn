@@ -1,0 +1,2596 @@
+basePath: /api/v1
+definitions:
+  handlers.adminPlanRequestItem:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: string
+      plan_name:
+        type: string
+      reviewed_at:
+        type: string
+      status:
+        type: string
+      user_email:
+        type: string
+      user_name:
+        type: string
+    type: object
+  handlers.announcementItem:
+    properties:
+      content:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: string
+      is_active:
+        type: boolean
+      title:
+        type: string
+    type: object
+  handlers.createAnnouncementRequest:
+    properties:
+      content:
+        type: string
+      title:
+        type: string
+    type: object
+  handlers.createDeviceRequest:
+    properties:
+      name:
+        type: string
+    type: object
+  handlers.createInboundRequest:
+    properties:
+      enabled:
+        type: boolean
+      port:
+        type: integer
+      protocol:
+        type: string
+      settings:
+        additionalProperties: true
+        type: object
+      tag:
+        type: string
+    type: object
+  handlers.createNodeGroupRequest:
+    properties:
+      name:
+        type: string
+    type: object
+  handlers.createPlanRequest:
+    properties:
+      duration_days:
+        type: integer
+      max_devices:
+        type: integer
+      name:
+        type: string
+      node_group_id:
+        type: string
+      speed_limit:
+        type: integer
+      traffic_limit:
+        type: integer
+    type: object
+  handlers.createPlanRequestBody:
+    properties:
+      plan_id:
+        type: string
+    type: object
+  handlers.createUserTemplateRequest:
+    properties:
+      duration_days:
+        type: integer
+      max_devices:
+        type: integer
+      name:
+        type: string
+      node_group_id:
+        type: string
+      speed_limit:
+        type: integer
+      traffic_limit:
+        type: integer
+    type: object
+  handlers.deviceItem:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      xray_uuid:
+        type: string
+    type: object
+  handlers.deviceResponse:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      subscription_url:
+        type: string
+      xray_uuid:
+        type: string
+    type: object
+  handlers.disable2FARequest:
+    properties:
+      code:
+        type: string
+    type: object
+  handlers.enable2FARequest:
+    properties:
+      code:
+        type: string
+      secret:
+        type: string
+    type: object
+  handlers.generateTokenResponse:
+    properties:
+      install_command:
+        type: string
+      token:
+        type: string
+    type: object
+  handlers.inboundResponse:
+    properties:
+      created_at:
+        type: string
+      enabled:
+        type: boolean
+      id:
+        type: string
+      node_id:
+        type: string
+      port:
+        type: integer
+      protocol:
+        type: string
+      settings:
+        additionalProperties: true
+        type: object
+      tag:
+        type: string
+    type: object
+  handlers.issueCertificateRequest:
+    properties:
+      domain:
+        type: string
+      email:
+        type: string
+    required:
+    - domain
+    - email
+    type: object
+  handlers.loginRequest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+      totp_code:
+        type: string
+    type: object
+  handlers.loginResponse:
+    properties:
+      token:
+        type: string
+    type: object
+  handlers.nodeGroupDetail:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      nodes:
+        items:
+          $ref: '#/definitions/handlers.nodeGroupNode'
+        type: array
+    type: object
+  handlers.nodeGroupListItem:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      node_count:
+        type: integer
+    type: object
+  handlers.nodeGroupNode:
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+      status:
+        type: string
+    type: object
+  handlers.nodeListItem:
+    properties:
+      country:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: string
+      ip:
+        type: string
+      last_ping_at:
+        type: string
+      name:
+        type: string
+      port:
+        type: integer
+      region:
+        type: string
+      status:
+        type: string
+      updated_at:
+        type: string
+      xray_version:
+        type: string
+    type: object
+  handlers.planRequestResponse:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: string
+      plan_id:
+        type: string
+      plan_name:
+        type: string
+      reviewed_at:
+        type: string
+      status:
+        type: string
+    type: object
+  handlers.planResponse:
+    properties:
+      created_at:
+        type: string
+      duration_days:
+        type: integer
+      id:
+        type: string
+      is_active:
+        type: boolean
+      max_devices:
+        type: integer
+      name:
+        type: string
+      node_group_id:
+        type: string
+      node_group_name:
+        type: string
+      speed_limit:
+        type: integer
+      traffic_limit:
+        type: integer
+    type: object
+  handlers.registerRequest:
+    properties:
+      email:
+        type: string
+      name:
+        type: string
+      password:
+        type: string
+    type: object
+  handlers.registerResponse:
+    properties:
+      email:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      sub_token:
+        type: string
+    type: object
+  handlers.reviewRequestBody:
+    properties:
+      action:
+        type: string
+    type: object
+  handlers.setNodesRequest:
+    properties:
+      node_ids:
+        items:
+          type: string
+        type: array
+    type: object
+  handlers.settingItem:
+    properties:
+      key:
+        type: string
+      value:
+        type: string
+    type: object
+  handlers.tlsStatusResponse:
+    properties:
+      cert_file:
+        type: string
+      domain:
+        type: string
+      has_cert:
+        type: boolean
+      key_file:
+        type: string
+    type: object
+  handlers.updateAnnouncementRequest:
+    properties:
+      content:
+        type: string
+      is_active:
+        type: boolean
+      title:
+        type: string
+    type: object
+  handlers.updateInboundRequest:
+    properties:
+      enabled:
+        type: boolean
+      port:
+        type: integer
+      protocol:
+        type: string
+      settings:
+        additionalProperties: true
+        type: object
+      tag:
+        type: string
+    type: object
+  handlers.updatePlanRequest:
+    properties:
+      duration_days:
+        type: integer
+      is_active:
+        type: boolean
+      max_devices:
+        type: integer
+      name:
+        type: string
+      node_group_id:
+        type: string
+      speed_limit:
+        type: integer
+      traffic_limit:
+        type: integer
+    type: object
+  handlers.updateProfileRequest:
+    properties:
+      email:
+        type: string
+      name:
+        type: string
+      password:
+        type: string
+    type: object
+  handlers.updateUserRequest:
+    properties:
+      is_active:
+        type: boolean
+      plan_expires_at:
+        type: string
+      plan_id:
+        type: string
+      plan_started_at:
+        type: string
+      status:
+        type: string
+    type: object
+  handlers.updateUserTemplateRequest:
+    properties:
+      duration_days:
+        type: integer
+      max_devices:
+        type: integer
+      name:
+        type: string
+      node_group_id:
+        type: string
+      speed_limit:
+        type: integer
+      traffic_limit:
+        type: integer
+    type: object
+  handlers.updateXrayRequest:
+    properties:
+      version:
+        type: string
+    type: object
+  handlers.updateXrayResponse:
+    properties:
+      status:
+        type: string
+      target_version:
+        type: string
+    type: object
+  handlers.userDetailResponse:
+    properties:
+      created_at:
+        type: string
+      devices:
+        items:
+          $ref: '#/definitions/handlers.deviceItem'
+        type: array
+      email:
+        type: string
+      id:
+        type: string
+      is_active:
+        type: boolean
+      name:
+        type: string
+      plan_expires_at:
+        type: string
+      plan_id:
+        type: string
+      plan_name:
+        type: string
+      plan_started_at:
+        type: string
+      status:
+        type: string
+      sub_token:
+        type: string
+      traffic_limit:
+        type: integer
+      traffic_reset_day:
+        type: integer
+      traffic_used:
+        type: integer
+    type: object
+  handlers.userListItem:
+    properties:
+      created_at:
+        type: string
+      email:
+        type: string
+      id:
+        type: string
+      is_active:
+        type: boolean
+      name:
+        type: string
+      plan_expires_at:
+        type: string
+      plan_id:
+        type: string
+      plan_name:
+        type: string
+      status:
+        type: string
+      traffic_limit:
+        type: integer
+      traffic_used:
+        type: integer
+    type: object
+  handlers.userListResponse:
+    properties:
+      limit:
+        type: integer
+      page:
+        type: integer
+      total:
+        type: integer
+      users:
+        items:
+          $ref: '#/definitions/handlers.userListItem'
+        type: array
+    type: object
+  handlers.userLoginRequest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    type: object
+  handlers.userPlanItem:
+    properties:
+      duration_days:
+        type: integer
+      id:
+        type: string
+      max_devices:
+        type: integer
+      name:
+        type: string
+      speed_limit:
+        type: integer
+      traffic_limit:
+        type: integer
+    type: object
+  handlers.userTemplateResponse:
+    properties:
+      created_at:
+        type: string
+      duration_days:
+        type: integer
+      id:
+        type: string
+      max_devices:
+        type: integer
+      name:
+        type: string
+      node_group_id:
+        type: string
+      node_group_name:
+        type: string
+      speed_limit:
+        type: integer
+      traffic_limit:
+        type: integer
+    type: object
+  handlers.xrayVersionResponse:
+    properties:
+      current_version:
+        type: string
+      latest_version:
+        type: string
+    type: object
+host: localhost:2053
+info:
+  contact: {}
+  description: VPN Panel Management API
+  title: Proxima VPN API
+  version: 0.1.0
+paths:
+  /admin/announcements:
+    get:
+      description: Returns all announcements ordered by creation date
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.announcementItem'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List announcements
+      tags:
+      - admin-announcements
+    post:
+      consumes:
+      - application/json
+      description: Creates a new announcement
+      parameters:
+      - description: Announcement details
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.createAnnouncementRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.announcementItem'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create announcement
+      tags:
+      - admin-announcements
+  /admin/announcements/{id}:
+    delete:
+      description: Deletes an announcement by ID
+      parameters:
+      - description: Announcement ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete announcement
+      tags:
+      - admin-announcements
+    put:
+      consumes:
+      - application/json
+      description: Partially updates an announcement
+      parameters:
+      - description: Announcement ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Fields to update
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.updateAnnouncementRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.announcementItem'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update announcement
+      tags:
+      - admin-announcements
+  /admin/auth/2fa/disable:
+    post:
+      consumes:
+      - application/json
+      description: Verify TOTP code and disable 2FA for the admin account
+      parameters:
+      - description: TOTP code
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.disable2FARequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Disable 2FA
+      tags:
+      - admin-auth
+  /admin/auth/2fa/enable:
+    post:
+      consumes:
+      - application/json
+      description: Verify TOTP code and enable 2FA for the admin account
+      parameters:
+      - description: Secret and TOTP code
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.enable2FARequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Enable 2FA
+      tags:
+      - admin-auth
+  /admin/auth/2fa/setup:
+    get:
+      description: Generate a TOTP secret and otpauth URL for the admin to scan
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Setup 2FA
+      tags:
+      - admin-auth
+  /admin/auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Authenticate admin with email/password and optional TOTP
+      parameters:
+      - description: Login credentials
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.loginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.loginResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Admin login
+      tags:
+      - admin-auth
+  /admin/backup/download:
+    get:
+      description: Downloads a backup file by key (defaults to latest)
+      parameters:
+      - description: Backup key
+        in: query
+        name: key
+        type: string
+      produces:
+      - application/octet-stream
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: file
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Download backup
+      tags:
+      - admin-backup
+  /admin/backup/list:
+    get:
+      description: Returns a list of available backups
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List backups
+      tags:
+      - admin-backup
+  /admin/backup/trigger:
+    post:
+      description: Triggers a manual database backup
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Trigger backup
+      tags:
+      - admin-backup
+  /admin/inbounds/{id}:
+    delete:
+      description: Removes an inbound by ID
+      parameters:
+      - description: Inbound ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete inbound
+      tags:
+      - admin-inbounds
+    put:
+      consumes:
+      - application/json
+      description: Partially updates an inbound configuration
+      parameters:
+      - description: Inbound ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Fields to update
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.updateInboundRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.inboundResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "409":
+          description: Conflict
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update inbound
+      tags:
+      - admin-inbounds
+  /admin/inbounds/{id}/toggle:
+    put:
+      description: Toggles the enabled/disabled state of an inbound
+      parameters:
+      - description: Inbound ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.inboundResponse'
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Toggle inbound
+      tags:
+      - admin-inbounds
+  /admin/node-groups:
+    get:
+      description: Returns all node groups with their node counts
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.nodeGroupListItem'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List node groups
+      tags:
+      - admin-node-groups
+    post:
+      consumes:
+      - application/json
+      description: Creates a new node group
+      parameters:
+      - description: Node group name
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.createNodeGroupRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.nodeGroupListItem'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create node group
+      tags:
+      - admin-node-groups
+  /admin/node-groups/{id}:
+    delete:
+      description: Deletes a node group and its node associations
+      parameters:
+      - description: Node Group ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete node group
+      tags:
+      - admin-node-groups
+    get:
+      description: Returns a single node group with its associated nodes
+      parameters:
+      - description: Node Group ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.nodeGroupDetail'
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get node group
+      tags:
+      - admin-node-groups
+    put:
+      consumes:
+      - application/json
+      description: Updates a node group's name
+      parameters:
+      - description: Node Group ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: New name
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.createNodeGroupRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update node group
+      tags:
+      - admin-node-groups
+  /admin/node-groups/{id}/nodes:
+    put:
+      consumes:
+      - application/json
+      description: Replaces all nodes in a group with the provided node IDs
+      parameters:
+      - description: Node Group ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Node IDs to assign
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.setNodesRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Set nodes in group
+      tags:
+      - admin-node-groups
+  /admin/nodes:
+    get:
+      description: Returns all registered (non-pending) nodes
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.nodeListItem'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List nodes
+      tags:
+      - admin-nodes
+  /admin/nodes/{id}:
+    delete:
+      description: Removes a node by ID
+      parameters:
+      - description: Node ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete node
+      tags:
+      - admin-nodes
+    get:
+      description: Returns a single node by ID
+      parameters:
+      - description: Node ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.nodeListItem'
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get node
+      tags:
+      - admin-nodes
+  /admin/nodes/{id}/tls:
+    get:
+      description: Returns the TLS certificate status for a node
+      parameters:
+      - description: Node ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.tlsStatusResponse'
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get TLS status
+      tags:
+      - admin-nodes
+  /admin/nodes/{id}/tls/issue:
+    post:
+      consumes:
+      - application/json
+      description: Stores domain info for a node to trigger ACME certificate issuance
+      parameters:
+      - description: Node ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Domain info
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.issueCertificateRequest'
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Issue TLS certificate
+      tags:
+      - admin-nodes
+  /admin/nodes/{id}/xray:
+    get:
+      description: Returns the current Xray version for a node
+      parameters:
+      - description: Node ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.xrayVersionResponse'
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get Xray version
+      tags:
+      - admin-nodes
+  /admin/nodes/{id}/xray/update:
+    post:
+      consumes:
+      - application/json
+      description: Requests an Xray version update for a node
+      parameters:
+      - description: Node ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Target version
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.updateXrayRequest'
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted
+          schema:
+            $ref: '#/definitions/handlers.updateXrayResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update Xray version
+      tags:
+      - admin-nodes
+  /admin/nodes/{nodeId}/inbounds:
+    get:
+      description: Returns all inbounds for a given node
+      parameters:
+      - description: Node ID
+        in: path
+        name: nodeId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.inboundResponse'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List inbounds
+      tags:
+      - admin-inbounds
+    post:
+      consumes:
+      - application/json
+      description: Adds a new inbound configuration for a node
+      parameters:
+      - description: Node ID
+        in: path
+        name: nodeId
+        required: true
+        type: string
+      - description: Inbound configuration
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.createInboundRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.inboundResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "409":
+          description: Conflict
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create inbound
+      tags:
+      - admin-inbounds
+  /admin/nodes/token:
+    post:
+      description: Creates a one-time registration token and install command for a
+        new node
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.generateTokenResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Generate node registration token
+      tags:
+      - admin-nodes
+  /admin/online-users:
+    get:
+      description: Returns detailed info about currently connected users
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              additionalProperties:
+                type: string
+              type: object
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get online users
+      tags:
+      - admin-stats
+  /admin/plan-requests:
+    get:
+      description: Returns all plan requests with optional status filter
+      parameters:
+      - description: Filter by status (pending, approved, rejected)
+        in: query
+        name: status
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.adminPlanRequestItem'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List plan requests
+      tags:
+      - admin-plan-requests
+  /admin/plan-requests/{id}:
+    put:
+      consumes:
+      - application/json
+      description: Approve or reject a pending plan request
+      parameters:
+      - description: Plan Request ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Action (approve or reject)
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.reviewRequestBody'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.adminPlanRequestItem'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Review plan request
+      tags:
+      - admin-plan-requests
+  /admin/plans:
+    get:
+      description: Returns all plans with node group information
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.planResponse'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List plans
+      tags:
+      - admin-plans
+    post:
+      consumes:
+      - application/json
+      description: Creates a new subscription plan
+      parameters:
+      - description: Plan details
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.createPlanRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.planResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create plan
+      tags:
+      - admin-plans
+  /admin/plans/{id}:
+    delete:
+      description: Soft-deletes a plan by deactivating it
+      parameters:
+      - description: Plan ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete plan
+      tags:
+      - admin-plans
+    get:
+      description: Returns a single plan by ID with node group info
+      parameters:
+      - description: Plan ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.planResponse'
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get plan
+      tags:
+      - admin-plans
+    put:
+      consumes:
+      - application/json
+      description: Partially updates an existing plan
+      parameters:
+      - description: Plan ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Fields to update
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.updatePlanRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.planResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update plan
+      tags:
+      - admin-plans
+  /admin/settings:
+    get:
+      description: Returns all application settings
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.settingItem'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List settings
+      tags:
+      - admin-settings
+    put:
+      consumes:
+      - application/json
+      description: Upserts one or more settings key-value pairs
+      parameters:
+      - description: Key-value pairs to upsert
+        in: body
+        name: body
+        required: true
+        schema:
+          additionalProperties: true
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update settings
+      tags:
+      - admin-settings
+  /admin/stats:
+    get:
+      description: Returns aggregate statistics for the admin dashboard
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get dashboard stats
+      tags:
+      - admin-stats
+  /admin/user-templates:
+    get:
+      description: Returns all user templates with node group info
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.userTemplateResponse'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List user templates
+      tags:
+      - admin-user-templates
+    post:
+      consumes:
+      - application/json
+      description: Creates a new user template for quick user provisioning
+      parameters:
+      - description: Template details
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.createUserTemplateRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.userTemplateResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create user template
+      tags:
+      - admin-user-templates
+  /admin/user-templates/{id}:
+    delete:
+      description: Deletes a user template by ID
+      parameters:
+      - description: Template ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete user template
+      tags:
+      - admin-user-templates
+    put:
+      consumes:
+      - application/json
+      description: Partially updates an existing user template
+      parameters:
+      - description: Template ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Fields to update
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.updateUserTemplateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.userTemplateResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update user template
+      tags:
+      - admin-user-templates
+  /admin/users:
+    get:
+      description: Returns paginated users with optional search and status filter
+      parameters:
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 20
+        description: Items per page
+        in: query
+        name: limit
+        type: integer
+      - description: Search by email or name
+        in: query
+        name: search
+        type: string
+      - description: Filter by status
+        in: query
+        name: status
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.userListResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List users
+      tags:
+      - admin-users
+  /admin/users/{id}:
+    delete:
+      description: Soft-deactivates a user (sets status to suspended)
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete user
+      tags:
+      - admin-users
+    get:
+      description: Returns a single user with plan and device details
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.userDetailResponse'
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get user
+      tags:
+      - admin-users
+    put:
+      consumes:
+      - application/json
+      description: Partially updates a user's status, plan, or active state
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Fields to update
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.updateUserRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update user
+      tags:
+      - admin-users
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Authenticate user with email and password
+      parameters:
+      - description: Login credentials
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.userLoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.loginResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: User login
+      tags:
+      - user-auth
+  /auth/register:
+    post:
+      consumes:
+      - application/json
+      description: Register a new user account
+      parameters:
+      - description: Registration details
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.registerRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.registerResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "409":
+          description: Conflict
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: User registration
+      tags:
+      - user-auth
+  /sub/{sub_token}/{device_id}:
+    get:
+      description: Returns proxy configuration for a device based on subscription
+        token
+      parameters:
+      - description: Subscription token
+        in: path
+        name: sub_token
+        required: true
+        type: string
+      - description: Device ID
+        in: path
+        name: device_id
+        required: true
+        type: string
+      produces:
+      - text/plain
+      responses:
+        "200":
+          description: Base64-encoded proxy configuration
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get subscription
+      tags:
+      - subscription
+  /user/announcements:
+    get:
+      description: Returns all active announcements for users
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              additionalProperties: true
+              type: object
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List announcements
+      tags:
+      - user-portal
+  /user/devices:
+    get:
+      description: Returns all devices for the authenticated user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.deviceResponse'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List devices
+      tags:
+      - user-portal
+    post:
+      consumes:
+      - application/json
+      description: Registers a new device for the authenticated user
+      parameters:
+      - description: Device name
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.createDeviceRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.deviceResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create device
+      tags:
+      - user-portal
+  /user/devices/{id}:
+    delete:
+      description: Removes a device belonging to the authenticated user
+      parameters:
+      - description: Device ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete device
+      tags:
+      - user-portal
+  /user/plan-requests:
+    get:
+      description: Returns the authenticated user's plan requests
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.planRequestResponse'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List my plan requests
+      tags:
+      - user-plans
+    post:
+      consumes:
+      - application/json
+      description: Submit a request for a subscription plan
+      parameters:
+      - description: Plan ID to request
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.createPlanRequestBody'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.planRequestResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "409":
+          description: Conflict
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create plan request
+      tags:
+      - user-plans
+  /user/plans:
+    get:
+      description: Returns all active subscription plans
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.userPlanItem'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List available plans
+      tags:
+      - user-plans
+  /user/profile:
+    get:
+      description: Returns the authenticated user's profile and plan info
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get profile
+      tags:
+      - user-portal
+    put:
+      consumes:
+      - application/json
+      description: Updates the authenticated user's email, name, or password
+      parameters:
+      - description: Fields to update
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.updateProfileRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "409":
+          description: Conflict
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update profile
+      tags:
+      - user-portal
+  /user/sub-token/regenerate:
+    post:
+      description: Generates a new subscription token, invalidating existing subscription
+        URLs
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Regenerate subscription token
+      tags:
+      - user-portal
+  /user/traffic:
+    get:
+      description: Returns the user's traffic usage, limits, and remaining days
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get traffic stats
+      tags:
+      - user-portal
+securityDefinitions:
+  BearerAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

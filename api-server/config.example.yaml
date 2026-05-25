@@ -1,0 +1,39 @@
+# ===========================================
+# Proxima VPN Panel - API Server Configuration
+# ===========================================
+# Copy this file to config.yaml and adjust values
+# cp config.example.yaml config.yaml
+
+server:
+  host: "0.0.0.0"
+  port: 2053
+
+database:
+  url: "postgres://vpnuser:vpnpass@localhost:5432/vpnpanel"
+  max_connections: 20
+  idle_timeout: "5m"
+
+redis:
+  url: "redis://localhost:6379"
+
+jwt:
+  secret: "change-me-to-random-secret"
+  admin_expiry: "8h"
+  user_expiry: "24h"
+
+backup:
+  s3:
+    endpoint: ""
+    bucket: ""
+    access_key: ""
+    secret_key: ""
+    region: ""
+  schedule: "0 3 * * *"  # Daily at 3 AM
+
+telegram:
+  enabled: false
+  bot_token: ""
+  chat_id: ""
+
+subscription:
+  update_interval: 3600  # seconds

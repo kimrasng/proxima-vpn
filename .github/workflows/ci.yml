@@ -1,0 +1,33 @@
+name: CI
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+      - name: Build api-server
+        run: cd api-server && go build ./...
+      - name: Build node-agent
+        run: cd node-agent && go build ./...
+      - name: Build pkg
+        run: cd pkg && go build ./...
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install dependencies
+        run: cd web && npm ci
+      - name: Build
+        run: cd web && npm run build
