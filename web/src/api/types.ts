@@ -23,6 +23,16 @@ export interface RegisterResponse {
 }
 
 // Admin - Nodes
+export interface NodeMetricsEntry {
+  cpu_usage: number;
+  memory_usage: number;
+  disk_usage: number;
+  load_avg: number;
+  network_in: number;
+  network_out: number;
+  recorded_at: string;
+}
+
 export interface Node {
   id: string;
   name: string;

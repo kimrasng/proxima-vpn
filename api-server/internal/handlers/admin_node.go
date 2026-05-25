@@ -65,6 +65,56 @@ func (h *AdminNodeHandler) GenerateToken(c *fiber.Ctx) error {
 	})
 }
 
+type nodeMetricsEntry struct {
+	CPUUsage    float64   `json:"cpu_usage"`
+	MemoryUsage float64   `json:"memory_usage"`
+	DiskUsage   float64   `json:"disk_usage"`
+	LoadAvg     float64   `json:"load_avg"`
+	NetworkIn   float64   `json:"network_in"`
+	NetworkOut  float64   `json:"network_out"`
+	RecordedAt  time.Time `json:"recorded_at"`
+}
+
+func (h *AdminNodeHandler) GetMetricsHistory(c *fiber.Ctx) error {
+	id := c.Params("id")
+	hours := c.QueryInt("hours", 24)
+	if hours < 1 {
+		hours = 1
+	}
+	if hours > 168 {
+		hours = 168
+	}
+
+	rows, err := h.db.Query(
+		context.Background(),
+		`SELECT cpu_usage, memory_usage, disk_usage, load_avg, network_in, network_out, recorded_at
+		 FROM node_metrics_history
+		 WHERE node_id = $1 AND recorded_at >= NOW() - ($2 || ' hours')::interval
+		 ORDER BY recorded_at ASC`,
+		id, hours,
+	)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to fetch metrics history",
+		})
+	}
+	defer rows.Close()
+
+	entries := make([]nodeMetricsEntry, 0)
+	for rows.Next() {
+		var e nodeMetricsEntry
+		if err := rows.Scan(
+			&e.CPUUsage, &e.MemoryUsage, &e.DiskUsage, &e.LoadAvg,
+			&e.NetworkIn, &e.NetworkOut, &e.RecordedAt,
+		); err != nil {
+			continue
+		}
+		entries = append(entries, e)
+	}
+
+	return c.JSON(entries)
+}
+
 type nodeListItem struct {
 	ID          string     `json:"id"`
 	Name        string     `json:"name"`

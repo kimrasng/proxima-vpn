@@ -106,8 +106,11 @@
       "lastRefreshed": "마지막 갱신",
       "autoRefresh": "30초마다 자동 갱신",
       "overview": "개요",
-      "performance": "성능",
-      "network": "네트워크",
+      "currentMetrics": "현재 메트릭",
+      "cpuMemoryChart": "CPU / 메모리 / 디스크 히스토리",
+      "loadChart": "Load Average 히스토리",
+      "networkChart": "네트워크 히스토리",
+      "noData": "데이터가 없습니다. 다음 heartbeat 이후 표시됩니다.",
       "xrayVersion": "Xray 버전",
       "createdAt": "생성일"
     },

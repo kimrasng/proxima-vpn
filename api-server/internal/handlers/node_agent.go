@@ -140,6 +140,20 @@ func (h *NodeAgentHandler) Heartbeat(c *fiber.Ctx) error {
 		})
 	}
 
+	_, err = h.db.Exec(
+		context.Background(),
+		`INSERT INTO node_metrics_history
+		 (node_id, cpu_usage, memory_usage, disk_usage, load_avg, network_in, network_out)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+		nodeID, req.CPUUsage, req.MemoryUsage, req.DiskUsage, req.LoadAvg,
+		req.NetworkIn, req.NetworkOut,
+	)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to record metrics history",
+		})
+	}
+
 	metrics.NodeCPUUsage.WithLabelValues(nodeID).Set(req.CPUUsage)
 	metrics.NodeMemoryUsage.WithLabelValues(nodeID).Set(req.MemoryUsage)
 

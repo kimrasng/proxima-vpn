@@ -92,6 +92,8 @@ export default function Users() {
 
   useEffect(() => {
     void fetchUsers();
+    const interval = setInterval(() => void fetchUsers(), 60000);
+    return () => clearInterval(interval);
   }, [page, statusFilter]);
 
   const handleSearch = () => {

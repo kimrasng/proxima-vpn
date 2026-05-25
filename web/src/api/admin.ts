@@ -1,6 +1,7 @@
 import { get, post, put, del, setClientTokenType } from './client';
 import type {
   Node,
+  NodeMetricsEntry,
   GenerateTokenResponse,
   NodeGroup,
   NodeGroupDetail,
@@ -78,6 +79,11 @@ export function listNodes(): Promise<Node[]> {
 export function getNode(id: string): Promise<Node> {
   applyAdminClient();
   return get<Node>(`/api/v1/admin/nodes/${id}`);
+}
+
+export function getNodeMetrics(id: string, hours = 24): Promise<NodeMetricsEntry[]> {
+  applyAdminClient();
+  return get<NodeMetricsEntry[]>(`/api/v1/admin/nodes/${id}/metrics?hours=${hours}`);
 }
 
 export function deleteNode(id: string): Promise<void> {

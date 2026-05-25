@@ -90,9 +90,11 @@ export default function Nodes() {
     }
   };
 
-  useEffect(() => {
-    void fetchNodes();
-  }, []);
+    useEffect(() => {
+      void fetchNodes();
+      const interval = setInterval(() => void fetchNodes(), 30000);
+      return () => clearInterval(interval);
+    }, []);
 
   const healthSummary = useMemo(() => {
     const online = nodes.filter((n) => n.status === "online").length;

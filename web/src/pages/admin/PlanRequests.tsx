@@ -38,6 +38,8 @@ export default function PlanRequests() {
 
   useEffect(() => {
     void fetchRequests();
+    const interval = setInterval(() => void fetchRequests(), 30000);
+    return () => clearInterval(interval);
   }, [statusFilter]);
 
   const handleReview = async (id: string, action: "approve" | "reject") => {

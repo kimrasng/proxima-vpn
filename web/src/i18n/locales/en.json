@@ -106,8 +106,11 @@
       "lastRefreshed": "Last refreshed",
       "autoRefresh": "auto-refreshes every 30s",
       "overview": "Overview",
-      "performance": "Performance",
-      "network": "Network",
+      "currentMetrics": "Current Metrics",
+      "cpuMemoryChart": "CPU / Memory / Disk History",
+      "loadChart": "Load Average History",
+      "networkChart": "Network History",
+      "noData": "No data yet. Data will appear after the next heartbeat.",
       "xrayVersion": "Xray Version",
       "createdAt": "Created At"
     },

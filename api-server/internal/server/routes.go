@@ -59,6 +59,7 @@ func (s *Server) registerRoutes() {
 	adminNodes.Post("/:id/xray/update", adminNodeHandler.UpdateXray)
 	adminNodes.Get("/:id/tls", adminNodeHandler.GetTLSStatus)
 	adminNodes.Post("/:id/tls/issue", adminNodeHandler.IssueCertificate)
+	adminNodes.Get("/:id/metrics", adminNodeHandler.GetMetricsHistory)
 
 	adminInboundHandler := handlers.NewAdminInboundHandler(s.db)
 	admin.Get("/nodes/:nodeId/inbounds", adminInboundHandler.List)

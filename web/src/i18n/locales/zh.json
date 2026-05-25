@@ -107,8 +107,11 @@
       "lastRefreshed": "最后刷新",
       "autoRefresh": "每30秒自动刷新",
       "overview": "概览",
-      "performance": "性能",
-      "network": "网络",
+      "currentMetrics": "当前指标",
+      "cpuMemoryChart": "CPU / 内存 / 磁盘历史",
+      "loadChart": "负载平均历史",
+      "networkChart": "网络历史",
+      "noData": "暂无数据，下次心跳后将显示。",
       "xrayVersion": "Xray 版本",
       "createdAt": "创建时间"
     },

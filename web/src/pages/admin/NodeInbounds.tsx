@@ -104,6 +104,11 @@ export default function NodeInbounds() {
   useEffect(() => {
     void fetchInbounds();
     void fetchNodeInfo();
+    const interval = setInterval(() => {
+      void fetchInbounds();
+      void fetchNodeInfo();
+    }, 30000);
+    return () => clearInterval(interval);
   }, [nodeId]);
 
   const handleIssueCert = async () => {

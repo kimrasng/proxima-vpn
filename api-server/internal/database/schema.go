@@ -168,6 +168,19 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 	migrations := []string{
 		`ALTER TABLE nodes ADD COLUMN IF NOT EXISTS network_in REAL NOT NULL DEFAULT 0`,
 		`ALTER TABLE nodes ADD COLUMN IF NOT EXISTS network_out REAL NOT NULL DEFAULT 0`,
+		`CREATE TABLE IF NOT EXISTS node_metrics_history (
+			id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			node_id      UUID NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
+			cpu_usage    REAL NOT NULL,
+			memory_usage REAL NOT NULL,
+			disk_usage   REAL NOT NULL,
+			load_avg     REAL NOT NULL,
+			network_in   REAL NOT NULL,
+			network_out  REAL NOT NULL,
+			recorded_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_node_metrics_history_node_recorded
+			ON node_metrics_history(node_id, recorded_at DESC)`,
 	}
 	for _, m := range migrations {
 		if _, err := pool.Exec(ctx, m); err != nil {
