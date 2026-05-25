@@ -188,6 +188,10 @@ func (s *Server) registerRoutes() {
 	})
 
 	s.app.Get("/metrics", adaptor.HTTPHandler(promhttp.Handler()))
+
+	s.app.Static("/scripts", "/app/scripts", fiber.Static{
+		Browse: false,
+	})
 }
 
 func (s *Server) parseAdminExpiry() time.Duration {

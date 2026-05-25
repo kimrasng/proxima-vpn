@@ -27,6 +27,7 @@ FROM alpine:3.19
 RUN apk --no-cache add ca-certificates
 
 COPY --from=builder /app/bin/api-server /usr/local/bin/api-server
+COPY scripts/ /app/scripts/
 
 EXPOSE 2053
 
