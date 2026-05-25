@@ -80,18 +80,6 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, []);
 
-  if (loading) {
-    return (
-      <ContentLayout header={<Header variant="h1">{t("admin.dashboard.title")}</Header>}>
-        <Box textAlign="center" padding="xl">
-          <Spinner size="large" />
-        </Box>
-      </ContentLayout>
-    );
-  }
-
-  const resourceData = buildNodeResourceData(nodes);
-
   const onlineNodeOptions = useMemo(() => {
     const nodeNames = [...new Set(onlineUsers.map((u) => u.node_name).filter(Boolean))];
     return [
@@ -104,6 +92,18 @@ export default function Dashboard() {
     if (onlineNodeFilter === "all") return onlineUsers;
     return onlineUsers.filter((u) => u.node_name === onlineNodeFilter);
   }, [onlineUsers, onlineNodeFilter]);
+
+  if (loading) {
+    return (
+      <ContentLayout header={<Header variant="h1">{t("admin.dashboard.title")}</Header>}>
+        <Box textAlign="center" padding="xl">
+          <Spinner size="large" />
+        </Box>
+      </ContentLayout>
+    );
+  }
+
+  const resourceData = buildNodeResourceData(nodes);
 
   const trafficData = trafficHistory.map((entry) => ({
     day: new Date(entry.date).toLocaleDateString(undefined, { weekday: "short" }),
