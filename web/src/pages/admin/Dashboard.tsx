@@ -100,47 +100,42 @@ export default function Dashboard() {
   return (
     <ContentLayout header={<Header variant="h1">{t("admin.dashboard.title")}</Header>}>
       <SpaceBetween size="l">
-        <ColumnLayout columns={4} variant="text-grid">
-          <Container>
-            <Box variant="awsui-key-label">{t("admin.dashboard.totalUsers")}</Box>
-            <Box variant="h1">{stats?.total_users ?? 0}</Box>
-          </Container>
-          <Container>
-            <Box variant="awsui-key-label">{t("admin.dashboard.activeUsers")}</Box>
-            <Box variant="h1">{stats?.active_users ?? 0}</Box>
-          </Container>
-          <Container>
-            <Box variant="awsui-key-label">{t("admin.dashboard.onlineUsers")}</Box>
-            <StatusIndicator type="success">
-              {stats?.online_users ?? 0}
-            </StatusIndicator>
-          </Container>
-          <Container>
-            <Box variant="awsui-key-label">{t("admin.dashboard.pendingRequests")}</Box>
-            <Box variant="h1">{stats?.pending_requests ?? 0}</Box>
-          </Container>
-        </ColumnLayout>
-
-        <ColumnLayout columns={4} variant="text-grid">
-          <Container>
-            <Box variant="awsui-key-label">{t("admin.dashboard.totalNodes")}</Box>
-            <Box variant="h1">{stats?.total_nodes ?? 0}</Box>
-          </Container>
-          <Container>
-            <Box variant="awsui-key-label">{t("admin.dashboard.onlineNodes")}</Box>
-            <StatusIndicator type="success">
-              {stats?.online_nodes ?? 0}
-            </StatusIndicator>
-          </Container>
-          <Container>
-            <Box variant="awsui-key-label">{t("admin.dashboard.trafficToday")}</Box>
-            <Box variant="h1">{formatBytes(stats?.total_traffic_today ?? 0)}</Box>
-          </Container>
-          <Container>
-            <Box variant="awsui-key-label">{t("admin.dashboard.trafficMonth")}</Box>
-            <Box variant="h1">{formatBytes(stats?.total_traffic_month ?? 0)}</Box>
-          </Container>
-        </ColumnLayout>
+        <Container>
+          <ColumnLayout columns={4} variant="text-grid">
+            <div>
+              <Box variant="awsui-key-label">{t("admin.dashboard.totalUsers")}</Box>
+              <Box variant="h1" padding={{ top: "xs" }}>{stats?.total_users ?? 0}</Box>
+            </div>
+            <div>
+              <Box variant="awsui-key-label">{t("admin.dashboard.activeUsers")}</Box>
+              <Box variant="h1" padding={{ top: "xs" }}>{stats?.active_users ?? 0}</Box>
+            </div>
+            <div>
+              <Box variant="awsui-key-label">{t("admin.dashboard.onlineUsers")}</Box>
+              <Box variant="h1" padding={{ top: "xs" }} color="text-status-success">{stats?.online_users ?? 0}</Box>
+            </div>
+            <div>
+              <Box variant="awsui-key-label">{t("admin.dashboard.pendingRequests")}</Box>
+              <Box variant="h1" padding={{ top: "xs" }}>{stats?.pending_requests ?? 0}</Box>
+            </div>
+            <div>
+              <Box variant="awsui-key-label">{t("admin.dashboard.totalNodes")}</Box>
+              <Box variant="h1" padding={{ top: "xs" }}>{stats?.total_nodes ?? 0}</Box>
+            </div>
+            <div>
+              <Box variant="awsui-key-label">{t("admin.dashboard.onlineNodes")}</Box>
+              <Box variant="h1" padding={{ top: "xs" }} color="text-status-success">{stats?.online_nodes ?? 0}</Box>
+            </div>
+            <div>
+              <Box variant="awsui-key-label">{t("admin.dashboard.trafficToday")}</Box>
+              <Box variant="h1" padding={{ top: "xs" }}>{formatBytes(stats?.total_traffic_today ?? 0)}</Box>
+            </div>
+            <div>
+              <Box variant="awsui-key-label">{t("admin.dashboard.trafficMonth")}</Box>
+              <Box variant="h1" padding={{ top: "xs" }}>{formatBytes(stats?.total_traffic_month ?? 0)}</Box>
+            </div>
+          </ColumnLayout>
+        </Container>
 
         <Container
           header={
