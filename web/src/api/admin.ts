@@ -28,6 +28,8 @@ import type {
   TwoFADisableRequest,
   TwoFAStatus,
   Announcement,
+  CreateAnnouncementRequest,
+  UpdateAnnouncementRequest,
   Setting,
   Inbound,
   CreateInboundRequest,
@@ -208,12 +210,12 @@ export function listAnnouncements(): Promise<Announcement[]> {
   return get<Announcement[]>('/api/v1/admin/announcements');
 }
 
-export function createAnnouncement(req: { title: string; content: string }): Promise<Announcement> {
+export function createAnnouncement(req: CreateAnnouncementRequest): Promise<Announcement> {
   applyAdminClient();
   return post<Announcement>('/api/v1/admin/announcements', req);
 }
 
-export function updateAnnouncement(id: string, req: { title?: string; content?: string; is_active?: boolean }): Promise<Announcement> {
+export function updateAnnouncement(id: string, req: UpdateAnnouncementRequest): Promise<Announcement> {
   applyAdminClient();
   return put<Announcement>(`/api/v1/admin/announcements/${id}`, req);
 }
@@ -221,6 +223,13 @@ export function updateAnnouncement(id: string, req: { title?: string; content?: 
 export function deleteAnnouncement(id: string): Promise<void> {
   applyAdminClient();
   return del<void>(`/api/v1/admin/announcements/${id}`);
+}
+
+export function uploadAnnouncementImage(file: File): Promise<{ url: string }> {
+  applyAdminClient();
+  const formData = new FormData();
+  formData.append('image', file);
+  return post<{ url: string }>('/api/v1/admin/uploads/image', formData);
 }
 
 export function getSettings(): Promise<Setting[]> {

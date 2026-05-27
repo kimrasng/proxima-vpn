@@ -181,6 +181,8 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_node_metrics_history_node_recorded
 			ON node_metrics_history(node_id, recorded_at DESC)`,
+		`ALTER TABLE announcements ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ`,
+		`ALTER TABLE announcements ADD COLUMN IF NOT EXISTS image_url TEXT`,
 	}
 	for _, m := range migrations {
 		if _, err := pool.Exec(ctx, m); err != nil {

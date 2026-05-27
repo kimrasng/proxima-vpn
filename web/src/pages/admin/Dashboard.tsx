@@ -34,18 +34,6 @@ function formatBytes(bytes: number): string {
   return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${units[i]}`;
 }
 
-function buildNodeResourceData(nodes: Node[]) {
-  return nodes
-    .filter((n) => n.status === "online")
-    .slice(0, 8)
-    .map((n) => ({
-      name: n.name.length > 12 ? n.name.slice(0, 12) + "…" : n.name,
-      CPU: parseFloat((n.cpu_usage ?? 0).toFixed(1)),
-      Memory: parseFloat((n.memory_usage ?? 0).toFixed(1)),
-      Disk: parseFloat((n.disk_usage ?? 0).toFixed(1)),
-    }));
-}
-
 export default function Dashboard() {
   const { t } = useTranslation();
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -103,8 +91,6 @@ export default function Dashboard() {
     );
   }
 
-  const resourceData = buildNodeResourceData(nodes);
-
   const trafficData = trafficHistory.map((entry) => ({
     day: new Date(entry.date).toLocaleDateString(undefined, { weekday: "short" }),
     upload: entry.upload,
@@ -158,44 +144,8 @@ export default function Dashboard() {
 
         <Container
           header={
-            <Header variant="h2" description="Current snapshot of online nodes">
-              Node Resources
-            </Header>
-          }
-        >
-          {resourceData.length > 0 ? (
-            <Box padding={{ vertical: "m" }}>
-              <ResponsiveContainer width="100%" height={280}>
-                <BarChart data={resourceData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-divider-default, #e9ebed)" />
-                  <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                  <YAxis unit="%" domain={[0, 100]} tick={{ fontSize: 12 }} />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "var(--color-background-container-content, #fff)",
-                      border: "1px solid var(--color-border-divider-default, #e9ebed)",
-                      borderRadius: "8px",
-                    }}
-                    formatter={(value: number) => `${value}%`}
-                  />
-                  <Legend />
-                  <Bar dataKey="CPU" fill="var(--color-charts-line-1, #0972d3)" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="Memory" fill="var(--color-charts-line-2, #eb5f07)" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="Disk" fill="var(--color-charts-line-3, #2ea597)" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </Box>
-          ) : (
-            <Box textAlign="center" padding="l">
-              <StatusIndicator type="info">No online nodes</StatusIndicator>
-            </Box>
-          )}
-        </Container>
-
-        <Container
-          header={
-            <Header variant="h2" description="Weekly traffic distribution">
-              Traffic Overview
+            <Header variant="h2" description={t("admin.dashboard.trafficDescription")}>
+              {t("admin.dashboard.trafficOverview")}
             </Header>
           }
         >
@@ -222,15 +172,15 @@ export default function Dashboard() {
             </Box>
           ) : (
             <Box textAlign="center" padding="l">
-              <StatusIndicator type="info">No traffic data available</StatusIndicator>
+              <StatusIndicator type="info">{t("admin.dashboard.noTrafficData")}</StatusIndicator>
             </Box>
           )}
         </Container>
 
         <Container
           header={
-            <Header variant="h2" description={`${nodes.length} nodes registered`}>
-              Node Status
+            <Header variant="h2" description={`${nodes.length} ${t("admin.dashboard.nodesRegistered")}`}>
+              {t("admin.dashboard.nodeStatus")}
             </Header>
           }
         >
@@ -260,7 +210,7 @@ export default function Dashboard() {
                     />
                     <ProgressBar
                       value={node.memory_usage ?? 0}
-                      label="Memory"
+                      label={t("admin.nodes.col.memory")}
                       resultText={`${(node.memory_usage ?? 0).toFixed(1)}%`}
                       variant="standalone"
                     />
@@ -288,14 +238,14 @@ export default function Dashboard() {
             </Header>
           }
           columnDefinitions={[
-            { id: "email", header: "Email", cell: (item: OnlineUser) => item.email },
-            { id: "device", header: "Device", cell: (item: OnlineUser) => item.device },
-            { id: "node_name", header: "Node", cell: (item: OnlineUser) => item.node_name },
+            { id: "email", header: t("admin.dashboard.col.email"), cell: (item: OnlineUser) => item.email },
+            { id: "device", header: t("admin.dashboard.col.device"), cell: (item: OnlineUser) => item.device },
+            { id: "node_name", header: t("admin.dashboard.col.node"), cell: (item: OnlineUser) => item.node_name },
           ]}
           items={filteredOnlineUsers}
           empty={
             <Box textAlign="center" padding="l">
-              <StatusIndicator type="info">No users online</StatusIndicator>
+              <StatusIndicator type="info">{t("admin.dashboard.noOnlineUsers")}</StatusIndicator>
             </Box>
           }
           variant="container"

@@ -53,7 +53,19 @@
       "onlineNodes": "在线节点",
       "trafficToday": "今日流量",
       "trafficMonth": "本月流量",
-      "pendingRequests": "待处理申请"
+      "pendingRequests": "待处理申请",
+      "trafficOverview": "流量概览",
+      "trafficDescription": "每周上传 / 下载",
+      "noTrafficData": "暂无流量数据",
+      "nodeStatus": "节点状态",
+      "nodesRegistered": "个节点已注册",
+      "noOnlineNodes": "暂无在线节点",
+      "noOnlineUsers": "暂无在线用户",
+      "col": {
+        "email": "邮箱",
+        "device": "设备",
+        "node": "节点"
+      }
     },
     "nodes": {
       "title": "节点管理",
@@ -185,13 +197,40 @@
     },
     "announcements": {
       "title": "公告管理",
-      "addAnnouncement": "添加公告",
-      "announcementTitle": "标题",
-      "content": "内容",
-      "isActive": "启用",
-      "editAnnouncement": "编辑公告",
-      "deleteConfirm": "确定要删除此公告吗？",
-      "empty": "暂无公告"
+      "create": "创建",
+      "edit": "编辑",
+      "delete": "删除",
+      "cancel": "取消",
+      "save": "保存",
+      "confirmDelete": "删除",
+      "active": "已启用",
+      "inactive": "已禁用",
+      "empty": "暂无公告",
+      "fetchError": "加载公告失败",
+      "createError": "创建公告失败",
+      "updateError": "更新公告失败",
+      "deleteError": "删除公告失败",
+      "imageUploadError": "图片上传失败",
+      "createTitle": "创建公告",
+      "editTitle": "编辑公告",
+      "deleteTitle": "删除公告",
+      "deleteMessage": "确定要删除公告 \"{{title}}\" 吗？",
+      "col": {
+        "title": "标题",
+        "active": "状态",
+        "expiresAt": "到期时间",
+        "createdAt": "创建时间",
+        "actions": "操作"
+      },
+      "form": {
+        "title": "标题",
+        "content": "内容",
+        "image": "图片（可选）",
+        "imageDesc": "上传图片或输入 URL",
+        "uploadImage": "上传",
+        "expiresAt": "到期时间（可选）",
+        "expiresAtDesc": "留空则永久显示"
+      }
     },
     "settings": {
       "title": "设置",
@@ -309,7 +348,10 @@
     "announcements": {
       "title": "公告",
       "empty": "暂无公告",
-      "loadError": "加载公告失败"
+      "loadError": "加载公告失败",
+      "close": "关闭",
+      "dontShowAgain": "不再显示",
+      "moreAnnouncements": "还有 {{count}} 条公告"
     }
   },
   "auth": {

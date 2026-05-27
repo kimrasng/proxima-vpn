@@ -255,8 +255,25 @@ export interface Announcement {
   id: string;
   title: string;
   content: string;
+  image_url?: string | null;
   is_active: boolean;
+  expires_at?: string | null;
   created_at: string;
+}
+
+export interface CreateAnnouncementRequest {
+  title: string;
+  content: string;
+  image_url?: string | null;
+  expires_at?: string | null;
+}
+
+export interface UpdateAnnouncementRequest {
+  title?: string;
+  content?: string;
+  image_url?: string | null;
+  is_active?: boolean;
+  expires_at?: string | null;
 }
 
 // Settings

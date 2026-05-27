@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Box,
@@ -16,7 +16,13 @@ import {
   Textarea,
   Toggle,
 } from "@cloudscape-design/components";
-import { listAnnouncements, createAnnouncement, updateAnnouncement, deleteAnnouncement } from "../../api/admin";
+import {
+  listAnnouncements,
+  createAnnouncement,
+  updateAnnouncement,
+  deleteAnnouncement,
+  uploadAnnouncementImage,
+} from "../../api/admin";
 import type { Announcement } from "../../api/types";
 
 export default function Announcements() {
@@ -27,9 +33,15 @@ export default function Announcements() {
   const [createModal, setCreateModal] = useState(false);
   const [editModal, setEditModal] = useState<Announcement | null>(null);
   const [deleteModal, setDeleteModal] = useState<Announcement | null>(null);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [imageUploading, setImageUploading] = useState(false);
+
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
-  const [actionLoading, setActionLoading] = useState(false);
+  const [imageUrl, setImageUrl] = useState("");
+  const [expiresAt, setExpiresAt] = useState("");
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchAnnouncements = async () => {
     try {
@@ -47,13 +59,36 @@ export default function Announcements() {
     void fetchAnnouncements();
   }, []);
 
+  const resetForm = () => {
+    setTitle("");
+    setContent("");
+    setImageUrl("");
+    setExpiresAt("");
+  };
+
+  const handleImageUpload = async (file: File) => {
+    setImageUploading(true);
+    try {
+      const res = await uploadAnnouncementImage(file);
+      setImageUrl(res.url);
+    } catch {
+      setError(t("admin.announcements.imageUploadError"));
+    } finally {
+      setImageUploading(false);
+    }
+  };
+
   const handleCreate = async () => {
     setActionLoading(true);
     try {
-      await createAnnouncement({ title, content });
+      await createAnnouncement({
+        title,
+        content,
+        image_url: imageUrl || null,
+        expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
+      });
       setCreateModal(false);
-      setTitle("");
-      setContent("");
+      resetForm();
       await fetchAnnouncements();
     } catch {
       setError(t("admin.announcements.createError"));
@@ -66,10 +101,14 @@ export default function Announcements() {
     if (!editModal) return;
     setActionLoading(true);
     try {
-      await updateAnnouncement(editModal.id, { title, content });
+      await updateAnnouncement(editModal.id, {
+        title,
+        content,
+        image_url: imageUrl || null,
+        expires_at: expiresAt ? new Date(expiresAt).toISOString() : "",
+      });
       setEditModal(null);
-      setTitle("");
-      setContent("");
+      resetForm();
       await fetchAnnouncements();
     } catch {
       setError(t("admin.announcements.updateError"));
@@ -101,6 +140,19 @@ export default function Announcements() {
     }
   };
 
+  const openCreate = () => {
+    resetForm();
+    setCreateModal(true);
+  };
+
+  const openEdit = (item: Announcement) => {
+    setTitle(item.title);
+    setContent(item.content);
+    setImageUrl(item.image_url ?? "");
+    setExpiresAt(item.expires_at ? new Date(item.expires_at).toISOString().slice(0, 16) : "");
+    setEditModal(item);
+  };
+
   if (loading) {
     return (
       <ContentLayout header={<Header variant="h1">{t("admin.announcements.title")}</Header>}>
@@ -108,6 +160,62 @@ export default function Announcements() {
       </ContentLayout>
     );
   }
+
+  const formFields = (
+    <SpaceBetween size="m">
+      <FormField label={t("admin.announcements.form.title")}>
+        <Input value={title} onChange={({ detail }) => setTitle(detail.value)} />
+      </FormField>
+      <FormField label={t("admin.announcements.form.content")}>
+        <Textarea value={content} onChange={({ detail }) => setContent(detail.value)} rows={6} />
+      </FormField>
+      <FormField
+        label={t("admin.announcements.form.image")}
+        description={t("admin.announcements.form.imageDesc")}
+      >
+        <SpaceBetween size="xs">
+          {imageUrl && (
+            <img src={imageUrl} alt="preview" style={{ maxHeight: 120, borderRadius: 6, objectFit: "cover" }} />
+          )}
+          <SpaceBetween direction="horizontal" size="xs">
+            <Input
+              value={imageUrl}
+              onChange={({ detail }) => setImageUrl(detail.value)}
+              placeholder="https://..."
+            />
+            <Button
+              loading={imageUploading}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              {t("admin.announcements.form.uploadImage")}
+            </Button>
+          </SpaceBetween>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            style={{ display: "none" }}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) void handleImageUpload(file);
+              e.target.value = "";
+            }}
+          />
+        </SpaceBetween>
+      </FormField>
+      <FormField
+        label={t("admin.announcements.form.expiresAt")}
+        description={t("admin.announcements.form.expiresAtDesc")}
+      >
+        <input
+          type="datetime-local"
+          value={expiresAt}
+          onChange={(e) => setExpiresAt(e.target.value)}
+          style={{ width: "100%", padding: "6px 8px", borderRadius: 4, border: "1px solid #aab7b8", fontSize: 14 }}
+        />
+      </FormField>
+    </SpaceBetween>
+  );
 
   return (
     <ContentLayout header={<Header variant="h1">{t("admin.announcements.title")}</Header>}>
@@ -119,11 +227,7 @@ export default function Announcements() {
         <Table
           header={
             <Header
-              actions={
-                <Button variant="primary" onClick={() => { setTitle(""); setContent(""); setCreateModal(true); }}>
-                  {t("admin.announcements.create")}
-                </Button>
-              }
+              actions={<Button variant="primary" onClick={openCreate}>{t("admin.announcements.create")}</Button>}
               counter={`(${announcements.length})`}
             >
               {t("admin.announcements.title")}
@@ -136,15 +240,17 @@ export default function Announcements() {
               id: "active",
               header: t("admin.announcements.col.active"),
               cell: (item) => (
-                <Toggle
-                  checked={item.is_active}
-                  onChange={() => void handleToggleActive(item)}
-                >
+                <Toggle checked={item.is_active} onChange={() => void handleToggleActive(item)}>
                   <StatusIndicator type={item.is_active ? "success" : "stopped"}>
                     {item.is_active ? t("admin.announcements.active") : t("admin.announcements.inactive")}
                   </StatusIndicator>
                 </Toggle>
               ),
+            },
+            {
+              id: "expiresAt",
+              header: t("admin.announcements.col.expiresAt"),
+              cell: (item) => item.expires_at ? new Date(item.expires_at).toLocaleString() : "—",
             },
             {
               id: "createdAt",
@@ -156,12 +262,8 @@ export default function Announcements() {
               header: t("admin.announcements.col.actions"),
               cell: (item) => (
                 <SpaceBetween direction="horizontal" size="xs">
-                  <Button variant="inline-link" onClick={() => { setTitle(item.title); setContent(item.content); setEditModal(item); }}>
-                    {t("admin.announcements.edit")}
-                  </Button>
-                  <Button variant="inline-link" onClick={() => setDeleteModal(item)}>
-                    {t("admin.announcements.delete")}
-                  </Button>
+                  <Button variant="inline-link" onClick={() => openEdit(item)}>{t("admin.announcements.edit")}</Button>
+                  <Button variant="inline-link" onClick={() => setDeleteModal(item)}>{t("admin.announcements.delete")}</Button>
                 </SpaceBetween>
               ),
             },
@@ -173,6 +275,7 @@ export default function Announcements() {
           visible={createModal}
           onDismiss={() => setCreateModal(false)}
           header={t("admin.announcements.createTitle")}
+          size="medium"
           footer={
             <Box float="right">
               <SpaceBetween direction="horizontal" size="xs">
@@ -184,20 +287,14 @@ export default function Announcements() {
             </Box>
           }
         >
-          <SpaceBetween size="m">
-            <FormField label={t("admin.announcements.form.title")}>
-              <Input value={title} onChange={({ detail }) => setTitle(detail.value)} />
-            </FormField>
-            <FormField label={t("admin.announcements.form.content")}>
-              <Textarea value={content} onChange={({ detail }) => setContent(detail.value)} rows={6} />
-            </FormField>
-          </SpaceBetween>
+          {formFields}
         </Modal>
 
         <Modal
           visible={editModal !== null}
           onDismiss={() => setEditModal(null)}
           header={t("admin.announcements.editTitle")}
+          size="medium"
           footer={
             <Box float="right">
               <SpaceBetween direction="horizontal" size="xs">
@@ -209,14 +306,7 @@ export default function Announcements() {
             </Box>
           }
         >
-          <SpaceBetween size="m">
-            <FormField label={t("admin.announcements.form.title")}>
-              <Input value={title} onChange={({ detail }) => setTitle(detail.value)} />
-            </FormField>
-            <FormField label={t("admin.announcements.form.content")}>
-              <Textarea value={content} onChange={({ detail }) => setContent(detail.value)} rows={6} />
-            </FormField>
-          </SpaceBetween>
+          {formFields}
         </Modal>
 
         <Modal

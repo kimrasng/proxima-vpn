@@ -119,6 +119,9 @@ func (s *Server) registerRoutes() {
 	adminAnnouncements.Put("/:id", adminAnnouncementHandler.Update)
 	adminAnnouncements.Delete("/:id", adminAnnouncementHandler.Delete)
 
+	adminUploadHandler := handlers.NewAdminUploadHandler(&s.config.Storage, s.config.Server.PanelURL)
+	admin.Post("/uploads/image", adminUploadHandler.UploadImage)
+
 	adminStatsHandler := handlers.NewAdminStatsHandler(s.db, services.NewOnlineTracker(s.redis))
 	admin.Get("/stats", adminStatsHandler.GetDashboardStats)
 	admin.Get("/stats/traffic-history", adminStatsHandler.GetTrafficHistory)
@@ -195,6 +198,10 @@ func (s *Server) registerRoutes() {
 	})
 
 	s.app.Static("/downloads", "/app/downloads", fiber.Static{
+		Browse: false,
+	})
+
+	s.app.Static("/uploads", "/app/uploads", fiber.Static{
 		Browse: false,
 	})
 }

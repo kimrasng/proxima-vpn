@@ -53,7 +53,19 @@
       "onlineNodes": "Online Nodes",
       "trafficToday": "Traffic Today",
       "trafficMonth": "Traffic This Month",
-      "pendingRequests": "Pending Requests"
+      "pendingRequests": "Pending Requests",
+      "trafficOverview": "Traffic Overview",
+      "trafficDescription": "Weekly upload / download",
+      "noTrafficData": "No traffic data available",
+      "nodeStatus": "Node Status",
+      "nodesRegistered": "nodes registered",
+      "noOnlineNodes": "No online nodes",
+      "noOnlineUsers": "No users online",
+      "col": {
+        "email": "Email",
+        "device": "Device",
+        "node": "Node"
+      }
     },
     "nodes": {
       "title": "Node Management",
@@ -261,6 +273,7 @@
       "createError": "Failed to create announcement",
       "updateError": "Failed to update announcement",
       "deleteError": "Failed to delete announcement",
+      "imageUploadError": "Failed to upload image",
       "createTitle": "Create Announcement",
       "editTitle": "Edit Announcement",
       "deleteTitle": "Delete Announcement",
@@ -268,12 +281,18 @@
       "col": {
         "title": "Title",
         "active": "Active",
+        "expiresAt": "Expires At",
         "createdAt": "Created",
         "actions": "Actions"
       },
       "form": {
         "title": "Title",
-        "content": "Content"
+        "content": "Content",
+        "image": "Image (optional)",
+        "imageDesc": "Upload an image or enter a URL",
+        "uploadImage": "Upload",
+        "expiresAt": "Expires At (optional)",
+        "expiresAtDesc": "Leave empty to show indefinitely"
       }
     },
     "settings": {
@@ -421,7 +440,10 @@
     "announcements": {
       "title": "Announcements",
       "empty": "No announcements",
-      "loadError": "Failed to load announcements"
+      "loadError": "Failed to load announcements",
+      "close": "Close",
+      "dontShowAgain": "Don't show again",
+      "moreAnnouncements": "{{count}} more announcement(s)"
     }
   },
   "auth": {

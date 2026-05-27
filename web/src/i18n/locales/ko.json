@@ -53,7 +53,19 @@
       "onlineNodes": "온라인 노드",
       "trafficToday": "오늘 트래픽",
       "trafficMonth": "이번 달 트래픽",
-      "pendingRequests": "대기 중 요청"
+      "pendingRequests": "대기 중 요청",
+      "trafficOverview": "트래픽 현황",
+      "trafficDescription": "주간 업로드 / 다운로드",
+      "noTrafficData": "트래픽 데이터가 없습니다",
+      "nodeStatus": "노드 상태",
+      "nodesRegistered": "개 노드 등록됨",
+      "noOnlineNodes": "온라인 노드 없음",
+      "noOnlineUsers": "온라인 사용자 없음",
+      "col": {
+        "email": "이메일",
+        "device": "디바이스",
+        "node": "노드"
+      }
     },
     "nodes": {
       "title": "노드 관리",
@@ -261,6 +273,7 @@
       "createError": "공지사항 작성에 실패했습니다",
       "updateError": "공지사항 수정에 실패했습니다",
       "deleteError": "공지사항 삭제에 실패했습니다",
+      "imageUploadError": "이미지 업로드에 실패했습니다",
       "createTitle": "공지사항 작성",
       "editTitle": "공지사항 수정",
       "deleteTitle": "공지사항 삭제",
@@ -268,12 +281,18 @@
       "col": {
         "title": "제목",
         "active": "활성",
+        "expiresAt": "만료일",
         "createdAt": "생성일",
         "actions": "작업"
       },
       "form": {
         "title": "제목",
-        "content": "내용"
+        "content": "내용",
+        "image": "이미지 (선택)",
+        "imageDesc": "이미지를 업로드하거나 URL을 입력하세요",
+        "uploadImage": "업로드",
+        "expiresAt": "만료일 (선택)",
+        "expiresAtDesc": "비워두면 무기한 표시됩니다"
       }
     },
     "settings": {
@@ -421,7 +440,10 @@
     "announcements": {
       "title": "공지사항",
       "empty": "공지사항이 없습니다",
-      "loadError": "공지사항을 불러오는데 실패했습니다"
+      "loadError": "공지사항을 불러오는데 실패했습니다",
+      "close": "닫기",
+      "dontShowAgain": "다시 보지 않기",
+      "moreAnnouncements": "{{count}}개의 공지사항이 더 있습니다"
     }
   },
   "auth": {

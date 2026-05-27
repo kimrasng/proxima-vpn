@@ -36,6 +36,8 @@ services:
       PANEL_URL: ${PANEL_URL:-http://localhost:8080}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+    volumes:
+      - uploads_data:/app/uploads
     depends_on:
       db:
         condition: service_healthy
@@ -63,3 +65,4 @@ services:
 volumes:
   pg_data:
   redis_data:
+  uploads_data:

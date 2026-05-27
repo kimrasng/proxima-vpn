@@ -16,6 +16,13 @@ type Config struct {
 	Backup       BackupConfig       `yaml:"backup"`
 	Telegram     TelegramConfig     `yaml:"telegram"`
 	Subscription SubscriptionConfig `yaml:"subscription"`
+	Storage      StorageConfig      `yaml:"storage"`
+}
+
+type StorageConfig struct {
+	Type      string   `yaml:"type"`
+	LocalPath string   `yaml:"local_path"`
+	S3        S3Config `yaml:"s3"`
 }
 
 type ServerConfig struct {
@@ -80,6 +87,10 @@ func Load(path string) (*Config, error) {
 		},
 		Subscription: SubscriptionConfig{
 			UpdateInterval: 3600,
+		},
+		Storage: StorageConfig{
+			Type:      "local",
+			LocalPath: "/app/uploads",
 		},
 	}
 

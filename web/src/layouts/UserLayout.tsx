@@ -7,6 +7,7 @@ import {
   TopNavigation,
 } from "@cloudscape-design/components";
 import { useTheme } from "../hooks/useTheme";
+import AnnouncementPopup from "../components/AnnouncementPopup";
 
 export default function UserLayout() {
   const { t, i18n } = useTranslation();
@@ -28,6 +29,7 @@ export default function UserLayout() {
 
   return (
     <>
+      <AnnouncementPopup />
       <TopNavigation
         identity={{
           href: "/portal/devices",

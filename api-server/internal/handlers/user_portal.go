@@ -258,7 +258,10 @@ func (h *UserPortalHandler) RegenerateSubToken(c *fiber.Ctx) error {
 func (h *UserPortalHandler) ListAnnouncements(c *fiber.Ctx) error {
 	rows, err := h.db.Query(
 		context.Background(),
-		`SELECT id, title, content, is_active, created_at FROM announcements WHERE is_active = true ORDER BY created_at DESC`,
+		`SELECT id, title, content, image_url, is_active, expires_at, created_at
+		 FROM announcements
+		 WHERE is_active = true AND (expires_at IS NULL OR expires_at > NOW())
+		 ORDER BY created_at DESC`,
 	)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to list announcements"})
@@ -266,17 +269,19 @@ func (h *UserPortalHandler) ListAnnouncements(c *fiber.Ctx) error {
 	defer rows.Close()
 
 	type item struct {
-		ID        string    `json:"id"`
-		Title     string    `json:"title"`
-		Content   string    `json:"content"`
-		IsActive  bool      `json:"is_active"`
-		CreatedAt time.Time `json:"created_at"`
+		ID        string     `json:"id"`
+		Title     string     `json:"title"`
+		Content   string     `json:"content"`
+		ImageURL  *string    `json:"image_url"`
+		IsActive  bool       `json:"is_active"`
+		ExpiresAt *time.Time `json:"expires_at"`
+		CreatedAt time.Time  `json:"created_at"`
 	}
 
 	items := make([]item, 0)
 	for rows.Next() {
 		var a item
-		if err := rows.Scan(&a.ID, &a.Title, &a.Content, &a.IsActive, &a.CreatedAt); err != nil {
+		if err := rows.Scan(&a.ID, &a.Title, &a.Content, &a.ImageURL, &a.IsActive, &a.ExpiresAt, &a.CreatedAt); err != nil {
 			continue
 		}
 		items = append(items, a)
