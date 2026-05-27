@@ -372,6 +372,7 @@
       "unnamed": "이름 없는 기기",
       "empty": "등록된 기기가 없습니다",
       "noPlan": "먼저 플랜을 선택해주세요",
+      "limitReached": "기기 등록 한도에 도달했습니다",
       "deleteConfirmTitle": "기기 삭제",
       "deleteConfirmMessage": "'{{name}}' 기기를 삭제하시겠습니까?",
       "addSuccess": "기기가 추가되었습니다",

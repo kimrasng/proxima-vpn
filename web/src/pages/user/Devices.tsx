@@ -3,7 +3,6 @@ import { useTranslation } from "react-i18next";
 import {
   ContentLayout,
   Header,
-  Cards,
   Button,
   SpaceBetween,
   Box,
@@ -13,13 +12,191 @@ import {
   Spinner,
   Flashbar,
   type FlashbarProps,
-  CopyToClipboard,
   StatusIndicator,
+  Container,
+  ColumnLayout,
   Tabs,
 } from "@cloudscape-design/components";
 import { QRCodeSVG } from "qrcode.react";
 import type { Device } from "../../api/types";
 import * as userApi from "../../api/user";
+
+const SUBSCRIPTION_FORMATS = [
+  { id: "v2ray", label: "V2Ray" },
+  { id: "clash", label: "Clash" },
+  { id: "singbox", label: "Sing-box" },
+  { id: "surfboard", label: "Surfboard" },
+  { id: "quantumult", label: "Quantumult" },
+];
+
+function getSubscriptionUrl(device: Device, format?: string): string {
+  const base = device.subscription_url || `${window.location.origin}/sub/${device.xray_uuid}`;
+  if (format && format !== "v2ray") return `${base}?format=${format}`;
+  return base;
+}
+
+function CopyableUrl({ url }: { url: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      const el = document.createElement("textarea");
+      el.value = url;
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand("copy");
+      document.body.removeChild(el);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, width: "100%" }}>
+      <code
+        style={{
+          flex: 1,
+          padding: "6px 10px",
+          borderRadius: 4,
+          fontSize: 12,
+          fontFamily: "monospace",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+          background: "var(--color-background-input-default, #f4f4f4)",
+          border: "1px solid var(--color-border-input-default, #aab7b8)",
+          cursor: "text",
+          userSelect: "all",
+          display: "block",
+        }}
+        title={url}
+      >
+        {url}
+      </code>
+      <Button
+        variant="inline-icon"
+        iconName={copied ? "status-positive" : "copy"}
+        ariaLabel="Copy"
+        onClick={() => void handleCopy()}
+      />
+    </div>
+  );
+}
+
+function DeviceCard({
+  device,
+  onDelete,
+  onQr,
+}: {
+  device: Device;
+  onDelete: (d: Device) => void;
+  onQr: (d: Device) => void;
+}) {
+  const { t } = useTranslation();
+  const [activeFormat, setActiveFormat] = useState("v2ray");
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyUuid = async () => {
+    try {
+      await navigator.clipboard.writeText(device.xray_uuid);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      const el = document.createElement("textarea");
+      el.value = device.xray_uuid;
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand("copy");
+      document.body.removeChild(el);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  return (
+    <Container
+      header={
+        <Header
+          variant="h3"
+          actions={
+            <SpaceBetween direction="horizontal" size="xs">
+              <Button
+                variant="inline-icon"
+                iconName="video-on"
+                ariaLabel={t("user.devices.showQr")}
+                onClick={() => onQr(device)}
+              />
+              <Button
+                variant="inline-icon"
+                iconName="remove"
+                ariaLabel={t("common.delete")}
+                onClick={() => onDelete(device)}
+              />
+            </SpaceBetween>
+          }
+        >
+          {device.name || t("user.devices.unnamed")}
+        </Header>
+      }
+    >
+      <SpaceBetween size="m">
+        <div>
+          <Box variant="awsui-key-label">{t("user.devices.xrayUuid")}</Box>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
+            <code
+              style={{
+                flex: 1,
+                padding: "6px 10px",
+                borderRadius: 4,
+                fontSize: 12,
+                fontFamily: "monospace",
+                background: "var(--color-background-input-default, #f4f4f4)",
+                border: "1px solid var(--color-border-input-default, #aab7b8)",
+                userSelect: "all",
+                display: "block",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+              title={device.xray_uuid}
+            >
+              {device.xray_uuid}
+            </code>
+            <Button
+              variant="inline-icon"
+              iconName={copied ? "status-positive" : "copy"}
+              ariaLabel="Copy UUID"
+              onClick={() => void handleCopyUuid()}
+            />
+          </div>
+        </div>
+
+        <div>
+          <Box variant="awsui-key-label">{t("user.devices.subscriptionUrl")}</Box>
+          <Box margin={{ top: "xs" }}>
+            <Tabs
+              activeTabId={activeFormat}
+              onChange={({ detail }) => setActiveFormat(detail.activeTabId)}
+              tabs={SUBSCRIPTION_FORMATS.map((fmt) => ({
+                id: fmt.id,
+                label: fmt.label,
+                content: (
+                  <Box margin={{ top: "xs" }}>
+                    <CopyableUrl url={getSubscriptionUrl(device, fmt.id)} />
+                  </Box>
+                ),
+              }))}
+            />
+          </Box>
+        </div>
+      </SpaceBetween>
+    </Container>
+  );
+}
 
 export default function Devices() {
   const { t } = useTranslation();
@@ -30,6 +207,7 @@ export default function Devices() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showQrModal, setShowQrModal] = useState(false);
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
+  const [qrFormat, setQrFormat] = useState("v2ray");
   const [newDeviceName, setNewDeviceName] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [profile, setProfile] = useState<{ plan_name?: string; max_devices?: number } | null>(null);
@@ -52,7 +230,6 @@ export default function Devices() {
 
   useEffect(() => {
     void loadDevices();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleAddDevice = async () => {
@@ -86,28 +263,10 @@ export default function Devices() {
     }
   };
 
-  const getSubscriptionUrl = (device: Device, format?: string): string => {
-    const base = device.subscription_url || `${window.location.origin}/sub/${device.xray_uuid}`;
-    if (format && format !== "v2ray") {
-      return `${base}?format=${format}`;
-    }
-    return base;
-  };
-
-  const subscriptionFormats = [
-    { id: "v2ray", label: "V2Ray" },
-    { id: "clash", label: "Clash" },
-    { id: "singbox", label: "Sing-box" },
-    { id: "surfboard", label: "Surfboard" },
-    { id: "quantumult", label: "Quantumult" },
-  ];
-
   if (loading) {
     return (
       <ContentLayout header={<Header variant="h1">{t("user.devices.title")}</Header>}>
-        <Box textAlign="center" padding="xl">
-          <Spinner size="large" />
-        </Box>
+        <Box textAlign="center" padding="xl"><Spinner size="large" /></Box>
       </ContentLayout>
     );
   }
@@ -123,99 +282,58 @@ export default function Devices() {
     );
   }
 
+  const maxDevices = profile?.max_devices ?? 0;
+  const atLimit = maxDevices > 0 && devices.length >= maxDevices;
+
   return (
-    <ContentLayout header={<Header variant="h1">{t("user.devices.title")}</Header>}>
+    <ContentLayout
+      header={
+        <Header
+          variant="h1"
+          counter={`(${devices.length}${maxDevices > 0 ? `/${maxDevices}` : ""})`}
+          actions={
+            <Button
+              variant="primary"
+              disabled={atLimit}
+              onClick={() => setShowAddModal(true)}
+            >
+              {t("user.devices.addDevice")}
+            </Button>
+          }
+          description={
+            atLimit
+              ? <StatusIndicator type="warning">{t("user.devices.limitReached")}</StatusIndicator>
+              : undefined
+          }
+        >
+          {t("user.devices.title")}
+        </Header>
+      }
+    >
       <SpaceBetween size="l">
         <Flashbar items={flash} />
-        <Cards
-          cardDefinition={{
-            header: (item) => item.name || t("user.devices.unnamed"),
-            sections: [
-              {
-                id: "uuid",
-                header: t("user.devices.xrayUuid"),
-                content: (item) => (
-                  <CopyToClipboard
-                    copyButtonAriaLabel="Copy UUID"
-                    textToCopy={item.xray_uuid}
-                    copySuccessText={t("common.copied")}
-                    copyErrorText={t("common.error")}
-                    variant="inline"
-                  />
-                ),
-              },
-              {
-                id: "subscription",
-                header: t("user.devices.subscriptionUrl"),
-                content: (item) => (
-                  <Tabs
-                    tabs={subscriptionFormats.map((fmt) => ({
-                      id: fmt.id,
-                      label: fmt.label,
-                      content: (
-                        <CopyToClipboard
-                          copyButtonAriaLabel={`Copy ${fmt.label} URL`}
-                          textToCopy={getSubscriptionUrl(item, fmt.id)}
-                          copySuccessText={t("common.copied")}
-                          copyErrorText={t("common.error")}
-                          variant="inline"
-                        />
-                      ),
-                    }))}
-                  />
-                ),
-              },
-              {
-                id: "actions",
-                content: (item) => (
-                  <SpaceBetween direction="horizontal" size="xs">
-                    <Button
-                      iconName="view-full"
-                      variant="icon"
-                      onClick={() => {
-                        setSelectedDevice(item);
-                        setShowQrModal(true);
-                      }}
-                      ariaLabel={t("user.devices.showQr")}
-                    />
-                    <Button
-                      iconName="remove"
-                      variant="icon"
-                      onClick={() => {
-                        setSelectedDevice(item);
-                        setShowDeleteModal(true);
-                      }}
-                      ariaLabel={t("common.delete")}
-                    />
-                  </SpaceBetween>
-                ),
-              },
-            ],
-          }}
-          items={devices}
-          header={
-            <Header
-              counter={`(${devices.length}/${profile?.max_devices ?? "∞"})`}
-              actions={
-                <Button variant="primary" onClick={() => setShowAddModal(true)}>
-                  {t("user.devices.addDevice")}
-                </Button>
-              }
-            >
-              {t("user.devices.title")}
-            </Header>
-          }
-          empty={
-            <Box textAlign="center" padding="l">
-              <SpaceBetween size="m">
-                <b>{t("user.devices.empty")}</b>
-                <Button variant="primary" onClick={() => setShowAddModal(true)}>
-                  {t("user.devices.addDevice")}
-                </Button>
-              </SpaceBetween>
-            </Box>
-          }
-        />
+
+        {devices.length === 0 ? (
+          <Box textAlign="center" padding="xl">
+            <SpaceBetween size="m">
+              <StatusIndicator type="info">{t("user.devices.empty")}</StatusIndicator>
+              <Button variant="primary" onClick={() => setShowAddModal(true)}>
+                {t("user.devices.addDevice")}
+              </Button>
+            </SpaceBetween>
+          </Box>
+        ) : (
+          <ColumnLayout columns={devices.length === 1 ? 1 : 2} borders="none">
+            {devices.map((device) => (
+              <DeviceCard
+                key={device.id}
+                device={device}
+                onDelete={(d) => { setSelectedDevice(d); setShowDeleteModal(true); }}
+                onQr={(d) => { setSelectedDevice(d); setQrFormat("v2ray"); setShowQrModal(true); }}
+              />
+            ))}
+          </ColumnLayout>
+        )}
       </SpaceBetween>
 
       <Modal
@@ -225,10 +343,8 @@ export default function Devices() {
         footer={
           <Box float="right">
             <SpaceBetween direction="horizontal" size="xs">
-              <Button variant="link" onClick={() => setShowAddModal(false)}>
-                {t("common.cancel")}
-              </Button>
-              <Button variant="primary" onClick={handleAddDevice} loading={submitting}>
+              <Button variant="link" onClick={() => setShowAddModal(false)}>{t("common.cancel")}</Button>
+              <Button variant="primary" onClick={() => void handleAddDevice()} loading={submitting}>
                 {t("common.confirm")}
               </Button>
             </SpaceBetween>
@@ -251,10 +367,8 @@ export default function Devices() {
         footer={
           <Box float="right">
             <SpaceBetween direction="horizontal" size="xs">
-              <Button variant="link" onClick={() => setShowDeleteModal(false)}>
-                {t("common.cancel")}
-              </Button>
-              <Button variant="primary" onClick={handleDeleteDevice} loading={submitting}>
+              <Button variant="link" onClick={() => setShowDeleteModal(false)}>{t("common.cancel")}</Button>
+              <Button variant="primary" onClick={() => void handleDeleteDevice()} loading={submitting}>
                 {t("common.delete")}
               </Button>
             </SpaceBetween>
@@ -268,20 +382,27 @@ export default function Devices() {
         visible={showQrModal}
         onDismiss={() => setShowQrModal(false)}
         header={t("user.devices.qrTitle")}
+        size="medium"
       >
         {selectedDevice && (
-          <Box textAlign="center" padding="l">
-            <SpaceBetween size="m">
-              <QRCodeSVG value={getSubscriptionUrl(selectedDevice)} size={256} />
-              <CopyToClipboard
-                copyButtonAriaLabel="Copy URL"
-                textToCopy={getSubscriptionUrl(selectedDevice)}
-                copySuccessText={t("common.copied")}
-                copyErrorText={t("common.error")}
-                variant="inline"
-              />
-            </SpaceBetween>
-          </Box>
+          <SpaceBetween size="l">
+            <Box textAlign="center">
+              <QRCodeSVG value={getSubscriptionUrl(selectedDevice, qrFormat)} size={220} />
+            </Box>
+            <Tabs
+              activeTabId={qrFormat}
+              onChange={({ detail }) => setQrFormat(detail.activeTabId)}
+              tabs={SUBSCRIPTION_FORMATS.map((fmt) => ({
+                id: fmt.id,
+                label: fmt.label,
+                content: (
+                  <Box margin={{ top: "xs" }}>
+                    <CopyableUrl url={getSubscriptionUrl(selectedDevice, fmt.id)} />
+                  </Box>
+                ),
+              }))}
+            />
+          </SpaceBetween>
         )}
       </Modal>
     </ContentLayout>

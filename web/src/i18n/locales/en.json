@@ -372,6 +372,7 @@
       "unnamed": "Unnamed Device",
       "empty": "No devices registered",
       "noPlan": "Please select a plan first",
+      "limitReached": "Device limit reached",
       "deleteConfirmTitle": "Delete Device",
       "deleteConfirmMessage": "Are you sure you want to delete '{{name}}'?",
       "addSuccess": "Device added successfully",
