@@ -136,9 +136,9 @@ type nodeListItem struct {
 	LastPingAt  *time.Time `json:"last_ping_at"`
 }
 
-// ListNodes returns all registered (non-pending) nodes.
+// ListNodes returns all nodes including pending ones.
 // @Summary List nodes
-// @Description Returns all registered (non-pending) nodes
+// @Description Returns all nodes including pending (awaiting registration) ones
 // @Tags admin-nodes
 // @Produce json
 // @Success 200 {array} nodeListItem
@@ -151,7 +151,7 @@ func (h *AdminNodeHandler) ListNodes(c *fiber.Ctx) error {
 		`SELECT id, name, country, region, ip::text, port, status, xray_version,
 		        cpu_usage, memory_usage, disk_usage, load_avg, network_in, network_out,
 		        last_seen, created_at, updated_at, last_ping_at
-		 FROM nodes WHERE status != 'pending' ORDER BY created_at DESC`,
+		 FROM nodes ORDER BY created_at DESC`,
 	)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{

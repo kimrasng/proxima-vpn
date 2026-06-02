@@ -109,6 +109,7 @@ export default function Nodes() {
       const data = await generateNodeToken();
       setTokenData(data);
       setTokenModal(true);
+      await fetchNodes();
     } catch {
       setError(t("admin.nodes.tokenError"));
     } finally {
@@ -211,13 +212,21 @@ export default function Nodes() {
           }
           items={nodes}
           columnDefinitions={[
-            { id: "name", header: t("admin.nodes.col.name"), cell: (item) => (
-              <Button variant="inline-link" onClick={() => navigate(`/admin/nodes/${item.id}`)}>
-                {item.name}
-              </Button>
-            ) },
-            { id: "country", header: t("admin.nodes.col.country"), cell: (item) => item.country },
-            { id: "ip", header: t("admin.nodes.col.ip"), cell: (item) => item.ip },
+            { id: "name", header: t("admin.nodes.col.name"), cell: (item) =>
+              item.status === "pending" ? (
+                <Box color="text-status-inactive">—</Box>
+              ) : (
+                <Button variant="inline-link" onClick={() => navigate(`/admin/nodes/${item.id}`)}>
+                  {item.name}
+                </Button>
+              )
+            },
+            { id: "country", header: t("admin.nodes.col.country"), cell: (item) =>
+              item.status === "pending" ? <Box color="text-status-inactive">—</Box> : item.country
+            },
+            { id: "ip", header: t("admin.nodes.col.ip"), cell: (item) =>
+              item.status === "pending" ? <Box color="text-status-inactive">—</Box> : item.ip
+            },
             {
               id: "status",
               header: t("admin.nodes.col.status"),
@@ -301,6 +310,7 @@ export default function Nodes() {
                 <SpaceBetween direction="horizontal" size="xs">
                   <Button
                     variant="inline-link"
+                    disabled={item.status === "pending"}
                     onClick={() => setMetricsModal(item)}
                   >
                     {t("admin.nodes.details")}

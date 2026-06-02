@@ -44,7 +44,7 @@ func (h *AdminStatsHandler) GetDashboardStats(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to query stats"})
 	}
 
-	err = h.db.QueryRow(ctx, `SELECT COUNT(*) FROM nodes`).Scan(&totalNodes)
+	err = h.db.QueryRow(ctx, `SELECT COUNT(*) FROM nodes WHERE status != 'pending'`).Scan(&totalNodes)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to query stats"})
 	}
