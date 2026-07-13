@@ -19,6 +19,7 @@ import (
 	"github.com/proximavpn/proxima-vpn/node-agent/internal/client"
 	"github.com/proximavpn/proxima-vpn/node-agent/internal/config"
 	"github.com/proximavpn/proxima-vpn/node-agent/internal/process"
+	"github.com/proximavpn/proxima-vpn/node-agent/internal/shaper"
 	"github.com/proximavpn/proxima-vpn/node-agent/internal/stats"
 	"github.com/proximavpn/proxima-vpn/node-agent/internal/xray"
 )
@@ -127,6 +128,7 @@ func runCmd() *cobra.Command {
 				return fmt.Errorf("start xray: %w", err)
 			}
 			defer runner.Stop()
+			applyShaping(xrayConfig)
 
 			time.Sleep(2 * time.Second)
 
@@ -221,8 +223,22 @@ func configPollLoop(ctx context.Context, apiClient *client.APIClient, runner *xr
 				log.Printf("restart xray: %v", err)
 				continue
 			}
+			applyShaping(newConfig)
 			lastHash = newHash
 		}
+	}
+}
+
+// applyShaping installs tc bandwidth limits for the speed-limited inbounds
+// present in the given Xray config. Best-effort: failures are logged only.
+func applyShaping(config []byte) {
+	tiers := shaper.TiersFromConfig(config)
+	if err := shaper.Apply("", tiers); err != nil {
+		log.Printf("traffic shaping: %v", err)
+		return
+	}
+	if len(tiers) > 0 {
+		log.Printf("applied speed limits to %d tier(s)", len(tiers))
 	}
 }
 

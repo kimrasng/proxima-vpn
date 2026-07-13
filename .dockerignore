@@ -1,0 +1,22 @@
+# Secrets and local env
+.env
+.env.*
+!.env.example
+
+# Local deploy/test helper scripts containing credentials
+scripts/deploy_nodes.sh
+scripts/e2e_test.sh
+
+# VCS and agent/vibe-coding tooling
+.git
+.gitignore
+.omo/
+.codegraph
+codegraph/
+AGENTS.md
+
+# Build artifacts and deps
+bin/
+web/dist/
+web/node_modules/
+**/*.test

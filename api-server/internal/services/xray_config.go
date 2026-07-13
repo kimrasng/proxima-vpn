@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sort"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/proximavpn/proxima-vpn/pkg/speedtier"
 )
 
 type XrayConfigService struct {
@@ -203,13 +205,18 @@ func (s *XrayConfigService) GenerateConfig(ctx context.Context, nodeID string) (
 	}
 	defer rows.Close()
 
+	// Unlimited clients are provisioned on the shared inbounds for every
+	// protocol. Speed-limited clients are grouped by their Mbps value and only
+	// provisioned on a dedicated VLESS Reality inbound that the node agent
+	// rate-limits with tc; provisioning them on the shared vmess/trojan/ss
+	// inbounds would let them bypass the limit, so those are excluded.
 	var vlessClients []xrayClient
 	var vmessClients []xrayClient
 	var trojanClients []xrayTrojanClient
+	tierVless := map[int][]xrayClient{}
 	policyLevels := map[string]xrayPolicyLevel{
 		"0": {StatsUserUplink: true, StatsUserDownlink: true},
 	}
-	levelIdx := 0
 
 	for rows.Next() {
 		var uuid string
@@ -219,33 +226,34 @@ func (s *XrayConfigService) GenerateConfig(ctx context.Context, nodeID string) (
 			continue
 		}
 
-		level := 0
 		if speedLimit != nil && *speedLimit > 0 {
-			levelIdx++
-			level = levelIdx
-			policyLevels[fmt.Sprintf("%d", level)] = xrayPolicyLevel{
-				StatsUserUplink:   true,
-				StatsUserDownlink: true,
-			}
+			mbps := int(*speedLimit)
+			tierVless[mbps] = append(tierVless[mbps], xrayClient{
+				ID:    uuid,
+				Flow:  "xtls-rprx-vision",
+				Email: uuid + "@proxima",
+				Level: 0,
+			})
+			continue
 		}
 
 		vlessClients = append(vlessClients, xrayClient{
 			ID:    uuid,
 			Flow:  "xtls-rprx-vision",
 			Email: uuid + "@proxima",
-			Level: level,
+			Level: 0,
 		})
 
 		vmessClients = append(vmessClients, xrayClient{
 			ID:    uuid,
 			Email: uuid + "@proxima-vmess",
-			Level: level,
+			Level: 0,
 		})
 
 		trojanClients = append(trojanClients, xrayTrojanClient{
 			Password: uuid,
 			Email:    uuid + "@proxima-trojan",
-			Level:    level,
+			Level:    0,
 		})
 	}
 
@@ -257,6 +265,29 @@ func (s *XrayConfigService) GenerateConfig(ctx context.Context, nodeID string) (
 	}
 	if trojanClients == nil {
 		trojanClients = []xrayTrojanClient{}
+	}
+
+	// Reality parameters for the speed-tier inbounds mirror the main VLESS
+	// Reality inbound (falling back to sane defaults).
+	tierDest := "www.microsoft.com:443"
+	tierServerNames := []string{"www.microsoft.com"}
+	for _, ib := range dbInbounds {
+		if ib.Protocol != "vless_reality" {
+			continue
+		}
+		var st struct {
+			Dest        string   `json:"dest"`
+			ServerNames []string `json:"server_names"`
+		}
+		if json.Unmarshal(ib.Settings, &st) == nil {
+			if st.Dest != "" {
+				tierDest = st.Dest
+			}
+			if len(st.ServerNames) > 0 {
+				tierServerNames = st.ServerNames
+			}
+		}
+		break
 	}
 
 	apiSettings, _ := json.Marshal(xrayDokodemoSettings{
@@ -282,6 +313,23 @@ func (s *XrayConfigService) GenerateConfig(ctx context.Context, nodeID string) (
 		}
 	} else {
 		inbounds = append(inbounds, s.buildLegacyInbounds(nodePort, vlessClients, vmessClients, trojanClients, realityPrivateKey, realityShortID, tlsCertFile, tlsKeyFile, ssPassword)...)
+	}
+
+	// Append one dedicated VLESS Reality inbound per speed tier. Iterate in a
+	// stable (sorted) order so the generated config is deterministic and the
+	// node agent does not needlessly restart Xray on every poll.
+	tierMbps := make([]int, 0, len(tierVless))
+	for mbps := range tierVless {
+		tierMbps = append(tierMbps, mbps)
+	}
+	sort.Ints(tierMbps)
+	for _, mbps := range tierMbps {
+		inbounds = append(inbounds, s.buildTierVlessInbound(
+			speedtier.VlessPort(nodePort, mbps),
+			speedtier.Tag(mbps),
+			tierVless[mbps],
+			realityPrivateKey, realityShortID, tierDest, tierServerNames,
+		))
 	}
 
 	cfg := xrayConfig{
@@ -377,6 +425,46 @@ func (s *XrayConfigService) buildVlessReality(ib inboundRow, clients []xrayClien
 			DestOverride: []string{"http", "tls"},
 		},
 	}, nil
+}
+
+// buildTierVlessInbound builds a dedicated VLESS Reality inbound for a single
+// speed tier. The node agent recognizes the tag (see pkg/speedtier) and applies
+// a tc bandwidth limit to the inbound's port.
+func (s *XrayConfigService) buildTierVlessInbound(
+	port int,
+	tag string,
+	clients []xrayClient,
+	privateKey, shortID, dest string,
+	serverNames []string,
+) xrayInbound {
+	if clients == nil {
+		clients = []xrayClient{}
+	}
+	settings, _ := json.Marshal(xrayInboundSettings{
+		Clients:    clients,
+		Decryption: "none",
+	})
+
+	return xrayInbound{
+		Port:     port,
+		Protocol: "vless",
+		Tag:      tag,
+		Settings: settings,
+		StreamSettings: &xrayStreamSettings{
+			Network:  "tcp",
+			Security: "reality",
+			RealitySettings: &xrayRealitySettings{
+				Dest:        dest,
+				ServerNames: serverNames,
+				PrivateKey:  privateKey,
+				ShortIds:    []string{shortID},
+			},
+		},
+		Sniffing: &xraySniffing{
+			Enabled:      true,
+			DestOverride: []string{"http", "tls"},
+		},
+	}
 }
 
 func (s *XrayConfigService) buildVmessWS(ib inboundRow, clients []xrayClient, tlsCertFile, tlsKeyFile *string) (*xrayInbound, error) {

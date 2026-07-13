@@ -58,7 +58,7 @@ func (u *Updater) CheckUpdate(ctx context.Context) (newVersion string, available
 	if err != nil {
 		return "", false, fmt.Errorf("create update check request: %w", err)
 	}
-	req.Header.Set("X-API-Key", u.apiKey)
+	req.Header.Set("X-Node-Key", u.apiKey)
 	req.Header.Set("X-Agent-Version", u.currentVersion)
 	req.Header.Set("X-Agent-OS", runtime.GOOS)
 	req.Header.Set("X-Agent-Arch", runtime.GOARCH)
@@ -100,7 +100,7 @@ func (u *Updater) PerformUpdate(ctx context.Context, targetVersion string) error
 	if err != nil {
 		return fmt.Errorf("create download request: %w", err)
 	}
-	req.Header.Set("X-API-Key", u.apiKey)
+	req.Header.Set("X-Node-Key", u.apiKey)
 
 	resp, err := u.httpClient.Do(req)
 	if err != nil {

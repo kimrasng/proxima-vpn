@@ -2,38 +2,163 @@ package xray
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
 	"strings"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/encoding"
-	"google.golang.org/protobuf/proto"
 )
 
 func init() {
-	encoding.RegisterCodec(protoCodec{})
+	encoding.RegisterCodec(statsCodec{})
 }
 
-type protoCodec struct{}
+// statsCodec is a minimal gRPC codec that hand-encodes the two protobuf
+// messages we exchange with Xray's StatsService. We deliberately avoid pulling
+// in Xray's generated protobufs (and the full protobuf runtime message
+// machinery) by marshaling the protobuf wire format directly.
+type statsCodec struct{}
 
-func (protoCodec) Marshal(v any) ([]byte, error) {
-	m, ok := v.(proto.Message)
+func (statsCodec) Name() string { return "proto" }
+
+func (statsCodec) Marshal(v any) ([]byte, error) {
+	req, ok := v.(*queryStatsRequest)
 	if !ok {
-		return nil, fmt.Errorf("protoCodec: cannot marshal non-proto message %T", v)
+		return nil, fmt.Errorf("statsCodec: unsupported marshal type %T", v)
 	}
-	return proto.Marshal(m)
+	var buf []byte
+	// field 1: pattern (string, wire type 2)
+	if req.Pattern != "" {
+		buf = appendTag(buf, 1, 2)
+		buf = appendBytes(buf, []byte(req.Pattern))
+	}
+	// field 2: reset (bool, wire type 0)
+	if req.Reset_ {
+		buf = appendTag(buf, 2, 0)
+		buf = binary.AppendUvarint(buf, 1)
+	}
+	return buf, nil
 }
 
-func (protoCodec) Unmarshal(data []byte, v any) error {
-	m, ok := v.(proto.Message)
+func (statsCodec) Unmarshal(data []byte, v any) error {
+	resp, ok := v.(*queryStatsResponse)
 	if !ok {
-		return fmt.Errorf("protoCodec: cannot unmarshal into non-proto message %T", v)
+		return fmt.Errorf("statsCodec: unsupported unmarshal type %T", v)
 	}
-	return proto.Unmarshal(data, m)
+	resp.Stat = resp.Stat[:0]
+	for len(data) > 0 {
+		field, wire, n := consumeTag(data)
+		if n == 0 {
+			return fmt.Errorf("statsCodec: bad tag")
+		}
+		data = data[n:]
+		// field 1 (repeated Stat), wire type 2
+		if field == 1 && wire == 2 {
+			b, m := consumeBytes(data)
+			if m == 0 {
+				return fmt.Errorf("statsCodec: bad stat length")
+			}
+			data = data[m:]
+			s, err := parseStat(b)
+			if err != nil {
+				return err
+			}
+			resp.Stat = append(resp.Stat, s)
+			continue
+		}
+		// skip unknown fields
+		skip, err := skipField(data, wire)
+		if err != nil {
+			return err
+		}
+		data = data[skip:]
+	}
+	return nil
 }
 
-func (protoCodec) Name() string { return "proto" }
+func parseStat(data []byte) (*statProto, error) {
+	s := &statProto{}
+	for len(data) > 0 {
+		field, wire, n := consumeTag(data)
+		if n == 0 {
+			return nil, fmt.Errorf("statsCodec: bad stat tag")
+		}
+		data = data[n:]
+		switch {
+		case field == 1 && wire == 2: // name
+			b, m := consumeBytes(data)
+			if m == 0 {
+				return nil, fmt.Errorf("statsCodec: bad name")
+			}
+			s.Name = string(b)
+			data = data[m:]
+		case field == 2 && wire == 0: // value
+			val, m := binary.Uvarint(data)
+			if m <= 0 {
+				return nil, fmt.Errorf("statsCodec: bad value")
+			}
+			s.Value = int64(val)
+			data = data[m:]
+		default:
+			skip, err := skipField(data, wire)
+			if err != nil {
+				return nil, err
+			}
+			data = data[skip:]
+		}
+	}
+	return s, nil
+}
+
+func appendTag(buf []byte, field, wire int) []byte {
+	return binary.AppendUvarint(buf, uint64(field)<<3|uint64(wire))
+}
+
+func appendBytes(buf, b []byte) []byte {
+	buf = binary.AppendUvarint(buf, uint64(len(b)))
+	return append(buf, b...)
+}
+
+func consumeTag(data []byte) (field, wire, n int) {
+	tag, m := binary.Uvarint(data)
+	if m <= 0 {
+		return 0, 0, 0
+	}
+	return int(tag >> 3), int(tag & 0x7), m
+}
+
+func consumeBytes(data []byte) ([]byte, int) {
+	l, m := binary.Uvarint(data)
+	if m <= 0 || uint64(len(data)-m) < l {
+		return nil, 0
+	}
+	return data[m : m+int(l)], m + int(l)
+}
+
+func skipField(data []byte, wire int) (int, error) {
+	switch wire {
+	case 0: // varint
+		_, m := binary.Uvarint(data)
+		if m <= 0 {
+			return 0, fmt.Errorf("statsCodec: bad varint")
+		}
+		return m, nil
+	case 2: // length-delimited
+		l, m := binary.Uvarint(data)
+		if m <= 0 || uint64(len(data)-m) < l {
+			return 0, fmt.Errorf("statsCodec: bad length-delimited")
+		}
+		return m + int(l), nil
+	case 5: // 32-bit
+		return 4, nil
+	case 1: // 64-bit
+		return 8, nil
+	default:
+		return 0, fmt.Errorf("statsCodec: unsupported wire type %d", wire)
+	}
+}
 
 type TrafficStat struct {
 	UUID     string
@@ -54,7 +179,7 @@ const (
 func NewStatsClient(addr string) (*StatsClient, error) {
 	conn, err := grpc.NewClient(addr,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithDefaultCallOptions(grpc.ForceCodec(protoCodec{})),
+		grpc.WithDefaultCallOptions(grpc.ForceCodec(statsCodec{})),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("connect xray grpc: %w", err)
@@ -136,11 +261,7 @@ type statEntry struct {
 // Xray QueryStatsRequest: field 1 (string) = pattern, field 2 (bool) = reset
 // Xray QueryStatsResponse: field 1 (repeated Stat): Stat.field1=name, Stat.field2=value
 func (c *StatsClient) queryStats(ctx context.Context, pattern string, reset bool) ([]statEntry, error) {
-	req := &queryStatsRequest{
-		Pattern: proto.String(pattern),
-		Reset_:  proto.Bool(reset),
-	}
-
+	req := &queryStatsRequest{Pattern: pattern, Reset_: reset}
 	resp := &queryStatsResponse{}
 	if err := c.conn.Invoke(ctx, queryStatsMethod, req, resp); err != nil {
 		return nil, err
@@ -151,7 +272,7 @@ func (c *StatsClient) queryStats(ctx context.Context, pattern string, reset bool
 		if s == nil {
 			continue
 		}
-		entries = append(entries, statEntry{name: s.GetName(), value: s.GetValue()})
+		entries = append(entries, statEntry{name: s.Name, value: s.Value})
 	}
 	return entries, nil
 }
@@ -169,36 +290,16 @@ func parseStatName(name string) (uuid, direction string) {
 	return parts[1], parts[3]
 }
 
-// Minimal proto message types mirroring xray.app.stats.command without importing Xray's proto.
 type queryStatsRequest struct {
-	Pattern *string `protobuf:"bytes,1,opt,name=pattern,proto3,oneof"`
-	Reset_  *bool   `protobuf:"varint,2,opt,name=reset,proto3,oneof"`
+	Pattern string
+	Reset_  bool
 }
-
-func (q *queryStatsRequest) ProtoReflect() protoReflectIface { return nil }
-func (q *queryStatsRequest) Reset()                          {}
-func (q *queryStatsRequest) String() string                  { return fmt.Sprintf("%+v", *q) }
-func (q *queryStatsRequest) ProtoMessage()                   {}
 
 type statProto struct {
-	Name  string `protobuf:"bytes,1,opt,name=name,proto3"`
-	Value int64  `protobuf:"varint,2,opt,name=value,proto3"`
+	Name  string
+	Value int64
 }
-
-func (s *statProto) ProtoReflect() protoReflectIface { return nil }
-func (s *statProto) Reset()                          {}
-func (s *statProto) String() string                  { return fmt.Sprintf("%+v", *s) }
-func (s *statProto) ProtoMessage()                   {}
-func (s *statProto) GetName() string                 { return s.Name }
-func (s *statProto) GetValue() int64                 { return s.Value }
 
 type queryStatsResponse struct {
-	Stat []*statProto `protobuf:"bytes,1,rep,name=stat,proto3"`
+	Stat []*statProto
 }
-
-func (q *queryStatsResponse) ProtoReflect() protoReflectIface { return nil }
-func (q *queryStatsResponse) Reset()                          {}
-func (q *queryStatsResponse) String() string                  { return fmt.Sprintf("%+v", *q) }
-func (q *queryStatsResponse) ProtoMessage()                   {}
-
-type protoReflectIface = interface{}

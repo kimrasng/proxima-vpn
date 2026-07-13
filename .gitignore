@@ -36,10 +36,20 @@ Thumbs.db
 .continue/
 .aider*
 CLAUDE.md
+AGENTS.md
 .clinerules
 .cursorignore
 .cursorindexingignore
 .playwright-mcp/
+
+# Agent / vibe-coding tooling (omo)
+.omo/
+.codegraph
+codegraph/
+
+# Local deploy/test helper scripts containing credentials
+scripts/deploy_nodes.sh
+scripts/e2e_test.sh
 
 /web/dist/
 /bin/

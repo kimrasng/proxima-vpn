@@ -2,27 +2,79 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/redis/go-redis/v9"
 	"github.com/proximavpn/proxima-vpn/pkg/crypto"
 )
 
 // AdminNodeHandler handles admin node management endpoints.
 type AdminNodeHandler struct {
 	db       *pgxpool.Pool
+	redis    *redis.Client
 	panelURL string
 }
 
 // NewAdminNodeHandler creates a new AdminNodeHandler.
-func NewAdminNodeHandler(db *pgxpool.Pool, panelURL string) *AdminNodeHandler {
+func NewAdminNodeHandler(db *pgxpool.Pool, rdb *redis.Client, panelURL string) *AdminNodeHandler {
 	return &AdminNodeHandler{
 		db:       db,
+		redis:    rdb,
 		panelURL: panelURL,
 	}
+}
+
+const (
+	xrayLatestVersionCacheKey = "xray:latest_version"
+	xrayLatestVersionCacheTTL = 10 * time.Minute
+	xrayReleasesURL           = "https://api.github.com/repos/XTLS/Xray-core/releases/latest"
+)
+
+// latestXrayVersion returns the latest published Xray-core release tag, caching
+// the result in Redis to avoid hitting the GitHub API rate limit. On any error
+// it returns an empty string so callers degrade gracefully.
+func (h *AdminNodeHandler) latestXrayVersion(ctx context.Context) string {
+	if h.redis != nil {
+		if cached, err := h.redis.Get(ctx, xrayLatestVersionCacheKey).Result(); err == nil && cached != "" {
+			return cached
+		}
+	}
+
+	reqCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(reqCtx, http.MethodGet, xrayReleasesURL, nil)
+	if err != nil {
+		return ""
+	}
+	req.Header.Set("Accept", "application/vnd.github+json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return ""
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return ""
+	}
+
+	var payload struct {
+		TagName string `json:"tag_name"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		return ""
+	}
+
+	if payload.TagName != "" && h.redis != nil {
+		h.redis.Set(ctx, xrayLatestVersionCacheKey, payload.TagName, xrayLatestVersionCacheTTL)
+	}
+	return payload.TagName
 }
 
 type generateTokenResponse struct {
@@ -384,7 +436,7 @@ func (h *AdminNodeHandler) GetXrayVersion(c *fiber.Ctx) error {
 
 	return c.JSON(xrayVersionResponse{
 		CurrentVersion: version,
-		LatestVersion:  "",
+		LatestVersion:  h.latestXrayVersion(context.Background()),
 	})
 }
 

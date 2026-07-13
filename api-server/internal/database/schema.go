@@ -1,5 +1,10 @@
 package database
 
+// This file is the single source of truth for the database schema. It is applied
+// idempotently at API startup by Migrate() (called from cmd/main.go). New tables
+// belong in the schema constant below; incremental column additions for existing
+// deployments go in the migrations slice inside Migrate().
+
 import (
 	"context"
 	"fmt"
@@ -49,6 +54,7 @@ CREATE TABLE IF NOT EXISTS users (
     plan_expires_at  TIMESTAMPTZ,
     traffic_used     BIGINT NOT NULL DEFAULT 0,
     traffic_reset_at TIMESTAMPTZ,
+    telegram_id      BIGINT UNIQUE,
     is_active        BOOLEAN NOT NULL DEFAULT true,
     status           TEXT NOT NULL DEFAULT 'pending',
     created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -73,6 +79,7 @@ CREATE TABLE IF NOT EXISTS nodes (
     tls_cert_file       TEXT,
     tls_key_file        TEXT,
     ss_password         TEXT,
+    xray_target_version TEXT NOT NULL DEFAULT '',
     cpu_usage           REAL NOT NULL DEFAULT 0,
     memory_usage        REAL NOT NULL DEFAULT 0,
     disk_usage          REAL NOT NULL DEFAULT 0,
@@ -183,6 +190,8 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 			ON node_metrics_history(node_id, recorded_at DESC)`,
 		`ALTER TABLE announcements ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ`,
 		`ALTER TABLE announcements ADD COLUMN IF NOT EXISTS image_url TEXT`,
+		`ALTER TABLE nodes ADD COLUMN IF NOT EXISTS xray_target_version TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE users ADD COLUMN IF NOT EXISTS telegram_id BIGINT UNIQUE`,
 	}
 	for _, m := range migrations {
 		if _, err := pool.Exec(ctx, m); err != nil {

@@ -28,16 +28,19 @@ services:
       dockerfile: api-server/Dockerfile
     ports:
       - "2053:2053"
-    env_file: .env
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgres://vpnuser:vpnpass@db:5432/vpnpanel}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
-      JWT_SECRET: ${JWT_SECRET}
+      # Leave JWT_SECRET empty to auto-generate and persist one in app_data.
+      JWT_SECRET: ${JWT_SECRET:-}
       PANEL_URL: ${PANEL_URL:-http://localhost:8080}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
+      # Leave ADMIN_PASSWORD empty to auto-generate one (printed in api logs).
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      SWAGGER_ENABLED: ${SWAGGER_ENABLED:-true}
     volumes:
       - uploads_data:/app/uploads
+      - app_data:/app/data
     depends_on:
       db:
         condition: service_healthy
@@ -66,3 +69,4 @@ volumes:
   pg_data:
   redis_data:
   uploads_data:
+  app_data:

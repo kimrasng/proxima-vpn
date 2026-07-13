@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"math"
 	"net/url"
 	"strings"
 	"time"
@@ -13,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/proximavpn/proxima-vpn/api-server/internal/services/subscription"
+	"github.com/proximavpn/proxima-vpn/pkg/speedtier"
 )
 
 type SubscriptionHandler struct {
@@ -34,6 +36,7 @@ type subscriptionUser struct {
 	Status        string
 	TrafficUsed   int64
 	TrafficLimit  *int64
+	SpeedLimit    *int64
 	PlanExpiresAt *time.Time
 }
 
@@ -78,7 +81,7 @@ func (h *SubscriptionHandler) GetSubscription(c *fiber.Ctx) error {
 	var deviceUUID string
 	err := h.db.QueryRow(ctx,
 		`SELECT u.id, u.plan_id, u.is_active, u.status, u.traffic_used,
-		        p.traffic_limit, u.plan_expires_at, d.xray_uuid
+		        p.traffic_limit, p.speed_limit, u.plan_expires_at, d.xray_uuid
 		 FROM users u
 		 JOIN devices d ON d.user_id = u.id
 		 LEFT JOIN plans p ON u.plan_id = p.id
@@ -86,7 +89,7 @@ func (h *SubscriptionHandler) GetSubscription(c *fiber.Ctx) error {
 		subToken, deviceID,
 	).Scan(
 		&user.ID, &user.PlanID, &user.IsActive, &user.Status,
-		&user.TrafficUsed, &user.TrafficLimit, &user.PlanExpiresAt, &deviceUUID,
+		&user.TrafficUsed, &user.TrafficLimit, &user.SpeedLimit, &user.PlanExpiresAt, &deviceUUID,
 	)
 	if err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
@@ -130,6 +133,14 @@ func (h *SubscriptionHandler) GetSubscription(c *fiber.Ctx) error {
 		nodes = append(nodes, node)
 	}
 
+	// Plan speed limit determines which port a client connects to (a dedicated
+	// tc-shaped port) and, for limited plans, restricts them to VLESS only so
+	// the limit cannot be bypassed via other protocols.
+	speedMbps := 0
+	if user.SpeedLimit != nil && *user.SpeedLimit > 0 {
+		speedMbps = int(*user.SpeedLimit)
+	}
+
 	format := strings.ToLower(c.Query("format"))
 	if format == "" {
 		format = detectFormatFromUA(c.Get("User-Agent"))
@@ -140,8 +151,9 @@ func (h *SubscriptionHandler) GetSubscription(c *fiber.Ctx) error {
 
 	switch format {
 	case "clash":
-		nodeInfos := buildNodeInfoList(nodes, deviceUUID)
-		result, err := subscription.GenerateClash(nodeInfos, deviceUUID)
+		nodeInfos := buildNodeInfoList(nodes, deviceUUID, speedMbps)
+		infoLabels := buildPlanInfoLabels(user)
+		result, err := subscription.GenerateClash(nodeInfos, deviceUUID, infoLabels)
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to generate clash config"})
 		}
@@ -149,7 +161,7 @@ func (h *SubscriptionHandler) GetSubscription(c *fiber.Ctx) error {
 		contentType = "text/yaml; charset=utf-8"
 
 	case "singbox":
-		nodeInfos := buildNodeInfoList(nodes, deviceUUID)
+		nodeInfos := buildNodeInfoList(nodes, deviceUUID, speedMbps)
 		result, err := subscription.GenerateSingbox(nodeInfos, deviceUUID)
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to generate singbox config"})
@@ -158,7 +170,7 @@ func (h *SubscriptionHandler) GetSubscription(c *fiber.Ctx) error {
 		contentType = "application/json; charset=utf-8"
 
 	case "surfboard":
-		nodeInfos := buildNodeInfoList(nodes, deviceUUID)
+		nodeInfos := buildNodeInfoList(nodes, deviceUUID, speedMbps)
 		result, err := subscription.GenerateSurfboard(nodeInfos, deviceUUID)
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to generate surfboard config"})
@@ -167,7 +179,7 @@ func (h *SubscriptionHandler) GetSubscription(c *fiber.Ctx) error {
 		contentType = "text/plain; charset=utf-8"
 
 	case "quantumult":
-		nodeInfos := buildNodeInfoList(nodes, deviceUUID)
+		nodeInfos := buildNodeInfoList(nodes, deviceUUID, speedMbps)
 		result, err := subscription.GenerateQuantumult(nodeInfos, deviceUUID)
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to generate quantumult config"})
@@ -183,7 +195,12 @@ func (h *SubscriptionHandler) GetSubscription(c *fiber.Ctx) error {
 				fragment += " [OFFLINE]"
 			}
 
-			links = append(links, buildVLESSLink(deviceUUID, node, fragment))
+			links = append(links, buildVLESSLink(deviceUUID, node, speedtier.VlessPort(node.Port, speedMbps), fragment))
+
+			// Speed-limited plans are VLESS-only (see buildNodeInfoList).
+			if speedMbps > 0 {
+				continue
+			}
 
 			hasTLS := node.TLSCertFile != nil && node.TLSKeyFile != nil &&
 				*node.TLSCertFile != "" && *node.TLSKeyFile != ""
@@ -246,20 +263,52 @@ func detectFormatFromUA(ua string) string {
 	}
 }
 
-func buildNodeInfoList(nodes []subscriptionNode, userUUID string) []subscription.NodeInfo {
+// buildPlanInfoLabels builds Korean informational pseudo-node labels shown in
+// Clash (remaining traffic and days until plan expiry).
+func buildPlanInfoLabels(user subscriptionUser) []string {
+	var labels []string
+
+	if user.TrafficLimit != nil && *user.TrafficLimit > 0 {
+		remaining := *user.TrafficLimit - user.TrafficUsed
+		if remaining < 0 {
+			remaining = 0
+		}
+		gb := float64(remaining) / (1024 * 1024 * 1024)
+		labels = append(labels, fmt.Sprintf("잔여 트래픽: %.1f GB", gb))
+	} else {
+		labels = append(labels, "잔여 트래픽: 무제한")
+	}
+
+	if user.PlanExpiresAt != nil {
+		days := int(math.Ceil(time.Until(*user.PlanExpiresAt).Hours() / 24))
+		if days < 0 {
+			days = 0
+		}
+		labels = append(labels, fmt.Sprintf("만료까지: %d일", days))
+	}
+
+	return labels
+}
+
+func buildNodeInfoList(nodes []subscriptionNode, userUUID string, speedMbps int) []subscription.NodeInfo {
 	var infos []subscription.NodeInfo
 	for _, node := range nodes {
-		hasTLS := node.TLSCertFile != nil && node.TLSKeyFile != nil &&
-			*node.TLSCertFile != "" && *node.TLSKeyFile != ""
-
 		infos = append(infos, subscription.NodeInfo{
 			Name:             node.Name,
 			IP:               node.IP,
-			Port:             node.Port,
+			Port:             speedtier.VlessPort(node.Port, speedMbps),
 			Protocol:         "vless_reality",
 			RealityPublicKey: node.RealityPublicKey,
 			RealityShortID:   node.RealityShortID,
 		})
+
+		// Speed-limited plans are VLESS-only so the tc limit cannot be bypassed.
+		if speedMbps > 0 {
+			continue
+		}
+
+		hasTLS := node.TLSCertFile != nil && node.TLSKeyFile != nil &&
+			*node.TLSCertFile != "" && *node.TLSKeyFile != ""
 
 		if hasTLS {
 			infos = append(infos, subscription.NodeInfo{
@@ -296,12 +345,12 @@ func buildNodeInfoList(nodes []subscriptionNode, userUUID string) []subscription
 	return infos
 }
 
-func buildVLESSLink(uuid string, node subscriptionNode, fragment string) string {
+func buildVLESSLink(uuid string, node subscriptionNode, port int, fragment string) string {
 	return fmt.Sprintf(
 		"vless://%s@%s:%d?type=tcp&security=reality&sni=www.microsoft.com&fp=chrome&pbk=%s&sid=%s&flow=xtls-rprx-vision#%s",
 		uuid,
 		node.IP,
-		node.Port,
+		port,
 		url.QueryEscape(node.RealityPublicKey),
 		url.QueryEscape(node.RealityShortID),
 		url.PathEscape(fragment+" VLESS"),

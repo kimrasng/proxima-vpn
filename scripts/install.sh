@@ -110,15 +110,16 @@ echo ""
 
 # --- Install dependencies ---
 log_step "1/4" "Installing dependencies..."
+# iproute2 provides `tc`, used by the agent to enforce per-plan speed limits.
 if command -v apt-get &>/dev/null; then
     apt-get update -qq >/dev/null 2>&1
-    apt-get install -y -qq curl unzip jq >/dev/null 2>&1
+    apt-get install -y -qq curl unzip jq iproute2 >/dev/null 2>&1
 elif command -v yum &>/dev/null; then
-    yum install -y -q curl unzip jq >/dev/null 2>&1
+    yum install -y -q curl unzip jq iproute >/dev/null 2>&1
 elif command -v dnf &>/dev/null; then
-    dnf install -y -q curl unzip jq >/dev/null 2>&1
+    dnf install -y -q curl unzip jq iproute >/dev/null 2>&1
 else
-    log_warn "Could not detect package manager. Ensure curl, unzip, and jq are installed."
+    log_warn "Could not detect package manager. Ensure curl, unzip, jq, and iproute2 (tc) are installed."
 fi
 
 # --- Download and install Xray-core ---
@@ -196,6 +197,22 @@ if ! $REGISTER_CMD; then
 fi
 
 log_info "Node registered successfully"
+
+# --- Open firewall ports (best-effort) ---
+# The main service port plus the speed-tier port range (20001-22000), which the
+# panel uses for per-plan speed-limited VLESS Reality inbounds.
+TIER_PORT_RANGE_START=20001
+TIER_PORT_RANGE_END=22000
+if command -v ufw &>/dev/null && ufw status 2>/dev/null | grep -q "Status: active"; then
+    ufw allow "${PORT}/tcp" >/dev/null 2>&1 || true
+    ufw allow "${TIER_PORT_RANGE_START}:${TIER_PORT_RANGE_END}/tcp" >/dev/null 2>&1 || true
+    log_info "ufw: opened ${PORT} and ${TIER_PORT_RANGE_START}-${TIER_PORT_RANGE_END} (tcp)"
+elif command -v firewall-cmd &>/dev/null && firewall-cmd --state &>/dev/null; then
+    firewall-cmd --permanent --add-port="${PORT}/tcp" >/dev/null 2>&1 || true
+    firewall-cmd --permanent --add-port="${TIER_PORT_RANGE_START}-${TIER_PORT_RANGE_END}/tcp" >/dev/null 2>&1 || true
+    firewall-cmd --reload >/dev/null 2>&1 || true
+    log_info "firewalld: opened ${PORT} and ${TIER_PORT_RANGE_START}-${TIER_PORT_RANGE_END} (tcp)"
+fi
 
 # --- Create systemd service ---
 cat > /etc/systemd/system/node-agent.service <<EOF

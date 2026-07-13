@@ -71,14 +71,26 @@ func (h *NodeAgentHandler) Register(c *fiber.Ctx) error {
 
 	apiKey := crypto.GenerateAPIKey()
 
+	realityPrivateKey, realityPublicKey, err := crypto.GenerateRealityKeypair()
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to generate reality keys",
+		})
+	}
+	realityShortID := crypto.GenerateRealityShortID()
+
 	_, err = h.db.Exec(
 		context.Background(),
 		`UPDATE nodes
 		 SET name = $1, ip = $2::inet, port = $3, xray_version = $4,
-		     country = $5, region = $6, api_key = $7, reg_token = NULL, status = 'offline'
-		 WHERE id = $8`,
+		     country = $5, region = $6, api_key = $7, reg_token = NULL, status = 'offline',
+		     reality_private_key = COALESCE(NULLIF(reality_private_key, ''), $8),
+		     reality_public_key  = COALESCE(NULLIF(reality_public_key, ''), $9),
+		     reality_short_id    = COALESCE(NULLIF(reality_short_id, ''), $10)
+		 WHERE id = $11`,
 		req.Name, req.IP, req.Port, req.XrayVersion,
-		req.Country, req.Region, apiKey, nodeID,
+		req.Country, req.Region, apiKey,
+		realityPrivateKey, realityPublicKey, realityShortID, nodeID,
 	)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{

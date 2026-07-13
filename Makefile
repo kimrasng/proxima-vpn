@@ -13,12 +13,7 @@ NODE_AGENT := $(BIN_DIR)/node-agent
 # Go build flags
 GO_BUILD_FLAGS := CGO_ENABLED=0 go build -trimpath
 
-# Database migration
-DATABASE_URL ?= $(DATABASE_URL)
-MIGRATIONS_DIR := ./migrations
-
 .PHONY: build build-api build-agent test lint \
-        migrate-up migrate-down migrate-create \
         dev-api dev-web docker-up docker-down clean help
 
 ## Build targets
@@ -45,17 +40,6 @@ lint: ## Run linters (golangci-lint + frontend eslint)
 		echo "golangci-lint not found, skipping Go lint"; \
 	fi
 	cd web && npm run lint
-
-## Database migrations (goose)
-
-migrate-up: ## Run database migrations up
-	goose -dir $(MIGRATIONS_DIR) postgres "$(DATABASE_URL)" up
-
-migrate-down: ## Run database migrations down
-	goose -dir $(MIGRATIONS_DIR) postgres "$(DATABASE_URL)" down
-
-migrate-create: ## Create a new migration file (usage: make migrate-create NAME=create_users)
-	goose -dir $(MIGRATIONS_DIR) create $(NAME) sql
 
 ## Development
 

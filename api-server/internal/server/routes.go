@@ -48,7 +48,7 @@ func (s *Server) registerRoutes() {
 	twoFA.Post("/enable", admin2FA.Enable)
 	twoFA.Post("/disable", admin2FA.Disable)
 
-	adminNodeHandler := handlers.NewAdminNodeHandler(s.db, s.config.Server.PanelURL)
+	adminNodeHandler := handlers.NewAdminNodeHandler(s.db, s.redis, s.config.Server.PanelURL)
 	adminNodes := admin.Group("/nodes")
 	adminNodes.Post("/token", adminNodeHandler.GenerateToken)
 	adminNodes.Get("/", adminNodeHandler.ListNodes)
@@ -106,8 +106,6 @@ func (s *Server) registerRoutes() {
 	adminPlanRequests.Get("/", adminPlanRequestHandler.List)
 	adminPlanRequests.Put("/:id", adminPlanRequestHandler.Review)
 
-	admin.Group("/stats")
-
 	adminSettingsHandler := handlers.NewAdminSettingsHandler(s.db)
 	admin.Get("/settings", adminSettingsHandler.List)
 	admin.Put("/settings", adminSettingsHandler.Update)
@@ -143,6 +141,8 @@ func (s *Server) registerRoutes() {
 	nodeAgent.Post("/heartbeat", nodeAgentHandler.Heartbeat)
 	nodeAgent.Post("/stats", nodeAgentHandler.Stats)
 	nodeAgent.Get("/inbounds", nodeAgentHandler.GetInbounds)
+	nodeAgent.Get("/update", nodeAgentHandler.CheckUpdate)
+	nodeAgent.Get("/update/download", nodeAgentHandler.DownloadUpdate)
 
 	userAuthHandler := handlers.NewUserAuthHandler(s.db, s.config.JWT.Secret, s.parseUserExpiry())
 	auth := api.Group("/auth")
@@ -168,8 +168,6 @@ func (s *Server) registerRoutes() {
 	user.Get("/traffic", userPortalHandler.GetTrafficStats)
 	user.Post("/sub-token/regenerate", userPortalHandler.RegenerateSubToken)
 	user.Get("/announcements", userPortalHandler.ListAnnouncements)
-
-	api.Group("/nodes")
 
 	subscriptionHandler := handlers.NewSubscriptionHandler(s.db, s.config.Subscription.UpdateInterval)
 	subLimiter := limiter.New(limiter.Config{
