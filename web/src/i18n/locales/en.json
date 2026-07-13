@@ -367,6 +367,7 @@
       "deviceNamePlaceholder": "e.g. My iPhone",
       "xrayUuid": "UUID",
       "subscriptionUrl": "Subscription URL",
+      "yamlUrl": "Clash YAML Profile URL",
       "showQr": "Show QR Code",
       "qrTitle": "Subscription QR Code",
       "unnamed": "Unnamed Device",

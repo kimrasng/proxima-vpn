@@ -367,6 +367,7 @@
       "deviceNamePlaceholder": "예: 내 아이폰",
       "xrayUuid": "UUID",
       "subscriptionUrl": "구독 URL",
+      "yamlUrl": "Clash YAML 프로필 URL",
       "showQr": "QR 코드 보기",
       "qrTitle": "구독 QR 코드",
       "unnamed": "이름 없는 기기",

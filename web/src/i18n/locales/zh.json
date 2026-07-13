@@ -275,6 +275,7 @@
       "deviceNamePlaceholder": "例如：我的 iPhone",
       "xrayUuid": "UUID",
       "subscriptionUrl": "订阅链接",
+      "yamlUrl": "Clash YAML 配置链接",
       "showQr": "显示二维码",
       "qrTitle": "订阅二维码",
       "unnamed": "未命名设备",

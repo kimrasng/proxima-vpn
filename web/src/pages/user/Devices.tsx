@@ -181,6 +181,13 @@ function DeviceCard({
         </div>
 
         <div>
+          <Box variant="awsui-key-label">{t("user.devices.yamlUrl")}</Box>
+          <Box margin={{ top: "xs" }}>
+            <CopyableUrl url={getSubscriptionUrl(device, "clash")} />
+          </Box>
+        </div>
+
+        <div>
           <Box variant="awsui-key-label">{t("user.devices.subscriptionUrl")}</Box>
           <Box margin={{ top: "xs" }}>
             <Tabs
