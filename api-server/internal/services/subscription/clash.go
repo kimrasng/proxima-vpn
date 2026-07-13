@@ -105,9 +105,12 @@ func GenerateClash(nodes []NodeInfo, userUUID string, infoLabels []string) ([]by
 		}
 	}
 
-	selectProxies := make([]string, 0, len(proxyNames)+1)
+	// "DIRECT" is a Clash built-in policy; adding it to the select group lets the
+	// user manually route through a direct (no-proxy) connection from the UI.
+	selectProxies := make([]string, 0, len(proxyNames)+2)
 	selectProxies = append(selectProxies, groupAuto)
 	selectProxies = append(selectProxies, proxyNames...)
+	selectProxies = append(selectProxies, "DIRECT")
 
 	groups := []proxyGroup{
 		{
