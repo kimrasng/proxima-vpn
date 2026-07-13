@@ -211,7 +211,7 @@ func clashVLESSReality(node NodeInfo, uuid string) map[string]any {
 		"udp":                true,
 		"flow":               "xtls-rprx-vision",
 		"client-fingerprint": "chrome",
-		"servername":         "www.microsoft.com",
+		"servername":         "www.cloudflare.com",
 		"reality-opts": map[string]any{
 			"public-key": node.RealityPublicKey,
 			"short-id":   node.RealityShortID,

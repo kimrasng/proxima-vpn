@@ -269,8 +269,8 @@ func (s *XrayConfigService) GenerateConfig(ctx context.Context, nodeID string) (
 
 	// Reality parameters for the speed-tier inbounds mirror the main VLESS
 	// Reality inbound (falling back to sane defaults).
-	tierDest := "www.microsoft.com:443"
-	tierServerNames := []string{"www.microsoft.com"}
+	tierDest := "www.cloudflare.com:443"
+	tierServerNames := []string{"www.cloudflare.com"}
 	for _, ib := range dbInbounds {
 		if ib.Protocol != "vless_reality" {
 			continue
@@ -390,14 +390,14 @@ func (s *XrayConfigService) buildVlessReality(ib inboundRow, clients []xrayClien
 		ServerNames []string `json:"server_names"`
 	}
 	if err := json.Unmarshal(ib.Settings, &settings); err != nil {
-		settings.Dest = "www.microsoft.com:443"
-		settings.ServerNames = []string{"www.microsoft.com"}
+		settings.Dest = "www.cloudflare.com:443"
+		settings.ServerNames = []string{"www.cloudflare.com"}
 	}
 	if settings.Dest == "" {
-		settings.Dest = "www.microsoft.com:443"
+		settings.Dest = "www.cloudflare.com:443"
 	}
 	if len(settings.ServerNames) == 0 {
-		settings.ServerNames = []string{"www.microsoft.com"}
+		settings.ServerNames = []string{"www.cloudflare.com"}
 	}
 
 	inboundSettings, _ := json.Marshal(xrayInboundSettings{
@@ -597,8 +597,8 @@ func (s *XrayConfigService) buildLegacyInbounds(
 				Network:  "tcp",
 				Security: "reality",
 				RealitySettings: &xrayRealitySettings{
-					Dest:        "www.microsoft.com:443",
-					ServerNames: []string{"www.microsoft.com"},
+					Dest:        "www.cloudflare.com:443",
+					ServerNames: []string{"www.cloudflare.com"},
 					PrivateKey:  realityPrivateKey,
 					ShortIds:    []string{realityShortID},
 				},

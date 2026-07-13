@@ -347,7 +347,7 @@ func buildNodeInfoList(nodes []subscriptionNode, userUUID string, speedMbps int)
 
 func buildVLESSLink(uuid string, node subscriptionNode, port int, fragment string) string {
 	return fmt.Sprintf(
-		"vless://%s@%s:%d?type=tcp&security=reality&sni=www.microsoft.com&fp=chrome&pbk=%s&sid=%s&flow=xtls-rprx-vision#%s",
+		"vless://%s@%s:%d?type=tcp&security=reality&sni=www.cloudflare.com&fp=chrome&pbk=%s&sid=%s&flow=xtls-rprx-vision#%s",
 		uuid,
 		node.IP,
 		port,

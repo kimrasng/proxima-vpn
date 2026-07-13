@@ -76,7 +76,7 @@ func singboxVLESS(node NodeInfo, userUUID string) map[string]interface{} {
 		"flow":        "xtls-rprx-vision",
 		"tls": map[string]interface{}{
 			"enabled":     true,
-			"server_name": "www.microsoft.com",
+			"server_name": "www.cloudflare.com",
 			"utls": map[string]interface{}{
 				"enabled":     true,
 				"fingerprint": "chrome",
