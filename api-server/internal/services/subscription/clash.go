@@ -55,8 +55,8 @@ type clashDNS struct {
 	Listen         string   `yaml:"listen"`
 	IPv6           bool     `yaml:"ipv6"`
 	EnhancedMode   string   `yaml:"enhanced-mode"`
-	FakeIPRange    string   `yaml:"fake-ip-range"`
-	FakeIPFilter   []string `yaml:"fake-ip-filter"`
+	FakeIPRange    string   `yaml:"fake-ip-range,omitempty"`
+	FakeIPFilter   []string `yaml:"fake-ip-filter,omitempty"`
 	DefaultServer  []string `yaml:"default-nameserver"`
 	Nameserver     []string `yaml:"nameserver"`
 	Fallback       []string `yaml:"fallback,omitempty"`
@@ -158,13 +158,15 @@ func GenerateClash(nodes []NodeInfo, userUUID string, infoLabels []string) ([]by
 			},
 			SkipDomain: []string{"+.push.apple.com", "+.apple.com"},
 		},
+		// redir-host (not fake-ip): the DNS returns real IPs so DIRECT-routed
+		// traffic connects correctly. Proxied traffic keeps its domain via the
+		// sniffer, so it still works. fake-ip would hand DIRECT a 198.18.x.x
+		// placeholder address it cannot connect to, breaking direct connections.
 		DNS: clashDNS{
 			Enable:        true,
 			Listen:        "0.0.0.0:1053",
 			IPv6:          false,
-			EnhancedMode:  "fake-ip",
-			FakeIPRange:   "198.18.0.1/16",
-			FakeIPFilter:  []string{"*.lan", "*.local", "*.localhost", "+.pool.ntp.org", "+.ntp.org"},
+			EnhancedMode:  "redir-host",
 			DefaultServer: []string{"1.1.1.1", "8.8.8.8"},
 			Nameserver:    []string{"https://cloudflare-dns.com/dns-query", "https://dns.google/dns-query"},
 		},
