@@ -6,11 +6,14 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Proxy group names (Korean, shown in the client UI).
+// Proxy group names (Korean, shown in the client UI). DIRECT is offered as a
+// selectable policy in the manual/fallback groups so users can route traffic
+// without a proxy, mirroring the reference verge.yaml layout.
 const (
-	groupAuto   = "자동 선택"
-	groupSelect = "노드 선택"
-	groupInfo   = "구독 정보"
+	groupSelect   = "🚀 노드 선택"
+	groupAuto     = "♻️ 자동 선택"
+	groupFallback = "🐟 미지정 트래픽"
+	groupInfo     = "📊 구독 정보"
 )
 
 type clashConfig struct {
@@ -105,12 +108,20 @@ func GenerateClash(nodes []NodeInfo, userUUID string, infoLabels []string) ([]by
 		}
 	}
 
-	// "DIRECT" is a Clash built-in policy; adding it to the select group lets the
-	// user manually route through a direct (no-proxy) connection from the UI.
+	// "DIRECT" is a Clash built-in policy. It is offered in the manual node group
+	// and the fallback group so users can route a connection without any proxy
+	// straight from the client UI.
 	selectProxies := make([]string, 0, len(proxyNames)+2)
 	selectProxies = append(selectProxies, groupAuto)
 	selectProxies = append(selectProxies, proxyNames...)
 	selectProxies = append(selectProxies, "DIRECT")
+
+	// The fallback group is the MATCH target; its first entry (the node select
+	// group) is the default, but the user can switch it to DIRECT to bypass the
+	// proxy entirely.
+	fallbackProxies := make([]string, 0, len(proxyNames)+3)
+	fallbackProxies = append(fallbackProxies, groupSelect, groupAuto, "DIRECT")
+	fallbackProxies = append(fallbackProxies, proxyNames...)
 
 	groups := []proxyGroup{
 		{
@@ -124,6 +135,11 @@ func GenerateClash(nodes []NodeInfo, userUUID string, infoLabels []string) ([]by
 			Proxies:  proxyNames,
 			URL:      "http://www.gstatic.com/generate_204",
 			Interval: 300,
+		},
+		{
+			Name:    groupFallback,
+			Type:    "select",
+			Proxies: fallbackProxies,
 		},
 	}
 	if len(infoNames) > 0 {
@@ -182,7 +198,7 @@ func GenerateClash(nodes []NodeInfo, userUUID string, infoLabels []string) ([]by
 			"IP-CIDR,172.16.0.0/12,DIRECT,no-resolve",
 			"IP-CIDR,192.168.0.0/16,DIRECT,no-resolve",
 			"GEOIP,PRIVATE,DIRECT,no-resolve",
-			"MATCH," + groupSelect,
+			"MATCH," + groupFallback,
 		},
 	}
 
