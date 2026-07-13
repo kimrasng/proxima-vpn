@@ -30,7 +30,12 @@ const SUBSCRIPTION_FORMATS = [
 ];
 
 function getSubscriptionUrl(device: Device, format?: string): string {
-  const base = device.subscription_url || `${window.location.origin}/sub/${device.xray_uuid}`;
+  const raw = device.subscription_url || `/sub/${device.xray_uuid}`;
+  // subscription_url is a relative path (/sub/<token>/<id>); make it absolute so
+  // copied links and QR codes work when imported into a client.
+  const base = /^https?:\/\//i.test(raw)
+    ? raw
+    : `${window.location.origin}${raw.startsWith("/") ? "" : "/"}${raw}`;
   if (format && format !== "v2ray") return `${base}?format=${format}`;
   return base;
 }
