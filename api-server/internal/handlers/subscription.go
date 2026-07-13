@@ -104,7 +104,7 @@ func (h *SubscriptionHandler) GetSubscription(c *fiber.Ctx) error {
 	}
 
 	rows, err := h.db.Query(ctx,
-		`SELECT n.id, n.name, n.ip, n.port, n.status, n.reality_public_key, n.reality_short_id,
+		`SELECT n.id, n.name, host(n.ip), n.port, n.status, n.reality_public_key, n.reality_short_id,
 		        n.tls_cert_file, n.tls_key_file, n.ss_password
 		 FROM nodes n
 		 JOIN node_group_nodes ngn ON n.id = ngn.node_id
