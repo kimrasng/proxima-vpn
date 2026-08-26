@@ -67,7 +67,7 @@ func main() {
 	expiryCheck := scheduler.NewExpiryCheckScheduler(db)
 	go expiryCheck.Start(ctx)
 
-	telegramSvc := services.NewTelegramService(cfg.Telegram)
+	telegramSvc := services.NewTelegramService(db, cfg.Telegram)
 
 	nodeMonitor := scheduler.NewNodeMonitorScheduler(db, telegramSvc)
 	go nodeMonitor.Start(ctx)
@@ -83,11 +83,13 @@ func main() {
 		}
 	}
 
-	var backupSvc *services.BackupService
-	if cfg.Backup.S3.Bucket != "" {
-		backupSvc = services.NewBackupService(cfg.Database.URL, cfg.Backup.S3, cfg.Backup.Schedule)
-		go backupSvc.StartScheduler(ctx)
-	}
+	// Always constructed (not gated on cfg.Backup.S3.Bucket being set at
+	// boot) so an admin who configures S3 purely through the Settings panel,
+	// with no config.yaml changes, can still use it - BackupService resolves
+	// its S3 config and schedule from the settings table on every call/tick,
+	// falling back to config.yaml (see services/backup.go).
+	backupSvc := services.NewBackupService(db, cfg.Database.URL, cfg.Backup.S3, cfg.Backup.Schedule)
+	go backupSvc.StartScheduler(ctx)
 
 	srv := server.NewServer(cfg, db, rdb, backupSvc)
 	if err := srv.Start(); err != nil {

@@ -109,13 +109,14 @@ func (h *AdminAuthHandler) Login(c *fiber.Ctx) error {
 	}
 
 	now := time.Now()
+	expiry := resolveSessionExpiry(context.Background(), h.db, h.jwtExpiry)
 	claims := AdminClaims{
 		AdminID: id,
 		Email:   email,
 		Role:    "admin",
 		RegisteredClaims: jwt.RegisteredClaims{
 			IssuedAt:  jwt.NewNumericDate(now),
-			ExpiresAt: jwt.NewNumericDate(now.Add(h.jwtExpiry)),
+			ExpiresAt: jwt.NewNumericDate(now.Add(expiry)),
 		},
 	}
 

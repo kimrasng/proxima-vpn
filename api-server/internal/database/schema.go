@@ -76,6 +76,7 @@ CREATE TABLE IF NOT EXISTS nodes (
     reality_public_key  TEXT NOT NULL DEFAULT '',
     reality_short_id    TEXT NOT NULL DEFAULT '',
     tls_domain          TEXT NOT NULL DEFAULT '',
+    tls_email           TEXT NOT NULL DEFAULT '',
     tls_cert_file       TEXT,
     tls_key_file        TEXT,
     ss_password         TEXT,
@@ -202,6 +203,15 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 		`ALTER TABLE devices ADD COLUMN IF NOT EXISTS wg_private_key TEXT`,
 		`ALTER TABLE devices ADD COLUMN IF NOT EXISTS wg_public_key TEXT`,
 		`ALTER TABLE devices ADD COLUMN IF NOT EXISTS wg_address TEXT`,
+		// tls_email is the ACME account email for a node's Let's Encrypt
+		// certificate (see IssueCertificate in handlers/admin_node.go and the
+		// node-agent tls poll loop in node-agent/cmd/main.go). Previously only
+		// tls_domain was persisted, which nothing ever read back - the
+		// node-agent had no way to learn a domain was requested, so
+		// tls_cert_file/tls_key_file never got populated and vmess_ws/
+		// trojan_tls inbounds silently never made it into the running Xray
+		// config (see buildVmessWS/buildTrojanTLS in services/xray_config.go).
+		`ALTER TABLE nodes ADD COLUMN IF NOT EXISTS tls_email TEXT NOT NULL DEFAULT ''`,
 	}
 	for _, m := range migrations {
 		if _, err := pool.Exec(ctx, m); err != nil {

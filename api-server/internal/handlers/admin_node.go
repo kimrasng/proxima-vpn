@@ -353,7 +353,12 @@ type issueCertificateRequest struct {
 	Email  string `json:"email" validate:"required,email"`
 }
 
-// IssueCertificate stores domain info for a node so the node-agent can issue a TLS certificate via ACME.
+// IssueCertificate stores domain info for a node. The node-agent polls
+// GET /nodes/{id}/tls-domain (see NodeAgentHandler.GetTLSDomain) and, once it
+// sees a non-empty domain, obtains the certificate via ACME itself and
+// reports the resulting file paths back through POST /nodes/{id}/tls-cert
+// (see NodeAgentHandler.ReportTLSCert) - this handler only records what was
+// requested, it does not perform issuance.
 // @Summary Issue TLS certificate
 // @Description Stores domain info for a node to trigger ACME certificate issuance
 // @Tags admin-nodes
@@ -381,11 +386,16 @@ func (h *AdminNodeHandler) IssueCertificate(c *fiber.Ctx) error {
 			"error": "domain is required",
 		})
 	}
+	if req.Email == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "email is required",
+		})
+	}
 
 	result, err := h.db.Exec(
 		context.Background(),
-		`UPDATE nodes SET tls_domain = $1, updated_at = NOW() WHERE id = $2 AND status != 'pending'`,
-		req.Domain, id,
+		`UPDATE nodes SET tls_domain = $1, tls_email = $2, updated_at = NOW() WHERE id = $3 AND status != 'pending'`,
+		req.Domain, req.Email, id,
 	)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{

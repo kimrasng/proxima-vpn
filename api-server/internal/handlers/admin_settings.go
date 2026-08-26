@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
+	"strconv"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -67,10 +69,10 @@ func (h *AdminSettingsHandler) Update(c *fiber.Ctx) error {
 	}
 
 	ctx := context.Background()
-	for key, value := range body {
+	for key, raw := range body {
 		_, err := h.db.Exec(ctx,
 			`INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2`,
-			key, value,
+			key, settingValueToString(raw),
 		)
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to update settings"})
@@ -78,4 +80,29 @@ func (h *AdminSettingsHandler) Update(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{"status": "ok"})
+}
+
+// settingValueToString converts a JSON-decoded settings value (the `value`
+// column is TEXT, but the admin Settings form - web/src/pages/admin/
+// Settings.tsx - submits real booleans for its toggle fields, e.g.
+// self_registration/telegram_enabled) into the string form callers that read
+// it back expect (see e.g. "value = 'false'" in UserAuthHandler.Register).
+// Without this, saving the Settings page always failed: pgx cannot bind a
+// Go bool to a TEXT column, and every real save includes at least one
+// boolean field.
+func settingValueToString(raw interface{}) string {
+	switch v := raw.(type) {
+	case string:
+		return v
+	case bool:
+		return strconv.FormatBool(v)
+	case float64:
+		return strconv.FormatFloat(v, 'f', -1, 64)
+	default:
+		b, err := json.Marshal(v)
+		if err != nil {
+			return ""
+		}
+		return string(b)
+	}
 }

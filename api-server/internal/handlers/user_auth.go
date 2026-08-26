@@ -66,6 +66,21 @@ type registerResponse struct {
 // @Failure 409 {object} map[string]string
 // @Router /auth/register [post]
 func (h *UserAuthHandler) Register(c *fiber.Ctx) error {
+	// self_registration defaults to enabled (matching the admin Settings UI's
+	// default, web/src/pages/admin/Settings.tsx) when the key hasn't been set
+	// yet; only an explicit "false" blocks registration. Previously this
+	// setting was saved by the admin panel but never read anywhere, so
+	// disabling it had no effect - registration stayed open regardless.
+	var selfRegDisabled bool
+	if err := h.db.QueryRow(
+		context.Background(),
+		`SELECT value = 'false' FROM settings WHERE key = 'self_registration'`,
+	).Scan(&selfRegDisabled); err == nil && selfRegDisabled {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+			"error": "self-registration is disabled",
+		})
+	}
+
 	var req registerRequest
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
@@ -201,13 +216,14 @@ func (h *UserAuthHandler) Login(c *fiber.Ctx) error {
 	}
 
 	now := time.Now()
+	expiry := resolveSessionExpiry(context.Background(), h.db, h.jwtExpiry)
 	claims := UserClaims{
 		UserID: id,
 		Email:  email,
 		Status: status,
 		RegisteredClaims: jwt.RegisteredClaims{
 			IssuedAt:  jwt.NewNumericDate(now),
-			ExpiresAt: jwt.NewNumericDate(now.Add(h.jwtExpiry)),
+			ExpiresAt: jwt.NewNumericDate(now.Add(expiry)),
 		},
 	}
 

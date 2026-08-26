@@ -348,3 +348,72 @@ func (c *APIClient) SendStats(ctx context.Context, stats []TrafficStat, onlineUU
 
 	return nil
 }
+
+// TLSDomain is the domain/email an admin requested for this node via the
+// panel's "Issue Certificate" action.
+type TLSDomain struct {
+	Domain string `json:"domain"`
+	Email  string `json:"email"`
+}
+
+// GetTLSDomain fetches the TLS domain/email currently requested for this
+// node, if any.
+func (c *APIClient) GetTLSDomain(ctx context.Context) (TLSDomain, error) {
+	url := fmt.Sprintf("%s/api/v1/nodes/%s/tls-domain", c.serverURL, c.nodeID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return TLSDomain{}, fmt.Errorf("create tls domain request: %w", err)
+	}
+	req.Header.Set("X-Node-Key", c.apiKey)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return TLSDomain{}, fmt.Errorf("get tls domain request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return TLSDomain{}, fmt.Errorf("get tls domain failed (status %d): %s", resp.StatusCode, string(body))
+	}
+
+	var td TLSDomain
+	if err := json.NewDecoder(resp.Body).Decode(&td); err != nil {
+		return TLSDomain{}, fmt.Errorf("decode tls domain: %w", err)
+	}
+	return td, nil
+}
+
+// ReportTLSCert reports the local file paths of a certificate this node-agent
+// just obtained via ACME, so the server can wire them into this node's
+// vmess_ws/trojan_tls inbounds.
+func (c *APIClient) ReportTLSCert(ctx context.Context, certFile, keyFile string) error {
+	body, err := json.Marshal(struct {
+		CertFile string `json:"cert_file"`
+		KeyFile  string `json:"key_file"`
+	}{CertFile: certFile, KeyFile: keyFile})
+	if err != nil {
+		return fmt.Errorf("marshal tls cert report: %w", err)
+	}
+
+	url := fmt.Sprintf("%s/api/v1/nodes/%s/tls-cert", c.serverURL, c.nodeID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("create tls cert report request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Node-Key", c.apiKey)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("tls cert report request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("tls cert report failed (status %d): %s", resp.StatusCode, string(respBody))
+	}
+
+	return nil
+}

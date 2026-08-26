@@ -51,6 +51,9 @@ type subscriptionNode struct {
 	RealityShortID     string
 	TLSCertFile        *string
 	TLSKeyFile         *string
+	VmessPort          *int
+	TrojanPort         *int
+	SSPort             *int
 	SSPassword         *string
 	WGPort             *int
 	WGServerPrivateKey *string
@@ -112,13 +115,29 @@ func (h *SubscriptionHandler) GetSubscription(c *fiber.Ctx) error {
 
 	rows, err := h.db.Query(ctx,
 		`SELECT n.id, n.name, host(n.ip), n.port, n.status, n.reality_public_key, n.reality_short_id,
-		        n.tls_cert_file, n.tls_key_file, n.ss_password,
+		        n.tls_cert_file, n.tls_key_file,
+		        vmessib.port, trojanib.port, ssib.port, ssib.settings->>'password',
 		        wgib.port, wgib.settings->>'private_key',
 		        hy2ib.port
 		 FROM nodes n
 		 JOIN node_group_nodes ngn ON n.id = ngn.node_id
 		 JOIN node_groups ng ON ngn.node_group_id = ng.id
 		 JOIN plans p ON p.node_group_id = ng.id
+		 LEFT JOIN LATERAL (
+		     SELECT port FROM inbounds
+		     WHERE node_id = n.id AND protocol = 'vmess_ws' AND enabled = true
+		     ORDER BY created_at LIMIT 1
+		 ) vmessib ON true
+		 LEFT JOIN LATERAL (
+		     SELECT port FROM inbounds
+		     WHERE node_id = n.id AND protocol = 'trojan_tls' AND enabled = true
+		     ORDER BY created_at LIMIT 1
+		 ) trojanib ON true
+		 LEFT JOIN LATERAL (
+		     SELECT port, settings FROM inbounds
+		     WHERE node_id = n.id AND protocol = 'shadowsocks' AND enabled = true
+		     ORDER BY created_at LIMIT 1
+		 ) ssib ON true
 		 LEFT JOIN LATERAL (
 		     SELECT port, settings FROM inbounds
 		     WHERE node_id = n.id AND protocol = 'wireguard' AND enabled = true
@@ -145,7 +164,8 @@ func (h *SubscriptionHandler) GetSubscription(c *fiber.Ctx) error {
 		if err := rows.Scan(
 			&node.ID, &node.Name, &node.IP, &node.Port,
 			&node.Status, &node.RealityPublicKey, &node.RealityShortID,
-			&node.TLSCertFile, &node.TLSKeyFile, &node.SSPassword,
+			&node.TLSCertFile, &node.TLSKeyFile,
+			&node.VmessPort, &node.TrojanPort, &node.SSPort, &node.SSPassword,
 			&node.WGPort, &node.WGServerPrivateKey,
 			&node.HY2Port,
 		); err != nil {
@@ -244,13 +264,15 @@ func (h *SubscriptionHandler) GetSubscription(c *fiber.Ctx) error {
 			hasTLS := node.TLSCertFile != nil && node.TLSKeyFile != nil &&
 				*node.TLSCertFile != "" && *node.TLSKeyFile != ""
 
-			if hasTLS {
-				links = append(links, buildVMESSLink(deviceUUID, node, fragment))
-				links = append(links, buildTrojanLink(deviceUUID, node, fragment))
+			if hasTLS && node.VmessPort != nil {
+				links = append(links, buildVMESSLink(deviceUUID, node, *node.VmessPort, fragment))
+			}
+			if hasTLS && node.TrojanPort != nil {
+				links = append(links, buildTrojanLink(deviceUUID, node, *node.TrojanPort, fragment))
 			}
 
-			if node.SSPassword != nil && *node.SSPassword != "" {
-				links = append(links, buildSSLink(*node.SSPassword, node, fragment))
+			if node.SSPassword != nil && *node.SSPassword != "" && node.SSPort != nil {
+				links = append(links, buildSSLink(*node.SSPassword, node, *node.SSPort, fragment))
 			}
 		}
 		body = []byte(base64.StdEncoding.EncodeToString([]byte(strings.Join(links, "\n"))))
@@ -349,32 +371,34 @@ func buildNodeInfoList(nodes []subscriptionNode, userUUID string, speedMbps int,
 		hasTLS := node.TLSCertFile != nil && node.TLSKeyFile != nil &&
 			*node.TLSCertFile != "" && *node.TLSKeyFile != ""
 
-		if hasTLS {
+		if hasTLS && node.VmessPort != nil {
 			infos = append(infos, subscription.NodeInfo{
 				Name:       node.Name + " VMess",
 				IP:         node.IP,
-				Port:       8443,
+				Port:       *node.VmessPort,
 				Protocol:   "vmess_ws",
 				WSPath:     "/vmess",
 				TLSEnabled: true,
 				ServerName: node.IP,
 			})
+		}
 
+		if hasTLS && node.TrojanPort != nil {
 			infos = append(infos, subscription.NodeInfo{
 				Name:       node.Name + " Trojan",
 				IP:         node.IP,
-				Port:       2083,
+				Port:       *node.TrojanPort,
 				Protocol:   "trojan_tls",
 				TLSEnabled: true,
 				ServerName: node.IP,
 			})
 		}
 
-		if node.SSPassword != nil && *node.SSPassword != "" {
+		if node.SSPassword != nil && *node.SSPassword != "" && node.SSPort != nil {
 			infos = append(infos, subscription.NodeInfo{
 				Name:       node.Name + " SS",
 				IP:         node.IP,
-				Port:       8388,
+				Port:       *node.SSPort,
 				Protocol:   "shadowsocks",
 				SSMethod:   "2022-blake3-aes-128-gcm",
 				SSPassword: *node.SSPassword,
@@ -449,12 +473,12 @@ func buildVLESSLink(uuid string, node subscriptionNode, port int, fragment strin
 	)
 }
 
-func buildVMESSLink(uuid string, node subscriptionNode, fragment string) string {
+func buildVMESSLink(uuid string, node subscriptionNode, port int, fragment string) string {
 	vmessConfig := map[string]interface{}{
 		"v":    "2",
 		"ps":   fragment + " VMess",
 		"add":  node.IP,
-		"port": 8443,
+		"port": port,
 		"id":   uuid,
 		"aid":  0,
 		"net":  "ws",
@@ -467,24 +491,24 @@ func buildVMESSLink(uuid string, node subscriptionNode, fragment string) string 
 	return "vmess://" + base64.StdEncoding.EncodeToString(jsonBytes)
 }
 
-func buildTrojanLink(uuid string, node subscriptionNode, fragment string) string {
+func buildTrojanLink(uuid string, node subscriptionNode, port int, fragment string) string {
 	return fmt.Sprintf(
 		"trojan://%s@%s:%d?security=tls&type=tcp#%s",
 		uuid,
 		node.IP,
-		2083,
+		port,
 		url.PathEscape(fragment+" Trojan"),
 	)
 }
 
-func buildSSLink(password string, node subscriptionNode, fragment string) string {
+func buildSSLink(password string, node subscriptionNode, port int, fragment string) string {
 	method := "2022-blake3-aes-128-gcm"
 	userinfo := base64.URLEncoding.EncodeToString([]byte(method + ":" + password))
 	return fmt.Sprintf(
 		"ss://%s@%s:%d#%s",
 		userinfo,
 		node.IP,
-		8388,
+		port,
 		url.PathEscape(fragment+" SS"),
 	)
 }

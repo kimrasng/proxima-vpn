@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"sort"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -307,6 +308,13 @@ func (s *XrayConfigService) GenerateConfig(ctx context.Context, nodeID string) (
 		for _, ib := range dbInbounds {
 			xrayIb, err := s.buildInbound(ib, vlessClients, vmessClients, trojanClients, realityPrivateKey, realityShortID, tlsCertFile, tlsKeyFile)
 			if err != nil {
+				// Most commonly a vmess_ws/trojan_tls inbound waiting on a TLS
+				// cert the admin hasn't issued yet (see IssueCertificate in
+				// handlers/admin_node.go and the node-agent tls poll loop) -
+				// log it instead of dropping it silently, so a misconfigured
+				// inbound doesn't just vanish from the running config with no
+				// trace.
+				log.Printf("xray config: skipping inbound %s (%s) on node %s: %v", ib.Tag, ib.Protocol, nodeID, err)
 				continue
 			}
 			inbounds = append(inbounds, *xrayIb)

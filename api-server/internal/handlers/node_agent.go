@@ -311,6 +311,73 @@ func (h *NodeAgentHandler) GetHysteria2Users(c *fiber.Ctx) error {
 	return c.JSON(uuids)
 }
 
+type tlsDomainResponse struct {
+	Domain string `json:"domain"`
+	Email  string `json:"email"`
+}
+
+// GetTLSDomain returns the TLS domain/email an admin requested for this node
+// via AdminNodeHandler.IssueCertificate (admin_node.go), if any. The
+// node-agent polls this and, when it sees a non-empty domain, obtains the
+// certificate itself via ACME (node-agent/internal/cert) and reports the
+// resulting file paths back through ReportTLSCert below.
+func (h *NodeAgentHandler) GetTLSDomain(c *fiber.Ctx) error {
+	nodeID := c.Locals("node_id").(string)
+
+	var domain, email string
+	err := h.db.QueryRow(
+		context.Background(),
+		`SELECT tls_domain, tls_email FROM nodes WHERE id = $1`,
+		nodeID,
+	).Scan(&domain, &email)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to fetch node",
+		})
+	}
+
+	return c.JSON(tlsDomainResponse{Domain: domain, Email: email})
+}
+
+type reportTLSCertRequest struct {
+	CertFile string `json:"cert_file"`
+	KeyFile  string `json:"key_file"`
+}
+
+// ReportTLSCert records the local file paths of a certificate the node-agent
+// just obtained via ACME, so XrayConfigService.GenerateConfig can wire them
+// into vmess_ws/trojan_tls inbounds (see buildVmessWS/buildTrojanTLS in
+// services/xray_config.go). Paths are node-local: Xray and the node-agent
+// that obtained the cert run on the same host.
+func (h *NodeAgentHandler) ReportTLSCert(c *fiber.Ctx) error {
+	nodeID := c.Locals("node_id").(string)
+
+	var req reportTLSCertRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "invalid request body",
+		})
+	}
+	if req.CertFile == "" || req.KeyFile == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "cert_file and key_file are required",
+		})
+	}
+
+	_, err := h.db.Exec(
+		context.Background(),
+		`UPDATE nodes SET tls_cert_file = $1, tls_key_file = $2, updated_at = NOW() WHERE id = $3`,
+		req.CertFile, req.KeyFile, nodeID,
+	)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to update node",
+		})
+	}
+
+	return c.JSON(fiber.Map{"status": "ok"})
+}
+
 type statEntry struct {
 	XrayUUID string `json:"xray_uuid"`
 	UpBytes  int64  `json:"up_bytes"`

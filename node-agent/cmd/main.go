@@ -164,8 +164,10 @@ func runCmd() *cobra.Command {
 
 			if tlsDomain != "" {
 				cm := cert.NewCertManager(tlsDomain, tlsEmail, certDir)
-				if _, _, err := cm.ObtainOrRenew(ctx); err != nil {
+				if certPath, keyPath, err := cm.ObtainOrRenew(ctx); err != nil {
 					log.Printf("warning: initial cert obtain failed: %v", err)
+				} else if err := apiClient.ReportTLSCert(ctx, certPath, keyPath); err != nil {
+					log.Printf("warning: report tls cert failed: %v", err)
 				}
 				cm.StartAutoRenew(ctx)
 				defer cm.Stop()
@@ -176,6 +178,7 @@ func runCmd() *cobra.Command {
 		go inboundsPollLoop(ctx, apiClient)
 		go updateCheckLoop(ctx, updater.NewUpdater(version, "", cfg.ServerURL, cfg.NodeID, cfg.APIKey))
 		go xrayUpdateLoop(ctx, apiClient, runner, xrayVersion)
+		go tlsPollLoop(ctx, apiClient, certDir, tlsDomain)
 
 			sigCh := make(chan os.Signal, 1)
 			signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
@@ -306,6 +309,60 @@ func xrayUpdateLoop(ctx context.Context, apiClient *client.APIClient, runner *xr
 				xrayVersion.Set(v)
 				log.Printf("xray updated to %s", v)
 			}
+		}
+	}
+}
+
+// tlsPollLoop polls the server for a TLS domain the admin requested via the
+// panel's "Issue Certificate" button (AdminNodeHandler.IssueCertificate,
+// api-server/internal/handlers/admin_node.go) and, once one appears, obtains
+// the certificate via ACME and reports the resulting file paths back so the
+// server can wire them into this node's vmess_ws/trojan_tls inbounds (see
+// buildVmessWS/buildTrojanTLS in services/xray_config.go). Previously that
+// button only wrote a DB column nothing ever read, so vmess_ws/trojan_tls
+// inbounds were silently dropped from every generated config no matter what
+// the admin did.
+//
+// staticDomain is the --tls-domain flag: if the operator provided one at
+// startup, cert issuance for that domain is already handled by
+// cert.NewCertManager/StartAutoRenew in runCmd, so this loop stays out of
+// the way rather than potentially requesting a second, different cert.
+func tlsPollLoop(ctx context.Context, apiClient *client.APIClient, certDir, staticDomain string) {
+	if staticDomain != "" {
+		return
+	}
+
+	ticker := time.NewTicker(5 * time.Minute)
+	defer ticker.Stop()
+
+	check := func() {
+		td, err := apiClient.GetTLSDomain(ctx)
+		if err != nil {
+			log.Printf("tls domain poll: %v", err)
+			return
+		}
+		if td.Domain == "" {
+			return
+		}
+
+		cm := cert.NewCertManager(td.Domain, td.Email, certDir)
+		certPath, keyPath, err := cm.ObtainOrRenew(ctx)
+		if err != nil {
+			log.Printf("tls cert obtain/renew for %s: %v", td.Domain, err)
+			return
+		}
+		if err := apiClient.ReportTLSCert(ctx, certPath, keyPath); err != nil {
+			log.Printf("tls cert report: %v", err)
+		}
+	}
+
+	check()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			check()
 		}
 	}
 }
