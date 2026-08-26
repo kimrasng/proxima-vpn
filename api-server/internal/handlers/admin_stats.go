@@ -13,11 +13,12 @@ import (
 type AdminStatsHandler struct {
 	db      *pgxpool.Pool
 	tracker *services.OnlineTracker
+	stats   *services.StatsService
 }
 
 // NewAdminStatsHandler creates a new AdminStatsHandler.
 func NewAdminStatsHandler(db *pgxpool.Pool, tracker *services.OnlineTracker) *AdminStatsHandler {
-	return &AdminStatsHandler{db: db, tracker: tracker}
+	return &AdminStatsHandler{db: db, tracker: tracker, stats: services.NewStatsService(db)}
 }
 
 // GetDashboardStats returns aggregate statistics for the admin dashboard.
@@ -32,28 +33,12 @@ func NewAdminStatsHandler(db *pgxpool.Pool, tracker *services.OnlineTracker) *Ad
 func (h *AdminStatsHandler) GetDashboardStats(c *fiber.Ctx) error {
 	ctx := context.Background()
 
-	var totalUsers, activeUsers, totalNodes, onlineNodes, pendingRequests int64
-
-	err := h.db.QueryRow(ctx, `SELECT COUNT(*) FROM users`).Scan(&totalUsers)
+	summary, err := h.stats.GetSummary(ctx)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to query stats"})
 	}
 
-	err = h.db.QueryRow(ctx, `SELECT COUNT(*) FROM users WHERE status = 'active' AND is_active = true`).Scan(&activeUsers)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to query stats"})
-	}
-
-	err = h.db.QueryRow(ctx, `SELECT COUNT(*) FROM nodes WHERE status != 'pending'`).Scan(&totalNodes)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to query stats"})
-	}
-
-	err = h.db.QueryRow(ctx, `SELECT COUNT(*) FROM nodes WHERE status = 'online'`).Scan(&onlineNodes)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to query stats"})
-	}
-
+	var pendingRequests int64
 	err = h.db.QueryRow(ctx, `SELECT COUNT(*) FROM plan_requests WHERE status = 'pending'`).Scan(&pendingRequests)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to query stats"})
@@ -61,24 +46,32 @@ func (h *AdminStatsHandler) GetDashboardStats(c *fiber.Ctx) error {
 
 	var totalTrafficToday, totalTrafficMonth int64
 
-	_ = h.db.QueryRow(ctx, `
-		SELECT COALESCE(SUM(bytes), 0) FROM traffic_logs
+	// up_bytes + dn_bytes: traffic_logs has no single "bytes" column (see
+	// database/schema.go). The previous version of this query referenced
+	// SUM(bytes), which errored on every call; the error was discarded (the
+	// call used `_ =`), so these two figures were silently always 0.
+	if err := h.db.QueryRow(ctx, `
+		SELECT COALESCE(SUM(up_bytes + dn_bytes), 0) FROM traffic_logs
 		WHERE created_at >= CURRENT_DATE
-	`).Scan(&totalTrafficToday)
+	`).Scan(&totalTrafficToday); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to query stats"})
+	}
 
-	_ = h.db.QueryRow(ctx, `
-		SELECT COALESCE(SUM(bytes), 0) FROM traffic_logs
+	if err := h.db.QueryRow(ctx, `
+		SELECT COALESCE(SUM(up_bytes + dn_bytes), 0) FROM traffic_logs
 		WHERE created_at >= DATE_TRUNC('month', CURRENT_DATE)
-	`).Scan(&totalTrafficMonth)
+	`).Scan(&totalTrafficMonth); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to query stats"})
+	}
 
 	onlineUsers, _ := h.tracker.GetAllOnlineCount(ctx)
 
 	return c.JSON(fiber.Map{
-		"total_users":         totalUsers,
-		"active_users":        activeUsers,
+		"total_users":         summary.TotalUsers,
+		"active_users":        summary.ActiveUsers,
 		"online_users":        onlineUsers,
-		"total_nodes":         totalNodes,
-		"online_nodes":        onlineNodes,
+		"total_nodes":         summary.TotalNodes,
+		"online_nodes":        summary.OnlineNodes,
 		"total_traffic_today": totalTrafficToday,
 		"total_traffic_month": totalTrafficMonth,
 		"pending_requests":    pendingRequests,

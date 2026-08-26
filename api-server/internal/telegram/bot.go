@@ -13,6 +13,7 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"github.com/proximavpn/proxima-vpn/api-server/internal/config"
+	"github.com/proximavpn/proxima-vpn/api-server/internal/services"
 	"github.com/proximavpn/proxima-vpn/pkg/crypto"
 )
 
@@ -23,6 +24,7 @@ type BotService struct {
 	rdb      *redis.Client
 	chatID   string
 	panelURL string
+	plan     *services.PlanService
 }
 
 // NewBotService creates a new Telegram bot service.
@@ -40,6 +42,7 @@ func NewBotService(cfg config.TelegramConfig, db *pgxpool.Pool, rdb *redis.Clien
 		rdb:      rdb,
 		chatID:   cfg.ChatID,
 		panelURL: panelURL,
+		plan:     services.NewPlanService(db),
 	}, nil
 }
 
@@ -125,7 +128,7 @@ func (s *BotService) handleCommand(msg *tgbotapi.Message) {
 			"/users - List users\n"+
 			"/user &lt;email&gt; - Show user details\n"+
 			"/adduser &lt;email&gt; &lt;password&gt; &lt;name&gt; - Create user\n"+
-			"/deluser &lt;email&gt; - Delete user\n"+
+			"/deluser &lt;email&gt; - Deactivate user\n"+
 			"/enable &lt;email&gt; - Enable user\n"+
 			"/disable &lt;email&gt; - Disable user\n"+
 			"/setplan &lt;email&gt; &lt;plan_name&gt; - Assign plan to user\n"+
@@ -402,12 +405,12 @@ func (s *BotService) handleDelUser(msg *tgbotapi.Message) {
 
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("✅ Yes, delete", "deluser_confirm:"+email),
+			tgbotapi.NewInlineKeyboardButtonData("✅ Yes, deactivate", "deluser_confirm:"+email),
 			tgbotapi.NewInlineKeyboardButtonData("❌ No, cancel", "deluser_cancel:"+email),
 		),
 	)
 
-	reply := tgbotapi.NewMessage(msg.Chat.ID, fmt.Sprintf("⚠️ Are you sure you want to delete user <b>%s</b>?", email))
+	reply := tgbotapi.NewMessage(msg.Chat.ID, fmt.Sprintf("⚠️ Are you sure you want to deactivate user <b>%s</b>?", email))
 	reply.ParseMode = "HTML"
 	reply.ReplyMarkup = keyboard
 	if _, err := s.bot.Send(reply); err != nil {
@@ -452,21 +455,22 @@ func (s *BotService) handleDisable(msg *tgbotapi.Message) {
 }
 
 func (s *BotService) handleStats(msg *tgbotapi.Message) {
-	ctx := context.Background()
-
-	var totalUsers, activeUsers, totalNodes, onlineNodes int64
-
-	_ = s.db.QueryRow(ctx, `SELECT COUNT(*) FROM users`).Scan(&totalUsers)
-	_ = s.db.QueryRow(ctx, `SELECT COUNT(*) FROM users WHERE status = 'active' AND is_active = true`).Scan(&activeUsers)
-	_ = s.db.QueryRow(ctx, `SELECT COUNT(*) FROM nodes`).Scan(&totalNodes)
-	_ = s.db.QueryRow(ctx, `SELECT COUNT(*) FROM nodes WHERE status = 'online'`).Scan(&onlineNodes)
+	// services.StatsService is the single source of truth for these counts,
+	// shared with the admin dashboard (admin_stats.go) and Prometheus
+	// (metrics.go) - this used to count 'pending' nodes toward Total Nodes
+	// while the dashboard didn't, which this fixes.
+	summary, err := services.NewStatsService(s.db).GetSummary(context.Background())
+	if err != nil {
+		s.sendReply(msg.Chat.ID, "❌ Failed to query stats.")
+		return
+	}
 
 	text := fmt.Sprintf("📊 <b>Dashboard Stats</b>\n\n"+
 		"👥 Total Users: %d\n"+
 		"✅ Active Users: %d\n"+
 		"🖥 Total Nodes: %d\n"+
 		"🟢 Online Nodes: %d",
-		totalUsers, activeUsers, totalNodes, onlineNodes)
+		summary.TotalUsers, summary.ActiveUsers, summary.TotalNodes, summary.OnlineNodes)
 
 	s.sendReply(msg.Chat.ID, text)
 }
@@ -490,16 +494,20 @@ func (s *BotService) handleCallback(cb *tgbotapi.CallbackQuery) {
 		email := strings.TrimPrefix(data, "deluser_confirm:")
 		ctx := context.Background()
 
-		tag, err := s.db.Exec(ctx, `DELETE FROM users WHERE email = $1`, email)
+		// Soft-deactivate rather than hard-delete, matching the admin panel's
+		// AdminUserHandler.Delete (admin_user.go) - a hard DELETE here would
+		// let anyone with bot access bypass whatever recovery/audit guarantee
+		// the panel's "delete" was meant to provide.
+		tag, err := s.db.Exec(ctx, `UPDATE users SET is_active = false, status = 'suspended' WHERE email = $1`, email)
 		if err != nil || tag.RowsAffected() == 0 {
-			s.sendReply(cb.Message.Chat.ID, fmt.Sprintf("❌ Failed to delete user <b>%s</b>.", email))
+			s.sendReply(cb.Message.Chat.ID, fmt.Sprintf("❌ Failed to deactivate user <b>%s</b>.", email))
 			return
 		}
-		s.sendReply(cb.Message.Chat.ID, fmt.Sprintf("🗑 User <b>%s</b> deleted.", email))
+		s.sendReply(cb.Message.Chat.ID, fmt.Sprintf("🚫 User <b>%s</b> deactivated.", email))
 
 	case strings.HasPrefix(data, "deluser_cancel:"):
 		email := strings.TrimPrefix(data, "deluser_cancel:")
-		s.sendReply(cb.Message.Chat.ID, fmt.Sprintf("↩️ Deletion of <b>%s</b> cancelled.", email))
+		s.sendReply(cb.Message.Chat.ID, fmt.Sprintf("↩️ Deactivation of <b>%s</b> cancelled.", email))
 	}
 }
 
@@ -511,27 +519,14 @@ func (s *BotService) handleSetPlan(msg *tgbotapi.Message) {
 	}
 	email := args[0]
 	planName := strings.Join(args[1:], " ")
-	ctx := context.Background()
 
-	var planID string
-	var durationDays int
-	err := s.db.QueryRow(ctx,
-		`SELECT id, duration_days FROM plans WHERE name = $1 AND is_active = true`, planName,
-	).Scan(&planID, &durationDays)
-	if err != nil {
-		s.sendReply(msg.Chat.ID, fmt.Sprintf("❌ Plan <b>%s</b> not found or inactive.", planName))
-		return
-	}
-
-	tag, err := s.db.Exec(ctx,
-		`UPDATE users SET plan_id = $1, plan_started_at = NOW(), plan_expires_at = NOW() + make_interval(days => $2), status = 'active', updated_at = NOW() WHERE email = $3`,
-		planID, durationDays, email)
+	// Delegates to services.PlanService so this goes through the exact same
+	// logic as the admin panel's plan-request approval (admin_plan_request.go)
+	// - traffic reset and reactivation included, not just the plan/expiry
+	// fields this command used to set on its own.
+	durationDays, err := s.plan.AssignPlanByName(context.Background(), email, planName)
 	if err != nil {
 		s.sendReply(msg.Chat.ID, fmt.Sprintf("❌ Failed to assign plan: %s", err.Error()))
-		return
-	}
-	if tag.RowsAffected() == 0 {
-		s.sendReply(msg.Chat.ID, fmt.Sprintf("❌ User <b>%s</b> not found.", email))
 		return
 	}
 

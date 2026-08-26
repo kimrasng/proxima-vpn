@@ -6,16 +6,18 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/proximavpn/proxima-vpn/api-server/internal/services"
 )
 
 // AdminPlanRequestHandler handles admin plan request review endpoints.
 type AdminPlanRequestHandler struct {
-	db *pgxpool.Pool
+	db   *pgxpool.Pool
+	plan *services.PlanService
 }
 
 // NewAdminPlanRequestHandler creates a new AdminPlanRequestHandler.
 func NewAdminPlanRequestHandler(db *pgxpool.Pool) *AdminPlanRequestHandler {
-	return &AdminPlanRequestHandler{db: db}
+	return &AdminPlanRequestHandler{db: db, plan: services.NewPlanService(db)}
 }
 
 type adminPlanRequestItem struct {
@@ -134,18 +136,6 @@ func (h *AdminPlanRequestHandler) Review(c *fiber.Ctx) error {
 	}
 
 	if req.Action == "approve" {
-		var durationDays int
-		err = h.db.QueryRow(
-			context.Background(),
-			`SELECT duration_days FROM plans WHERE id = $1`,
-			planID,
-		).Scan(&durationDays)
-		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"error": "internal server error",
-			})
-		}
-
 		_, err = h.db.Exec(
 			context.Background(),
 			`UPDATE plan_requests SET status = 'approved', reviewed_by = $1, reviewed_at = NOW() WHERE id = $2`,
@@ -157,14 +147,7 @@ func (h *AdminPlanRequestHandler) Review(c *fiber.Ctx) error {
 			})
 		}
 
-		_, err = h.db.Exec(
-			context.Background(),
-			`UPDATE users SET plan_id = $1, plan_started_at = NOW(), plan_expires_at = NOW() + make_interval(days => $2),
-			 traffic_used = 0, status = 'active', is_active = true
-			 WHERE id = $3`,
-			planID, durationDays, userID,
-		)
-		if err != nil {
+		if err := h.plan.AssignPlanToUser(context.Background(), userID, planID); err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 				"error": "internal server error",
 			})

@@ -26,7 +26,7 @@ func GenerateQuantumult(nodes []NodeInfo, userUUID string) ([]byte, error) {
 
 func buildQuantumultLine(node NodeInfo, userUUID string) string {
 	switch node.Protocol {
-	case "vmess":
+	case "vmess_ws":
 		parts := []string{
 			fmt.Sprintf("vmess=%s:%d", node.IP, node.Port),
 			"method=chacha20-poly1305",
@@ -41,7 +41,7 @@ func buildQuantumultLine(node NodeInfo, userUUID string) string {
 		parts = append(parts, fmt.Sprintf("tag=%s", node.Name))
 		return strings.Join(parts, ", ")
 
-	case "trojan":
+	case "trojan_tls":
 		return fmt.Sprintf("trojan=%s:%d, password=%s, over-tls=true, tls-verification=false, tag=%s",
 			node.IP, node.Port, userUUID, node.Name)
 
@@ -49,6 +49,10 @@ func buildQuantumultLine(node NodeInfo, userUUID string) string {
 		return fmt.Sprintf("shadowsocks=%s:%d, method=%s, password=%s, tag=%s",
 			node.IP, node.Port, node.SSMethod, node.SSPassword, node.Name)
 
+	// hysteria2/wireguard: intentionally unsupported here, same reasoning as
+	// buildSurfboardProxyLine in surfboard.go - not verified against a real
+	// QuantumultX client, and getting the syntax subtly wrong would be worse
+	// than omitting it. Clash and Sing-box cover both protocols instead.
 	default:
 		return ""
 	}

@@ -64,12 +64,13 @@ type StatsPayload struct {
 
 // HeartbeatPayload is the payload for heartbeat.
 type HeartbeatPayload struct {
-	CPU        float64 `json:"cpu_usage"`
-	Memory     float64 `json:"memory_usage"`
-	Disk       float64 `json:"disk_usage"`
-	LoadAvg    float64 `json:"load_avg"`
-	NetworkIn  float64 `json:"network_in"`
-	NetworkOut float64 `json:"network_out"`
+	CPU         float64 `json:"cpu_usage"`
+	Memory      float64 `json:"memory_usage"`
+	Disk        float64 `json:"disk_usage"`
+	LoadAvg     float64 `json:"load_avg"`
+	NetworkIn   float64 `json:"network_in"`
+	NetworkOut  float64 `json:"network_out"`
+	XrayVersion string  `json:"xray_version,omitempty"`
 }
 
 // Register registers this node with the main server.
@@ -139,14 +140,15 @@ func (c *APIClient) GetConfig(ctx context.Context) ([]byte, error) {
 }
 
 // SendHeartbeat sends system metrics to the server.
-func (c *APIClient) SendHeartbeat(ctx context.Context, cpu, memory, disk, loadAvg, networkIn, networkOut float64) error {
+func (c *APIClient) SendHeartbeat(ctx context.Context, cpu, memory, disk, loadAvg, networkIn, networkOut float64, xrayVersion string) error {
 	payload := HeartbeatPayload{
-		CPU:        cpu,
-		Memory:     memory,
-		Disk:       disk,
-		LoadAvg:    loadAvg,
-		NetworkIn:  networkIn,
-		NetworkOut: networkOut,
+		CPU:         cpu,
+		Memory:      memory,
+		Disk:        disk,
+		LoadAvg:     loadAvg,
+		NetworkIn:   networkIn,
+		NetworkOut:  networkOut,
+		XrayVersion: xrayVersion,
 	}
 
 	body, err := json.Marshal(payload)
@@ -209,6 +211,109 @@ func (c *APIClient) GetInbounds(ctx context.Context) ([]InboundConfig, error) {
 		return nil, fmt.Errorf("decode inbounds: %w", err)
 	}
 	return inbounds, nil
+}
+
+// XrayUpdateInfo is the response from the server's xray update-check endpoint.
+type XrayUpdateInfo struct {
+	TargetVersion string `json:"target_version"`
+}
+
+// CheckXrayUpdate asks the server whether a newer Xray-core version is
+// targeted for this node. Returns ("", false, nil) when up to date.
+func (c *APIClient) CheckXrayUpdate(ctx context.Context, currentVersion string) (string, bool, error) {
+	url := fmt.Sprintf("%s/api/v1/nodes/%s/xray-update", c.serverURL, c.nodeID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return "", false, fmt.Errorf("create xray update check request: %w", err)
+	}
+	req.Header.Set("X-Node-Key", c.apiKey)
+	req.Header.Set("X-Xray-Version", currentVersion)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return "", false, fmt.Errorf("xray update check request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNoContent {
+		return "", false, nil
+	}
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return "", false, fmt.Errorf("xray update check failed (status %d): %s", resp.StatusCode, string(body))
+	}
+
+	var info XrayUpdateInfo
+	if err := json.NewDecoder(resp.Body).Decode(&info); err != nil {
+		return "", false, fmt.Errorf("decode xray update response: %w", err)
+	}
+	if info.TargetVersion == "" || info.TargetVersion == currentVersion {
+		return "", false, nil
+	}
+	return info.TargetVersion, true, nil
+}
+
+// WireGuardPeer is a peer that should currently be admitted on this node's
+// WireGuard interface.
+type WireGuardPeer struct {
+	PublicKey  string `json:"public_key"`
+	AllowedIPs string `json:"allowed_ips"`
+}
+
+// GetWireGuardPeers fetches the current set of eligible WireGuard peers from
+// the server.
+func (c *APIClient) GetWireGuardPeers(ctx context.Context) ([]WireGuardPeer, error) {
+	url := fmt.Sprintf("%s/api/v1/nodes/%s/wireguard/peers", c.serverURL, c.nodeID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("create wireguard peers request: %w", err)
+	}
+	req.Header.Set("X-Node-Key", c.apiKey)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("get wireguard peers request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("get wireguard peers failed (status %d): %s", resp.StatusCode, string(body))
+	}
+
+	var peers []WireGuardPeer
+	if err := json.NewDecoder(resp.Body).Decode(&peers); err != nil {
+		return nil, fmt.Errorf("decode wireguard peers: %w", err)
+	}
+	return peers, nil
+}
+
+// GetHysteria2Users fetches the current set of xray_uuids eligible to
+// authenticate against this node's Hysteria2 server.
+func (c *APIClient) GetHysteria2Users(ctx context.Context) ([]string, error) {
+	url := fmt.Sprintf("%s/api/v1/nodes/%s/hysteria2/users", c.serverURL, c.nodeID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("create hysteria2 users request: %w", err)
+	}
+	req.Header.Set("X-Node-Key", c.apiKey)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("get hysteria2 users request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("get hysteria2 users failed (status %d): %s", resp.StatusCode, string(body))
+	}
+
+	var uuids []string
+	if err := json.NewDecoder(resp.Body).Decode(&uuids); err != nil {
+		return nil, fmt.Errorf("decode hysteria2 users: %w", err)
+	}
+	return uuids, nil
 }
 
 func (c *APIClient) SendStats(ctx context.Context, stats []TrafficStat, onlineUUIDs []string) error {

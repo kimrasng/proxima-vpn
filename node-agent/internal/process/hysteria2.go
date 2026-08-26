@@ -40,10 +40,15 @@ type Hysteria2TLS struct {
 	Key  string `json:"key"`
 }
 
-// Hysteria2Auth holds authentication configuration.
+// Hysteria2Auth holds authentication configuration. Use Type "password" for a
+// single node-wide secret, or Type "userpass" with UserPass populated to gate
+// each connection by its own credential (see buildHysteria2Config in
+// node-agent/cmd/main.go, which uses each device's xray_uuid as both the
+// username and password so suspending/deleting a device revokes it here too).
 type Hysteria2Auth struct {
-	Type     string `json:"type"`
-	Password string `json:"password,omitempty"`
+	Type     string            `json:"type"`
+	Password string            `json:"password,omitempty"`
+	UserPass map[string]string `json:"userpass,omitempty"`
 }
 
 // Hysteria2Bandwidth holds bandwidth limit configuration.

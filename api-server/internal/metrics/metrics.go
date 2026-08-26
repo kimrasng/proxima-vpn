@@ -8,6 +8,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
+	"github.com/proximavpn/proxima-vpn/api-server/internal/services"
 )
 
 var (
@@ -45,7 +46,8 @@ var (
 // StartGaugeUpdater runs a background goroutine that periodically queries the
 // database and updates the node/user count gauges. It stops when ctx is cancelled.
 func StartGaugeUpdater(ctx context.Context, db *pgxpool.Pool) {
-	updateGauges(ctx, db)
+	stats := services.NewStatsService(db)
+	updateGauges(ctx, stats)
 
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
@@ -55,29 +57,22 @@ func StartGaugeUpdater(ctx context.Context, db *pgxpool.Pool) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			updateGauges(ctx, db)
+			updateGauges(ctx, stats)
 		}
 	}
 }
 
-func updateGauges(ctx context.Context, db *pgxpool.Pool) {
-	var count int64
-
-	if err := db.QueryRow(ctx, `SELECT COUNT(*) FROM nodes`).Scan(&count); err == nil {
-		NodesTotal.Set(float64(count))
-	} else {
-		log.Printf("metrics: failed to query nodes count: %v", err)
+// updateGauges delegates to services.StatsService so this gauge's counts
+// can't drift from the admin dashboard's or the Telegram bot's - it
+// previously counted 'pending' nodes toward NodesTotal while the dashboard
+// didn't, which this fixes.
+func updateGauges(ctx context.Context, stats *services.StatsService) {
+	summary, err := stats.GetSummary(ctx)
+	if err != nil {
+		log.Printf("metrics: failed to query summary: %v", err)
+		return
 	}
-
-	if err := db.QueryRow(ctx, `SELECT COUNT(*) FROM users`).Scan(&count); err == nil {
-		UsersTotal.Set(float64(count))
-	} else {
-		log.Printf("metrics: failed to query users count: %v", err)
-	}
-
-	if err := db.QueryRow(ctx, `SELECT COUNT(*) FROM users WHERE status = 'active' AND is_active = true`).Scan(&count); err == nil {
-		UsersActive.Set(float64(count))
-	} else {
-		log.Printf("metrics: failed to query active users count: %v", err)
-	}
+	NodesTotal.Set(float64(summary.TotalNodes))
+	UsersTotal.Set(float64(summary.TotalUsers))
+	UsersActive.Set(float64(summary.ActiveUsers))
 }

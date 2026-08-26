@@ -9,6 +9,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/proximavpn/proxima-vpn/pkg/crypto"
 )
 
 type AdminInboundHandler struct {
@@ -153,6 +154,13 @@ func (h *AdminInboundHandler) Create(c *fiber.Ctx) error {
 	if settings == nil {
 		settings = make(map[string]interface{})
 	}
+	if req.Protocol == "wireguard" {
+		if err := ensureWireGuardServerSettings(settings); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "failed to generate wireguard server keys",
+			})
+		}
+	}
 	settingsJSON, err := json.Marshal(settings)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -244,6 +252,34 @@ func (h *AdminInboundHandler) Update(c *fiber.Ctx) error {
 		argIdx++
 	}
 	if req.Settings != nil {
+		protocol := ""
+		if req.Protocol != nil {
+			protocol = *req.Protocol
+		} else {
+			_ = h.db.QueryRow(context.Background(), `SELECT protocol FROM inbounds WHERE id = $1`, id).Scan(&protocol)
+		}
+		if protocol == "wireguard" {
+			if pk, ok := req.Settings["private_key"]; !ok || pk == "" {
+				// Preserve the existing server private key across unrelated
+				// edits (e.g. toggling the port) so already-provisioned peers
+				// don't silently lose their server identity.
+				var existingRaw json.RawMessage
+				if err := h.db.QueryRow(context.Background(), `SELECT settings FROM inbounds WHERE id = $1`, id).Scan(&existingRaw); err == nil {
+					var existing map[string]interface{}
+					if json.Unmarshal(existingRaw, &existing) == nil {
+						if existingPK, ok := existing["private_key"]; ok {
+							req.Settings["private_key"] = existingPK
+						}
+					}
+				}
+			}
+			if err := ensureWireGuardServerSettings(req.Settings); err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+					"error": "failed to generate wireguard server keys",
+				})
+			}
+		}
+
 		settingsJSON, err := json.Marshal(req.Settings)
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -363,4 +399,22 @@ func (h *AdminInboundHandler) Toggle(c *fiber.Ctx) error {
 	return c.JSON(ib)
 }
 
-
+// ensureWireGuardServerSettings fills in a wireguard inbound's server
+// private_key and address if the admin didn't supply them, so the node-agent
+// (see node-agent/cmd/main.go:buildWireGuardConfig) always has a usable
+// interface config. address defaults to the whole wgAddressPoolBase pool so
+// every device address allocated in user_device.go routes correctly back
+// through this node's wg0 interface, regardless of which node it targets.
+func ensureWireGuardServerSettings(settings map[string]interface{}) error {
+	if pk, ok := settings["private_key"]; !ok || pk == "" {
+		priv, _, err := crypto.GenerateWireGuardKeypair()
+		if err != nil {
+			return err
+		}
+		settings["private_key"] = priv
+	}
+	if addr, ok := settings["address"]; !ok || addr == "" {
+		settings["address"] = fmt.Sprintf("%s.0.1/16", wgAddressPoolBase)
+	}
+	return nil
+}

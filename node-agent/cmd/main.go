@@ -10,6 +10,8 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"slices"
+	"sync"
 	"syscall"
 	"time"
 
@@ -21,8 +23,12 @@ import (
 	"github.com/proximavpn/proxima-vpn/node-agent/internal/process"
 	"github.com/proximavpn/proxima-vpn/node-agent/internal/shaper"
 	"github.com/proximavpn/proxima-vpn/node-agent/internal/stats"
+	"github.com/proximavpn/proxima-vpn/node-agent/internal/updater"
 	"github.com/proximavpn/proxima-vpn/node-agent/internal/xray"
 )
+
+// version is set at build time via -ldflags "-X main.version=...` (see Makefile).
+var version = "dev"
 
 func main() {
 	rootCmd := &cobra.Command{
@@ -62,7 +68,12 @@ func registerCmd() *cobra.Command {
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
 
-			resp, err := apiClient.Register(ctx, serverURL, token, ip, port, "xray-latest", name, country, region)
+			xrayVersion, err := xray.NewXrayRunner("", "").Version()
+			if err != nil {
+				xrayVersion = "unknown"
+			}
+
+			resp, err := apiClient.Register(ctx, serverURL, token, ip, port, xrayVersion, name, country, region)
 			if err != nil {
 				return fmt.Errorf("registration failed: %w", err)
 			}
@@ -130,6 +141,13 @@ func runCmd() *cobra.Command {
 			defer runner.Stop()
 			applyShaping(xrayConfig)
 
+			xrayVersion := &versionHolder{}
+			if v, err := runner.Version(); err == nil {
+				xrayVersion.Set(v)
+			} else {
+				log.Printf("warning: could not detect xray version: %v", err)
+			}
+
 			time.Sleep(2 * time.Second)
 
 			statsClient, err := xray.NewStatsClient(runner.GRPCAddr())
@@ -153,9 +171,11 @@ func runCmd() *cobra.Command {
 				defer cm.Stop()
 			}
 
-		go heartbeatLoop(ctx, apiClient)
+		go heartbeatLoop(ctx, apiClient, xrayVersion)
 		go configPollLoop(ctx, apiClient, runner, xrayConfig)
 		go inboundsPollLoop(ctx, apiClient)
+		go updateCheckLoop(ctx, updater.NewUpdater(version, "", cfg.ServerURL, cfg.NodeID, cfg.APIKey))
+		go xrayUpdateLoop(ctx, apiClient, runner, xrayVersion)
 
 			sigCh := make(chan os.Signal, 1)
 			signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
@@ -175,7 +195,27 @@ func runCmd() *cobra.Command {
 	return cmd
 }
 
-func heartbeatLoop(ctx context.Context, apiClient *client.APIClient) {
+// versionHolder is a concurrency-safe box for the currently-running Xray
+// version, shared between heartbeatLoop (reads it every 30s) and
+// xrayUpdateLoop (updates it after a successful binary swap).
+type versionHolder struct {
+	mu sync.RWMutex
+	v  string
+}
+
+func (h *versionHolder) Set(v string) {
+	h.mu.Lock()
+	h.v = v
+	h.mu.Unlock()
+}
+
+func (h *versionHolder) Get() string {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return h.v
+}
+
+func heartbeatLoop(ctx context.Context, apiClient *client.APIClient, xrayVersion *versionHolder) {
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
 
@@ -185,8 +225,86 @@ func heartbeatLoop(ctx context.Context, apiClient *client.APIClient) {
 			return
 		case <-ticker.C:
 			m := stats.CollectSysMetrics()
-			if err := apiClient.SendHeartbeat(ctx, m.CPU, m.Memory, m.Disk, m.LoadAvg, m.NetworkIn, m.NetworkOut); err != nil {
+			if err := apiClient.SendHeartbeat(ctx, m.CPU, m.Memory, m.Disk, m.LoadAvg, m.NetworkIn, m.NetworkOut, xrayVersion.Get()); err != nil {
 				log.Printf("heartbeat: %v", err)
+			}
+		}
+	}
+}
+
+// updateCheckLoop periodically checks whether a newer node-agent binary is
+// targeted for this node and, if so, downloads and applies it, then exits so
+// the process supervisor (systemd Restart=always, see scripts/install.sh)
+// restarts with the new binary.
+func updateCheckLoop(ctx context.Context, upd *updater.Updater) {
+	ticker := time.NewTicker(5 * time.Minute)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			target, available, err := upd.CheckUpdate(ctx)
+			if err != nil {
+				log.Printf("node-agent update check: %v", err)
+				continue
+			}
+			if !available {
+				continue
+			}
+			log.Printf("node-agent update available: %s, downloading...", target)
+			if err := upd.PerformUpdate(ctx, target); err != nil {
+				log.Printf("node-agent self-update failed: %v", err)
+				continue
+			}
+			log.Println("node-agent self-update applied, restarting...")
+			_ = syscall.Kill(syscall.Getpid(), syscall.SIGTERM)
+			return
+		}
+	}
+}
+
+// xrayUpdateLoop periodically checks whether the admin requested a different
+// Xray-core version for this node (nodes.xray_target_version) and, if so,
+// downloads it from GitHub, swaps the binary, and restarts Xray in place.
+func xrayUpdateLoop(ctx context.Context, apiClient *client.APIClient, runner *xray.XrayRunner, xrayVersion *versionHolder) {
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			target, available, err := apiClient.CheckXrayUpdate(ctx, xrayVersion.Get())
+			if err != nil {
+				log.Printf("xray update check: %v", err)
+				continue
+			}
+			if !available {
+				continue
+			}
+
+			log.Printf("xray update available: %s, downloading...", target)
+			if err := runner.Stop(); err != nil {
+				log.Printf("xray update: stop failed: %v", err)
+				continue
+			}
+			if err := runner.UpdateBinary(ctx, target); err != nil {
+				log.Printf("xray update: download/replace failed: %v", err)
+				if startErr := runner.Start(); startErr != nil {
+					log.Printf("xray update: restart after failed update also failed: %v", startErr)
+				}
+				continue
+			}
+			if err := runner.Start(); err != nil {
+				log.Printf("xray update: restart failed: %v", err)
+				continue
+			}
+			if v, err := runner.Version(); err == nil {
+				xrayVersion.Set(v)
+				log.Printf("xray updated to %s", v)
 			}
 		}
 	}
@@ -245,11 +363,13 @@ func applyShaping(config []byte) {
 func inboundsPollLoop(ctx context.Context, apiClient *client.APIClient) {
 	var hy2Manager *process.Hysteria2Manager
 	var wgManager *process.WireGuardManager
+	wgPeers := map[string]process.WireGuardPeer{}
+	var hy2Users []string
 
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
 
-	applyInbounds(ctx, apiClient, &hy2Manager, &wgManager)
+	applyInbounds(ctx, apiClient, &hy2Manager, &wgManager, &wgPeers, &hy2Users)
 
 	for {
 		select {
@@ -262,12 +382,12 @@ func inboundsPollLoop(ctx context.Context, apiClient *client.APIClient) {
 			}
 			return
 		case <-ticker.C:
-			applyInbounds(ctx, apiClient, &hy2Manager, &wgManager)
+			applyInbounds(ctx, apiClient, &hy2Manager, &wgManager, &wgPeers, &hy2Users)
 		}
 	}
 }
 
-func applyInbounds(ctx context.Context, apiClient *client.APIClient, hy2 **process.Hysteria2Manager, wg **process.WireGuardManager) {
+func applyInbounds(ctx context.Context, apiClient *client.APIClient, hy2 **process.Hysteria2Manager, wg **process.WireGuardManager, wgPeers *map[string]process.WireGuardPeer, hy2Users *[]string) {
 	inbounds, err := apiClient.GetInbounds(ctx)
 	if err != nil {
 		log.Printf("inbounds poll: %v", err)
@@ -297,12 +417,33 @@ func applyInbounds(ctx context.Context, apiClient *client.APIClient, hy2 **proce
 		if *hy2 == nil {
 			*hy2 = process.NewHysteria2Manager("", "")
 		}
-		if !(*hy2).IsRunning() {
-			cfg := buildHysteria2Config(hy2Port, inbounds)
+
+		users, err := apiClient.GetHysteria2Users(ctx)
+		if err != nil {
+			log.Printf("hysteria2 users poll: %v", err)
+			users = *hy2Users // keep serving the last known-good set
+		}
+		slices.Sort(users)
+
+		usersChanged := !slices.Equal(users, *hy2Users)
+		if !(*hy2).IsRunning() || usersChanged {
+			cfg := buildHysteria2Config(hy2Port, inbounds, users)
+			// UpdateConfig only restarts the process if it's already running
+			// (see Hysteria2Manager.UpdateConfig); an explicit Start() covers
+			// the cold-start case below.
 			if err := (*hy2).UpdateConfig(cfg); err != nil {
 				log.Printf("hysteria2 update config: %v", err)
 			} else {
-				log.Printf("hysteria2 started on port %d", hy2Port)
+				*hy2Users = users
+				if !(*hy2).IsRunning() {
+					if err := (*hy2).Start(); err != nil {
+						log.Printf("hysteria2 start: %v", err)
+					} else {
+						log.Printf("hysteria2 started on port %d with %d user(s)", hy2Port, len(users))
+					}
+				} else {
+					log.Printf("hysteria2 users changed, restarted with %d user(s)", len(users))
+				}
 			}
 		}
 	} else if *hy2 != nil && (*hy2).IsRunning() {
@@ -310,6 +451,7 @@ func applyInbounds(ctx context.Context, apiClient *client.APIClient, hy2 **proce
 			log.Printf("hysteria2 stop: %v", err)
 		} else {
 			log.Println("hysteria2 stopped (no enabled inbound)")
+			*hy2Users = nil
 		}
 	}
 
@@ -325,24 +467,99 @@ func applyInbounds(ctx context.Context, apiClient *client.APIClient, hy2 **proce
 				log.Printf("wireguard start: %v", err)
 			} else {
 				log.Printf("wireguard started on port %d", wgPort)
+				// A freshly-started interface always has zero peers (see
+				// buildWireGuardConfig); forget whatever we'd previously
+				// applied so the sync below re-adds everyone.
+				*wgPeers = map[string]process.WireGuardPeer{}
 			}
+		}
+		if (*wg).IsRunning() {
+			syncWireGuardPeers(ctx, apiClient, *wg, wgPeers)
 		}
 	} else if *wg != nil && (*wg).IsRunning() {
 		if err := (*wg).Stop(); err != nil {
 			log.Printf("wireguard stop: %v", err)
 		} else {
 			log.Println("wireguard stopped (no enabled inbound)")
+			*wgPeers = map[string]process.WireGuardPeer{}
 		}
 	}
 }
 
-func buildHysteria2Config(port int, inbounds []client.InboundConfig) process.Hysteria2Config {
+// syncWireGuardPeers fetches the currently-eligible peer set from the server
+// and diffs it against wgPeers (the set last applied to the running
+// interface), calling AddPeer/RemovePeer (node-agent/internal/process/
+// wireguard.go) only for what changed. This runs every inboundsPollLoop tick
+// (30s) so suspensions/expiries/new devices reach the interface without a
+// full wg-quick restart.
+func syncWireGuardPeers(ctx context.Context, apiClient *client.APIClient, wg *process.WireGuardManager, applied *map[string]process.WireGuardPeer) {
+	peers, err := apiClient.GetWireGuardPeers(ctx)
+	if err != nil {
+		log.Printf("wireguard peers poll: %v", err)
+		return
+	}
+
+	want := make(map[string]process.WireGuardPeer, len(peers))
+	for _, p := range peers {
+		if p.PublicKey == "" || p.AllowedIPs == "" {
+			continue
+		}
+		want[p.PublicKey] = process.WireGuardPeer{PublicKey: p.PublicKey, AllowedIPs: p.AllowedIPs}
+	}
+
+	for pubkey := range *applied {
+		if _, ok := want[pubkey]; ok {
+			continue
+		}
+		if err := wg.RemovePeer(pubkey); err != nil {
+			log.Printf("wireguard remove peer: %v", err)
+			continue
+		}
+		delete(*applied, pubkey)
+	}
+
+	added := 0
+	for pubkey, p := range want {
+		if existing, ok := (*applied)[pubkey]; ok && existing.AllowedIPs == p.AllowedIPs {
+			continue
+		}
+		if err := wg.AddPeer(p); err != nil {
+			log.Printf("wireguard add peer: %v", err)
+			continue
+		}
+		(*applied)[pubkey] = p
+		added++
+	}
+
+	if added > 0 || len(*applied) != len(want) {
+		log.Printf("wireguard peers synced: %d active", len(*applied))
+	}
+}
+
+// buildHysteria2Config builds a per-user Hysteria2 server config: each
+// eligible device's xray_uuid is admitted as both its own username and
+// password (auth type "userpass"), so suspending or deleting a device
+// revokes its Hysteria2 access on the next sync, the same as every other
+// protocol. See subscription/singbox.go:singboxHysteria2, which already
+// expects `password: userUUID` on the client side. Falls back to a single
+// node-wide password from inbound settings (legacy behavior) only if no
+// devices are currently eligible.
+func buildHysteria2Config(port int, inbounds []client.InboundConfig, users []string) process.Hysteria2Config {
 	cfg := process.Hysteria2Config{
 		Listen: fmt.Sprintf(":%d", port),
 		TLS: process.Hysteria2TLS{
 			Cert: "/etc/node-agent/certs/cert.pem",
 			Key:  "/etc/node-agent/certs/key.pem",
 		},
+	}
+
+	if len(users) > 0 {
+		userpass := make(map[string]string, len(users))
+		for _, uuid := range users {
+			userpass[uuid] = uuid
+		}
+		cfg.Auth = &process.Hysteria2Auth{Type: "userpass", UserPass: userpass}
+		return cfg
 	}
 
 	for _, ib := range inbounds {
@@ -361,9 +578,14 @@ func buildHysteria2Config(port int, inbounds []client.InboundConfig) process.Hys
 }
 
 func buildWireGuardConfig(port int, inbounds []client.InboundConfig) process.WireGuardConfig {
+	// 10.66.0.0/16 matches the device tunnel-IP pool allocated by the API
+	// server (see handlers/user_device.go:wgAddressPoolBase); a /16 on the
+	// interface routes the whole pool through wg0 regardless of which node a
+	// given device's peer entry ends up on. Overridden by settings.address if
+	// the admin (or ensureWireGuardServerSettings) set one explicitly.
 	cfg := process.WireGuardConfig{
 		ListenPort: port,
-		Address:    "10.0.0.1/24",
+		Address:    "10.66.0.1/16",
 	}
 
 	for _, ib := range inbounds {

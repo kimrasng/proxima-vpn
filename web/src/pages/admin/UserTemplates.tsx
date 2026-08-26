@@ -69,8 +69,12 @@ export default function UserTemplates() {
     try {
       const data = await listNodeGroups();
       setNodeGroups(data);
-    } catch {
-      /* empty */
+    } catch (err) {
+      // Node groups populate the create/edit form's dropdown; leaving
+      // nodeGroups empty on failure degrades that form gracefully (the user
+      // sees no groups to pick) rather than blocking the page, but the
+      // failure shouldn't be invisible.
+      console.warn("failed to list node groups", err);
     }
   };
 

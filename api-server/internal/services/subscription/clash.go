@@ -2,6 +2,7 @@ package subscription
 
 import (
 	"fmt"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -215,8 +216,44 @@ func clashProxy(node NodeInfo, userUUID string) any {
 		return clashTrojan(node, userUUID)
 	case "shadowsocks":
 		return clashShadowsocks(node)
+	case "wireguard":
+		return clashWireGuard(node)
+	case "hysteria2":
+		return clashHysteria2(node, userUUID)
 	default:
 		return nil
+	}
+}
+
+// clashHysteria2 builds a Clash Meta (mihomo) hysteria2 proxy entry. Vanilla
+// Clash does not support this proxy type either, same caveat as
+// clashWireGuard above.
+func clashHysteria2(node NodeInfo, userUUID string) map[string]any {
+	return map[string]any{
+		"name":     node.Name,
+		"type":     "hysteria2",
+		"server":   node.IP,
+		"port":     node.Port,
+		"password": userUUID,
+		"sni":      node.IP,
+		"udp":      true,
+	}
+}
+
+// clashWireGuard builds a Clash Meta (mihomo) wireguard proxy entry. Vanilla
+// Clash does not support this proxy type; clients on unpatched Clash will
+// simply fail to parse this one proxy (see clashVMessWS/clashTrojan/
+// clashShadowsocks above, which all remain vanilla-Clash compatible).
+func clashWireGuard(node NodeInfo) map[string]any {
+	return map[string]any{
+		"name":        node.Name,
+		"type":        "wireguard",
+		"server":      node.IP,
+		"port":        node.Port,
+		"ip":          strings.SplitN(node.WGAddress, "/", 2)[0],
+		"private-key": node.WGPrivateKey,
+		"public-key":  node.WGPeerPublicKey,
+		"udp":         true,
 	}
 }
 

@@ -27,6 +27,7 @@ const SUBSCRIPTION_FORMATS = [
   { id: "singbox", label: "Sing-box" },
   { id: "surfboard", label: "Surfboard" },
   { id: "quantumult", label: "Quantumult" },
+  { id: "wireguard", label: "WireGuard" },
 ];
 
 function getSubscriptionUrl(device: Device, format?: string): string {

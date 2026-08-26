@@ -192,6 +192,16 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 		`ALTER TABLE announcements ADD COLUMN IF NOT EXISTS image_url TEXT`,
 		`ALTER TABLE nodes ADD COLUMN IF NOT EXISTS xray_target_version TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE users ADD COLUMN IF NOT EXISTS telegram_id BIGINT UNIQUE`,
+		// Per-device WireGuard identity. wg_private_key/wg_public_key are the
+		// device's own X25519 keypair (see pkg/crypto.GenerateWireGuardKeypair);
+		// wg_address is its tunnel IP, allocated sequentially from wg_ip_seq
+		// out of a fixed 10.66.0.0/16 pool (see handlers/user_device.go). All
+		// three are NULL for devices that predate WireGuard support or were
+		// never assigned a tunnel address.
+		`CREATE SEQUENCE IF NOT EXISTS wg_ip_seq START 1`,
+		`ALTER TABLE devices ADD COLUMN IF NOT EXISTS wg_private_key TEXT`,
+		`ALTER TABLE devices ADD COLUMN IF NOT EXISTS wg_public_key TEXT`,
+		`ALTER TABLE devices ADD COLUMN IF NOT EXISTS wg_address TEXT`,
 	}
 	for _, m := range migrations {
 		if _, err := pool.Exec(ctx, m); err != nil {

@@ -2,12 +2,14 @@ package handlers
 
 import (
 	"context"
+	"log"
 	"regexp"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/proximavpn/proxima-vpn/api-server/internal/services"
 	"github.com/proximavpn/proxima-vpn/pkg/crypto"
 )
 
@@ -24,14 +26,16 @@ type UserAuthHandler struct {
 	db        *pgxpool.Pool
 	jwtSecret string
 	jwtExpiry time.Duration
+	telegram  *services.TelegramService
 }
 
 // NewUserAuthHandler creates a new UserAuthHandler.
-func NewUserAuthHandler(db *pgxpool.Pool, jwtSecret string, jwtExpiry time.Duration) *UserAuthHandler {
+func NewUserAuthHandler(db *pgxpool.Pool, jwtSecret string, jwtExpiry time.Duration, telegram *services.TelegramService) *UserAuthHandler {
 	return &UserAuthHandler{
 		db:        db,
 		jwtSecret: jwtSecret,
 		jwtExpiry: jwtExpiry,
+		telegram:  telegram,
 	}
 }
 
@@ -120,6 +124,12 @@ func (h *UserAuthHandler) Register(c *fiber.Ctx) error {
 			"error": "internal server error",
 		})
 	}
+
+	go func() {
+		if err := h.telegram.NotifyNewRegistration(context.Background(), req.Email); err != nil {
+			log.Printf("telegram registration alert: %v", err)
+		}
+	}()
 
 	return c.Status(fiber.StatusCreated).JSON(registerResponse{
 		ID:       id,

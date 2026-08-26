@@ -63,7 +63,12 @@ export default function Settings() {
     try {
       const data = await listBackups();
       setBackups(data.backups);
-    } catch {
+    } catch (err) {
+      // Backups are an optional feature (only enabled when S3 is configured
+      // server-side, see api-server/cmd/main.go), so a 404 here is the normal
+      // case for most deployments and shouldn't alarm the admin - but log it
+      // so a real failure (S3 misconfigured, network error) isn't invisible.
+      console.warn("failed to list backups", err);
     } finally {
       setBackupLoading(false);
     }

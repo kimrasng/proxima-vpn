@@ -211,6 +211,8 @@ export interface Device {
   id: string;
   name?: string;
   xray_uuid: string;
+  wg_public_key?: string;
+  wg_address?: string;
   subscription_url?: string;
   created_at: string;
 }

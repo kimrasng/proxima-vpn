@@ -10,6 +10,21 @@ import (
 	"github.com/proximavpn/proxima-vpn/pkg/crypto"
 )
 
+// wgAddressPool is the /16 tunnel-IP pool devices are allocated from,
+// carved into 254-address blocks (host octet 2-255) keyed by wg_ip_seq (see
+// database/schema.go). Node-agent WireGuard interfaces are independent
+// per-node networks, so every device can reuse the same address across nodes.
+const wgAddressPoolBase = "10.66"
+
+// wgAddressForIndex deterministically maps a wg_ip_seq value (>=1) to a
+// tunnel address in wgAddressPoolBase/16, e.g. 1 -> "10.66.0.2/32".
+func wgAddressForIndex(idx int64) string {
+	n := idx - 1
+	octet3 := n / 254
+	octet4 := n%254 + 2
+	return fmt.Sprintf("%s.%d.%d/32", wgAddressPoolBase, octet3, octet4)
+}
+
 // UserDeviceHandler handles user device management endpoints.
 type UserDeviceHandler struct {
 	db *pgxpool.Pool
@@ -28,6 +43,8 @@ type deviceResponse struct {
 	ID              string    `json:"id"`
 	Name            string    `json:"name"`
 	XrayUUID        string    `json:"xray_uuid"`
+	WGPublicKey     string    `json:"wg_public_key,omitempty"`
+	WGAddress       string    `json:"wg_address,omitempty"`
 	SubscriptionURL string    `json:"subscription_url,omitempty"`
 	CreatedAt       time.Time `json:"created_at"`
 }
@@ -107,14 +124,29 @@ func (h *UserDeviceHandler) Create(c *fiber.Ctx) error {
 
 	xrayUUID := crypto.NewUUID()
 
+	wgPrivateKey, wgPublicKey, err := crypto.GenerateWireGuardKeypair()
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "internal server error",
+		})
+	}
+
+	var wgIPIndex int64
+	if err := h.db.QueryRow(context.Background(), `SELECT nextval('wg_ip_seq')`).Scan(&wgIPIndex); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "internal server error",
+		})
+	}
+	wgAddress := wgAddressForIndex(wgIPIndex)
+
 	var resp deviceResponse
 	err = h.db.QueryRow(
 		context.Background(),
-		`INSERT INTO devices (user_id, name, xray_uuid)
-		 VALUES ($1, $2, $3)
-		 RETURNING id, name, xray_uuid, created_at`,
-		userID, req.Name, xrayUUID,
-	).Scan(&resp.ID, &resp.Name, &resp.XrayUUID, &resp.CreatedAt)
+		`INSERT INTO devices (user_id, name, xray_uuid, wg_private_key, wg_public_key, wg_address)
+		 VALUES ($1, $2, $3, $4, $5, $6)
+		 RETURNING id, name, xray_uuid, wg_public_key, wg_address, created_at`,
+		userID, req.Name, xrayUUID, wgPrivateKey, wgPublicKey, wgAddress,
+	).Scan(&resp.ID, &resp.Name, &resp.XrayUUID, &resp.WGPublicKey, &resp.WGAddress, &resp.CreatedAt)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "internal server error",
@@ -150,7 +182,8 @@ func (h *UserDeviceHandler) List(c *fiber.Ctx) error {
 
 	rows, err := h.db.Query(
 		context.Background(),
-		`SELECT id, name, xray_uuid, created_at FROM devices WHERE user_id = $1 ORDER BY created_at`,
+		`SELECT id, name, xray_uuid, COALESCE(wg_public_key, ''), COALESCE(wg_address, ''), created_at
+		 FROM devices WHERE user_id = $1 ORDER BY created_at`,
 		userID,
 	)
 	if err != nil {
@@ -163,7 +196,7 @@ func (h *UserDeviceHandler) List(c *fiber.Ctx) error {
 	var results []deviceResponse
 	for rows.Next() {
 		var d deviceResponse
-		if err := rows.Scan(&d.ID, &d.Name, &d.XrayUUID, &d.CreatedAt); err != nil {
+		if err := rows.Scan(&d.ID, &d.Name, &d.XrayUUID, &d.WGPublicKey, &d.WGAddress, &d.CreatedAt); err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 				"error": "internal server error",
 			})

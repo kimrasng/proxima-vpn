@@ -91,3 +91,38 @@ func (h *NodeAgentHandler) DownloadUpdate(c *fiber.Ctx) error {
 	}
 	return nil
 }
+
+type xrayUpdateInfoResponse struct {
+	TargetVersion string `json:"target_version"`
+}
+
+// CheckXrayUpdate reports whether an admin has requested a different Xray-core
+// version for this node (see AdminNodeHandler.UpdateXray, which sets
+// nodes.xray_target_version). The node-agent downloads the release itself
+// from GitHub, so unlike CheckUpdate this endpoint returns no download URL.
+// Returns 204 No Content when no update is targeted or the node is current.
+// @Summary Node Xray-core update check
+// @Description Reports the target Xray-core version requested for the node
+// @Tags node-agent
+// @Produce json
+// @Param id path string true "Node ID"
+// @Success 200 {object} xrayUpdateInfoResponse
+// @Success 204 "No update available"
+// @Failure 401 {object} map[string]string
+// @Router /nodes/{id}/xray-update [get]
+func (h *NodeAgentHandler) CheckXrayUpdate(c *fiber.Ctx) error {
+	nodeID := c.Locals("node_id").(string)
+	currentVersion := c.Get("X-Xray-Version")
+
+	var targetVersion string
+	err := h.db.QueryRow(
+		context.Background(),
+		`SELECT xray_target_version FROM nodes WHERE id = $1`,
+		nodeID,
+	).Scan(&targetVersion)
+	if err != nil || targetVersion == "" || targetVersion == currentVersion {
+		return c.SendStatus(fiber.StatusNoContent)
+	}
+
+	return c.JSON(xrayUpdateInfoResponse{TargetVersion: targetVersion})
+}

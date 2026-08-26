@@ -141,16 +141,19 @@ func (s *Server) registerRoutes() {
 	nodeAgent.Post("/heartbeat", nodeAgentHandler.Heartbeat)
 	nodeAgent.Post("/stats", nodeAgentHandler.Stats)
 	nodeAgent.Get("/inbounds", nodeAgentHandler.GetInbounds)
+	nodeAgent.Get("/wireguard/peers", nodeAgentHandler.GetWireGuardPeers)
+	nodeAgent.Get("/hysteria2/users", nodeAgentHandler.GetHysteria2Users)
 	nodeAgent.Get("/update", nodeAgentHandler.CheckUpdate)
 	nodeAgent.Get("/update/download", nodeAgentHandler.DownloadUpdate)
+	nodeAgent.Get("/xray-update", nodeAgentHandler.CheckXrayUpdate)
 
-	userAuthHandler := handlers.NewUserAuthHandler(s.db, s.config.JWT.Secret, s.parseUserExpiry())
+	userAuthHandler := handlers.NewUserAuthHandler(s.db, s.config.JWT.Secret, s.parseUserExpiry(), services.NewTelegramService(s.config.Telegram))
 	auth := api.Group("/auth")
 	auth.Post("/register", userAuthHandler.Register)
 	auth.Post("/login", loginLimiter, userAuthHandler.Login)
 
 	user := api.Group("/user")
-	user.Use(middleware.UserJWTMiddleware(s.config.JWT.Secret))
+	user.Use(middleware.UserJWTMiddleware(s.config.JWT.Secret, s.db))
 
 	userPlanHandler := handlers.NewUserPlanHandler(s.db)
 	user.Post("/plan-requests", userPlanHandler.CreateRequest)

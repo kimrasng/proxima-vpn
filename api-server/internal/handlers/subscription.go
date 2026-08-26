@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/proximavpn/proxima-vpn/api-server/internal/services/subscription"
+	"github.com/proximavpn/proxima-vpn/pkg/crypto"
 	"github.com/proximavpn/proxima-vpn/pkg/speedtier"
 )
 
@@ -41,16 +42,19 @@ type subscriptionUser struct {
 }
 
 type subscriptionNode struct {
-	ID               string
-	Name             string
-	IP               string
-	Port             int
-	Status           string
-	RealityPublicKey string
-	RealityShortID   string
-	TLSCertFile      *string
-	TLSKeyFile       *string
-	SSPassword       *string
+	ID                 string
+	Name               string
+	IP                 string
+	Port               int
+	Status             string
+	RealityPublicKey   string
+	RealityShortID     string
+	TLSCertFile        *string
+	TLSKeyFile         *string
+	SSPassword         *string
+	WGPort             *int
+	WGServerPrivateKey *string
+	HY2Port            *int
 }
 
 // GetSubscription returns the subscription configuration for a device.
@@ -79,9 +83,11 @@ func (h *SubscriptionHandler) GetSubscription(c *fiber.Ctx) error {
 
 	var user subscriptionUser
 	var deviceUUID string
+	var deviceWGPrivateKey, deviceWGAddress *string
 	err := h.db.QueryRow(ctx,
 		`SELECT u.id, u.plan_id, u.is_active, u.status, u.traffic_used,
-		        p.traffic_limit, p.speed_limit, u.plan_expires_at, d.xray_uuid
+		        p.traffic_limit, p.speed_limit, u.plan_expires_at, d.xray_uuid,
+		        d.wg_private_key, d.wg_address
 		 FROM users u
 		 JOIN devices d ON d.user_id = u.id
 		 LEFT JOIN plans p ON u.plan_id = p.id
@@ -90,6 +96,7 @@ func (h *SubscriptionHandler) GetSubscription(c *fiber.Ctx) error {
 	).Scan(
 		&user.ID, &user.PlanID, &user.IsActive, &user.Status,
 		&user.TrafficUsed, &user.TrafficLimit, &user.SpeedLimit, &user.PlanExpiresAt, &deviceUUID,
+		&deviceWGPrivateKey, &deviceWGAddress,
 	)
 	if err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
@@ -105,11 +112,23 @@ func (h *SubscriptionHandler) GetSubscription(c *fiber.Ctx) error {
 
 	rows, err := h.db.Query(ctx,
 		`SELECT n.id, n.name, host(n.ip), n.port, n.status, n.reality_public_key, n.reality_short_id,
-		        n.tls_cert_file, n.tls_key_file, n.ss_password
+		        n.tls_cert_file, n.tls_key_file, n.ss_password,
+		        wgib.port, wgib.settings->>'private_key',
+		        hy2ib.port
 		 FROM nodes n
 		 JOIN node_group_nodes ngn ON n.id = ngn.node_id
 		 JOIN node_groups ng ON ngn.node_group_id = ng.id
 		 JOIN plans p ON p.node_group_id = ng.id
+		 LEFT JOIN LATERAL (
+		     SELECT port, settings FROM inbounds
+		     WHERE node_id = n.id AND protocol = 'wireguard' AND enabled = true
+		     ORDER BY created_at LIMIT 1
+		 ) wgib ON true
+		 LEFT JOIN LATERAL (
+		     SELECT port FROM inbounds
+		     WHERE node_id = n.id AND protocol = 'hysteria2' AND enabled = true
+		     ORDER BY created_at LIMIT 1
+		 ) hy2ib ON true
 		 WHERE p.id = $1 AND n.status != 'pending'`,
 		user.PlanID,
 	)
@@ -127,6 +146,8 @@ func (h *SubscriptionHandler) GetSubscription(c *fiber.Ctx) error {
 			&node.ID, &node.Name, &node.IP, &node.Port,
 			&node.Status, &node.RealityPublicKey, &node.RealityShortID,
 			&node.TLSCertFile, &node.TLSKeyFile, &node.SSPassword,
+			&node.WGPort, &node.WGServerPrivateKey,
+			&node.HY2Port,
 		); err != nil {
 			continue
 		}
@@ -151,7 +172,7 @@ func (h *SubscriptionHandler) GetSubscription(c *fiber.Ctx) error {
 
 	switch format {
 	case "clash":
-		nodeInfos := buildNodeInfoList(nodes, deviceUUID, speedMbps)
+		nodeInfos := buildNodeInfoList(nodes, deviceUUID, speedMbps, deviceWGPrivateKey, deviceWGAddress)
 		infoLabels := buildPlanInfoLabels(user)
 		result, err := subscription.GenerateClash(nodeInfos, deviceUUID, infoLabels)
 		if err != nil {
@@ -161,7 +182,7 @@ func (h *SubscriptionHandler) GetSubscription(c *fiber.Ctx) error {
 		contentType = "text/yaml; charset=utf-8"
 
 	case "singbox":
-		nodeInfos := buildNodeInfoList(nodes, deviceUUID, speedMbps)
+		nodeInfos := buildNodeInfoList(nodes, deviceUUID, speedMbps, deviceWGPrivateKey, deviceWGAddress)
 		result, err := subscription.GenerateSingbox(nodeInfos, deviceUUID)
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to generate singbox config"})
@@ -170,7 +191,7 @@ func (h *SubscriptionHandler) GetSubscription(c *fiber.Ctx) error {
 		contentType = "application/json; charset=utf-8"
 
 	case "surfboard":
-		nodeInfos := buildNodeInfoList(nodes, deviceUUID, speedMbps)
+		nodeInfos := buildNodeInfoList(nodes, deviceUUID, speedMbps, deviceWGPrivateKey, deviceWGAddress)
 		result, err := subscription.GenerateSurfboard(nodeInfos, deviceUUID)
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to generate surfboard config"})
@@ -179,10 +200,28 @@ func (h *SubscriptionHandler) GetSubscription(c *fiber.Ctx) error {
 		contentType = "text/plain; charset=utf-8"
 
 	case "quantumult":
-		nodeInfos := buildNodeInfoList(nodes, deviceUUID, speedMbps)
+		nodeInfos := buildNodeInfoList(nodes, deviceUUID, speedMbps, deviceWGPrivateKey, deviceWGAddress)
 		result, err := subscription.GenerateQuantumult(nodeInfos, deviceUUID)
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to generate quantumult config"})
+		}
+		body = result
+		contentType = "text/plain; charset=utf-8"
+
+	case "wireguard":
+		// Single-node wg-quick .conf for the plain WireGuard app, which can't
+		// import Clash/Sing-box configs. Speed-limited plans are VLESS-only
+		// (see buildNodeInfoList) so WireGuard isn't offered here either.
+		if speedMbps > 0 {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "wireguard is not available on speed-limited plans"})
+		}
+		wgNode, ok := firstWireGuardNodeInfo(nodes, deviceWGPrivateKey, deviceWGAddress)
+		if !ok {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "no wireguard-enabled node available"})
+		}
+		result, err := subscription.GenerateWireGuardConf(wgNode)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to generate wireguard config"})
 		}
 		body = result
 		contentType = "text/plain; charset=utf-8"
@@ -290,7 +329,7 @@ func buildPlanInfoLabels(user subscriptionUser) []string {
 	return labels
 }
 
-func buildNodeInfoList(nodes []subscriptionNode, userUUID string, speedMbps int) []subscription.NodeInfo {
+func buildNodeInfoList(nodes []subscriptionNode, userUUID string, speedMbps int, deviceWGPrivateKey, deviceWGAddress *string) []subscription.NodeInfo {
 	var infos []subscription.NodeInfo
 	for _, node := range nodes {
 		infos = append(infos, subscription.NodeInfo{
@@ -341,8 +380,61 @@ func buildNodeInfoList(nodes []subscriptionNode, userUUID string, speedMbps int)
 				SSPassword: *node.SSPassword,
 			})
 		}
+
+		if node.HY2Port != nil {
+			infos = append(infos, subscription.NodeInfo{
+				Name:     node.Name + " Hysteria2",
+				IP:       node.IP,
+				Port:     *node.HY2Port,
+				Protocol: "hysteria2",
+			})
+		}
+
+		if node.WGPort != nil && node.WGServerPrivateKey != nil && *node.WGServerPrivateKey != "" &&
+			deviceWGPrivateKey != nil && *deviceWGPrivateKey != "" &&
+			deviceWGAddress != nil && *deviceWGAddress != "" {
+			if serverPubKey, err := crypto.DeriveWireGuardPublicKey(*node.WGServerPrivateKey); err == nil {
+				infos = append(infos, subscription.NodeInfo{
+					Name:            node.Name + " WireGuard",
+					IP:              node.IP,
+					Port:            *node.WGPort,
+					Protocol:        "wireguard",
+					WGPrivateKey:    *deviceWGPrivateKey,
+					WGPeerPublicKey: serverPubKey,
+					WGAddress:       *deviceWGAddress,
+				})
+			}
+		}
 	}
 	return infos
+}
+
+// firstWireGuardNodeInfo returns a standalone wireguard NodeInfo for the
+// first node in nodes that has an enabled wireguard inbound, for the
+// single-node format=wireguard .conf download (see GetSubscription).
+func firstWireGuardNodeInfo(nodes []subscriptionNode, deviceWGPrivateKey, deviceWGAddress *string) (subscription.NodeInfo, bool) {
+	if deviceWGPrivateKey == nil || *deviceWGPrivateKey == "" || deviceWGAddress == nil || *deviceWGAddress == "" {
+		return subscription.NodeInfo{}, false
+	}
+	for _, node := range nodes {
+		if node.WGPort == nil || node.WGServerPrivateKey == nil || *node.WGServerPrivateKey == "" {
+			continue
+		}
+		serverPubKey, err := crypto.DeriveWireGuardPublicKey(*node.WGServerPrivateKey)
+		if err != nil {
+			continue
+		}
+		return subscription.NodeInfo{
+			Name:            node.Name + " WireGuard",
+			IP:              node.IP,
+			Port:            *node.WGPort,
+			Protocol:        "wireguard",
+			WGPrivateKey:    *deviceWGPrivateKey,
+			WGPeerPublicKey: serverPubKey,
+			WGAddress:       *deviceWGAddress,
+		}, true
+	}
+	return subscription.NodeInfo{}, false
 }
 
 func buildVLESSLink(uuid string, node subscriptionNode, port int, fragment string) string {

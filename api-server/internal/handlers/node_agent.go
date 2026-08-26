@@ -125,6 +125,7 @@ type heartbeatRequest struct {
 	LoadAvg     float64 `json:"load_avg"`
 	NetworkIn   float64 `json:"network_in"`
 	NetworkOut  float64 `json:"network_out"`
+	XrayVersion string  `json:"xray_version"`
 }
 
 func (h *NodeAgentHandler) Heartbeat(c *fiber.Ctx) error {
@@ -141,10 +142,11 @@ func (h *NodeAgentHandler) Heartbeat(c *fiber.Ctx) error {
 		context.Background(),
 		`UPDATE nodes
 		 SET cpu_usage = $1, memory_usage = $2, disk_usage = $3, load_avg = $4,
-		     network_in = $5, network_out = $6, last_seen = NOW(), status = 'online'
-		 WHERE id = $7`,
+		     network_in = $5, network_out = $6, last_seen = NOW(), status = 'online',
+		     xray_version = COALESCE(NULLIF($7, ''), xray_version)
+		 WHERE id = $8`,
 		req.CPUUsage, req.MemoryUsage, req.DiskUsage, req.LoadAvg,
-		req.NetworkIn, req.NetworkOut, nodeID,
+		req.NetworkIn, req.NetworkOut, req.XrayVersion, nodeID,
 	)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -207,6 +209,106 @@ func (h *NodeAgentHandler) GetInbounds(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(inbounds)
+}
+
+type wireGuardPeerEntry struct {
+	PublicKey  string `json:"public_key"`
+	AllowedIPs string `json:"allowed_ips"`
+}
+
+// GetWireGuardPeers returns the WireGuard peers (device public key + tunnel
+// address) that should currently be admitted on this node's wg0 interface.
+// The eligibility predicate mirrors XrayConfigService.GenerateConfig's active-
+// client join (services/xray_config.go) so WireGuard access is revoked on the
+// same conditions - suspension, expiry, traffic limit - as every other
+// protocol. Speed-limited plans are excluded entirely (not just routed
+// elsewhere, as xray_config.go does with a dedicated tc-shaped VLESS port)
+// because WireGuard has no equivalent shaping hook; letting them through
+// would bypass their speed cap. The node-agent polls this and diffs against
+// what it last applied (see inboundsPollLoop/syncWireGuardPeers in
+// node-agent/cmd/main.go).
+func (h *NodeAgentHandler) GetWireGuardPeers(c *fiber.Ctx) error {
+	nodeID := c.Locals("node_id").(string)
+
+	rows, err := h.db.Query(
+		context.Background(),
+		`SELECT d.wg_public_key, d.wg_address
+		 FROM devices d
+		 JOIN users u ON d.user_id = u.id
+		 JOIN plans p ON u.plan_id = p.id
+		 JOIN node_groups ng ON p.node_group_id = ng.id
+		 JOIN node_group_nodes ngn ON ng.id = ngn.node_group_id
+		 WHERE ngn.node_id = $1
+		   AND u.is_active = true
+		   AND u.status = 'active'
+		   AND (u.plan_expires_at IS NULL OR u.plan_expires_at > NOW())
+		   AND (p.traffic_limit IS NULL OR u.traffic_used < p.traffic_limit)
+		   AND (p.speed_limit IS NULL OR p.speed_limit <= 0)
+		   AND d.wg_public_key IS NOT NULL AND d.wg_public_key != ''`,
+		nodeID,
+	)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to fetch wireguard peers",
+		})
+	}
+	defer rows.Close()
+
+	peers := make([]wireGuardPeerEntry, 0)
+	for rows.Next() {
+		var p wireGuardPeerEntry
+		if err := rows.Scan(&p.PublicKey, &p.AllowedIPs); err != nil {
+			continue
+		}
+		peers = append(peers, p)
+	}
+
+	return c.JSON(peers)
+}
+
+// GetHysteria2Users returns the device xray_uuids currently eligible to
+// authenticate against this node's Hysteria2 server. Each uuid is used as
+// both username and password (see buildHysteria2Config in node-agent/cmd/
+// main.go), matching subscription/singbox.go:singboxHysteria2's existing
+// `password: userUUID` expectation. Eligibility mirrors GetWireGuardPeers and
+// XrayConfigService.GenerateConfig so Hysteria2 access is revoked on the same
+// conditions as every other protocol.
+func (h *NodeAgentHandler) GetHysteria2Users(c *fiber.Ctx) error {
+	nodeID := c.Locals("node_id").(string)
+
+	rows, err := h.db.Query(
+		context.Background(),
+		`SELECT d.xray_uuid
+		 FROM devices d
+		 JOIN users u ON d.user_id = u.id
+		 JOIN plans p ON u.plan_id = p.id
+		 JOIN node_groups ng ON p.node_group_id = ng.id
+		 JOIN node_group_nodes ngn ON ng.id = ngn.node_group_id
+		 WHERE ngn.node_id = $1
+		   AND u.is_active = true
+		   AND u.status = 'active'
+		   AND (u.plan_expires_at IS NULL OR u.plan_expires_at > NOW())
+		   AND (p.traffic_limit IS NULL OR u.traffic_used < p.traffic_limit)
+		   AND (p.speed_limit IS NULL OR p.speed_limit <= 0)`,
+		nodeID,
+	)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to fetch hysteria2 users",
+		})
+	}
+	defer rows.Close()
+
+	uuids := make([]string, 0)
+	for rows.Next() {
+		var uuid string
+		if err := rows.Scan(&uuid); err != nil {
+			continue
+		}
+		uuids = append(uuids, uuid)
+	}
+
+	return c.JSON(uuids)
 }
 
 type statEntry struct {

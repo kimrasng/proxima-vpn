@@ -57,7 +57,7 @@ func GenerateSurfboard(nodes []NodeInfo, userUUID string) ([]byte, error) {
 
 func buildSurfboardProxyLine(node NodeInfo, userUUID string) string {
 	switch node.Protocol {
-	case "vmess":
+	case "vmess_ws":
 		parts := []string{
 			fmt.Sprintf("%s = vmess, %s, %d, username=%s", node.Name, node.IP, node.Port, userUUID),
 		}
@@ -72,7 +72,7 @@ func buildSurfboardProxyLine(node NodeInfo, userUUID string) string {
 		}
 		return strings.Join(parts, ", ")
 
-	case "trojan":
+	case "trojan_tls":
 		sni := node.ServerName
 		if sni == "" {
 			sni = node.IP
@@ -82,6 +82,10 @@ func buildSurfboardProxyLine(node NodeInfo, userUUID string) string {
 	case "shadowsocks":
 		return fmt.Sprintf("%s = ss, %s, %d, encrypt-method=%s, password=%s", node.Name, node.IP, node.Port, node.SSMethod, node.SSPassword)
 
+	// hysteria2/wireguard: intentionally unsupported here. Surfboard's
+	// [WireGuard]/hysteria proxy syntax is app-specific and not verified
+	// against a real client; Clash and Sing-box cover both protocols instead
+	// (see clash.go, singbox.go). Documented gap, not a silent one.
 	default:
 		return ""
 	}
