@@ -33,6 +33,9 @@ jobs:
   # version" before it ever got to analyze any code (see git history: every
   # run from 2026-07-13 through 2026-08-26 failed this way). v2.13.1 is
   # built with go1.27 and has been verified locally against this repo.
+  # The action itself is pinned to @v7 (not @v6, the previous value) because
+  # golangci-lint v2.x binaries are only supported by golangci-lint-action
+  # v7+; v6 rejects any v2 version string outright.
   lint-go:
     runs-on: ubuntu-latest
     steps:
@@ -41,17 +44,17 @@ jobs:
         with:
           go-version: '1.25'
       - name: golangci-lint (api-server)
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@v7
         with:
           version: v2.13.1
           working-directory: api-server
       - name: golangci-lint (node-agent)
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@v7
         with:
           version: v2.13.1
           working-directory: node-agent
       - name: golangci-lint (pkg)
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@v7
         with:
           version: v2.13.1
           working-directory: pkg
