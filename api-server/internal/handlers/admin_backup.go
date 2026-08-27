@@ -91,7 +91,7 @@ func (h *AdminBackupHandler) DownloadBackup(c *fiber.Ctx) error {
 			"error": "failed to download backup: " + err.Error(),
 		})
 	}
-	defer body.Close()
+	defer func() { _ = body.Close() }()
 
 	filename := filepath.Base(key)
 	c.Set("Content-Type", contentType)

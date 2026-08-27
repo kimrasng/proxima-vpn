@@ -138,7 +138,7 @@ func runCmd() *cobra.Command {
 			if err := runner.Start(); err != nil {
 				return fmt.Errorf("start xray: %w", err)
 			}
-			defer runner.Stop()
+			defer func() { _ = runner.Stop() }()
 			applyShaping(xrayConfig)
 
 			xrayVersion := &versionHolder{}
@@ -159,7 +159,7 @@ func runCmd() *cobra.Command {
 				collector := stats.NewCollector(statsClient, apiClient, stats.DefaultInterval)
 				collector.Start(ctx)
 				defer collector.Stop()
-				defer statsClient.Close()
+				defer func() { _ = statsClient.Close() }()
 			}
 
 			if tlsDomain != "" {
@@ -671,7 +671,7 @@ func detectIP() string {
 	if err != nil {
 		return ""
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	localAddr := conn.LocalAddr().(*net.UDPAddr)
 	return localAddr.IP.String()
 }

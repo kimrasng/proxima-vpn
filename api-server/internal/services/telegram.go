@@ -109,7 +109,7 @@ func (s *TelegramService) SendAlert(ctx context.Context, message string) error {
 	if err != nil {
 		return fmt.Errorf("telegram send: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("telegram API returned status %d", resp.StatusCode)

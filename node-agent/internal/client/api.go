@@ -101,7 +101,7 @@ func (c *APIClient) Register(ctx context.Context, serverURL, token, ip string, p
 	if err != nil {
 		return nil, fmt.Errorf("register request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
 		respBody, _ := io.ReadAll(resp.Body)
@@ -129,7 +129,7 @@ func (c *APIClient) GetConfig(ctx context.Context) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("get config request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(resp.Body)
@@ -168,7 +168,7 @@ func (c *APIClient) SendHeartbeat(ctx context.Context, cpu, memory, disk, loadAv
 	if err != nil {
 		return fmt.Errorf("heartbeat request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(resp.Body)
@@ -199,7 +199,7 @@ func (c *APIClient) GetInbounds(ctx context.Context) ([]InboundConfig, error) {
 	if err != nil {
 		return nil, fmt.Errorf("get inbounds request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -233,7 +233,7 @@ func (c *APIClient) CheckXrayUpdate(ctx context.Context, currentVersion string) 
 	if err != nil {
 		return "", false, fmt.Errorf("xray update check request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == http.StatusNoContent {
 		return "", false, nil
@@ -274,7 +274,7 @@ func (c *APIClient) GetWireGuardPeers(ctx context.Context) ([]WireGuardPeer, err
 	if err != nil {
 		return nil, fmt.Errorf("get wireguard peers request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -302,7 +302,7 @@ func (c *APIClient) GetHysteria2Users(ctx context.Context) ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("get hysteria2 users request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -339,7 +339,7 @@ func (c *APIClient) SendStats(ctx context.Context, stats []TrafficStat, onlineUU
 	if err != nil {
 		return fmt.Errorf("stats request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(resp.Body)
@@ -370,7 +370,7 @@ func (c *APIClient) GetTLSDomain(ctx context.Context) (TLSDomain, error) {
 	if err != nil {
 		return TLSDomain{}, fmt.Errorf("get tls domain request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -408,7 +408,7 @@ func (c *APIClient) ReportTLSCert(ctx context.Context, certFile, keyFile string)
 	if err != nil {
 		return fmt.Errorf("tls cert report request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(resp.Body)

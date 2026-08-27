@@ -481,7 +481,9 @@ func (s *BotService) handleCallback(cb *tgbotapi.CallbackQuery) {
 	}
 
 	callback := tgbotapi.NewCallback(cb.ID, "")
-	s.bot.Request(callback)
+	if _, err := s.bot.Request(callback); err != nil {
+		log.Printf("telegram bot callback ack error: %v", err)
+	}
 
 	data := cb.Data
 	switch {

@@ -45,8 +45,8 @@ func GenerateSurfboard(nodes []NodeInfo, userUUID string) ([]byte, error) {
 
 	sb.WriteString("[Proxy Group]\n")
 	allNodes := strings.Join(nodeNames, ", ")
-	sb.WriteString(fmt.Sprintf("Auto = url-test, %s, url=http://www.gstatic.com/generate_204, interval=300\n", allNodes))
-	sb.WriteString(fmt.Sprintf("Select = select, Auto, %s\n", allNodes))
+	fmt.Fprintf(&sb, "Auto = url-test, %s, url=http://www.gstatic.com/generate_204, interval=300\n", allNodes)
+	fmt.Fprintf(&sb, "Select = select, Auto, %s\n", allNodes)
 	sb.WriteString("\n")
 
 	sb.WriteString("[Rule]\n")

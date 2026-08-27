@@ -58,7 +58,7 @@ func (h *AdminUploadHandler) UploadImage(c *fiber.Ctx) error {
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to open file"})
 	}
-	defer src.Close()
+	defer func() { _ = src.Close() }()
 
 	var publicURL string
 
@@ -84,10 +84,18 @@ func (h *AdminUploadHandler) uploadToLocal(src multipart.File, filename string) 
 	if err != nil {
 		return "", fmt.Errorf("create file: %w", err)
 	}
-	defer dst.Close()
+	defer func() { _ = dst.Close() }()
 
 	if _, err := io.Copy(dst, src); err != nil {
 		return "", fmt.Errorf("write file: %w", err)
+	}
+
+	// Checked explicitly (not just via the deferred close above) because
+	// Close on a just-written file can fail to flush buffered data - a
+	// silent failure here would mean the uploaded image looks like it
+	// succeeded but is truncated on disk.
+	if err := dst.Close(); err != nil {
+		return "", fmt.Errorf("close file: %w", err)
 	}
 
 	return h.panelURL + "/uploads/" + filename, nil
@@ -96,16 +104,11 @@ func (h *AdminUploadHandler) uploadToLocal(src multipart.File, filename string) 
 func (h *AdminUploadHandler) uploadToS3(ctx context.Context, src multipart.File, filename, contentType string) (string, error) {
 	s3cfg := h.cfg.S3
 
-	customResolver := aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...interface{}) (aws.Endpoint, error) {
-		if s3cfg.Endpoint != "" {
-			return aws.Endpoint{URL: s3cfg.Endpoint, SigningRegion: s3cfg.Region}, nil
-		}
-		return aws.Endpoint{}, &aws.EndpointNotFoundError{}
-	})
-
+	// Service-specific endpoint override (s3.Options.BaseEndpoint) instead of
+	// the deprecated global aws.EndpointResolverWithOptions - same pattern
+	// already used in services/backup.go's newS3Client.
 	cfg, err := awsconfig.LoadDefaultConfig(ctx,
 		awsconfig.WithRegion(s3cfg.Region),
-		awsconfig.WithEndpointResolverWithOptions(customResolver),
 		awsconfig.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(
 			s3cfg.AccessKey, s3cfg.SecretKey, "",
 		)),
@@ -116,6 +119,9 @@ func (h *AdminUploadHandler) uploadToS3(ctx context.Context, src multipart.File,
 
 	client := s3.NewFromConfig(cfg, func(o *s3.Options) {
 		o.UsePathStyle = true
+		if s3cfg.Endpoint != "" {
+			o.BaseEndpoint = aws.String(s3cfg.Endpoint)
+		}
 	})
 
 	key := "uploads/" + filename

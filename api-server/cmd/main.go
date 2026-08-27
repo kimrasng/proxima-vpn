@@ -57,7 +57,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to connect to redis: %v", err)
 	}
-	defer rdb.Close()
+	defer func() { _ = rdb.Close() }()
 
 	log.Printf("proxima-vpn api-server v%s starting on %s:%d", version, cfg.Server.Host, cfg.Server.Port)
 

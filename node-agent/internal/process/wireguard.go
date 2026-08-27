@@ -138,21 +138,21 @@ func (m *WireGuardManager) GenerateConfig(cfg WireGuardConfig) error {
 	var sb strings.Builder
 
 	sb.WriteString("[Interface]\n")
-	sb.WriteString(fmt.Sprintf("PrivateKey = %s\n", cfg.PrivateKey))
-	sb.WriteString(fmt.Sprintf("ListenPort = %d\n", cfg.ListenPort))
+	fmt.Fprintf(&sb, "PrivateKey = %s\n", cfg.PrivateKey)
+	fmt.Fprintf(&sb, "ListenPort = %d\n", cfg.ListenPort)
 	if cfg.Address != "" {
-		sb.WriteString(fmt.Sprintf("Address = %s\n", cfg.Address))
+		fmt.Fprintf(&sb, "Address = %s\n", cfg.Address)
 	}
 	if cfg.DNS != "" {
-		sb.WriteString(fmt.Sprintf("DNS = %s\n", cfg.DNS))
+		fmt.Fprintf(&sb, "DNS = %s\n", cfg.DNS)
 	}
 
 	for _, peer := range cfg.Peers {
 		sb.WriteString("\n[Peer]\n")
-		sb.WriteString(fmt.Sprintf("PublicKey = %s\n", peer.PublicKey))
-		sb.WriteString(fmt.Sprintf("AllowedIPs = %s\n", peer.AllowedIPs))
+		fmt.Fprintf(&sb, "PublicKey = %s\n", peer.PublicKey)
+		fmt.Fprintf(&sb, "AllowedIPs = %s\n", peer.AllowedIPs)
 		if peer.PresharedKey != "" {
-			sb.WriteString(fmt.Sprintf("PresharedKey = %s\n", peer.PresharedKey))
+			fmt.Fprintf(&sb, "PresharedKey = %s\n", peer.PresharedKey)
 		}
 	}
 

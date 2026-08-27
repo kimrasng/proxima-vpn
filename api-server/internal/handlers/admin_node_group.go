@@ -313,7 +313,7 @@ func (h *AdminNodeGroupHandler) SetNodes(c *fiber.Ctx) error {
 			"error": "failed to start transaction",
 		})
 	}
-	defer tx.Rollback(context.Background())
+	defer func() { _ = tx.Rollback(context.Background()) }()
 
 	_, err = tx.Exec(
 		context.Background(),

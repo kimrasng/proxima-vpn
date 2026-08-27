@@ -168,7 +168,7 @@ func (r *XrayRunner) UpdateBinary(ctx context.Context, targetVersion string) err
 	if err != nil {
 		return fmt.Errorf("download xray release: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("download xray release: status %d", resp.StatusCode)
 	}
@@ -193,7 +193,7 @@ func (r *XrayRunner) UpdateBinary(ctx context.Context, targetVersion string) err
 			return fmt.Errorf("open xray binary in archive: %w", err)
 		}
 		xrayBin, err = io.ReadAll(rc)
-		rc.Close()
+		_ = rc.Close()
 		if err != nil {
 			return fmt.Errorf("read xray binary from archive: %w", err)
 		}
@@ -212,12 +212,12 @@ func (r *XrayRunner) UpdateBinary(ctx context.Context, targetVersion string) err
 	success := false
 	defer func() {
 		if !success {
-			os.Remove(tmpPath)
+			_ = os.Remove(tmpPath)
 		}
 	}()
 
 	if _, err := tmpFile.Write(xrayBin); err != nil {
-		tmpFile.Close()
+		_ = tmpFile.Close()
 		return fmt.Errorf("write xray binary: %w", err)
 	}
 	if err := tmpFile.Close(); err != nil {

@@ -67,7 +67,7 @@ func (u *Updater) CheckUpdate(ctx context.Context) (newVersion string, available
 	if err != nil {
 		return "", false, fmt.Errorf("update check request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == http.StatusNoContent || resp.StatusCode == http.StatusNotFound {
 		return "", false, nil
@@ -106,7 +106,7 @@ func (u *Updater) PerformUpdate(ctx context.Context, targetVersion string) error
 	if err != nil {
 		return fmt.Errorf("download request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("download returned status %d", resp.StatusCode)
@@ -125,12 +125,12 @@ func (u *Updater) PerformUpdate(ctx context.Context, targetVersion string) error
 	success := false
 	defer func() {
 		if !success {
-			os.Remove(tmpPath)
+			_ = os.Remove(tmpPath)
 		}
 	}()
 
 	if _, err := io.Copy(tmpFile, resp.Body); err != nil {
-		tmpFile.Close()
+		_ = tmpFile.Close()
 		return fmt.Errorf("write update binary: %w", err)
 	}
 	if err := tmpFile.Close(); err != nil {
