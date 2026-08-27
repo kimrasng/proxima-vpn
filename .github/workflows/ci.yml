@@ -26,6 +26,13 @@ jobs:
       - name: Test pkg
         run: cd pkg && go test ./...
 
+  # version is pinned (not "latest") because golangci-lint-action's "latest"
+  # resolved to a binary built with an older Go toolchain than go.work's
+  # `go 1.25.0`, which made every run fail immediately with "can't load
+  # config: the Go language version ... is lower than the targeted Go
+  # version" before it ever got to analyze any code (see git history: every
+  # run from 2026-07-13 through 2026-08-26 failed this way). v2.13.1 is
+  # built with go1.27 and has been verified locally against this repo.
   lint-go:
     runs-on: ubuntu-latest
     steps:
@@ -36,17 +43,17 @@ jobs:
       - name: golangci-lint (api-server)
         uses: golangci/golangci-lint-action@v6
         with:
-          version: latest
+          version: v2.13.1
           working-directory: api-server
       - name: golangci-lint (node-agent)
         uses: golangci/golangci-lint-action@v6
         with:
-          version: latest
+          version: v2.13.1
           working-directory: node-agent
       - name: golangci-lint (pkg)
         uses: golangci/golangci-lint-action@v6
         with:
-          version: latest
+          version: v2.13.1
           working-directory: pkg
 
   frontend:

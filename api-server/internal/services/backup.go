@@ -38,7 +38,6 @@ type BackupService struct {
 	dbURL      string
 	fallbackS3 config.S3Config
 	fallback   time.Duration
-	interval   time.Duration
 	cancel     context.CancelFunc
 }
 
