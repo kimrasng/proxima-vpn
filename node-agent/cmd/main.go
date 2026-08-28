@@ -37,6 +37,7 @@ func main() {
 	}
 
 	rootCmd.AddCommand(registerCmd())
+	rootCmd.AddCommand(unregisterCmd())
 	rootCmd.AddCommand(runCmd())
 
 	if err := rootCmd.Execute(); err != nil {
@@ -101,6 +102,43 @@ func registerCmd() *cobra.Command {
 	cmd.Flags().IntVar(&port, "port", 443, "Service port")
 	_ = cmd.MarkFlagRequired("server")
 	_ = cmd.MarkFlagRequired("token")
+
+	return cmd
+}
+
+// unregisterCmd deletes this node's own record from the panel (see
+// NodeAgentHandler.Unregister in api-server/internal/handlers/node_agent.go),
+// using the API key saved locally by `register`. scripts/uninstall.sh runs
+// this before removing the local install so uninstalling a node also removes
+// it from the admin panel, instead of leaving a stale entry that previously
+// had to be deleted by hand.
+func unregisterCmd() *cobra.Command {
+	var configPath string
+
+	cmd := &cobra.Command{
+		Use:   "unregister",
+		Short: "Remove this node's registration from the panel",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg, err := config.Load(configPath)
+			if err != nil {
+				return fmt.Errorf("load config: %w", err)
+			}
+
+			apiClient := client.NewAPIClient(cfg)
+
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+
+			if err := apiClient.Unregister(ctx); err != nil {
+				return fmt.Errorf("unregister failed: %w", err)
+			}
+
+			fmt.Println("Node unregistered from panel successfully.")
+			return nil
+		},
+	}
+
+	cmd.Flags().StringVar(&configPath, "config", config.DefaultConfigPath, "Config file path")
 
 	return cmd
 }

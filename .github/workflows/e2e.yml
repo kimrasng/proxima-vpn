@@ -1,0 +1,122 @@
+name: E2E (node-agent <-> server)
+
+# Runs scripts/e2e_full_test.sh: a real api-server + real node-agent + real
+# xray-core + real wg-quick, with real clients (also real xray-core/wg-quick)
+# tunneling through each of the 5 supported protocols to a local HTTP target.
+# This is a data-plane test, not just "does the config parse" - see the
+# script's own header comment for exactly what it does and does not cover
+# (ACME/Let's Encrypt cannot be tested here - it needs a real public domain).
+#
+# Runs on GitHub's hosted ubuntu-latest runner because it's a real VM (not a
+# restricted container), so wg-quick/tc/NET_ADMIN work without extra setup.
+
+on:
+  workflow_dispatch: {}
+  pull_request:
+    branches: [main]
+    paths:
+      - 'api-server/**'
+      - 'node-agent/**'
+      - 'pkg/**'
+      - 'scripts/e2e_full_test.sh'
+      - '.github/workflows/e2e.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'api-server/**'
+      - 'node-agent/**'
+      - 'pkg/**'
+      - 'scripts/e2e_full_test.sh'
+      - '.github/workflows/e2e.yml'
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: vpnuser
+          POSTGRES_PASSWORD: vpnpass
+          POSTGRES_DB: vpnpanel
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U vpnuser -d vpnpanel"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+
+    env:
+      DATABASE_URL: postgres://vpnuser:vpnpass@localhost:5432/vpnpanel
+      REDIS_URL: redis://localhost:6379
+      JWT_SECRET: e2e-test-secret-not-for-production-use
+      PANEL_URL: http://localhost:2053
+      ADMIN_EMAIL: admin@e2e.test
+      ADMIN_PASSWORD: E2ETestAdminPass123!
+      SWAGGER_ENABLED: "false"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+
+      - name: Install system dependencies (xray-core/wg-quick runtime deps)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq wireguard-tools iproute2 iptables unzip jq
+
+      - name: Build api-server and node-agent
+        run: |
+          cd api-server && go build -o /tmp/api-server ./cmd/main.go
+          cd ../node-agent && go build -o /tmp/node-agent ./cmd/main.go
+
+      - name: Install real Xray-core
+        run: |
+          XRAY_VERSION=$(curl -fsSL "https://api.github.com/repos/XTLS/Xray-core/releases/latest" | jq -r .tag_name)
+          curl -fsSL -o /tmp/xray.zip "https://github.com/XTLS/Xray-core/releases/download/${XRAY_VERSION}/Xray-linux-64.zip"
+          unzip -q /tmp/xray.zip -d /tmp/xray
+          sudo install -m 0755 /tmp/xray/xray /usr/local/bin/xray
+          xray version
+
+      - name: Start api-server
+        run: |
+          nohup /tmp/api-server > /tmp/api-server.log 2>&1 &
+          echo $! > /tmp/api-server.pid
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:2053/health > /dev/null && exit 0
+            sleep 1
+          done
+          echo "api-server did not become healthy in time"
+          cat /tmp/api-server.log
+          exit 1
+
+      - name: Run full protocol e2e test
+        env:
+          NODE_AGENT_BIN: /tmp/node-agent
+          BASE_URL: http://localhost:2053
+          E2E_LOG_DIR: /tmp/e2e-logs
+        run: |
+          mkdir -p /tmp/e2e-logs
+          bash scripts/e2e_full_test.sh
+
+      - name: Dump api-server log on failure
+        if: failure()
+        run: cat /tmp/api-server.log || true
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-logs
+          path: |
+            /tmp/api-server.log
+            /tmp/e2e-logs/**
+          if-no-files-found: ignore
+          retention-days: 7

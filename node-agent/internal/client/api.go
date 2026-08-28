@@ -116,6 +116,31 @@ func (c *APIClient) Register(ctx context.Context, serverURL, token, ip string, p
 	return &result, nil
 }
 
+// Unregister deletes this node's own record from the panel, authenticated
+// with its own API key. Used by `node-agent unregister` (cmd/main.go),
+// typically run from scripts/uninstall.sh, so uninstalling a node also
+// removes it from the admin panel.
+func (c *APIClient) Unregister(ctx context.Context) error {
+	url := fmt.Sprintf("%s/api/v1/nodes/%s", c.serverURL, c.nodeID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
+	if err != nil {
+		return fmt.Errorf("create unregister request: %w", err)
+	}
+	req.Header.Set("X-Node-Key", c.apiKey)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("unregister request: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("unregister failed (status %d): %s", resp.StatusCode, string(body))
+	}
+	return nil
+}
+
 // GetConfig fetches the Xray configuration from the server.
 func (c *APIClient) GetConfig(ctx context.Context) ([]byte, error) {
 	url := fmt.Sprintf("%s/api/v1/nodes/%s/config", c.serverURL, c.nodeID)

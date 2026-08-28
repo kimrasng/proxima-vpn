@@ -104,6 +104,37 @@ func (h *NodeAgentHandler) Register(c *fiber.Ctx) error {
 	})
 }
 
+// Unregister deletes this node's own record from the panel database,
+// authenticated with the node's own API key rather than an admin JWT. Called
+// by `node-agent unregister` (node-agent/cmd/main.go), which
+// scripts/uninstall.sh runs before removing the local install, so
+// uninstalling a node from the server also removes it from the panel instead
+// of leaving a stale entry that has to be deleted by hand. DELETE FROM nodes
+// cascades to node_group_nodes/inbounds/traffic_logs (see
+// database/schema.go), so this is a complete teardown, matching
+// AdminNodeHandler.DeleteNode's admin-initiated equivalent.
+func (h *NodeAgentHandler) Unregister(c *fiber.Ctx) error {
+	nodeID := c.Locals("node_id").(string)
+
+	result, err := h.db.Exec(
+		context.Background(),
+		`DELETE FROM nodes WHERE id = $1`,
+		nodeID,
+	)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to unregister node",
+		})
+	}
+	if result.RowsAffected() == 0 {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "node not found",
+		})
+	}
+
+	return c.JSON(fiber.Map{"message": "node unregistered"})
+}
+
 func (h *NodeAgentHandler) Config(c *fiber.Ctx) error {
 	nodeID := c.Locals("node_id").(string)
 
