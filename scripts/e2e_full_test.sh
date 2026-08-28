@@ -5,7 +5,9 @@
 # through the panel API, starts the real xray-core/wg-quick processes that
 # result, and then acts as a real client for each protocol - proving actual
 # encrypted traffic reaches a local HTTP target through each tunnel, not just
-# that config files parse.
+# that config files parse. Finishes by running `node-agent unregister` (the
+# same command scripts/uninstall.sh runs) and confirming the node is actually
+# gone from the panel and its API key is rejected afterward.
 #
 # This intentionally does NOT exercise ACME/Let's Encrypt (IssueCertificate):
 # that requires a real public domain reachable from the internet on port 80,
@@ -402,3 +404,155 @@ assert_eq "WireGuard tunnel reaches target" "$MARKER" "$(curl -s --max-time 10 h
 
 echo ""
 log "ALL PROTOCOLS PASSED (VLESS Reality, VMess, Trojan, Shadowsocks, WireGuard)"
+
+# ---------------------------------------------------------------------------
+# 15. Subscription formats. Every client app format the panel advertises is
+#     generated from the same node set and checked for (a) structural
+#     validity in that format's own syntax, and (b) actually containing the
+#     protocols it claims to support. This is what would have caught the
+#     Shadowsocks-missing-from-subscriptions bug: the node ran SS fine, but
+#     the subscription silently omitted it because it read a dead column.
+# ---------------------------------------------------------------------------
+log "testing subscription formats"
+
+sub_fetch() { curl -sf "$BASE_URL/sub/$SUB_TOKEN/$DEVICE_ID?format=$1"; }
+
+# --- Clash: must be valid YAML and carry every protocol as a typed proxy ---
+sub_fetch clash > "$WORKDIR/sub_clash.yaml"
+python3 - "$WORKDIR/sub_clash.yaml" <<'PY' || fail "clash subscription failed validation"
+import sys, yaml
+d = yaml.safe_load(open(sys.argv[1]))
+proxies = d.get("proxies") or []
+types = {p.get("type") for p in proxies}
+missing = {"vless", "vmess", "trojan", "ss", "wireguard"} - types
+assert not missing, f"clash: missing proxy types {missing} (got {types})"
+assert d.get("proxy-groups"), "clash: no proxy-groups"
+names = {p.get("name") for p in proxies}
+for g in d["proxy-groups"]:
+    for ref in (g.get("proxies") or []):
+        assert ref in names or ref in {n.get("name") for n in d["proxy-groups"]} or ref == "DIRECT", \
+            f"clash: proxy-group {g.get('name')!r} references unknown proxy {ref!r}"
+print("clash ok:", sorted(types))
+PY
+log "PASS: Clash subscription is valid YAML with all 5 protocols"
+
+# --- Sing-box: must be valid JSON with matching outbound types ---
+sub_fetch singbox > "$WORKDIR/sub_singbox.json"
+python3 - "$WORKDIR/sub_singbox.json" <<'PY' || fail "singbox subscription failed validation"
+import sys, json
+d = json.load(open(sys.argv[1]))
+obs = d.get("outbounds") or []
+types = {o.get("type") for o in obs}
+missing = {"vless", "vmess", "trojan", "shadowsocks", "wireguard"} - types
+assert not missing, f"singbox: missing outbound types {missing} (got {types})"
+tags = {o.get("tag") for o in obs}
+for o in obs:
+    if o.get("type") in ("selector", "urltest"):
+        for ref in (o.get("outbounds") or []):
+            assert ref in tags, f"singbox: {o.get('tag')!r} references unknown outbound {ref!r}"
+print("singbox ok:", sorted(types))
+PY
+log "PASS: Sing-box subscription is valid JSON with all 5 protocols"
+
+# --- Surfboard / Quantumult: documented to omit hysteria2+wireguard (and,
+#     as found during the audit, vless too), so assert the protocols they DO
+#     claim actually appear rather than asserting all five. ---
+sub_fetch surfboard > "$WORKDIR/sub_surfboard.conf"
+grep -q '^\[Proxy\]' "$WORKDIR/sub_surfboard.conf" || fail "surfboard: no [Proxy] section"
+grep -q '^\[Proxy Group\]' "$WORKDIR/sub_surfboard.conf" || fail "surfboard: no [Proxy Group] section"
+for p in vmess trojan ss; do
+  grep -qE "= ?$p," "$WORKDIR/sub_surfboard.conf" || fail "surfboard: no $p proxy line"
+done
+log "PASS: Surfboard subscription has the protocols it supports (vmess/trojan/ss)"
+
+sub_fetch quantumult > "$WORKDIR/sub_quantumult.conf"
+for p in vmess trojan shadowsocks; do
+  grep -q "^$p=" "$WORKDIR/sub_quantumult.conf" || fail "quantumult: no $p line"
+done
+log "PASS: Quantumult subscription has the protocols it supports (vmess/trojan/ss)"
+
+# --- Default v2ray base64 list: one link per protocol that has one ---
+V2RAY_LINKS=$(curl -sf "$BASE_URL/sub/$SUB_TOKEN/$DEVICE_ID" | base64 -d)
+for scheme in vless vmess trojan ss; do
+  echo "$V2RAY_LINKS" | grep -q "^$scheme://" || fail "v2ray subscription: no $scheme:// link"
+done
+log "PASS: v2ray subscription contains vless/vmess/trojan/ss links"
+
+# ---------------------------------------------------------------------------
+# 16. Access-control / edge cases. The happy path above only proves things
+#     work when everything is configured correctly; these assert the server
+#     actually *denies* access when it should. Each of these corresponds to a
+#     real revocation path the panel promises (suspend, expire, traffic cap).
+# ---------------------------------------------------------------------------
+log "testing access-control edge cases"
+
+# A device belonging to a suspended user must drop out of the node's config.
+curl -sf -X PUT "$BASE_URL/api/v1/admin/users/$USER_ID" \
+  -H "Authorization: Bearer $ADMIN_TOKEN" -H "Content-Type: application/json" \
+  -d '{"status":"suspended","is_active":false}' > /dev/null
+CLIENTS_WHEN_SUSPENDED=$(curl -sf "$BASE_URL/api/v1/nodes/$NODE_ID/config" -H "X-Node-Key: $NODE_KEY" \
+  | jq '[.inbounds[] | select(.tag=="vless-in") | .settings.clients // [] | length] | add')
+assert_eq "suspended user is removed from the node's xray clients" "0" "$CLIENTS_WHEN_SUSPENDED"
+
+WG_PEERS_WHEN_SUSPENDED=$(curl -sf "$BASE_URL/api/v1/nodes/$NODE_ID/wireguard/peers" -H "X-Node-Key: $NODE_KEY" | jq 'length')
+assert_eq "suspended user is removed from the wireguard peer set" "0" "$WG_PEERS_WHEN_SUSPENDED"
+
+HY2_WHEN_SUSPENDED=$(curl -sf "$BASE_URL/api/v1/nodes/$NODE_ID/hysteria2/users" -H "X-Node-Key: $NODE_KEY" | jq 'length')
+assert_eq "suspended user is removed from the hysteria2 user set" "0" "$HY2_WHEN_SUSPENDED"
+
+SUSPENDED_SUB_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/sub/$SUB_TOKEN/$DEVICE_ID")
+assert_eq "suspended user's subscription is refused" "403" "$SUSPENDED_SUB_STATUS"
+
+# Reactivate and confirm access actually comes back (proves the assertions
+# above were measuring the suspension, not a permanently broken fixture).
+curl -sf -X PUT "$BASE_URL/api/v1/admin/users/$USER_ID" \
+  -H "Authorization: Bearer $ADMIN_TOKEN" -H "Content-Type: application/json" \
+  -d '{"status":"active","is_active":true}' > /dev/null
+CLIENTS_AFTER_RESTORE=$(curl -sf "$BASE_URL/api/v1/nodes/$NODE_ID/config" -H "X-Node-Key: $NODE_KEY" \
+  | jq '[.inbounds[] | select(.tag=="vless-in") | .settings.clients // [] | length] | add')
+assert_eq "reactivated user is restored to the node's xray clients" "1" "$CLIENTS_AFTER_RESTORE"
+
+# An expired plan must revoke access the same way.
+curl -sf -X PUT "$BASE_URL/api/v1/admin/users/$USER_ID" \
+  -H "Authorization: Bearer $ADMIN_TOKEN" -H "Content-Type: application/json" \
+  -d '{"plan_expires_at":"2020-01-01T00:00:00Z"}' > /dev/null
+CLIENTS_WHEN_EXPIRED=$(curl -sf "$BASE_URL/api/v1/nodes/$NODE_ID/config" -H "X-Node-Key: $NODE_KEY" \
+  | jq '[.inbounds[] | select(.tag=="vless-in") | .settings.clients // [] | length] | add')
+assert_eq "user with an expired plan is removed from the node's xray clients" "0" "$CLIENTS_WHEN_EXPIRED"
+
+# Bad node credentials must be rejected outright.
+BAD_KEY_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/api/v1/nodes/$NODE_ID/config" -H "X-Node-Key: definitely-not-the-key")
+assert_eq "wrong node API key is rejected" "401" "$BAD_KEY_STATUS"
+
+NO_KEY_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/api/v1/nodes/$NODE_ID/config")
+assert_eq "missing node API key is rejected" "401" "$NO_KEY_STATUS"
+
+# An unknown subscription token must 404, not leak someone else's config.
+BAD_SUB_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/sub/00000000-0000-0000-0000-000000000000/$DEVICE_ID")
+assert_eq "unknown subscription token is refused" "404" "$BAD_SUB_STATUS"
+
+log "PASS: access-control edge cases behave correctly"
+
+# ---------------------------------------------------------------------------
+# 17. node-agent unregister: the same command scripts/uninstall.sh runs
+#     before tearing down the local install (see NodeAgentHandler.Unregister
+#     in api-server/internal/handlers/node_agent.go). Run while node-agent is
+#     still up, matching uninstall.sh's actual order (it unregisters before
+#     stopping the service) - unregister is a standalone HTTP call using the
+#     saved API key, independent of whether the agent process is running.
+# ---------------------------------------------------------------------------
+log "testing node-agent unregister"
+sudo "$NODE_AGENT_BIN" unregister --config "$WORKDIR/node-agent-config.json" \
+  > "$LOGDIR/unregister.log" 2>&1
+cat "$LOGDIR/unregister.log"
+grep -q "unregistered from panel successfully" "$LOGDIR/unregister.log" \
+  || fail "unregister command did not report success"
+
+STILL_PRESENT=$(curl -sf "$BASE_URL/api/v1/admin/nodes/" -H "Authorization: Bearer $ADMIN_TOKEN" \
+  | jq "[.[] | select(.id == \"$NODE_ID\")] | length")
+assert_eq "node no longer appears in admin node list after unregister" "0" "$STILL_PRESENT"
+
+UNREG_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/api/v1/nodes/$NODE_ID/tls-domain" -H "X-Node-Key: $NODE_KEY")
+assert_eq "node's own API key rejected after unregister" "401" "$UNREG_STATUS"
+
+log "PASS: node-agent unregister removed the node from the panel"

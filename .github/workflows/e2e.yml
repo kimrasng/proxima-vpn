@@ -106,6 +106,32 @@ jobs:
           mkdir -p /tmp/e2e-logs
           bash scripts/e2e_full_test.sh
 
+      # --- Browser e2e (admin panel + user portal) -------------------------
+      # Runs against the same api-server instance. vite preview proxies /api
+      # and /sub to it, mirroring what nginx does in production.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install web dependencies
+        run: cd web && npm ci
+
+      - name: Install Playwright browser
+        run: cd web && npx playwright install --with-deps chromium
+
+      - name: Build web
+        run: cd web && npm run build
+
+      - name: Run browser e2e
+        env:
+          E2E_BASE_URL: http://localhost:8080
+          E2E_ADMIN_EMAIL: admin@e2e.test
+          E2E_ADMIN_PASSWORD: E2ETestAdminPass123!
+          VITE_API_PROXY_TARGET: http://localhost:2053
+        run: cd web && npm run test:e2e
+
       - name: Dump api-server log on failure
         if: failure()
         run: cat /tmp/api-server.log || true
@@ -118,5 +144,7 @@ jobs:
           path: |
             /tmp/api-server.log
             /tmp/e2e-logs/**
+            web/playwright-report/**
+            web/test-results/**
           if-no-files-found: ignore
           retention-days: 7

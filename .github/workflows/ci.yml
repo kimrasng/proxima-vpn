@@ -8,6 +8,26 @@ on:
 jobs:
   backend:
     runs-on: ubuntu-latest
+
+    # Postgres is provided so the DB-backed tests (e.g. the Telegram bot
+    # command tests in internal/telegram) actually run instead of skipping
+    # themselves - they no-op unless TEST_DATABASE_URL is set.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: vpnuser
+          POSTGRES_PASSWORD: vpnpass
+          POSTGRES_DB: vpnpanel
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U vpnuser -d vpnpanel"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+
+    env:
+      TEST_DATABASE_URL: postgres://vpnuser:vpnpass@localhost:5432/vpnpanel
+
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -19,6 +39,22 @@ jobs:
         run: cd node-agent && go build ./...
       - name: Build pkg
         run: cd pkg && go build ./...
+      # The DB-backed tests exercise real tables, so the schema has to exist
+      # first. Migrate() is idempotent and is what the server itself runs at
+      # startup, so booting the binary briefly is the least duplicative way
+      # to apply it.
+      - name: Apply database schema
+        env:
+          DATABASE_URL: postgres://vpnuser:vpnpass@localhost:5432/vpnpanel
+          REDIS_URL: redis://localhost:6379
+          JWT_SECRET: ci-schema-bootstrap
+        run: |
+          cd api-server && go build -o /tmp/api-server ./cmd/main.go
+          # It will fail to reach Redis and exit; the migration runs before
+          # that, which is all this step needs.
+          /tmp/api-server > /tmp/migrate.log 2>&1 || true
+          grep -qi "failed to migrate" /tmp/migrate.log && { cat /tmp/migrate.log; exit 1; }
+          echo "schema applied"
       - name: Test api-server
         run: cd api-server && go test ./...
       - name: Test node-agent

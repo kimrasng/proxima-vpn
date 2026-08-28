@@ -53,3 +53,9 @@ scripts/e2e_test.sh
 
 /web/dist/
 /bin/
+
+# Playwright (browser e2e) output and the saved admin session
+/web/test-results/
+/web/playwright-report/
+/web/blob-report/
+/web/e2e/.auth/
