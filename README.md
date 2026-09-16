@@ -54,4 +54,3 @@ See [docs/troubleshooting.md](docs/troubleshooting.md)
 ## License
 
 MIT
-# vpn-panel
