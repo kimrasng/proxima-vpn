@@ -463,8 +463,15 @@ log "PASS: device added after startup can connect (${waited}s)"
 XRAY_PID_AFTER=$(pgrep -f "xray -config /etc/node-agent" | head -1)
 assert_eq "xray was NOT restarted to admit the new user" "$XRAY_PID_BEFORE" "$XRAY_PID_AFTER"
 
-grep -q "synced .* user" "$LOGDIR/node-agent.log" \
-  || fail "agent log has no record of a user sync - the new user likely arrived via a restart"
+# The tunnel can come up just before the agent logs the sync; don't race it.
+waited=0
+until grep -q "synced users without restart: 2 active" "$LOGDIR/node-agent.log"; do
+  waited=$((waited + 1))
+  [[ $waited -ge 15 ]] && fail "agent never logged a 2-user sync - the new user likely arrived via a restart"
+  sleep 1
+done
+grep -q "config changed, restarting xray" "$LOGDIR/node-agent.log" \
+  && fail "agent restarted xray on a users-only change"
 log "PASS: agent applied the change incrementally (AlterInbound accepted by real Xray)"
 
 # A botched sync could evict existing users while admitting the new one.
@@ -492,8 +499,13 @@ wait_for "supervisor to bring xray back" 40 bash -c "ss -tln | grep -q ':$VLESS_
 XRAY_PID_RESTARTED=$(pgrep -f "xray -config /etc/node-agent" | head -1)
 [[ -n "$XRAY_PID_RESTARTED" && "$XRAY_PID_RESTARTED" != "$XRAY_PID_AFTER" ]] \
   || fail "xray pid did not change - supervisor did not actually respawn it"
-grep -q "supervisor: xray restarted" "$LOGDIR/node-agent.log" \
-  || fail "agent log has no supervisor restart record"
+
+waited=0
+until grep -q "supervisor: xray restarted" "$LOGDIR/node-agent.log"; do
+  waited=$((waited + 1))
+  [[ $waited -ge 15 ]] && fail "agent log has no supervisor restart record"
+  sleep 1
+done
 
 # Liveness is not the point - carrying traffic again is. Retry while the fresh
 # process finishes binding every inbound.
