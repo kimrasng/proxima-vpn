@@ -21,7 +21,7 @@ type WireGuardConfig struct {
 // WireGuardPeer represents a single WireGuard peer entry.
 type WireGuardPeer struct {
 	PublicKey    string `json:"public_key"`
-	AllowedIPs  string `json:"allowed_ips"` // e.g., "10.0.0.2/32"
+	AllowedIPs   string `json:"allowed_ips"` // e.g., "10.0.0.2/32"
 	PresharedKey string `json:"preshared_key,omitempty"`
 }
 

@@ -19,12 +19,12 @@ func NewAdminPlanHandler(db *pgxpool.Pool) *AdminPlanHandler {
 }
 
 type createPlanRequest struct {
-	Name         string  `json:"name"`
-	TrafficLimit *int64  `json:"traffic_limit"`
-	DurationDays int     `json:"duration_days"`
-	MaxDevices   int     `json:"max_devices"`
-	SpeedLimit   *int    `json:"speed_limit"`
-	NodeGroupID  string  `json:"node_group_id"`
+	Name         string `json:"name"`
+	TrafficLimit *int64 `json:"traffic_limit"`
+	DurationDays int    `json:"duration_days"`
+	MaxDevices   int    `json:"max_devices"`
+	SpeedLimit   *int   `json:"speed_limit"`
+	NodeGroupID  string `json:"node_group_id"`
 }
 
 type updatePlanRequest struct {

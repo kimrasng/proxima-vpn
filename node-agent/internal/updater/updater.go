@@ -115,7 +115,7 @@ func (u *Updater) PerformUpdate(ctx context.Context, targetVersion string) error
 	dir := filepath.Dir(u.binaryPath)
 	tmpFile, err := os.CreateTemp(dir, "node-agent-update-*")
 	if err != nil {
-			tmpFile, err = os.CreateTemp("", "node-agent-update-*")
+		tmpFile, err = os.CreateTemp("", "node-agent-update-*")
 		if err != nil {
 			return fmt.Errorf("create temp file: %w", err)
 		}

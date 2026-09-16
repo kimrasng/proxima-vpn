@@ -7,8 +7,8 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/redis/go-redis/v9"
 	"github.com/proximavpn/proxima-vpn/pkg/crypto"
+	"github.com/redis/go-redis/v9"
 )
 
 // UserPortalHandler handles user self-service endpoints.
@@ -35,14 +35,14 @@ func (h *UserPortalHandler) GetProfile(c *fiber.Ctx) error {
 	userID := c.Locals("user_id").(string)
 
 	var (
-		email          string
-		name           string
-		status         string
-		trafficUsed    int64
-		planName       *string
-		trafficLimit   *int64
-		planExpiresAt  *time.Time
-		planStartedAt  *time.Time
+		email         string
+		name          string
+		status        string
+		trafficUsed   int64
+		planName      *string
+		trafficLimit  *int64
+		planExpiresAt *time.Time
+		planStartedAt *time.Time
 	)
 
 	err := h.db.QueryRow(context.Background(), `
@@ -212,11 +212,11 @@ func (h *UserPortalHandler) GetTrafficStats(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{
-		"traffic_used":   trafficUsed,
-		"traffic_limit":  trafficLimit,
-		"percentage":     percentage,
+		"traffic_used":    trafficUsed,
+		"traffic_limit":   trafficLimit,
+		"percentage":      percentage,
 		"plan_expires_at": planExpiresAt,
-		"days_remaining": daysRemaining,
+		"days_remaining":  daysRemaining,
 	})
 }
 

@@ -42,12 +42,12 @@ type clashProfile struct {
 }
 
 type clashSniffer struct {
-	Enabled          bool                          `yaml:"enable"`
-	OverrideDest     bool                          `yaml:"override-destination"`
-	Sniff            map[string]clashSniffPortSpec `yaml:"sniff"`
-	SkipDomain       []string                      `yaml:"skip-domain,omitempty"`
-	ForceDNSMapping  bool                          `yaml:"force-dns-mapping"`
-	ParsePureIP      bool                          `yaml:"parse-pure-ip"`
+	Enabled         bool                          `yaml:"enable"`
+	OverrideDest    bool                          `yaml:"override-destination"`
+	Sniff           map[string]clashSniffPortSpec `yaml:"sniff"`
+	SkipDomain      []string                      `yaml:"skip-domain,omitempty"`
+	ForceDNSMapping bool                          `yaml:"force-dns-mapping"`
+	ParsePureIP     bool                          `yaml:"parse-pure-ip"`
 }
 
 type clashSniffPortSpec struct {
@@ -55,15 +55,15 @@ type clashSniffPortSpec struct {
 }
 
 type clashDNS struct {
-	Enable         bool     `yaml:"enable"`
-	Listen         string   `yaml:"listen"`
-	IPv6           bool     `yaml:"ipv6"`
-	EnhancedMode   string   `yaml:"enhanced-mode"`
-	FakeIPRange    string   `yaml:"fake-ip-range,omitempty"`
-	FakeIPFilter   []string `yaml:"fake-ip-filter,omitempty"`
-	DefaultServer  []string `yaml:"default-nameserver"`
-	Nameserver     []string `yaml:"nameserver"`
-	Fallback       []string `yaml:"fallback,omitempty"`
+	Enable        bool     `yaml:"enable"`
+	Listen        string   `yaml:"listen"`
+	IPv6          bool     `yaml:"ipv6"`
+	EnhancedMode  string   `yaml:"enhanced-mode"`
+	FakeIPRange   string   `yaml:"fake-ip-range,omitempty"`
+	FakeIPFilter  []string `yaml:"fake-ip-filter,omitempty"`
+	DefaultServer []string `yaml:"default-nameserver"`
+	Nameserver    []string `yaml:"nameserver"`
+	Fallback      []string `yaml:"fallback,omitempty"`
 }
 
 type proxyGroup struct {

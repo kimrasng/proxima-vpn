@@ -28,7 +28,7 @@ var allowedImageTypes = map[string]string{
 }
 
 type AdminUploadHandler struct {
-	cfg *config.StorageConfig
+	cfg      *config.StorageConfig
 	panelURL string
 }
 

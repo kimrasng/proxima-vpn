@@ -14,9 +14,9 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/gofiber/fiber/v2/middleware/requestid"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/redis/go-redis/v9"
 	"github.com/proximavpn/proxima-vpn/api-server/internal/config"
 	"github.com/proximavpn/proxima-vpn/api-server/internal/services"
+	"github.com/redis/go-redis/v9"
 )
 
 type Server struct {

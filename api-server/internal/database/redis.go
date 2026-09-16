@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/redis/go-redis/v9"
 	"github.com/proximavpn/proxima-vpn/api-server/internal/config"
+	"github.com/redis/go-redis/v9"
 )
 
 // NewRedisClient creates a Redis client and verifies connectivity.

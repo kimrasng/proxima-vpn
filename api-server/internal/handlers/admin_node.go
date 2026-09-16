@@ -10,8 +10,8 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/redis/go-redis/v9"
 	"github.com/proximavpn/proxima-vpn/pkg/crypto"
+	"github.com/redis/go-redis/v9"
 )
 
 // AdminNodeHandler handles admin node management endpoints.

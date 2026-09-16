@@ -225,21 +225,21 @@ type deviceItem struct {
 }
 
 type userDetailResponse struct {
-	ID             string       `json:"id"`
-	Email          string       `json:"email"`
-	Name           string       `json:"name"`
-	SubToken       string       `json:"sub_token"`
-	PlanID         *string      `json:"plan_id"`
-	PlanName       *string      `json:"plan_name"`
-	PlanStartedAt  *time.Time   `json:"plan_started_at"`
-	PlanExpiresAt  *time.Time   `json:"plan_expires_at"`
-	TrafficUsed    int64        `json:"traffic_used"`
-	TrafficLimit   *int64       `json:"traffic_limit"`
-	TrafficResetDay *int        `json:"traffic_reset_day"`
-	IsActive       bool         `json:"is_active"`
-	Status         string       `json:"status"`
-	CreatedAt      time.Time    `json:"created_at"`
-	Devices        []deviceItem `json:"devices"`
+	ID              string       `json:"id"`
+	Email           string       `json:"email"`
+	Name            string       `json:"name"`
+	SubToken        string       `json:"sub_token"`
+	PlanID          *string      `json:"plan_id"`
+	PlanName        *string      `json:"plan_name"`
+	PlanStartedAt   *time.Time   `json:"plan_started_at"`
+	PlanExpiresAt   *time.Time   `json:"plan_expires_at"`
+	TrafficUsed     int64        `json:"traffic_used"`
+	TrafficLimit    *int64       `json:"traffic_limit"`
+	TrafficResetDay *int         `json:"traffic_reset_day"`
+	IsActive        bool         `json:"is_active"`
+	Status          string       `json:"status"`
+	CreatedAt       time.Time    `json:"created_at"`
+	Devices         []deviceItem `json:"devices"`
 }
 
 // Get returns a single user with plan and device details.
