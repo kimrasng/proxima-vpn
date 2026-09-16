@@ -306,9 +306,9 @@ func updateCheckLoop(ctx context.Context, upd *updater.Updater) {
 	}
 }
 
-// xrayUpdateLoop periodically checks whether the admin requested a different
-// Xray-core version for this node (nodes.xray_target_version) and, if so,
-// downloads it from GitHub, swaps the binary, and restarts Xray in place.
+// xrayUpdateLoop applies an admin-requested Xray-core version change. Staging
+// and validation happen while the old Xray still serves - stopping first, as
+// this used to, made every slow download an outage of that length.
 func xrayUpdateLoop(ctx context.Context, apiClient *client.APIClient, runner *xray.XrayRunner, xrayVersion *versionHolder) {
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
@@ -328,21 +328,38 @@ func xrayUpdateLoop(ctx context.Context, apiClient *client.APIClient, runner *xr
 			}
 
 			log.Printf("xray update available: %s, downloading...", target)
-			if err := runner.Stop(); err != nil {
-				log.Printf("xray update: stop failed: %v", err)
+			staged, err := runner.StageBinary(ctx, target)
+			if err != nil {
+				log.Printf("xray update: download/validate failed, keeping current version: %v", err)
 				continue
 			}
-			if err := runner.UpdateBinary(ctx, target); err != nil {
-				log.Printf("xray update: download/replace failed: %v", err)
+
+			if err := runner.Stop(); err != nil {
+				log.Printf("xray update: stop failed: %v", err)
+				runner.DiscardBinary(staged)
+				continue
+			}
+			if err := runner.CommitBinary(staged); err != nil {
+				log.Printf("xray update: install failed: %v", err)
+				runner.DiscardBinary(staged)
 				if startErr := runner.Start(); startErr != nil {
-					log.Printf("xray update: restart after failed update also failed: %v", startErr)
+					log.Printf("xray update: restart after failed install also failed: %v", startErr)
 				}
 				continue
 			}
+
 			if err := runner.Start(); err != nil {
-				log.Printf("xray update: restart failed: %v", err)
+				log.Printf("xray update: new binary failed to start, rolling back: %v", err)
+				if rbErr := runner.RestoreBinary(); rbErr != nil {
+					log.Printf("xray update: binary rollback failed: %v", rbErr)
+					continue
+				}
+				if startErr := runner.Start(); startErr != nil {
+					log.Printf("xray update: restart on previous binary failed: %v", startErr)
+				}
 				continue
 			}
+
 			if v, err := runner.Version(); err == nil {
 				xrayVersion.Set(v)
 				log.Printf("xray updated to %s", v)
