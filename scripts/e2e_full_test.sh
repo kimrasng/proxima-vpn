@@ -489,7 +489,11 @@ assert_eq "the pre-existing device still works after the sync" "$MARKER" "$(fetc
 # ---------------------------------------------------------------------------
 log "testing supervisor (killing xray and expecting an automatic restart)"
 
-sudo pkill -KILL -f "xray -config /etc/node-agent" || fail "could not kill the server-side xray"
+# Kill by pid: `pkill -f <pattern>` also matches the sudo/pkill command line
+# itself, so it kills itself and reports failure even though xray did die.
+# XRAY_PID_AFTER came from the same pattern, which matches only the
+# agent-managed Xray (-config /etc/node-agent), never this script's clients.
+sudo kill -KILL "$XRAY_PID_AFTER" || fail "could not kill the server-side xray (pid $XRAY_PID_AFTER)"
 wait_for "vless port to drop after the kill" 15 bash -c "! ss -tln | grep -q ':$VLESS_PORT '"
 
 # superviseLoop checks every 10s, and Start() then waits out a 3s startup
