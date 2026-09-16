@@ -205,7 +205,8 @@ func (s *XrayConfigService) GenerateDigest(ctx context.Context, nodeID string) (
 	// always produces the same digest regardless of DB row order.
 	userHasher := sha256.New()
 	for _, u := range users {
-		fmt.Fprintf(userHasher, "%s\x00%s\x00%s\x00%s\x00%d\n", u.InboundTag, u.UUID, u.Email, u.Flow, u.Level)
+		// hash.Hash.Write is documented never to return an error.
+		_, _ = fmt.Fprintf(userHasher, "%s\x00%s\x00%s\x00%s\x00%d\n", u.InboundTag, u.UUID, u.Email, u.Flow, u.Level)
 	}
 
 	return ConfigDigest{
