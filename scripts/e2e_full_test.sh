@@ -5,9 +5,14 @@
 # through the panel API, starts the real xray-core/wg-quick processes that
 # result, and then acts as a real client for each protocol - proving actual
 # encrypted traffic reaches a local HTTP target through each tunnel, not just
-# that config files parse. Finishes by running `node-agent unregister` (the
-# same command scripts/uninstall.sh runs) and confirming the node is actually
-# gone from the panel and its API key is rejected afterward.
+# that config files parse. Then it exercises the agent's live-management paths
+# against that running Xray: adding a device mid-flight must be applied over
+# the handler API without a restart, killing Xray must be noticed and repaired
+# by the supervisor, and the bytes those tunnels moved must land in
+# users.traffic_used and then actually gate access once the cap is exceeded.
+# Finishes by running `node-agent unregister` (the same command
+# scripts/uninstall.sh runs) and confirming the node is actually gone from the
+# panel and its API key is rejected afterward.
 #
 # This intentionally does NOT exercise ACME/Let's Encrypt (IssueCertificate):
 # that requires a real public domain reachable from the internet on port 80,
@@ -406,6 +411,133 @@ echo ""
 log "ALL PROTOCOLS PASSED (VLESS Reality, VMess, Trojan, Shadowsocks, WireGuard)"
 
 # ---------------------------------------------------------------------------
+# 14b. Live user sync over Xray's handler API. Adding a device used to require
+#      restarting Xray, dropping every connected user; the agent now diffs the
+#      config digest and, when only the user set changed, applies the delta via
+#      AlterInbound instead. Proving that needs a real Xray: the protobuf
+#      encoding is hand-rolled (see internal/xray/handler.go), so unit tests
+#      can pin the bytes but only Xray itself can confirm it accepts them.
+#
+#      The assertion is that a device created *after* Xray started can connect
+#      without Xray having restarted - checked both ways, since a restart would
+#      also (eventually) make the new UUID work and would otherwise pass
+#      silently.
+# ---------------------------------------------------------------------------
+log "testing live user sync (AlterInbound, no restart)"
+
+XRAY_PID_BEFORE=$(pgrep -f "xray -config /etc/node-agent" | head -1)
+[[ -n "$XRAY_PID_BEFORE" ]] || fail "could not find the server-side xray process"
+
+DEVICE2=$(curl -sf -X POST "$BASE_URL/api/v1/user/devices" \
+  -H "Authorization: Bearer $USER_TOKEN" -H "Content-Type: application/json" \
+  -d '{"name":"e2e-device-live"}')
+DEVICE2_UUID=$(echo "$DEVICE2" | jq -r .xray_uuid)
+[[ -n "$DEVICE2_UUID" && "$DEVICE2_UUID" != "null" ]] || fail "second device creation did not return xray_uuid"
+
+# The agent polls the digest every 30s (configPollLoop), so allow one full
+# cycle plus margin for the gRPC round-trip.
+log "waiting for the agent to pick up the new user (digest poll is 30s)"
+cat > "$WORKDIR/vless-client2.json" <<EOF
+{
+  "inbounds": [{"listen":"127.0.0.1","port":1084,"protocol":"socks","settings":{"udp":true}}],
+  "outbounds": [{
+    "protocol": "vless",
+    "settings": {"vnext":[{"address":"127.0.0.1","port":$VLESS_PORT,"users":[{"id":"$DEVICE2_UUID","flow":"xtls-rprx-vision","encryption":"none"}]}]},
+    "streamSettings": {"network":"tcp","security":"reality","realitySettings":{"serverName":"www.cloudflare.com","fingerprint":"chrome","publicKey":"$REALITY_PUBKEY","shortId":"$REALITY_SHORTID","spiderX":""}}
+  }]
+}
+EOF
+xray -config "$WORKDIR/vless-client2.json" > "$LOGDIR/vless-client2.log" 2>&1 &
+PIDS+=($!)
+wait_for "second vless client socks ready" 10 bash -c "ss -tln | grep -q ':1084 '"
+
+# Retry rather than sleeping a flat 45s: succeeds as soon as the sync lands.
+waited=0
+until [[ "$(fetch_via_socks 1084)" == "$MARKER" ]]; do
+  waited=$((waited + 1))
+  [[ $waited -ge 60 ]] && fail "new device never became usable (60s) - live user sync is not working"
+  sleep 1
+done
+log "PASS: device added after startup can connect (${waited}s)"
+
+XRAY_PID_AFTER=$(pgrep -f "xray -config /etc/node-agent" | head -1)
+assert_eq "xray was NOT restarted to admit the new user" "$XRAY_PID_BEFORE" "$XRAY_PID_AFTER"
+
+grep -q "synced .* user" "$LOGDIR/node-agent.log" \
+  || fail "agent log has no record of a user sync - the new user likely arrived via a restart"
+log "PASS: agent applied the change incrementally (AlterInbound accepted by real Xray)"
+
+# A botched sync could evict existing users while admitting the new one.
+assert_eq "the pre-existing device still works after the sync" "$MARKER" "$(fetch_via_socks 1080)"
+
+# ---------------------------------------------------------------------------
+# 14c. Supervisor. A crashed or OOM-killed Xray used to stay dead while the
+#      agent kept reporting healthy (its liveness check accepted the zombie);
+#      superviseLoop now polls every 10s and restarts it. Kill the real process
+#      and assert service comes back on its own.
+#
+#      The pattern matches only the agent-managed Xray (-config
+#      /etc/node-agent/...), never the client Xrays this script runs out of
+#      $WORKDIR.
+# ---------------------------------------------------------------------------
+log "testing supervisor (killing xray and expecting an automatic restart)"
+
+sudo pkill -KILL -f "xray -config /etc/node-agent" || fail "could not kill the server-side xray"
+wait_for "vless port to drop after the kill" 15 bash -c "! ss -tln | grep -q ':$VLESS_PORT '"
+
+# superviseLoop checks every 10s, and Start() then waits out a 3s startup
+# grace, so ~15s is the expected recovery time.
+wait_for "supervisor to bring xray back" 40 bash -c "ss -tln | grep -q ':$VLESS_PORT '"
+
+XRAY_PID_RESTARTED=$(pgrep -f "xray -config /etc/node-agent" | head -1)
+[[ -n "$XRAY_PID_RESTARTED" && "$XRAY_PID_RESTARTED" != "$XRAY_PID_AFTER" ]] \
+  || fail "xray pid did not change - supervisor did not actually respawn it"
+grep -q "supervisor: xray restarted" "$LOGDIR/node-agent.log" \
+  || fail "agent log has no supervisor restart record"
+
+# Liveness is not the point - carrying traffic again is. Retry while the fresh
+# process finishes binding every inbound.
+waited=0
+until [[ "$(fetch_via_socks 1080)" == "$MARKER" ]]; do
+  waited=$((waited + 1))
+  [[ $waited -ge 30 ]] && fail "tunnel never recovered after the supervisor restart"
+  sleep 1
+done
+log "PASS: supervisor restarted xray and traffic flows again (${waited}s)"
+
+# ---------------------------------------------------------------------------
+# 14d. Traffic accounting. Xray counts per-user bytes under stats keys derived
+#      from the client email (uuid@proxima), the agent scrapes them over gRPC
+#      every 30s and POSTs to /stats, and the server both appends to
+#      traffic_logs and accumulates users.traffic_used - the value its own
+#      access-control SQL then enforces. Every tunnel above already pushed
+#      bytes through, so the whole chain is observable from the admin API.
+# ---------------------------------------------------------------------------
+log "testing traffic accounting (xray stats -> agent -> server)"
+
+# Generate a payload big enough to be unmistakable, then let a stats cycle land.
+for _ in 1 2 3; do fetch_via_socks 1080 > /dev/null; done
+
+waited=0
+while true; do
+  TRAFFIC_USED=$(curl -sf "$BASE_URL/api/v1/admin/users/$USER_ID" \
+    -H "Authorization: Bearer $ADMIN_TOKEN" | jq -r .traffic_used)
+  [[ "$TRAFFIC_USED" =~ ^[0-9]+$ && "$TRAFFIC_USED" -gt 0 ]] && break
+  waited=$((waited + 1))
+  [[ $waited -ge 75 ]] && fail "traffic_used stayed at ${TRAFFIC_USED:-unset} after 75s - the stats pipeline is broken"
+  sleep 1
+done
+log "PASS: traffic_used = $TRAFFIC_USED bytes (${waited}s, via real xray stats)"
+
+# traffic_logs is the audit trail the admin charts read; an empty table with a
+# non-zero traffic_used would mean the aggregate is being written blind.
+LOGGED_ROWS=$(curl -sf "$BASE_URL/api/v1/admin/stats/traffic-history" \
+  -H "Authorization: Bearer $ADMIN_TOKEN" | jq 'length')
+[[ "$LOGGED_ROWS" =~ ^[0-9]+$ && "$LOGGED_ROWS" -gt 0 ]] \
+  || fail "traffic history is empty despite traffic_used=$TRAFFIC_USED"
+log "PASS: traffic_logs has $LOGGED_ROWS aggregated row(s)"
+
+# ---------------------------------------------------------------------------
 # 15. Subscription formats. Every client app format the panel advertises is
 #     generated from the same node set and checked for (a) structural
 #     validity in that format's own syntax, and (b) actually containing the
@@ -508,9 +640,10 @@ assert_eq "suspended user's subscription is refused" "403" "$SUSPENDED_SUB_STATU
 curl -sf -X PUT "$BASE_URL/api/v1/admin/users/$USER_ID" \
   -H "Authorization: Bearer $ADMIN_TOKEN" -H "Content-Type: application/json" \
   -d '{"status":"active","is_active":true}' > /dev/null
+DEVICE_COUNT=$(curl -sf "$BASE_URL/api/v1/user/devices" -H "Authorization: Bearer $USER_TOKEN" | jq 'length')
 CLIENTS_AFTER_RESTORE=$(curl -sf "$BASE_URL/api/v1/nodes/$NODE_ID/config" -H "X-Node-Key: $NODE_KEY" \
   | jq '[.inbounds[] | select(.tag=="vless-in") | .settings.clients // [] | length] | add')
-assert_eq "reactivated user is restored to the node's xray clients" "1" "$CLIENTS_AFTER_RESTORE"
+assert_eq "reactivated user's devices are restored to the node's xray clients" "$DEVICE_COUNT" "$CLIENTS_AFTER_RESTORE"
 
 # An expired plan must revoke access the same way.
 curl -sf -X PUT "$BASE_URL/api/v1/admin/users/$USER_ID" \
@@ -519,6 +652,27 @@ curl -sf -X PUT "$BASE_URL/api/v1/admin/users/$USER_ID" \
 CLIENTS_WHEN_EXPIRED=$(curl -sf "$BASE_URL/api/v1/nodes/$NODE_ID/config" -H "X-Node-Key: $NODE_KEY" \
   | jq '[.inbounds[] | select(.tag=="vless-in") | .settings.clients // [] | length] | add')
 assert_eq "user with an expired plan is removed from the node's xray clients" "0" "$CLIENTS_WHEN_EXPIRED"
+
+# Exceeding the traffic cap must revoke access too. Config generation enforces
+# traffic_used < traffic_limit itself, so dropping the limit below the bytes
+# section 14d accumulated takes effect at once - no need to wait out the
+# 5-minute ExpiryCheckScheduler, which only mirrors this into users.status.
+curl -sf -X PUT "$BASE_URL/api/v1/admin/users/$USER_ID" \
+  -H "Authorization: Bearer $ADMIN_TOKEN" -H "Content-Type: application/json" \
+  -d '{"plan_expires_at":null,"status":"active","is_active":true}' > /dev/null
+curl -sf -X PUT "$BASE_URL/api/v1/admin/plans/$PLAN_ID" \
+  -H "Authorization: Bearer $ADMIN_TOKEN" -H "Content-Type: application/json" \
+  -d "{\"name\":\"e2e-plan\",\"node_group_id\":\"$NG_ID\",\"duration_days\":30,\"max_devices\":3,\"is_active\":true,\"traffic_limit\":1}" > /dev/null
+
+CLIENTS_OVER_QUOTA=$(curl -sf "$BASE_URL/api/v1/nodes/$NODE_ID/config" -H "X-Node-Key: $NODE_KEY" \
+  | jq '[.inbounds[] | select(.tag=="vless-in") | .settings.clients // [] | length] | add')
+assert_eq "user over the traffic cap is removed from the node's xray clients" "0" "$CLIENTS_OVER_QUOTA"
+
+WG_PEERS_OVER_QUOTA=$(curl -sf "$BASE_URL/api/v1/nodes/$NODE_ID/wireguard/peers" -H "X-Node-Key: $NODE_KEY" | jq 'length')
+assert_eq "user over the traffic cap is removed from the wireguard peer set" "0" "$WG_PEERS_OVER_QUOTA"
+
+OVER_QUOTA_SUB_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/sub/$SUB_TOKEN/$DEVICE_ID")
+assert_eq "user over the traffic cap is refused a subscription" "403" "$OVER_QUOTA_SUB_STATUS"
 
 # Bad node credentials must be rejected outright.
 BAD_KEY_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/api/v1/nodes/$NODE_ID/config" -H "X-Node-Key: definitely-not-the-key")
