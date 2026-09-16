@@ -49,16 +49,18 @@ type RegisterResponse struct {
 	APIKey string `json:"api_key"`
 }
 
-// TrafficStat represents per-user traffic data.
+// TrafficStat represents per-user traffic data. The json names deliberately
+// differ from the Go field names: they must match handlers.statEntry, which
+// parses this payload. They did not, so every field decoded as zero.
 type TrafficStat struct {
-	UUID     string `json:"uuid"`
-	Upload   int64  `json:"upload"`
-	Download int64  `json:"download"`
+	UUID     string `json:"xray_uuid"`
+	Upload   int64  `json:"up_bytes"`
+	Download int64  `json:"dn_bytes"`
 }
 
 // StatsPayload is the payload for sending stats.
 type StatsPayload struct {
-	Traffic     []TrafficStat `json:"traffic"`
+	Traffic     []TrafficStat `json:"stats"`
 	OnlineUUIDs []string      `json:"online_uuids"`
 }
 
