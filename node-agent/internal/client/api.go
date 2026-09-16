@@ -62,7 +62,9 @@ type StatsPayload struct {
 	OnlineUUIDs []string      `json:"online_uuids"`
 }
 
-// HeartbeatPayload is the payload for heartbeat.
+// HeartbeatPayload is the payload for heartbeat. ConfigHash and XrayRunning let
+// the panel tell "agent alive" apart from "Xray actually serving the config we
+// published".
 type HeartbeatPayload struct {
 	CPU         float64 `json:"cpu_usage"`
 	Memory      float64 `json:"memory_usage"`
@@ -71,6 +73,14 @@ type HeartbeatPayload struct {
 	NetworkIn   float64 `json:"network_in"`
 	NetworkOut  float64 `json:"network_out"`
 	XrayVersion string  `json:"xray_version,omitempty"`
+	ConfigHash  string  `json:"config_hash,omitempty"`
+	XrayRunning bool    `json:"xray_running"`
+}
+
+type NodeStatus struct {
+	XrayVersion string
+	ConfigHash  string
+	XrayRunning bool
 }
 
 // Register registers this node with the main server.
@@ -164,8 +174,53 @@ func (c *APIClient) GetConfig(ctx context.Context) ([]byte, error) {
 	return io.ReadAll(resp.Body)
 }
 
+type ConfigDigest struct {
+	Hash          string             `json:"hash"`
+	StructureHash string             `json:"structure_hash"`
+	UsersHash     string             `json:"users_hash"`
+	Users         []ConfigDigestUser `json:"users"`
+}
+
+type ConfigDigestUser struct {
+	InboundTag string `json:"inbound_tag"`
+	UUID       string `json:"uuid"`
+	Email      string `json:"email"`
+	Flow       string `json:"flow"`
+	Level      uint32 `json:"level"`
+}
+
+// GetConfigDigest fetches the config fingerprint instead of the whole config,
+// so an unchanged node costs a few hundred bytes per poll. StructureHash tells
+// a users-only change apart from one needing a restart.
+func (c *APIClient) GetConfigDigest(ctx context.Context) (ConfigDigest, error) {
+	var digest ConfigDigest
+
+	url := fmt.Sprintf("%s/api/v1/nodes/%s/config/digest", c.serverURL, c.nodeID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return digest, fmt.Errorf("create config digest request: %w", err)
+	}
+	req.Header.Set("X-Node-Key", c.apiKey)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return digest, fmt.Errorf("get config digest request: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(resp.Body)
+		return digest, fmt.Errorf("get config digest failed (status %d): %s", resp.StatusCode, string(respBody))
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&digest); err != nil {
+		return digest, fmt.Errorf("decode config digest: %w", err)
+	}
+	return digest, nil
+}
+
 // SendHeartbeat sends system metrics to the server.
-func (c *APIClient) SendHeartbeat(ctx context.Context, cpu, memory, disk, loadAvg, networkIn, networkOut float64, xrayVersion string) error {
+func (c *APIClient) SendHeartbeat(ctx context.Context, cpu, memory, disk, loadAvg, networkIn, networkOut float64, status NodeStatus) error {
 	payload := HeartbeatPayload{
 		CPU:         cpu,
 		Memory:      memory,
@@ -173,7 +228,9 @@ func (c *APIClient) SendHeartbeat(ctx context.Context, cpu, memory, disk, loadAv
 		LoadAvg:     loadAvg,
 		NetworkIn:   networkIn,
 		NetworkOut:  networkOut,
-		XrayVersion: xrayVersion,
+		XrayVersion: status.XrayVersion,
+		ConfigHash:  status.ConfigHash,
+		XrayRunning: status.XrayRunning,
 	}
 
 	body, err := json.Marshal(payload)

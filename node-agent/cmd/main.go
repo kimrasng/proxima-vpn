@@ -1,9 +1,9 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -27,7 +27,8 @@ import (
 	"github.com/proximavpn/proxima-vpn/node-agent/internal/xray"
 )
 
-// version is set at build time via -ldflags "-X main.version=...` (see Makefile).
+// version is stamped at build time via -ldflags "-X main.version=..." by the
+// Makefile's build-agent target and api-server/Dockerfile's AGENT_VERSION arg.
 var version = "dev"
 
 func main() {
@@ -179,6 +180,8 @@ func runCmd() *cobra.Command {
 			defer func() { _ = runner.Stop() }()
 			applyShaping(xrayConfig)
 
+			state := newNodeState(xrayConfig)
+
 			xrayVersion := &versionHolder{}
 			if v, err := runner.Version(); err == nil {
 				xrayVersion.Set(v)
@@ -211,12 +214,13 @@ func runCmd() *cobra.Command {
 				defer cm.Stop()
 			}
 
-		go heartbeatLoop(ctx, apiClient, xrayVersion)
-		go configPollLoop(ctx, apiClient, runner, xrayConfig)
-		go inboundsPollLoop(ctx, apiClient)
-		go updateCheckLoop(ctx, updater.NewUpdater(version, "", cfg.ServerURL, cfg.NodeID, cfg.APIKey))
-		go xrayUpdateLoop(ctx, apiClient, runner, xrayVersion)
-		go tlsPollLoop(ctx, apiClient, certDir, tlsDomain)
+			go heartbeatLoop(ctx, apiClient, runner, xrayVersion, state)
+			go superviseLoop(ctx, runner, state)
+			go configPollLoop(ctx, apiClient, runner, statsClient, state)
+			go inboundsPollLoop(ctx, apiClient)
+			go updateCheckLoop(ctx, updater.NewUpdater(version, "", cfg.ServerURL, cfg.NodeID, cfg.APIKey))
+			go xrayUpdateLoop(ctx, apiClient, runner, xrayVersion, state)
+			go tlsPollLoop(ctx, apiClient, certDir, tlsDomain)
 
 			sigCh := make(chan os.Signal, 1)
 			signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
@@ -256,7 +260,84 @@ func (h *versionHolder) Get() string {
 	return h.v
 }
 
-func heartbeatLoop(ctx context.Context, apiClient *client.APIClient, xrayVersion *versionHolder) {
+// nodeState tracks what Xray is actually running, as opposed to what the server
+// has published: the heartbeat reports configHash, and configPollLoop diffs
+// against users to decide restart vs. incremental update.
+type nodeState struct {
+	mu            sync.RWMutex
+	config        []byte
+	configHash    string
+	structureHash string
+	usersHash     string
+	users         map[userKey]xray.VLESSUser
+}
+
+// userKey keys on email because that is how Xray's RemoveUserOperation
+// addresses a user.
+type userKey struct {
+	InboundTag string
+	Email      string
+}
+
+func newNodeState(config []byte) *nodeState {
+	s := &nodeState{users: map[userKey]xray.VLESSUser{}}
+	s.setConfig(config, "")
+	return s
+}
+
+func (s *nodeState) setConfig(config []byte, structureHash string) {
+	sum := sha256.Sum256(config)
+	s.mu.Lock()
+	s.config = config
+	s.configHash = hex.EncodeToString(sum[:])
+	s.structureHash = structureHash
+	s.mu.Unlock()
+}
+
+func (s *nodeState) StructureHash() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.structureHash
+}
+
+func (s *nodeState) ConfigHash() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.configHash
+}
+
+func (s *nodeState) Config() []byte {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.config
+}
+
+func (s *nodeState) setUsers(usersHash string, users map[userKey]xray.VLESSUser) {
+	s.mu.Lock()
+	s.usersHash = usersHash
+	s.users = users
+	s.mu.Unlock()
+}
+
+func (s *nodeState) UsersHash() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.usersHash
+}
+
+// UsersSnapshot copies the set so callers can diff without holding the lock
+// across gRPC calls.
+func (s *nodeState) UsersSnapshot() map[userKey]xray.VLESSUser {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make(map[userKey]xray.VLESSUser, len(s.users))
+	for k, v := range s.users {
+		out[k] = v
+	}
+	return out
+}
+
+func heartbeatLoop(ctx context.Context, apiClient *client.APIClient, runner *xray.XrayRunner, xrayVersion *versionHolder, state *nodeState) {
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
 
@@ -266,9 +347,66 @@ func heartbeatLoop(ctx context.Context, apiClient *client.APIClient, xrayVersion
 			return
 		case <-ticker.C:
 			m := stats.CollectSysMetrics()
-			if err := apiClient.SendHeartbeat(ctx, m.CPU, m.Memory, m.Disk, m.LoadAvg, m.NetworkIn, m.NetworkOut, xrayVersion.Get()); err != nil {
+			status := client.NodeStatus{
+				XrayVersion: xrayVersion.Get(),
+				ConfigHash:  state.ConfigHash(),
+				XrayRunning: runner.IsRunning(),
+			}
+			if err := apiClient.SendHeartbeat(ctx, m.CPU, m.Memory, m.Disk, m.LoadAvg, m.NetworkIn, m.NetworkOut, status); err != nil {
 				log.Printf("heartbeat: %v", err)
 			}
+		}
+	}
+}
+
+// superviseLoop restarts Xray if it dies on its own - previously a crashed or
+// OOM-killed Xray stayed dead while the agent kept reporting healthy. Attempts
+// back off so a config Xray refuses cannot become a hot spawn loop.
+func superviseLoop(ctx context.Context, runner *xray.XrayRunner, state *nodeState) {
+	const (
+		checkInterval = 10 * time.Second
+		maxBackoff    = 5 * time.Minute
+	)
+
+	backoff := time.Duration(0)
+	var nextAttempt time.Time
+
+	ticker := time.NewTicker(checkInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			if runner.IsRunning() {
+				backoff = 0
+				nextAttempt = time.Time{}
+				continue
+			}
+			if time.Now().Before(nextAttempt) {
+				continue
+			}
+
+			log.Println("supervisor: xray is not running, restarting")
+			if err := runner.Start(); err != nil {
+				if backoff == 0 {
+					backoff = checkInterval
+				} else if backoff < maxBackoff {
+					backoff *= 2
+				}
+				if backoff > maxBackoff {
+					backoff = maxBackoff
+				}
+				nextAttempt = time.Now().Add(backoff)
+				log.Printf("supervisor: restart failed, retrying in %s: %v", backoff, err)
+				continue
+			}
+
+			backoff = 0
+			nextAttempt = time.Time{}
+			applyShaping(state.Config())
+			log.Println("supervisor: xray restarted")
 		}
 	}
 }
@@ -309,7 +447,7 @@ func updateCheckLoop(ctx context.Context, upd *updater.Updater) {
 // xrayUpdateLoop applies an admin-requested Xray-core version change. Staging
 // and validation happen while the old Xray still serves - stopping first, as
 // this used to, made every slow download an outage of that length.
-func xrayUpdateLoop(ctx context.Context, apiClient *client.APIClient, runner *xray.XrayRunner, xrayVersion *versionHolder) {
+func xrayUpdateLoop(ctx context.Context, apiClient *client.APIClient, runner *xray.XrayRunner, xrayVersion *versionHolder, state *nodeState) {
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
 
@@ -360,6 +498,7 @@ func xrayUpdateLoop(ctx context.Context, apiClient *client.APIClient, runner *xr
 				continue
 			}
 
+			applyShaping(state.Config())
 			if v, err := runner.Version(); err == nil {
 				xrayVersion.Set(v)
 				log.Printf("xray updated to %s", v)
@@ -422,25 +561,63 @@ func tlsPollLoop(ctx context.Context, apiClient *client.APIClient, certDir, stat
 	}
 }
 
-func configPollLoop(ctx context.Context, apiClient *client.APIClient, runner *xray.XrayRunner, lastConfig []byte) {
+// configPollLoop keeps the node's Xray in sync with the server. It polls the
+// digest rather than the full config, applies users-only changes over the
+// handler API so routine account edits stop dropping live connections, and rolls
+// back if a structural change fails to start.
+func configPollLoop(
+	ctx context.Context,
+	apiClient *client.APIClient,
+	runner *xray.XrayRunner,
+	statsClient *xray.StatsClient,
+	state *nodeState,
+) {
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
-
-	lastHash := sha256.Sum256(lastConfig)
 
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			newConfig, err := apiClient.GetConfig(ctx)
+			digest, err := apiClient.GetConfigDigest(ctx)
 			if err != nil {
-				log.Printf("config poll: %v", err)
+				log.Printf("config digest poll: %v", err)
 				continue
 			}
 
-			newHash := sha256.Sum256(newConfig)
-			if bytes.Equal(lastHash[:], newHash[:]) {
+			if digest.Hash == state.ConfigHash() {
+				// Reconcile anyway when a previous sync failed, so a
+				// transient gRPC error does not leave users out of step
+				// indefinitely.
+				if digest.UsersHash != state.UsersHash() {
+					syncUsers(ctx, statsClient, state, digest)
+				}
+				continue
+			}
+
+			if usersOnlyChange(state, digest) {
+				if syncUsers(ctx, statsClient, state, digest) {
+					newConfig, err := apiClient.GetConfig(ctx)
+					if err != nil {
+						log.Printf("fetch config after user sync: %v", err)
+						continue
+					}
+					// Xray already serves this user set; the file only
+					// needs to match for the next cold start.
+					if err := runner.WriteConfig(newConfig); err != nil {
+						log.Printf("write config after user sync: %v", err)
+						continue
+					}
+					state.setConfig(newConfig, digest.StructureHash)
+					continue
+				}
+				log.Println("config poll: incremental user sync failed, falling back to restart")
+			}
+
+			newConfig, err := apiClient.GetConfig(ctx)
+			if err != nil {
+				log.Printf("config poll: %v", err)
 				continue
 			}
 
@@ -450,13 +627,136 @@ func configPollLoop(ctx context.Context, apiClient *client.APIClient, runner *xr
 				continue
 			}
 			if err := runner.Restart(); err != nil {
-				log.Printf("restart xray: %v", err)
+				log.Printf("restart xray on new config: %v", err)
+				rollbackConfig(runner, state)
 				continue
 			}
+
 			applyShaping(newConfig)
-			lastHash = newHash
+			state.setConfig(newConfig, digest.StructureHash)
+			state.setUsers(digest.UsersHash, usersFromDigest(digest))
 		}
 	}
+}
+
+// rollbackConfig reverts to the previous config after a new one failed to start,
+// so a bad config published fleet-wide cannot take every node down at once.
+func rollbackConfig(runner *xray.XrayRunner, state *nodeState) {
+	if !runner.HasBackupConfig() {
+		log.Println("rollback: no previous config available")
+		return
+	}
+
+	prev, err := runner.RestoreConfig()
+	if err != nil {
+		log.Printf("rollback: restore previous config: %v", err)
+		return
+	}
+	if err := runner.Restart(); err != nil {
+		log.Printf("rollback: restart on previous config failed: %v", err)
+		return
+	}
+
+	applyShaping(prev)
+	// Clear structureHash: the agent no longer knows the server-side structure
+	// digest for the config now running, and an empty value forces the next
+	// change through the restart path rather than an unsafe incremental one.
+	state.setConfig(prev, "")
+	state.setUsers("", map[userKey]xray.VLESSUser{})
+	log.Println("rollback: restarted xray on previous config")
+}
+
+// usersOnlyChange reports whether a digest differs from the running state only
+// in its user set. StructureHash is authoritative here: it is computed from the
+// config with client lists emptied, so an equal value means nothing but the
+// users moved. An empty local StructureHash means the agent has not yet seen a
+// digest (cold start), so it cannot claim the structure matches.
+func usersOnlyChange(state *nodeState, digest client.ConfigDigest) bool {
+	local := state.StructureHash()
+	if local == "" || digest.StructureHash == "" {
+		return false
+	}
+	if local != digest.StructureHash {
+		return false
+	}
+	return digest.UsersHash != state.UsersHash()
+}
+
+// usersFromDigest converts a digest's user list into nodeState's keyed form.
+func usersFromDigest(digest client.ConfigDigest) map[userKey]xray.VLESSUser {
+	out := make(map[userKey]xray.VLESSUser, len(digest.Users))
+	for _, u := range digest.Users {
+		out[userKey{InboundTag: u.InboundTag, Email: u.Email}] = xray.VLESSUser{
+			UUID:  u.UUID,
+			Email: u.Email,
+			Flow:  u.Flow,
+			Level: u.Level,
+		}
+	}
+	return out
+}
+
+// syncUsers applies the running/wanted user diff over Xray's handler API,
+// reporting whether the whole set now matches. A false return tells the caller
+// to fall back to a restart.
+func syncUsers(ctx context.Context, statsClient *xray.StatsClient, state *nodeState, digest client.ConfigDigest) bool {
+	if statsClient == nil {
+		return false
+	}
+
+	want := usersFromDigest(digest)
+	live := state.UsersSnapshot()
+	applied := make(map[userKey]xray.VLESSUser, len(live))
+	for k, v := range live {
+		applied[k] = v
+	}
+
+	ok := true
+
+	for key := range live {
+		if _, keep := want[key]; keep {
+			continue
+		}
+		if err := statsClient.RemoveVLESSUser(ctx, key.InboundTag, key.Email); err != nil {
+			log.Printf("sync users: %v", err)
+			ok = false
+			continue
+		}
+		delete(applied, key)
+	}
+
+	for key, u := range want {
+		if existing, exists := applied[key]; exists && existing == u {
+			continue
+		}
+		// Xray rejects an add for an email already on the inbound, so replace
+		// rather than add when the credentials changed under the same email.
+		if _, exists := applied[key]; exists {
+			if err := statsClient.RemoveVLESSUser(ctx, key.InboundTag, key.Email); err != nil {
+				log.Printf("sync users: %v", err)
+				ok = false
+				continue
+			}
+			delete(applied, key)
+		}
+		if err := statsClient.AddVLESSUser(ctx, key.InboundTag, u); err != nil {
+			log.Printf("sync users: %v", err)
+			ok = false
+			continue
+		}
+		applied[key] = u
+	}
+
+	if !ok {
+		// Keep what landed so the next poll retries only the remainder;
+		// the empty hash keeps reconciliation armed.
+		state.setUsers("", applied)
+		return false
+	}
+
+	state.setUsers(digest.UsersHash, applied)
+	log.Printf("synced users without restart: %d active", len(applied))
+	return true
 }
 
 // applyShaping installs tc bandwidth limits for the speed-limited inbounds
