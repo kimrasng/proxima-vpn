@@ -280,9 +280,51 @@ type userKey struct {
 }
 
 func newNodeState(config []byte) *nodeState {
-	s := &nodeState{users: map[userKey]xray.VLESSUser{}}
+	s := &nodeState{users: vlessUsersOfConfig(config)}
 	s.setConfig(config, "")
 	return s
+}
+
+// vlessUsersOfConfig reads the VLESS clients out of the config Xray is about to
+// run. Seeded empty instead, the first incremental sync re-adds users Xray
+// already has, and Xray rejects a duplicate email - collapsing every sync into
+// the restart the handler API exists to avoid.
+func vlessUsersOfConfig(config []byte) map[userKey]xray.VLESSUser {
+	users := map[userKey]xray.VLESSUser{}
+
+	var parsed struct {
+		Inbounds []struct {
+			Protocol string `json:"protocol"`
+			Tag      string `json:"tag"`
+			Settings struct {
+				Clients []struct {
+					ID    string `json:"id"`
+					Email string `json:"email"`
+					Flow  string `json:"flow"`
+					Level uint32 `json:"level"`
+				} `json:"clients"`
+			} `json:"settings"`
+		} `json:"inbounds"`
+	}
+	if err := json.Unmarshal(config, &parsed); err != nil {
+		log.Printf("warning: could not read initial user set from config: %v", err)
+		return users
+	}
+
+	for _, ib := range parsed.Inbounds {
+		if ib.Protocol != "vless" {
+			continue
+		}
+		for _, c := range ib.Settings.Clients {
+			users[userKey{InboundTag: ib.Tag, Email: c.Email}] = xray.VLESSUser{
+				UUID:  c.ID,
+				Email: c.Email,
+				Flow:  c.Flow,
+				Level: c.Level,
+			}
+		}
+	}
+	return users
 }
 
 func (s *nodeState) setConfig(config []byte, structureHash string) {
@@ -406,6 +448,10 @@ func superviseLoop(ctx context.Context, runner *xray.XrayRunner, state *nodeStat
 			backoff = 0
 			nextAttempt = time.Time{}
 			applyShaping(state.Config())
+			// A respawned Xray only knows its config file's users, losing any
+			// the agent added over the handler API; the empty hash re-arms
+			// reconciliation on the next poll.
+			state.setUsers("", vlessUsersOfConfig(state.Config()))
 			log.Println("supervisor: xray restarted")
 		}
 	}
@@ -662,7 +708,7 @@ func rollbackConfig(runner *xray.XrayRunner, state *nodeState) {
 	// digest for the config now running, and an empty value forces the next
 	// change through the restart path rather than an unsafe incremental one.
 	state.setConfig(prev, "")
-	state.setUsers("", map[userKey]xray.VLESSUser{})
+	state.setUsers("", vlessUsersOfConfig(prev))
 	log.Println("rollback: restarted xray on previous config")
 }
 
