@@ -1,6 +1,6 @@
 module github.com/proximavpn/proxima-vpn/pkg
 
-go 1.22
+go 1.25.0
 
 require (
 	github.com/google/uuid v1.6.0

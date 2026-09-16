@@ -1,4 +1,4 @@
-FROM golang:1.24-alpine AS builder
+FROM golang:1.25-alpine AS builder
 
 ENV GOTOOLCHAIN=auto
 
@@ -17,17 +17,25 @@ COPY pkg/ pkg/
 COPY api-server/ api-server/
 COPY node-agent/ node-agent/
 
-RUN --mount=type=cache,target=/root/go/pkg/mod \
-    --mount=type=cache,target=/root/.cache/go-build \
-    cd api-server && CGO_ENABLED=0 GOOS=linux go build -o /app/bin/api-server ./cmd/main.go
+# Stamped into the node-agent binaries so self-update version comparisons mean
+# something. Pass --build-arg AGENT_VERSION=v1.2.3 when publishing a release.
+ARG AGENT_VERSION=dev
 
 RUN --mount=type=cache,target=/root/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /app/bin/node-agent-linux-amd64 ./node-agent/cmd/main.go
+    cd api-server && CGO_ENABLED=0 GOOS=linux go build -trimpath -o /app/bin/api-server ./cmd
 
 RUN --mount=type=cache,target=/root/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o /app/bin/node-agent-linux-arm64 ./node-agent/cmd/main.go
+    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath \
+      -ldflags "-X main.version=${AGENT_VERSION}" \
+      -o /app/bin/node-agent-linux-amd64 ./node-agent/cmd
+
+RUN --mount=type=cache,target=/root/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath \
+      -ldflags "-X main.version=${AGENT_VERSION}" \
+      -o /app/bin/node-agent-linux-arm64 ./node-agent/cmd
 
 FROM alpine:3.19
 

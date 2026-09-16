@@ -49,7 +49,7 @@ jobs:
           REDIS_URL: redis://localhost:6379
           JWT_SECRET: ci-schema-bootstrap
         run: |
-          cd api-server && go build -o /tmp/api-server ./cmd/main.go
+          cd api-server && go build -o /tmp/api-server ./cmd
           # It will fail to reach Redis and exit; the migration runs before
           # that, which is all this step needs.
           /tmp/api-server > /tmp/migrate.log 2>&1 || true
