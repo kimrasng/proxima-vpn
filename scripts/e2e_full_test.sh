@@ -531,8 +531,10 @@ log "PASS: supervisor restarted xray and traffic flows again (${waited}s)"
 # ---------------------------------------------------------------------------
 log "testing traffic accounting (xray stats -> agent -> server)"
 
-# Generate a payload big enough to be unmistakable, then let a stats cycle land.
-for _ in 1 2 3; do fetch_via_socks 1080 > /dev/null; done
+# Push bytes through so there is something to account for. Failures are ignored:
+# the client Xray is still recovering from the restart above, and a dropped
+# request would abort the whole script under set -e.
+for _ in 1 2 3; do fetch_via_socks 1080 > /dev/null || true; done
 
 waited=0
 while true; do
