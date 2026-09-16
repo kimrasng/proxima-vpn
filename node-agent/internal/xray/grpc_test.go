@@ -54,3 +54,87 @@ func TestStatsCodecResponseRoundTrip(t *testing.T) {
 		t.Errorf("parseStatName wrong: %q %q", uuid, dir)
 	}
 }
+
+// Regression: real stat names carry the client email, not a bare uuid. The
+// suffix was returned verbatim, so the server's `WHERE xray_uuid = $1` never
+// matched and traffic_used stayed 0. The test above uses a bare "u1" and so
+// never exercised the real shape.
+func TestParseStatNameStripsTheEmailSuffix(t *testing.T) {
+	const id = "3f2b7c1e-0a4d-4c8b-9e77-5d1a2b3c4d5e"
+
+	for _, name := range []string{
+		"user>>>" + id + "@proxima>>>traffic>>>uplink",
+		"user>>>" + id + "@proxima-vmess>>>traffic>>>uplink",
+		"user>>>" + id + "@proxima-trojan>>>traffic>>>uplink",
+	} {
+		got, dir := parseStatName(name)
+		if got != id {
+			t.Errorf("%s\n got uuid %q\nwant %q", name, got, id)
+		}
+		if dir != "uplink" {
+			t.Errorf("%s: direction = %q, want uplink", name, dir)
+		}
+	}
+}
+
+func TestParseStatNameRejectsMalformedNames(t *testing.T) {
+	for _, name := range []string{
+		"",
+		"user>>>only-three>>>parts",
+		"inbound>>>x@proxima>>>traffic>>>uplink",
+		"user>>>x@proxima>>>online>>>uplink",
+		"user>>>@proxima>>>traffic>>>uplink",
+	} {
+		if got, _ := parseStatName(name); got != "" {
+			t.Errorf("%q should not yield a uuid, got %q", name, got)
+		}
+	}
+}
+
+// A device's counters arrive once per protocol under the same UUID after the
+// suffix is stripped, so they have to sum rather than overwrite each other.
+func TestGetUserTrafficSumsPerProtocolCounters(t *testing.T) {
+	const id = "3f2b7c1e-0a4d-4c8b-9e77-5d1a2b3c4d5e"
+
+	entries := []statEntry{
+		{name: "user>>>" + id + "@proxima>>>traffic>>>uplink", value: 100},
+		{name: "user>>>" + id + "@proxima>>>traffic>>>downlink", value: 200},
+		{name: "user>>>" + id + "@proxima-vmess>>>traffic>>>uplink", value: 10},
+		{name: "user>>>" + id + "@proxima-vmess>>>traffic>>>downlink", value: 20},
+	}
+
+	// Mirrors GetUserTraffic's aggregation over queryStats' output, which needs
+	// a live Xray to obtain.
+	trafficMap := map[string]*TrafficStat{}
+	for _, s := range entries {
+		uuid, direction := parseStatName(s.name)
+		if uuid == "" {
+			continue
+		}
+		ts, ok := trafficMap[uuid]
+		if !ok {
+			ts = &TrafficStat{UUID: uuid}
+			trafficMap[uuid] = ts
+		}
+		switch direction {
+		case "uplink":
+			ts.Upload += s.value
+		case "downlink":
+			ts.Download += s.value
+		}
+	}
+
+	if len(trafficMap) != 1 {
+		t.Fatalf("expected one device, got %d: %v", len(trafficMap), trafficMap)
+	}
+	ts := trafficMap[id]
+	if ts == nil {
+		t.Fatalf("no entry for %s: %v", id, trafficMap)
+	}
+	if ts.Upload != 110 {
+		t.Errorf("upload = %d, want 110", ts.Upload)
+	}
+	if ts.Download != 220 {
+		t.Errorf("download = %d, want 220", ts.Download)
+	}
+}

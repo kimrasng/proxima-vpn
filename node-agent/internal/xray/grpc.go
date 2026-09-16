@@ -213,11 +213,13 @@ func (c *StatsClient) GetUserTraffic(ctx context.Context) ([]TrafficStat, error)
 			ts = &TrafficStat{UUID: uuid}
 			trafficMap[uuid] = ts
 		}
+		// Accumulate: one device has a separate counter per protocol
+		// (uuid@proxima, uuid@proxima-vmess, ...), all folding to this UUID.
 		switch direction {
 		case "uplink":
-			ts.Upload = s.value
+			ts.Upload += s.value
 		case "downlink":
-			ts.Download = s.value
+			ts.Download += s.value
 		}
 	}
 
@@ -286,8 +288,13 @@ func (c *StatsClient) queryStats(ctx context.Context, pattern string, reset bool
 	return entries, nil
 }
 
-// parseStatName extracts UUID and direction from a Xray stat name.
-// Format: "user>>>{uuid}>>>traffic>>>{uplink|downlink}"
+// parseStatName extracts the device UUID and direction from a Xray stat name.
+// Format: "user>>>{email}>>>traffic>>>{uplink|downlink}"
+//
+// Xray keys stats by client email, which the panel sets to "{uuid}@proxima"
+// (plus -vmess/-trojan variants). The server matches on devices.xray_uuid, so
+// the suffix must come off or nothing matches and traffic_used stays 0.
+// Stripping it also sums a device's per-protocol counters into one total.
 func parseStatName(name string) (uuid, direction string) {
 	parts := strings.Split(name, ">>>")
 	if len(parts) != 4 {
@@ -296,7 +303,14 @@ func parseStatName(name string) (uuid, direction string) {
 	if parts[0] != "user" || parts[2] != "traffic" {
 		return "", ""
 	}
-	return parts[1], parts[3]
+	email := parts[1]
+	if at := strings.IndexByte(email, '@'); at >= 0 {
+		email = email[:at]
+	}
+	if email == "" {
+		return "", ""
+	}
+	return email, parts[3]
 }
 
 type queryStatsRequest struct {
