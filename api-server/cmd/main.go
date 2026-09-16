@@ -67,6 +67,9 @@ func main() {
 	expiryCheck := scheduler.NewExpiryCheckScheduler(db)
 	go expiryCheck.Start(ctx)
 
+	retention := scheduler.NewRetentionScheduler(db)
+	go retention.Start(ctx)
+
 	telegramSvc := services.NewTelegramService(db, cfg.Telegram)
 
 	nodeMonitor := scheduler.NewNodeMonitorScheduler(db, telegramSvc)
@@ -99,6 +102,7 @@ func main() {
 	trafficReset.Stop()
 	expiryCheck.Stop()
 	nodeMonitor.Stop()
+	retention.Stop()
 	if backupSvc != nil {
 		backupSvc.Stop()
 	}

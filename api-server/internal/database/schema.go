@@ -218,6 +218,9 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 		// node actually applied (compare with GenerateDigest).
 		`ALTER TABLE nodes ADD COLUMN IF NOT EXISTS config_hash TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE nodes ADD COLUMN IF NOT EXISTS xray_running BOOLEAN NOT NULL DEFAULT false`,
+		// Keeps the retention sweeps (scheduler/retention.go) off full scans.
+		`CREATE INDEX IF NOT EXISTS idx_traffic_logs_created_at ON traffic_logs(created_at)`,
+		`CREATE INDEX IF NOT EXISTS idx_node_metrics_history_recorded_at ON node_metrics_history(recorded_at)`,
 	}
 	for _, m := range migrations {
 		if _, err := pool.Exec(ctx, m); err != nil {
