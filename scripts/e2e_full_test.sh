@@ -531,6 +531,10 @@ log "PASS: supervisor restarted xray and traffic flows again (${waited}s)"
 # ---------------------------------------------------------------------------
 log "testing traffic accounting (xray stats -> agent -> server)"
 
+# `set -x` for this section only: an earlier run died here with no assertion
+# message, and the trace is what identifies the offending command.
+set -x
+
 # Push bytes through so there is something to account for. Failures are ignored:
 # the client Xray is still recovering from the restart above, and a dropped
 # request would abort the whole script under set -e.
@@ -538,8 +542,10 @@ for _ in 1 2 3; do fetch_via_socks 1080 > /dev/null || true; done
 
 waited=0
 while true; do
+  # `VAR=$(cmd)` adopts cmd's exit status, so an unguarded curl failure in this
+  # retry loop would kill the script under set -e instead of retrying.
   TRAFFIC_USED=$(curl -sf "$BASE_URL/api/v1/admin/users/$USER_ID" \
-    -H "Authorization: Bearer $ADMIN_TOKEN" | jq -r .traffic_used)
+    -H "Authorization: Bearer $ADMIN_TOKEN" | jq -r '.traffic_used // empty') || TRAFFIC_USED=""
   [[ "$TRAFFIC_USED" =~ ^[0-9]+$ && "$TRAFFIC_USED" -gt 0 ]] && break
   waited=$((waited + 1))
   [[ $waited -ge 75 ]] && fail "traffic_used stayed at ${TRAFFIC_USED:-unset} after 75s - the stats pipeline is broken"
@@ -550,9 +556,9 @@ log "PASS: traffic_used = $TRAFFIC_USED bytes (${waited}s, via real xray stats)"
 # traffic_logs is the audit trail the admin charts read; an empty table with a
 # non-zero traffic_used would mean the aggregate is being written blind.
 LOGGED_ROWS=$(curl -sf "$BASE_URL/api/v1/admin/stats/traffic-history" \
-  -H "Authorization: Bearer $ADMIN_TOKEN" | jq 'length')
+  -H "Authorization: Bearer $ADMIN_TOKEN" | jq 'length') || LOGGED_ROWS=""
 [[ "$LOGGED_ROWS" =~ ^[0-9]+$ && "$LOGGED_ROWS" -gt 0 ]] \
-  || fail "traffic history is empty despite traffic_used=$TRAFFIC_USED"
+  || fail "traffic history is empty (got '${LOGGED_ROWS:-request failed}') despite traffic_used=$TRAFFIC_USED"
 log "PASS: traffic_logs has $LOGGED_ROWS aggregated row(s)"
 
 # ---------------------------------------------------------------------------
