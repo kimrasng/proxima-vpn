@@ -139,6 +139,7 @@ func (s *Server) registerRoutes() {
 	nodeAgent.Use(middleware.NodeAPIKeyMiddleware(s.db))
 	nodeAgent.Delete("/", nodeAgentHandler.Unregister)
 	nodeAgent.Get("/config", nodeAgentHandler.Config)
+	nodeAgent.Get("/config/digest", nodeAgentHandler.ConfigDigest)
 	nodeAgent.Post("/heartbeat", nodeAgentHandler.Heartbeat)
 	nodeAgent.Post("/stats", nodeAgentHandler.Stats)
 	nodeAgent.Get("/inbounds", nodeAgentHandler.GetInbounds)

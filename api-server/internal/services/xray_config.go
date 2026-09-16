@@ -2,6 +2,8 @@ package services
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -155,8 +157,120 @@ type inboundRow struct {
 	Enabled  bool
 }
 
+// ConfigUser is one client admitted by a node's generated config, tagged with
+// the inbound it belongs to.
+type ConfigUser struct {
+	InboundTag string `json:"inbound_tag"`
+	UUID       string `json:"uuid"`
+	Email      string `json:"email"`
+	Flow       string `json:"flow"`
+	Level      uint32 `json:"level"`
+}
+
+// ConfigDigest fingerprints a node's config without transferring it.
+// StructureHash covers the config with client lists emptied, so it moves only on
+// structural edits (ports, inbounds, keys, routing) - which is what lets an
+// agent apply a users-only change without a restart.
+type ConfigDigest struct {
+	Hash          string       `json:"hash"`
+	StructureHash string       `json:"structure_hash"`
+	UsersHash     string       `json:"users_hash"`
+	Users         []ConfigUser `json:"users"`
+}
+
+// GenerateDigest builds the same config GenerateConfig would and returns only
+// its fingerprint plus the user set it admits.
+func (s *XrayConfigService) GenerateDigest(ctx context.Context, nodeID string) (ConfigDigest, error) {
+	cfg, users, err := s.generate(ctx, nodeID)
+	if err != nil {
+		return ConfigDigest{}, err
+	}
+
+	sort.Slice(users, func(i, j int) bool {
+		if users[i].InboundTag != users[j].InboundTag {
+			return users[i].InboundTag < users[j].InboundTag
+		}
+		return users[i].Email < users[j].Email
+	})
+
+	configSum := sha256.Sum256(cfg)
+
+	structure, err := stripClients(cfg)
+	if err != nil {
+		return ConfigDigest{}, fmt.Errorf("derive config structure: %w", err)
+	}
+	structureSum := sha256.Sum256(structure)
+
+	// Hash the user set from its canonical (sorted) form so an unchanged set
+	// always produces the same digest regardless of DB row order.
+	userHasher := sha256.New()
+	for _, u := range users {
+		fmt.Fprintf(userHasher, "%s\x00%s\x00%s\x00%s\x00%d\n", u.InboundTag, u.UUID, u.Email, u.Flow, u.Level)
+	}
+
+	return ConfigDigest{
+		Hash:          hex.EncodeToString(configSum[:]),
+		StructureHash: hex.EncodeToString(structureSum[:]),
+		UsersHash:     hex.EncodeToString(userHasher.Sum(nil)),
+		Users:         users,
+	}, nil
+}
+
+// stripClients re-renders a config with every inbound's client list emptied.
+func stripClients(cfg []byte) ([]byte, error) {
+	var full map[string]json.RawMessage
+	if err := json.Unmarshal(cfg, &full); err != nil {
+		return nil, err
+	}
+
+	raw, ok := full["inbounds"]
+	if !ok {
+		return json.Marshal(full)
+	}
+
+	var inbounds []map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &inbounds); err != nil {
+		return nil, err
+	}
+
+	for _, ib := range inbounds {
+		settingsRaw, ok := ib["settings"]
+		if !ok {
+			continue
+		}
+		var settings map[string]json.RawMessage
+		if err := json.Unmarshal(settingsRaw, &settings); err != nil {
+			continue
+		}
+		if _, has := settings["clients"]; !has {
+			continue
+		}
+		settings["clients"] = json.RawMessage(`[]`)
+		cleaned, err := json.Marshal(settings)
+		if err != nil {
+			return nil, err
+		}
+		ib["settings"] = cleaned
+	}
+
+	stripped, err := json.Marshal(inbounds)
+	if err != nil {
+		return nil, err
+	}
+	full["inbounds"] = stripped
+
+	return json.Marshal(full)
+}
+
 // GenerateConfig builds a full Xray JSON config for the given node.
 func (s *XrayConfigService) GenerateConfig(ctx context.Context, nodeID string) ([]byte, error) {
+	cfg, _, err := s.generate(ctx, nodeID)
+	return cfg, err
+}
+
+// generate builds a node's Xray config and, alongside it, the flattened set of
+// clients that config admits.
+func (s *XrayConfigService) generate(ctx context.Context, nodeID string) ([]byte, []ConfigUser, error) {
 	var realityPrivateKey, realityShortID string
 	var tlsCertFile, tlsKeyFile *string
 	var ssPassword *string
@@ -166,7 +280,7 @@ func (s *XrayConfigService) GenerateConfig(ctx context.Context, nodeID string) (
 		nodeID,
 	).Scan(&nodePort, &realityPrivateKey, &realityShortID, &tlsCertFile, &tlsKeyFile, &ssPassword)
 	if err != nil {
-		return nil, fmt.Errorf("fetch node details: %w", err)
+		return nil, nil, fmt.Errorf("fetch node details: %w", err)
 	}
 
 	ibRows, err := s.db.Query(ctx,
@@ -174,7 +288,7 @@ func (s *XrayConfigService) GenerateConfig(ctx context.Context, nodeID string) (
 		nodeID,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("fetch inbounds: %w", err)
+		return nil, nil, fmt.Errorf("fetch inbounds: %w", err)
 	}
 	defer ibRows.Close()
 
@@ -202,7 +316,7 @@ func (s *XrayConfigService) GenerateConfig(ctx context.Context, nodeID string) (
 		nodeID,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("fetch clients: %w", err)
+		return nil, nil, fmt.Errorf("fetch clients: %w", err)
 	}
 	defer rows.Close()
 
@@ -366,7 +480,40 @@ func (s *XrayConfigService) GenerateConfig(ctx context.Context, nodeID string) (
 		},
 	}
 
-	return json.MarshalIndent(cfg, "", "  ")
+	out, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return nil, nil, fmt.Errorf("marshal xray config: %w", err)
+	}
+	return out, vlessUsersOf(inbounds), nil
+}
+
+// vlessUsersOf flattens the clients of every VLESS inbound in a generated
+// config, deriving the digest's user set from the config itself so the two
+// cannot drift. VLESS only, because it is the sole protocol the agent can
+// provision incrementally; every admitted device lands on some VLESS inbound,
+// and a node with none yields an empty set so user changes read as structural
+// and fall back to a restart.
+func vlessUsersOf(inbounds []xrayInbound) []ConfigUser {
+	users := make([]ConfigUser, 0)
+	for _, ib := range inbounds {
+		if ib.Protocol != "vless" {
+			continue
+		}
+		var settings xrayInboundSettings
+		if err := json.Unmarshal(ib.Settings, &settings); err != nil {
+			continue
+		}
+		for _, c := range settings.Clients {
+			users = append(users, ConfigUser{
+				InboundTag: ib.Tag,
+				UUID:       c.ID,
+				Email:      c.Email,
+				Flow:       c.Flow,
+				Level:      uint32(c.Level),
+			})
+		}
+	}
+	return users
 }
 
 func (s *XrayConfigService) buildInbound(

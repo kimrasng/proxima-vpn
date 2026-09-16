@@ -8,22 +8,22 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/redis/go-redis/v9"
 	"github.com/proximavpn/proxima-vpn/api-server/internal/metrics"
 	"github.com/proximavpn/proxima-vpn/api-server/internal/services"
 	"github.com/proximavpn/proxima-vpn/pkg/crypto"
+	"github.com/redis/go-redis/v9"
 )
 
 type NodeAgentHandler struct {
-	db           *pgxpool.Pool
-	redis        *redis.Client
+	db            *pgxpool.Pool
+	redis         *redis.Client
 	xrayConfigSvc *services.XrayConfigService
 }
 
 func NewNodeAgentHandler(db *pgxpool.Pool, rdb *redis.Client) *NodeAgentHandler {
 	return &NodeAgentHandler{
-		db:           db,
-		redis:        rdb,
+		db:            db,
+		redis:         rdb,
 		xrayConfigSvc: services.NewXrayConfigService(db),
 	}
 }
@@ -149,6 +149,21 @@ func (h *NodeAgentHandler) Config(c *fiber.Ctx) error {
 	return c.Send(configJSON)
 }
 
+// ConfigDigest returns a fingerprint of the node's config so an unchanged agent
+// need not download the whole document every poll.
+func (h *NodeAgentHandler) ConfigDigest(c *fiber.Ctx) error {
+	nodeID := c.Locals("node_id").(string)
+
+	digest, err := h.xrayConfigSvc.GenerateDigest(context.Background(), nodeID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to generate config digest",
+		})
+	}
+
+	return c.JSON(digest)
+}
+
 type heartbeatRequest struct {
 	CPUUsage    float64 `json:"cpu_usage"`
 	MemoryUsage float64 `json:"memory_usage"`
@@ -157,6 +172,8 @@ type heartbeatRequest struct {
 	NetworkIn   float64 `json:"network_in"`
 	NetworkOut  float64 `json:"network_out"`
 	XrayVersion string  `json:"xray_version"`
+	ConfigHash  string  `json:"config_hash"`
+	XrayRunning bool    `json:"xray_running"`
 }
 
 func (h *NodeAgentHandler) Heartbeat(c *fiber.Ctx) error {
@@ -174,10 +191,12 @@ func (h *NodeAgentHandler) Heartbeat(c *fiber.Ctx) error {
 		`UPDATE nodes
 		 SET cpu_usage = $1, memory_usage = $2, disk_usage = $3, load_avg = $4,
 		     network_in = $5, network_out = $6, last_seen = NOW(), status = 'online',
-		     xray_version = COALESCE(NULLIF($7, ''), xray_version)
-		 WHERE id = $8`,
+		     xray_version = COALESCE(NULLIF($7, ''), xray_version),
+		     config_hash = $8, xray_running = $9
+		 WHERE id = $10`,
 		req.CPUUsage, req.MemoryUsage, req.DiskUsage, req.LoadAvg,
-		req.NetworkIn, req.NetworkOut, req.XrayVersion, nodeID,
+		req.NetworkIn, req.NetworkOut, req.XrayVersion,
+		req.ConfigHash, req.XrayRunning, nodeID,
 	)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{

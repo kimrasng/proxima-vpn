@@ -212,6 +212,12 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 		// trojan_tls inbounds silently never made it into the running Xray
 		// config (see buildVmessWS/buildTrojanTLS in services/xray_config.go).
 		`ALTER TABLE nodes ADD COLUMN IF NOT EXISTS tls_email TEXT NOT NULL DEFAULT ''`,
+		// Self-reported runtime state from the heartbeat. status alone only
+		// tracked agent reachability, so a crashed Xray or a node on a stale
+		// config looked healthy. config_hash is the sha256 of the config the
+		// node actually applied (compare with GenerateDigest).
+		`ALTER TABLE nodes ADD COLUMN IF NOT EXISTS config_hash TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE nodes ADD COLUMN IF NOT EXISTS xray_running BOOLEAN NOT NULL DEFAULT false`,
 	}
 	for _, m := range migrations {
 		if _, err := pool.Exec(ctx, m); err != nil {
