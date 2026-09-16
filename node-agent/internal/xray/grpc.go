@@ -24,25 +24,34 @@ type statsCodec struct{}
 func (statsCodec) Name() string { return "proto" }
 
 func (statsCodec) Marshal(v any) ([]byte, error) {
-	req, ok := v.(*queryStatsRequest)
-	if !ok {
+	switch req := v.(type) {
+	case *queryStatsRequest:
+		var buf []byte
+		// field 1: pattern (string, wire type 2)
+		if req.Pattern != "" {
+			buf = appendTag(buf, 1, 2)
+			buf = appendBytes(buf, []byte(req.Pattern))
+		}
+		// field 2: reset (bool, wire type 0)
+		if req.Reset_ {
+			buf = appendTag(buf, 2, 0)
+			buf = binary.AppendUvarint(buf, 1)
+		}
+		return buf, nil
+	case *alterInboundRequest:
+		return marshalAlterInboundRequest(req), nil
+	default:
 		return nil, fmt.Errorf("statsCodec: unsupported marshal type %T", v)
 	}
-	var buf []byte
-	// field 1: pattern (string, wire type 2)
-	if req.Pattern != "" {
-		buf = appendTag(buf, 1, 2)
-		buf = appendBytes(buf, []byte(req.Pattern))
-	}
-	// field 2: reset (bool, wire type 0)
-	if req.Reset_ {
-		buf = appendTag(buf, 2, 0)
-		buf = binary.AppendUvarint(buf, 1)
-	}
-	return buf, nil
 }
 
 func (statsCodec) Unmarshal(data []byte, v any) error {
+	// AlterInboundResponse is an empty protobuf message, so an empty body is
+	// the expected success case rather than a decode failure.
+	if _, ok := v.(*alterInboundResponse); ok {
+		return nil
+	}
+
 	resp, ok := v.(*queryStatsResponse)
 	if !ok {
 		return fmt.Errorf("statsCodec: unsupported unmarshal type %T", v)
