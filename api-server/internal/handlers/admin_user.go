@@ -2,11 +2,14 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/proximavpn/proxima-vpn/pkg/crypto"
 )
@@ -225,21 +228,21 @@ type deviceItem struct {
 }
 
 type userDetailResponse struct {
-	ID              string       `json:"id"`
-	Email           string       `json:"email"`
-	Name            string       `json:"name"`
-	SubToken        string       `json:"sub_token"`
-	PlanID          *string      `json:"plan_id"`
-	PlanName        *string      `json:"plan_name"`
-	PlanStartedAt   *time.Time   `json:"plan_started_at"`
-	PlanExpiresAt   *time.Time   `json:"plan_expires_at"`
-	TrafficUsed     int64        `json:"traffic_used"`
-	TrafficLimit    *int64       `json:"traffic_limit"`
-	TrafficResetDay *int         `json:"traffic_reset_day"`
-	IsActive        bool         `json:"is_active"`
-	Status          string       `json:"status"`
-	CreatedAt       time.Time    `json:"created_at"`
-	Devices         []deviceItem `json:"devices"`
+	ID             string       `json:"id"`
+	Email          string       `json:"email"`
+	Name           string       `json:"name"`
+	SubToken       string       `json:"sub_token"`
+	PlanID         *string      `json:"plan_id"`
+	PlanName       *string      `json:"plan_name"`
+	PlanStartedAt  *time.Time   `json:"plan_started_at"`
+	PlanExpiresAt  *time.Time   `json:"plan_expires_at"`
+	TrafficUsed    int64        `json:"traffic_used"`
+	TrafficLimit   *int64       `json:"traffic_limit"`
+	TrafficResetAt *time.Time   `json:"traffic_reset_at"`
+	IsActive       bool         `json:"is_active"`
+	Status         string       `json:"status"`
+	CreatedAt      time.Time    `json:"created_at"`
+	Devices        []deviceItem `json:"devices"`
 }
 
 // Get returns a single user with plan and device details.
@@ -261,7 +264,7 @@ func (h *AdminUserHandler) Get(c *fiber.Ctx) error {
 		context.Background(),
 		`SELECT u.id, u.email, u.name, u.sub_token, u.plan_id, p.name,
 		        u.plan_started_at, u.plan_expires_at, u.traffic_used, p.traffic_limit,
-		        u.traffic_reset_day, u.is_active, u.status, u.created_at
+		        u.traffic_reset_at, u.is_active, u.status, u.created_at
 		 FROM users u
 		 LEFT JOIN plans p ON u.plan_id = p.id
 		 WHERE u.id = $1`,
@@ -269,11 +272,19 @@ func (h *AdminUserHandler) Get(c *fiber.Ctx) error {
 	).Scan(
 		&u.ID, &u.Email, &u.Name, &u.SubToken, &u.PlanID, &u.PlanName,
 		&u.PlanStartedAt, &u.PlanExpiresAt, &u.TrafficUsed, &u.TrafficLimit,
-		&u.TrafficResetDay, &u.IsActive, &u.Status, &u.CreatedAt,
+		&u.TrafficResetAt, &u.IsActive, &u.Status, &u.CreatedAt,
 	)
 	if err != nil {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-			"error": "user not found",
+		// Only an absent row is a 404. Reporting every failure that way is what
+		// made a query naming a non-existent column look like a missing user.
+		if errors.Is(err, pgx.ErrNoRows) {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+				"error": "user not found",
+			})
+		}
+		log.Printf("admin get user %s: %v", id, err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to fetch user",
 		})
 	}
 

@@ -531,10 +531,6 @@ log "PASS: supervisor restarted xray and traffic flows again (${waited}s)"
 # ---------------------------------------------------------------------------
 log "testing traffic accounting (xray stats -> agent -> server)"
 
-# `set -x` for this section only: an earlier run died here with no assertion
-# message, and the trace is what identifies the offending command.
-set -x
-
 # Push bytes through so there is something to account for. Failures are ignored:
 # the client Xray is still recovering from the restart above, and a dropped
 # request would abort the whole script under set -e.
