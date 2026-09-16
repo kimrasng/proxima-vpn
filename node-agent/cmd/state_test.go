@@ -115,3 +115,52 @@ func TestSeededStateMatchesEquivalentDigest(t *testing.T) {
 		}
 	}
 }
+
+// Regression: a fresh agent starts from a config, not a digest, so it has no
+// structure hash - and usersOnlyChange reads an empty one as "unknown" and
+// demands a restart. Until the hash is learned, every startup's first user
+// change restarted Xray.
+func TestStructureHashLearnedFromMatchingDigestEnablesIncrementalSync(t *testing.T) {
+	state := newNodeState([]byte(configWithTwoVlessUsers))
+
+	if usersOnlyChange(state, client.ConfigDigest{
+		StructureHash: "structure-1",
+		UsersHash:     "users-2",
+	}) {
+		t.Fatal("an unknown local structure hash must not be treated as a users-only change")
+	}
+
+	state.setStructureHash("structure-1")
+
+	if !usersOnlyChange(state, client.ConfigDigest{
+		StructureHash: "structure-1",
+		UsersHash:     "users-2",
+	}) {
+		t.Error("a user change under an unchanged structure must take the incremental path")
+	}
+
+	if usersOnlyChange(state, client.ConfigDigest{
+		StructureHash: "structure-2",
+		UsersHash:     "users-2",
+	}) {
+		t.Error("a structural change must still force a restart")
+	}
+}
+
+func TestSetStructureHashLeavesConfigAndUsersAlone(t *testing.T) {
+	state := newNodeState([]byte(configWithTwoVlessUsers))
+	hashBefore := state.ConfigHash()
+	usersBefore := len(state.UsersSnapshot())
+
+	state.setStructureHash("structure-1")
+
+	if got := state.ConfigHash(); got != hashBefore {
+		t.Errorf("config hash changed: %q -> %q", hashBefore, got)
+	}
+	if got := len(state.UsersSnapshot()); got != usersBefore {
+		t.Errorf("user count changed: %d -> %d", usersBefore, got)
+	}
+	if got := state.StructureHash(); got != "structure-1" {
+		t.Errorf("structure hash = %q, want %q", got, "structure-1")
+	}
+}

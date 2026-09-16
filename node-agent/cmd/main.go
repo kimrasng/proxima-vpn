@@ -342,6 +342,13 @@ func (s *nodeState) StructureHash() string {
 	return s.structureHash
 }
 
+// setStructureHash records the digest for the config already running.
+func (s *nodeState) setStructureHash(structureHash string) {
+	s.mu.Lock()
+	s.structureHash = structureHash
+	s.mu.Unlock()
+}
+
 func (s *nodeState) ConfigHash() string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -633,6 +640,12 @@ func configPollLoop(
 			}
 
 			if digest.Hash == state.ConfigHash() {
+				// The running config matches the server's, so its structure
+				// digest is now known. Recording it here is what lets the
+				// *first* user-only change after startup take the incremental
+				// path: usersOnlyChange treats an empty local structure hash as
+				// "unknown" and falls back to a restart.
+				state.setStructureHash(digest.StructureHash)
 				// Reconcile anyway when a previous sync failed, so a
 				// transient gRPC error does not leave users out of step
 				// indefinitely.
