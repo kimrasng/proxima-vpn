@@ -113,6 +113,22 @@ func (h *SubscriptionHandler) GetSubscription(c *fiber.Ctx) error {
 		})
 	}
 
+	// traffic_used and plan_expires_at were selected but never checked. Xray
+	// config generation gates on these same conditions, so an over-quota or
+	// expired user could not connect - but still got node addresses and
+	// credentials handed to them.
+	if user.PlanExpiresAt != nil && user.PlanExpiresAt.Before(time.Now()) {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+			"error": "plan expired",
+		})
+	}
+
+	if user.TrafficLimit != nil && *user.TrafficLimit > 0 && user.TrafficUsed >= *user.TrafficLimit {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+			"error": "traffic limit exceeded",
+		})
+	}
+
 	rows, err := h.db.Query(ctx,
 		`SELECT n.id, n.name, host(n.ip), n.port, n.status, n.reality_public_key, n.reality_short_id,
 		        n.tls_cert_file, n.tls_key_file,
