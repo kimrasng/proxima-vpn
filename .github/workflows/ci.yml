@@ -29,10 +29,16 @@ jobs:
       TEST_DATABASE_URL: postgres://vpnuser:vpnpass@localhost:5432/vpnpanel
 
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version: '1.25'
+          # go.work keeps each go.sum in a subdirectory; setup-go only looks at
+          # the repo root, so caching silently failed as "file is not found".
+          cache-dependency-path: |
+            api-server/go.sum
+            node-agent/go.sum
+            pkg/go.sum
       - name: Build api-server
         run: cd api-server && go build ./...
       - name: Build node-agent
@@ -75,10 +81,14 @@ jobs:
   lint-go:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version: '1.25'
+          cache-dependency-path: |
+            api-server/go.sum
+            node-agent/go.sum
+            pkg/go.sum
       - name: golangci-lint (api-server)
         uses: golangci/golangci-lint-action@v7
         with:
@@ -98,10 +108,12 @@ jobs:
   frontend:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: '20'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
       - name: Install dependencies
         run: cd web && npm ci
       - name: Lint

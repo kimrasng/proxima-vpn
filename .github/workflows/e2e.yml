@@ -61,11 +61,15 @@ jobs:
       SWAGGER_ENABLED: "false"
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version: '1.25'
+          cache-dependency-path: |
+            api-server/go.sum
+            node-agent/go.sum
+            pkg/go.sum
 
       - name: Install system dependencies (xray-core/wg-quick runtime deps)
         run: |
@@ -109,7 +113,7 @@ jobs:
       # --- Browser e2e (admin panel + user portal) -------------------------
       # Runs against the same api-server instance. vite preview proxies /api
       # and /sub to it, mirroring what nginx does in production.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '20'
           cache: npm
@@ -138,7 +142,7 @@ jobs:
 
       - name: Upload logs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: e2e-logs
           path: |
