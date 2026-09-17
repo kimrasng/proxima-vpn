@@ -24,6 +24,7 @@ import AdminLogin from "./pages/auth/AdminLogin";
 import Register from "./pages/auth/Register";
 
 import Devices from "./pages/user/Devices";
+import UserNodes from "./pages/user/Nodes";
 import Traffic from "./pages/user/Traffic";
 import PlanInfo from "./pages/user/PlanInfo";
 import AccountSettings from "./pages/user/AccountSettings";
@@ -71,6 +72,7 @@ export const router = createBrowserRouter([
     ),
     children: [
       { path: "/portal/devices", element: <Devices /> },
+      { path: "/portal/nodes", element: <UserNodes /> },
       { path: "/portal/traffic", element: <Traffic /> },
       { path: "/portal/plan", element: <PlanInfo /> },
       { path: "/portal/account", element: <AccountSettings /> },

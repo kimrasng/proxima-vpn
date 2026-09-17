@@ -8,6 +8,7 @@ import type {
   PlanRequest,
   Plan,
   Announcement,
+  AvailableNode,
 } from './types';
 
 function applyUserClient() {
@@ -62,6 +63,11 @@ export function listMyPlanRequests(): Promise<PlanRequest[]> {
 export function listPlans(): Promise<Plan[]> {
   applyUserClient();
   return get<Plan[]>('/api/v1/user/plans');
+}
+
+export function listAvailableNodes(): Promise<AvailableNode[]> {
+  applyUserClient();
+  return get<AvailableNode[]>('/api/v1/user/nodes');
 }
 
 export function listAnnouncements(): Promise<Announcement[]> {

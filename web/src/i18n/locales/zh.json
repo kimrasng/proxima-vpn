@@ -102,7 +102,6 @@
       "metricsTitle": "指标",
       "networkIn": "入站流量（累计）",
       "networkOut": "出站流量（累计）",
-      "region": "地区",
       "save": "保存",
       "editModalTitle": "编辑节点",
       "editSuccess": "节点更新成功",
@@ -162,25 +161,22 @@
       "trafficUsed": "已用流量",
       "expiresAt": "到期时间",
       "isActive": "启用",
-      "editUser": "编辑用户",
+      "editUser": "编辑",
       "deleteConfirm": "确定要删除此用户吗？",
       "empty": "暂无用户",
       "assignPlan": "分配套餐",
       "resetTraffic": "重置流量",
       "createUser": "创建用户",
       "createUserModalTitle": "创建用户",
-      "email": "邮箱",
       "password": "密码",
       "createSuccess": "用户创建成功",
       "createError": "创建用户失败",
       "resetTrafficSuccess": "流量重置成功",
       "resetTrafficError": "重置流量失败",
-      "editUser": "编辑",
       "editUserModalTitle": "编辑用户",
       "editUserSuccess": "用户更新成功",
       "editUserError": "更新用户失败",
       "planLabel": "套餐",
-      "expiresAt": "到期时间",
       "noTrafficLimit": "无限制"
     },
     "planRequests": {
@@ -265,7 +261,8 @@
       "traffic": "流量概况",
       "plan": "套餐信息",
       "account": "账户设置",
-      "announcements": "公告"
+      "announcements": "公告",
+      "nodes": "节点"
     },
     "devices": {
       "title": "设备管理",
@@ -353,6 +350,17 @@
       "close": "关闭",
       "dontShowAgain": "不再显示",
       "moreAnnouncements": "还有 {{count}} 条公告"
+    },
+    "nodes": {
+      "title": "可用节点",
+      "description": "您的套餐可连接的服务器位置。",
+      "name": "名称",
+      "location": "位置",
+      "status": "状态",
+      "online": "在线",
+      "offline": "离线",
+      "empty": "您的套餐暂无可用节点。",
+      "loadError": "加载节点失败"
     }
   },
   "auth": {

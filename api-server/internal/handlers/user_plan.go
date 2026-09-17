@@ -172,7 +172,60 @@ type userPlanItem struct {
 	SpeedLimit   *int   `json:"speed_limit"`
 }
 
-// ListPlans returns all active plans available for users.
+// userNodeItem is the minimal node view an end user gets: no address, port, key
+// or protocol detail, since the subscription is the only place credentials
+// belong. Anything added here is published to every user.
+type userNodeItem struct {
+	Name    string `json:"name"`
+	Country string `json:"country"`
+	Region  string `json:"region"`
+	Status  string `json:"status"`
+}
+
+// ListNodes returns the nodes the authenticated user's plan grants access to.
+// @Summary List my available nodes
+// @Description Returns name and location of the nodes the user's plan can use
+// @Tags user-plans
+// @Produce json
+// @Success 200 {array} userNodeItem
+// @Failure 500 {object} map[string]string
+// @Security BearerAuth
+// @Router /user/nodes [get]
+func (h *UserPlanHandler) ListNodes(c *fiber.Ctx) error {
+	userID := c.Locals("user_id").(string)
+
+	// The same plan -> node group -> node chain the Xray config is built from,
+	// so this cannot advertise a node the user could not reach. No plan or no
+	// group joins to nothing and yields [].
+	rows, err := h.db.Query(
+		context.Background(),
+		`SELECT n.name, n.country, n.region, n.status
+		 FROM nodes n
+		 JOIN node_group_nodes ngn ON ngn.node_id = n.id
+		 JOIN node_groups ng ON ng.id = ngn.node_group_id
+		 JOIN plans p ON p.node_group_id = ng.id
+		 JOIN users u ON u.plan_id = p.id
+		 WHERE u.id = $1 AND n.status <> 'pending'
+		 ORDER BY n.country, n.name`,
+		userID,
+	)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to list nodes"})
+	}
+	defer rows.Close()
+
+	items := make([]userNodeItem, 0)
+	for rows.Next() {
+		var n userNodeItem
+		if err := rows.Scan(&n.Name, &n.Country, &n.Region, &n.Status); err != nil {
+			continue
+		}
+		items = append(items, n)
+	}
+
+	return c.JSON(items)
+}
+
 // @Summary List available plans
 // @Description Returns all active subscription plans
 // @Tags user-plans

@@ -163,6 +163,7 @@ func (s *Server) registerRoutes() {
 	user.Post("/plan-requests", userPlanHandler.CreateRequest)
 	user.Get("/plan-requests", userPlanHandler.ListRequests)
 	user.Get("/plans", userPlanHandler.ListPlans)
+	user.Get("/nodes", userPlanHandler.ListNodes)
 
 	userDeviceHandler := handlers.NewUserDeviceHandler(s.db)
 	user.Post("/devices", userDeviceHandler.Create)

@@ -357,7 +357,8 @@
       "traffic": "Traffic",
       "plan": "Plan",
       "account": "Account",
-      "announcements": "Announcements"
+      "announcements": "Announcements",
+      "nodes": "Nodes"
     },
     "devices": {
       "title": "Device Management",
@@ -446,6 +447,17 @@
       "close": "Close",
       "dontShowAgain": "Don't show again",
       "moreAnnouncements": "{{count}} more announcement(s)"
+    },
+    "nodes": {
+      "title": "Available Nodes",
+      "description": "Server locations your plan can connect to.",
+      "name": "Name",
+      "location": "Location",
+      "status": "Status",
+      "online": "Online",
+      "offline": "Offline",
+      "empty": "No nodes are available on your plan yet.",
+      "loadError": "Failed to load nodes"
     }
   },
   "auth": {

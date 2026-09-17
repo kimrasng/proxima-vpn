@@ -17,6 +17,7 @@ export default function UserLayout() {
 
   const navItems: SideNavigationProps.Item[] = [
     { type: "link", text: t("user.nav.devices"), href: "/portal/devices" },
+    { type: "link", text: t("user.nav.nodes"), href: "/portal/nodes" },
     { type: "link", text: t("user.nav.traffic"), href: "/portal/traffic" },
     { type: "link", text: t("user.nav.plan"), href: "/portal/plan" },
     { type: "link", text: t("user.nav.account"), href: "/portal/account" },

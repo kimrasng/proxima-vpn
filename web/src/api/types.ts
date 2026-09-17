@@ -238,6 +238,14 @@ export interface UpdateProfileRequest {
   password?: string;
 }
 
+// What /api/v1/user/nodes returns: location only, no connection detail.
+export interface AvailableNode {
+  name: string;
+  country: string;
+  region: string;
+  status: string;
+}
+
 export interface TrafficStats {
   traffic_used: number;
   traffic_limit?: number;
