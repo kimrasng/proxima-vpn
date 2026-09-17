@@ -164,3 +164,69 @@ func TestSetStructureHashLeavesConfigAndUsersAlone(t *testing.T) {
 		t.Errorf("structure hash = %q, want %q", got, "structure-1")
 	}
 }
+
+// Regression: syncUsers snapshots the user set, then makes gRPC calls with the
+// lock released. If the supervisor respawns Xray in that window, the sync was
+// mutating a process that no longer exists, and writing its result back would
+// claim users the new Xray never received - so the next poll sees no mismatch
+// and never reconciles, leaving those devices unable to connect.
+func TestSetUsersIfGenRejectsAWriteAcrossARestart(t *testing.T) {
+	state := newNodeState([]byte(configWithTwoVlessUsers))
+
+	gen := state.XrayGen()
+
+	// Supervisor respawns Xray while a sync is in flight.
+	state.noteXrayRestarted(vlessUsersOfConfig([]byte(configWithTwoVlessUsers)))
+
+	stale := map[userKey]xray.VLESSUser{
+		{InboundTag: "vless-in", Email: "uuid-c@proxima"}: {UUID: "uuid-c", Email: "uuid-c@proxima"},
+	}
+	if state.setUsersIfGen(gen, "users-from-stale-sync", stale) {
+		t.Fatal("a write from before the restart must be rejected")
+	}
+	if h := state.UsersHash(); h != "" {
+		t.Errorf("users hash = %q, want empty so the next poll reconciles", h)
+	}
+	if _, leaked := state.UsersSnapshot()[userKey{InboundTag: "vless-in", Email: "uuid-c@proxima"}]; leaked {
+		t.Error("the discarded sync's users leaked into state")
+	}
+}
+
+func TestSetUsersIfGenAcceptsAWriteWithoutARestart(t *testing.T) {
+	state := newNodeState([]byte(configWithTwoVlessUsers))
+
+	gen := state.XrayGen()
+	users := map[userKey]xray.VLESSUser{
+		{InboundTag: "vless-in", Email: "uuid-a@proxima"}: {UUID: "uuid-a", Email: "uuid-a@proxima"},
+	}
+
+	if !state.setUsersIfGen(gen, "users-1", users) {
+		t.Fatal("a write with an unchanged generation must land")
+	}
+	if h := state.UsersHash(); h != "users-1" {
+		t.Errorf("users hash = %q, want users-1", h)
+	}
+}
+
+// Every path that puts a new Xray process into service must bump the
+// generation, or an in-flight sync can still write through it.
+func TestEveryRestartPathBumpsTheGeneration(t *testing.T) {
+	state := newNodeState([]byte(configWithTwoVlessUsers))
+	start := state.XrayGen()
+
+	state.noteXrayRestarted(map[userKey]xray.VLESSUser{})
+	afterCrashRestart := state.XrayGen()
+	if afterCrashRestart == start {
+		t.Error("noteXrayRestarted did not bump the generation")
+	}
+
+	state.noteXrayRestartedWith("users-2", map[userKey]xray.VLESSUser{})
+	if state.XrayGen() == afterCrashRestart {
+		t.Error("noteXrayRestartedWith did not bump the generation")
+	}
+	// The deliberate variant keeps the digest hash, since the config it
+	// restarted onto is the one the digest describes.
+	if h := state.UsersHash(); h != "users-2" {
+		t.Errorf("users hash = %q, want users-2 preserved", h)
+	}
+}

@@ -16,6 +16,12 @@ type Collector struct {
 	apiClient   *client.APIClient
 	interval    time.Duration
 	cancel      context.CancelFunc
+
+	// Xray's counters are read destructively (QueryStats reset=true), so a
+	// sample that fails to reach the server cannot be re-read. Carry it and
+	// fold it into the next attempt; dropping it under-reports usage for the
+	// length of any outage and makes traffic caps under-count.
+	pending map[string]client.TrafficStat
 }
 
 func NewCollector(statsClient *xray.StatsClient, apiClient *client.APIClient, interval time.Duration) *Collector {
@@ -26,6 +32,7 @@ func NewCollector(statsClient *xray.StatsClient, apiClient *client.APIClient, in
 		statsClient: statsClient,
 		apiClient:   apiClient,
 		interval:    interval,
+		pending:     map[string]client.TrafficStat{},
 	}
 }
 
@@ -61,22 +68,49 @@ func (c *Collector) collect(ctx context.Context) {
 		return
 	}
 
+	// Fold the fresh sample into whatever a previous attempt failed to deliver.
+	// Done before the online-users query so an error there cannot discard
+	// counters Xray has already zeroed.
+	c.accumulate(traffic)
+
 	onlineUsers, err := c.statsClient.GetOnlineUsers(ctx)
 	if err != nil {
 		log.Printf("collect online users: %v", err)
 		return
 	}
 
-	apiTraffic := make([]client.TrafficStat, len(traffic))
-	for i, t := range traffic {
-		apiTraffic[i] = client.TrafficStat{
-			UUID:     t.UUID,
-			Upload:   t.Upload,
-			Download: t.Download,
-		}
+	if err := c.flush(ctx, onlineUsers); err != nil {
+		log.Printf("send stats: %v (retrying %d device(s) on the next tick)", err, len(c.pending))
+	}
+}
+
+// flush posts the undelivered set, clearing it only once the server has it.
+func (c *Collector) flush(ctx context.Context, onlineUsers []string) error {
+	if len(c.pending) == 0 {
+		return nil
+	}
+
+	apiTraffic := make([]client.TrafficStat, 0, len(c.pending))
+	for _, t := range c.pending {
+		apiTraffic = append(apiTraffic, t)
 	}
 
 	if err := c.apiClient.SendStats(ctx, apiTraffic, onlineUsers); err != nil {
-		log.Printf("send stats: %v", err)
+		return err
+	}
+
+	c.pending = map[string]client.TrafficStat{}
+	return nil
+}
+
+// accumulate merges a freshly-read sample into the undelivered set.
+func (c *Collector) accumulate(traffic []xray.TrafficStat) {
+	for _, t := range traffic {
+		prev := c.pending[t.UUID]
+		c.pending[t.UUID] = client.TrafficStat{
+			UUID:     t.UUID,
+			Upload:   prev.Upload + t.Upload,
+			Download: prev.Download + t.Download,
+		}
 	}
 }

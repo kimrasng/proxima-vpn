@@ -270,6 +270,12 @@ type nodeState struct {
 	structureHash string
 	usersHash     string
 	users         map[userKey]xray.VLESSUser
+
+	// xrayGen counts Xray (re)starts. syncUsers reads the user set, then makes
+	// gRPC calls without the lock held; if the supervisor respawns Xray in that
+	// window, writing the result back would claim users the new process never
+	// received. Comparing the generation across the gap detects that.
+	xrayGen uint64
 }
 
 // userKey keys on email because that is how Xray's RemoveUserOperation
@@ -349,6 +355,45 @@ func (s *nodeState) setStructureHash(structureHash string) {
 	s.mu.Unlock()
 }
 
+func (s *nodeState) XrayGen() uint64 {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.xrayGen
+}
+
+// noteXrayRestarted bumps the generation and reseeds users from the config the
+// new process loaded, invalidating any sync already in flight.
+func (s *nodeState) noteXrayRestarted(users map[userKey]xray.VLESSUser) {
+	s.mu.Lock()
+	s.xrayGen++
+	s.usersHash = ""
+	s.users = users
+	s.mu.Unlock()
+}
+
+// noteXrayRestartedWith is noteXrayRestarted for a deliberate restart onto a
+// known config, where the server's user digest does describe what Xray loaded.
+func (s *nodeState) noteXrayRestartedWith(usersHash string, users map[userKey]xray.VLESSUser) {
+	s.mu.Lock()
+	s.xrayGen++
+	s.usersHash = usersHash
+	s.users = users
+	s.mu.Unlock()
+}
+
+// setUsersIfGen writes only if Xray has not restarted since gen was read,
+// reporting whether the write landed.
+func (s *nodeState) setUsersIfGen(gen uint64, usersHash string, users map[userKey]xray.VLESSUser) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.xrayGen != gen {
+		return false
+	}
+	s.usersHash = usersHash
+	s.users = users
+	return true
+}
+
 func (s *nodeState) ConfigHash() string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -359,13 +404,6 @@ func (s *nodeState) Config() []byte {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.config
-}
-
-func (s *nodeState) setUsers(usersHash string, users map[userKey]xray.VLESSUser) {
-	s.mu.Lock()
-	s.usersHash = usersHash
-	s.users = users
-	s.mu.Unlock()
 }
 
 func (s *nodeState) UsersHash() string {
@@ -458,7 +496,7 @@ func superviseLoop(ctx context.Context, runner *xray.XrayRunner, state *nodeStat
 			// A respawned Xray only knows its config file's users, losing any
 			// the agent added over the handler API; the empty hash re-arms
 			// reconciliation on the next poll.
-			state.setUsers("", vlessUsersOfConfig(state.Config()))
+			state.noteXrayRestarted(vlessUsersOfConfig(state.Config()))
 			log.Println("supervisor: xray restarted")
 		}
 	}
@@ -650,7 +688,9 @@ func configPollLoop(
 				// transient gRPC error does not leave users out of step
 				// indefinitely.
 				if digest.UsersHash != state.UsersHash() {
-					syncUsers(ctx, statsClient, state, digest)
+					if !syncUsers(ctx, statsClient, state, digest) {
+						log.Println("config poll: user reconciliation incomplete, retrying next tick")
+					}
 				}
 				continue
 			}
@@ -693,7 +733,7 @@ func configPollLoop(
 
 			applyShaping(newConfig)
 			state.setConfig(newConfig, digest.StructureHash)
-			state.setUsers(digest.UsersHash, usersFromDigest(digest))
+			state.noteXrayRestartedWith(digest.UsersHash, usersFromDigest(digest))
 		}
 	}
 }
@@ -721,7 +761,7 @@ func rollbackConfig(runner *xray.XrayRunner, state *nodeState) {
 	// digest for the config now running, and an empty value forces the next
 	// change through the restart path rather than an unsafe incremental one.
 	state.setConfig(prev, "")
-	state.setUsers("", vlessUsersOfConfig(prev))
+	state.noteXrayRestarted(vlessUsersOfConfig(prev))
 	log.Println("rollback: restarted xray on previous config")
 }
 
@@ -764,6 +804,9 @@ func syncUsers(ctx context.Context, statsClient *xray.StatsClient, state *nodeSt
 	}
 
 	want := usersFromDigest(digest)
+	// Snapshot the generation alongside the user set: everything below mutates
+	// a specific Xray process, and the supervisor may replace it mid-flight.
+	gen := state.XrayGen()
 	live := state.UsersSnapshot()
 	applied := make(map[userKey]xray.VLESSUser, len(live))
 	for k, v := range live {
@@ -807,13 +850,19 @@ func syncUsers(ctx context.Context, statsClient *xray.StatsClient, state *nodeSt
 	}
 
 	if !ok {
-		// Keep what landed so the next poll retries only the remainder;
-		// the empty hash keeps reconciliation armed.
-		state.setUsers("", applied)
+		// Keep what landed so the next poll retries only the remainder; the
+		// empty hash keeps reconciliation armed. Skipped if Xray restarted
+		// underneath us - the supervisor's reseed is the accurate state then.
+		if !state.setUsersIfGen(gen, "", applied) {
+			log.Println("sync users: xray restarted mid-sync, discarding partial result")
+		}
 		return false
 	}
 
-	state.setUsers(digest.UsersHash, applied)
+	if !state.setUsersIfGen(gen, digest.UsersHash, applied) {
+		log.Println("sync users: xray restarted mid-sync, discarding result")
+		return false
+	}
 	log.Printf("synced users without restart: %d active", len(applied))
 	return true
 }
