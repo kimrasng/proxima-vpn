@@ -221,6 +221,22 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 		// Keeps the retention sweeps (scheduler/retention.go) off full scans.
 		`CREATE INDEX IF NOT EXISTS idx_traffic_logs_created_at ON traffic_logs(created_at)`,
 		`CREATE INDEX IF NOT EXISTS idx_node_metrics_history_recorded_at ON node_metrics_history(recorded_at)`,
+		// One protocol per node: Xray takes a single config per node, and mixing
+		// protocols made speed limits bypassable via an uncapped inbound. Keyed
+		// on node_id alone - (node_id, protocol) would only block duplicates of
+		// the same protocol, the opposite of the rule. Guarded so a pre-existing
+		// multi-inbound node cannot fail the migration and block startup.
+		`DO $$
+		 BEGIN
+		   IF EXISTS (
+		     SELECT 1 FROM inbounds GROUP BY node_id HAVING COUNT(*) > 1
+		   ) THEN
+		     RAISE NOTICE 'inbounds: skipping one-inbound-per-node index; existing nodes have several';
+		   ELSE
+		     CREATE UNIQUE INDEX IF NOT EXISTS idx_inbounds_one_protocol_per_node
+		       ON inbounds(node_id);
+		   END IF;
+		 END $$`,
 	}
 	for _, m := range migrations {
 		if _, err := pool.Exec(ctx, m); err != nil {

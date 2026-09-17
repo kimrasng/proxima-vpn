@@ -1,18 +1,20 @@
 #!/usr/bin/env bash
 # Full data-plane end-to-end test: registers a real node-agent against a real
-# api-server, configures one inbound per supported protocol (VLESS Reality,
-# VMess, Trojan, Shadowsocks, WireGuard) exactly the way an admin would
-# through the panel API, starts the real xray-core/wg-quick processes that
-# result, and then acts as a real client for each protocol - proving actual
-# encrypted traffic reaches a local HTTP target through each tunnel, not just
-# that config files parse. Then it exercises the agent's live-management paths
-# against that running Xray: adding a device mid-flight must be applied over
-# the handler API without a restart, killing Xray must be noticed and repaired
-# by the supervisor, and the bytes those tunnels moved must land in
-# users.traffic_used and then actually gate access once the cap is exceeded.
-# Finishes by running `node-agent unregister` (the same command
-# scripts/uninstall.sh runs) and confirming the node is actually gone from the
-# panel and its API key is rejected afterward.
+# api-server, configures a VLESS Reality inbound exactly the way an admin would
+# through the panel API, starts the real xray-core that results, and then acts
+# as a real client - proving actual encrypted traffic reaches a local HTTP
+# target through the tunnel, not just that config files parse. Then it exercises
+# the agent's live-management paths against that running Xray: adding a device
+# mid-flight must be applied over the handler API without a restart, killing
+# Xray must be noticed and repaired by the supervisor, and the bytes those
+# tunnels moved must land in users.traffic_used and then actually gate access
+# once the cap is exceeded. Finishes by running `node-agent unregister` (the
+# same command scripts/uninstall.sh runs) and confirming the node is actually
+# gone from the panel and its API key is rejected afterward.
+#
+# The VMess/Trojan/Shadowsocks/WireGuard legs are retained but off by default:
+# a node serves one protocol now, so they cannot share this node. Run them with
+# E2E_LEGACY_PROTOCOLS=1 against a build without that constraint.
 #
 # This intentionally does NOT exercise ACME/Let's Encrypt (IssueCertificate):
 # that requires a real public domain reachable from the internet on port 80,
@@ -44,6 +46,12 @@ set -euo pipefail
 : "${BASE_URL:?}"
 : "${ADMIN_EMAIL:?}"
 : "${ADMIN_PASSWORD:?}"
+
+# A node now serves one protocol (AdminInboundHandler.Create plus a unique index
+# on inbounds.node_id), so the VMess/Trojan/Shadowsocks/WireGuard legs can no
+# longer share this node. Kept, not deleted - they are the only data-plane
+# coverage those protocols have - and run with E2E_LEGACY_PROTOCOLS=1.
+LEGACY_PROTOCOLS="${E2E_LEGACY_PROTOCOLS:-0}"
 
 WORKDIR=$(mktemp -d)
 LOGDIR="${E2E_LOG_DIR:-$WORKDIR/logs}"
@@ -143,6 +151,7 @@ create_inbound() {
 }
 
 create_inbound "{\"protocol\":\"vless_reality\",\"port\":$VLESS_PORT,\"tag\":\"vless-in\",\"settings\":{\"dest\":\"www.cloudflare.com:443\",\"server_names\":[\"www.cloudflare.com\"]}}" > "$WORKDIR/ib_vless.json"
+if [[ "$LEGACY_PROTOCOLS" == "1" ]]; then
 create_inbound "{\"protocol\":\"vmess_ws\",\"port\":$VMESS_PORT,\"tag\":\"vmess-in\",\"settings\":{\"ws_path\":\"/vmess\"}}" > "$WORKDIR/ib_vmess.json"
 create_inbound "{\"protocol\":\"trojan_tls\",\"port\":$TROJAN_PORT,\"tag\":\"trojan-in\",\"settings\":{}}" > "$WORKDIR/ib_trojan.json"
 
@@ -152,6 +161,9 @@ create_inbound "{\"protocol\":\"shadowsocks\",\"port\":$SS_PORT,\"tag\":\"ss-in\
 create_inbound "{\"protocol\":\"wireguard\",\"port\":$WG_PORT,\"tag\":\"wg-in\",\"settings\":{}}" > "$WORKDIR/ib_wg.json"
 WG_SERVER_PRIVKEY=$(jq -r .settings.private_key "$WORKDIR/ib_wg.json")
 WG_SERVER_PUBKEY=$(echo "$WG_SERVER_PRIVKEY" | wg pubkey)
+else
+log "SKIP: non-VLESS inbounds (a node serves one protocol; set E2E_LEGACY_PROTOCOLS=1)"
+fi
 
 # ---------------------------------------------------------------------------
 # 4. TLS: exercise the admin -> node-agent domain-request leg for real (this
@@ -237,10 +249,12 @@ sudo "$NODE_AGENT_BIN" run --config "$WORKDIR/node-agent-config.json" \
 PIDS+=($!)
 
 wait_for "vless port $VLESS_PORT listening" 30 bash -c "ss -tln | grep -q ':$VLESS_PORT '"
+if [[ "$LEGACY_PROTOCOLS" == "1" ]]; then
 wait_for "vmess port $VMESS_PORT listening" 10 bash -c "ss -tln | grep -q ':$VMESS_PORT '"
 wait_for "trojan port $TROJAN_PORT listening" 10 bash -c "ss -tln | grep -q ':$TROJAN_PORT '"
 wait_for "shadowsocks port $SS_PORT listening" 10 bash -c "ss -tln | grep -q ':$SS_PORT '"
 wait_for "wireguard interface wg0 up" 30 bash -c "ip link show wg0"
+fi
 
 if grep -qi "Failed to start" "$LOGDIR/node-agent.log"; then
   fail "xray-core failed to start (see node-agent.log above) - likely a config generation bug"
@@ -273,9 +287,11 @@ log "fetching client credentials via the subscription endpoint"
 SUB_TOKEN=$(curl -sf -X POST "$BASE_URL/api/v1/user/sub-token/regenerate" \
   -H "Authorization: Bearer $USER_TOKEN" | jq -r .sub_token)
 
+if [[ "$LEGACY_PROTOCOLS" == "1" ]]; then
 WG_CONF=$(curl -sf "$BASE_URL/sub/$SUB_TOKEN/$DEVICE_ID?format=wireguard")
 CLIENT_WG_PRIVKEY=$(echo "$WG_CONF" | sed -n 's/^PrivateKey = //p' | head -1)
 [[ -n "$CLIENT_WG_PRIVKEY" ]] || fail "wireguard subscription did not include a PrivateKey line"
+fi
 
 SUB_V2RAY=$(curl -sf "$BASE_URL/sub/$SUB_TOKEN/$DEVICE_ID" | base64 -d)
 VLESS_LINK=$(echo "$SUB_V2RAY" | grep '^vless://' | head -1)
@@ -320,6 +336,13 @@ PIDS+=($!)
 wait_for "vless client socks ready" 10 bash -c "ss -tln | grep -q ':1080 '"
 assert_eq "VLESS Reality tunnel reaches target" "$MARKER" "$(fetch_via_socks 1080)"
 
+# ---------------------------------------------------------------------------
+# 11-14. VMess / Trojan / Shadowsocks / WireGuard data plane. DEPRECATED: a
+#        node serves one protocol, so these cannot run beside the VLESS
+#        inbound above. Retained because nothing else covers their data
+#        plane. Not indented, to keep the heredoc terminators valid.
+# ---------------------------------------------------------------------------
+if [[ "$LEGACY_PROTOCOLS" == "1" ]]; then
 # ---------------------------------------------------------------------------
 # 11. VMess
 # ---------------------------------------------------------------------------
@@ -407,8 +430,12 @@ log "PASS: WireGuard handshake completed"
 
 assert_eq "WireGuard tunnel reaches target" "$MARKER" "$(curl -s --max-time 10 http://10.66.0.1:9090/marker.txt)"
 
+else
+log "SKIP: VMess/Trojan/Shadowsocks/WireGuard tunnels (deprecated, one protocol per node)"
+fi
+
 echo ""
-log "ALL PROTOCOLS PASSED (VLESS Reality, VMess, Trojan, Shadowsocks, WireGuard)"
+log "DATA PLANE PASSED (VLESS Reality; legacy protocols gated by E2E_LEGACY_PROTOCOLS)"
 
 # ---------------------------------------------------------------------------
 # 14b. Live user sync over Xray's handler API. Adding a device used to require
@@ -571,12 +598,13 @@ sub_fetch() { curl -sf "$BASE_URL/sub/$SUB_TOKEN/$DEVICE_ID?format=$1"; }
 
 # --- Clash: must be valid YAML and carry every protocol as a typed proxy ---
 sub_fetch clash > "$WORKDIR/sub_clash.yaml"
-python3 - "$WORKDIR/sub_clash.yaml" <<'PY' || fail "clash subscription failed validation"
-import sys, yaml
+EXPECT_TYPES="vless" ; [[ "$LEGACY_PROTOCOLS" == "1" ]] && EXPECT_TYPES="vless,vmess,trojan,ss,wireguard"
+EXPECT_TYPES="$EXPECT_TYPES" python3 - "$WORKDIR/sub_clash.yaml" <<'PY' || fail "clash subscription failed validation"
+import os, sys, yaml
 d = yaml.safe_load(open(sys.argv[1]))
 proxies = d.get("proxies") or []
 types = {p.get("type") for p in proxies}
-missing = {"vless", "vmess", "trojan", "ss", "wireguard"} - types
+missing = set(os.environ["EXPECT_TYPES"].split(",")) - types
 assert not missing, f"clash: missing proxy types {missing} (got {types})"
 assert d.get("proxy-groups"), "clash: no proxy-groups"
 names = {p.get("name") for p in proxies}
@@ -586,16 +614,17 @@ for g in d["proxy-groups"]:
             f"clash: proxy-group {g.get('name')!r} references unknown proxy {ref!r}"
 print("clash ok:", sorted(types))
 PY
-log "PASS: Clash subscription is valid YAML with all 5 protocols"
+log "PASS: Clash subscription is valid YAML with the expected protocols"
 
 # --- Sing-box: must be valid JSON with matching outbound types ---
 sub_fetch singbox > "$WORKDIR/sub_singbox.json"
-python3 - "$WORKDIR/sub_singbox.json" <<'PY' || fail "singbox subscription failed validation"
-import sys, json
+EXPECT_TYPES="vless" ; [[ "$LEGACY_PROTOCOLS" == "1" ]] && EXPECT_TYPES="vless,vmess,trojan,shadowsocks,wireguard"
+EXPECT_TYPES="$EXPECT_TYPES" python3 - "$WORKDIR/sub_singbox.json" <<'PY' || fail "singbox subscription failed validation"
+import os, sys, json
 d = json.load(open(sys.argv[1]))
 obs = d.get("outbounds") or []
 types = {o.get("type") for o in obs}
-missing = {"vless", "vmess", "trojan", "shadowsocks", "wireguard"} - types
+missing = set(os.environ["EXPECT_TYPES"].split(",")) - types
 assert not missing, f"singbox: missing outbound types {missing} (got {types})"
 tags = {o.get("tag") for o in obs}
 for o in obs:
@@ -604,11 +633,12 @@ for o in obs:
             assert ref in tags, f"singbox: {o.get('tag')!r} references unknown outbound {ref!r}"
 print("singbox ok:", sorted(types))
 PY
-log "PASS: Sing-box subscription is valid JSON with all 5 protocols"
+log "PASS: Sing-box subscription is valid JSON with the expected protocols"
 
 # --- Surfboard / Quantumult: documented to omit hysteria2+wireguard (and,
 #     as found during the audit, vless too), so assert the protocols they DO
 #     claim actually appear rather than asserting all five. ---
+if [[ "$LEGACY_PROTOCOLS" == "1" ]]; then
 sub_fetch surfboard > "$WORKDIR/sub_surfboard.conf"
 grep -q '^\[Proxy\]' "$WORKDIR/sub_surfboard.conf" || fail "surfboard: no [Proxy] section"
 grep -q '^\[Proxy Group\]' "$WORKDIR/sub_surfboard.conf" || fail "surfboard: no [Proxy Group] section"
@@ -622,13 +652,17 @@ for p in vmess trojan shadowsocks; do
   grep -q "^$p=" "$WORKDIR/sub_quantumult.conf" || fail "quantumult: no $p line"
 done
 log "PASS: Quantumult subscription has the protocols it supports (vmess/trojan/ss)"
+else
+log "SKIP: Surfboard/Quantumult formats (they carry only vmess/trojan/ss)"
+fi
 
 # --- Default v2ray base64 list: one link per protocol that has one ---
 V2RAY_LINKS=$(curl -sf "$BASE_URL/sub/$SUB_TOKEN/$DEVICE_ID" | base64 -d)
-for scheme in vless vmess trojan ss; do
+SCHEMES="vless" ; [[ "$LEGACY_PROTOCOLS" == "1" ]] && SCHEMES="vless vmess trojan ss"
+for scheme in $SCHEMES; do
   echo "$V2RAY_LINKS" | grep -q "^$scheme://" || fail "v2ray subscription: no $scheme:// link"
 done
-log "PASS: v2ray subscription contains vless/vmess/trojan/ss links"
+log "PASS: v2ray subscription contains the expected links"
 
 # ---------------------------------------------------------------------------
 # 16. Access-control / edge cases. The happy path above only proves things
@@ -649,8 +683,10 @@ assert_eq "suspended user is removed from the node's xray clients" "0" "$CLIENTS
 WG_PEERS_WHEN_SUSPENDED=$(curl -sf "$BASE_URL/api/v1/nodes/$NODE_ID/wireguard/peers" -H "X-Node-Key: $NODE_KEY" | jq 'length')
 assert_eq "suspended user is removed from the wireguard peer set" "0" "$WG_PEERS_WHEN_SUSPENDED"
 
+if [[ "$LEGACY_PROTOCOLS" == "1" ]]; then
 HY2_WHEN_SUSPENDED=$(curl -sf "$BASE_URL/api/v1/nodes/$NODE_ID/hysteria2/users" -H "X-Node-Key: $NODE_KEY" | jq 'length')
 assert_eq "suspended user is removed from the hysteria2 user set" "0" "$HY2_WHEN_SUSPENDED"
+fi
 
 SUSPENDED_SUB_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/sub/$SUB_TOKEN/$DEVICE_ID")
 assert_eq "suspended user's subscription is refused" "403" "$SUSPENDED_SUB_STATUS"

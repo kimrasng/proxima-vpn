@@ -78,6 +78,14 @@ export default function NodeInbounds() {
   const [ssMethod, setSsMethod] = useState("2022-blake3-aes-128-gcm");
   const [ssPassword, setSsPassword] = useState("");
 
+  // A node serves one protocol, so once an inbound exists the choice is fixed
+  // to its protocol; the server rejects anything else with a 409.
+  const lockedProtocol = inbounds[0]?.protocol ?? null;
+
+  useEffect(() => {
+    if (lockedProtocol) setProtocol(lockedProtocol);
+  }, [lockedProtocol]);
+
   const fetchInbounds = async () => {
     if (!nodeId) return;
     try {
@@ -368,10 +376,18 @@ export default function NodeInbounds() {
           }
         >
           <SpaceBetween size="m">
-            <FormField label="Protocol">
+            <FormField
+              label="Protocol"
+              description={
+                lockedProtocol
+                  ? `This node already serves ${lockedProtocol}. A node runs one protocol; delete the existing inbound to change it.`
+                  : undefined
+              }
+            >
               <Select
                 selectedOption={PROTOCOL_OPTIONS.find((o) => o.value === protocol) ?? null}
                 options={PROTOCOL_OPTIONS}
+                disabled={!!lockedProtocol}
                 onChange={({ detail }) => setProtocol(detail.selectedOption.value ?? "vless_reality")}
               />
             </FormField>

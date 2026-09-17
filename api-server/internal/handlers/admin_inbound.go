@@ -3,11 +3,13 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/proximavpn/proxima-vpn/pkg/crypto"
 )
@@ -145,6 +147,26 @@ func (h *AdminInboundHandler) Create(c *fiber.Ctx) error {
 		})
 	}
 
+	// A node serves one protocol. Xray takes a single config per node, and
+	// mixing protocols let a speed-limited user reach an uncapped inbound.
+	var existing string
+	err := h.db.QueryRow(
+		context.Background(),
+		`SELECT protocol FROM inbounds WHERE node_id = $1 LIMIT 1`,
+		nodeID,
+	).Scan(&existing)
+	if err == nil {
+		msg := fmt.Sprintf("this node already serves %s; a node can only run one protocol", existing)
+		if existing == req.Protocol {
+			msg = fmt.Sprintf("this node already has a %s inbound; edit it instead of adding another", existing)
+		}
+		return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": msg})
+	} else if !errors.Is(err, pgx.ErrNoRows) {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to check existing inbounds",
+		})
+	}
+
 	enabled := true
 	if req.Enabled != nil {
 		enabled = *req.Enabled
@@ -229,6 +251,30 @@ func (h *AdminInboundHandler) Update(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "port must be between 1 and 65535",
 		})
+	}
+
+	// Same one-protocol-per-node rule as Create: switching this inbound's
+	// protocol must not leave its node serving two.
+	if req.Protocol != nil {
+		var conflicting string
+		err := h.db.QueryRow(
+			context.Background(),
+			`SELECT other.protocol
+			 FROM inbounds other
+			 JOIN inbounds self ON self.node_id = other.node_id
+			 WHERE self.id = $1 AND other.id <> $1
+			 LIMIT 1`,
+			id,
+		).Scan(&conflicting)
+		if err == nil && conflicting != *req.Protocol {
+			return c.Status(fiber.StatusConflict).JSON(fiber.Map{
+				"error": fmt.Sprintf("this node already serves %s; a node can only run one protocol", conflicting),
+			})
+		} else if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "failed to check existing inbounds",
+			})
+		}
 	}
 
 	// Build dynamic update query
