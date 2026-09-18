@@ -53,7 +53,7 @@ export function createDevice(req: CreateDeviceRequest): Promise<Device> {
 
 export function deleteDevice(id: string): Promise<void> {
   applyUserClient();
-  return del<void>(`/api/user/devices/${id}`);
+  return del<void>(`/api/v1/user/devices/${id}`);
 }
 
 export function createPlanRequest(planId: string): Promise<PlanRequest> {

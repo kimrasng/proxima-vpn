@@ -117,5 +117,20 @@ jobs:
         run: cd web && npm ci
       - name: Lint
         run: cd web && npm run lint
+      # Every server route lives under /api/v1. A call written as /api/... still
+      # compiles, passes lint and looks right in review, then 404s only for
+      # whoever exercises that one path - device deletion shipped that way.
+      - name: Check API paths are versioned
+        run: |
+          set -o pipefail
+          offenders=$(grep -rnoE "['\"\`]/api/[a-z0-9-]+" \
+            --include='*.ts' --include='*.tsx' web/src \
+            | grep -v "/api/v1" || true)
+          if [ -n "$offenders" ]; then
+            echo "$offenders"
+            echo "::error::API calls above are missing the /api/v1 prefix"
+            exit 1
+          fi
+          echo "all API calls are versioned"
       - name: Build
         run: cd web && npm run build
