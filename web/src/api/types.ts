@@ -87,6 +87,8 @@ export interface Plan {
   traffic_limit?: number;
   duration_days: number;
   max_devices: number;
+  // null means the plan predates the cap and falls back to max_devices.
+  max_concurrent: number | null;
   speed_limit?: number;
   node_group_id: string;
   node_group_name?: string;
@@ -99,6 +101,7 @@ export interface CreatePlanRequest {
   traffic_limit?: number;
   duration_days: number;
   max_devices: number;
+  max_concurrent?: number;
   speed_limit?: number;
   node_group_id: string;
   is_active?: boolean;
@@ -109,6 +112,7 @@ export interface UpdatePlanRequest {
   traffic_limit?: number;
   duration_days?: number;
   max_devices?: number;
+  max_concurrent?: number;
   speed_limit?: number;
   node_group_id?: string;
   is_active?: boolean;

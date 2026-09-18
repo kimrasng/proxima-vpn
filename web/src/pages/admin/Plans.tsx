@@ -33,6 +33,7 @@ interface PlanForm {
   traffic_limit: string;
   duration_days: string;
   max_devices: string;
+  max_concurrent: string;
   speed_limit: string;
   node_group_id: string;
   is_active: boolean;
@@ -43,6 +44,7 @@ const emptyForm: PlanForm = {
   traffic_limit: "",
   duration_days: "30",
   max_devices: "3",
+  max_concurrent: "",
   speed_limit: "",
   node_group_id: "",
   is_active: true,
@@ -85,6 +87,7 @@ export default function Plans() {
         traffic_limit: form.traffic_limit ? Number(form.traffic_limit) * 1024 * 1024 * 1024 : undefined,
         duration_days: Number(form.duration_days),
         max_devices: Number(form.max_devices),
+        max_concurrent: form.max_concurrent ? Number(form.max_concurrent) : undefined,
         speed_limit: form.speed_limit ? Number(form.speed_limit) : undefined,
         node_group_id: form.node_group_id,
         is_active: form.is_active,
@@ -109,6 +112,7 @@ export default function Plans() {
         traffic_limit: form.traffic_limit ? Number(form.traffic_limit) * 1024 * 1024 * 1024 : undefined,
         duration_days: Number(form.duration_days),
         max_devices: Number(form.max_devices),
+        max_concurrent: form.max_concurrent ? Number(form.max_concurrent) : undefined,
         speed_limit: form.speed_limit ? Number(form.speed_limit) : undefined,
         node_group_id: form.node_group_id,
         is_active: form.is_active,
@@ -144,6 +148,7 @@ export default function Plans() {
       traffic_limit: plan.traffic_limit ? String(plan.traffic_limit / (1024 * 1024 * 1024)) : "",
       duration_days: String(plan.duration_days),
       max_devices: String(plan.max_devices),
+      max_concurrent: plan.max_concurrent === null ? "" : String(plan.max_concurrent),
       speed_limit: plan.speed_limit ? String(plan.speed_limit) : "",
       node_group_id: plan.node_group_id,
       is_active: plan.is_active,
@@ -166,6 +171,17 @@ export default function Plans() {
       </FormField>
       <FormField label={t("admin.plans.form.maxDevices")}>
         <Input value={form.max_devices} type="number" onChange={({ detail }) => setForm({ ...form, max_devices: detail.value })} />
+      </FormField>
+      <FormField
+        label={t("admin.plans.form.maxConcurrent")}
+        description={t("admin.plans.form.maxConcurrentHint")}
+      >
+        <Input
+          value={form.max_concurrent}
+          type="number"
+          placeholder={form.max_devices}
+          onChange={({ detail }) => setForm({ ...form, max_concurrent: detail.value })}
+        />
       </FormField>
       <FormField label={t("admin.plans.form.speedLimit")} description={t("admin.plans.form.speedHint")}>
         <Input value={form.speed_limit} type="number" onChange={({ detail }) => setForm({ ...form, speed_limit: detail.value })} />
@@ -217,6 +233,11 @@ export default function Plans() {
             { id: "traffic", header: t("admin.plans.col.trafficLimit"), cell: (item) => formatTraffic(item.traffic_limit) },
             { id: "duration", header: t("admin.plans.col.duration"), cell: (item) => `${item.duration_days}d` },
             { id: "devices", header: t("admin.plans.col.maxDevices"), cell: (item) => item.max_devices },
+            {
+              id: "concurrent",
+              header: t("admin.plans.col.maxConcurrent"),
+              cell: (item) => (item.max_concurrent === null ? item.max_devices : item.max_concurrent),
+            },
             { id: "speed", header: t("admin.plans.col.speedLimit"), cell: (item) => formatSpeed(item.speed_limit) },
             { id: "nodeGroup", header: t("admin.plans.col.nodeGroup"), cell: (item) => item.node_group_name ?? "-" },
             {

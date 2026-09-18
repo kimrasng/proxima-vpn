@@ -180,7 +180,8 @@
         "speedLimit": "Speed Limit",
         "nodeGroup": "Node Group",
         "active": "Active",
-        "actions": "Actions"
+        "actions": "Actions",
+        "maxConcurrent": "Concurrent"
       },
       "form": {
         "name": "Plan Name",
@@ -191,7 +192,9 @@
         "speedLimit": "Speed Limit (Mbps)",
         "speedHint": "Leave empty for unlimited",
         "nodeGroup": "Node Group",
-        "active": "Active"
+        "active": "Active",
+        "maxConcurrent": "Concurrent connections",
+        "maxConcurrentHint": "Distinct source addresses allowed at once across the whole node pool. Leave blank to inherit the device allowance."
       }
     },
     "users": {

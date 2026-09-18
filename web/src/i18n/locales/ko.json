@@ -180,7 +180,8 @@
         "speedLimit": "속도 제한",
         "nodeGroup": "노드 그룹",
         "active": "활성",
-        "actions": "작업"
+        "actions": "작업",
+        "maxConcurrent": "동시 접속"
       },
       "form": {
         "name": "플랜 이름",
@@ -191,7 +192,9 @@
         "speedLimit": "속도 제한 (Mbps)",
         "speedHint": "비워두면 무제한",
         "nodeGroup": "노드 그룹",
-        "active": "활성화"
+        "active": "활성화",
+        "maxConcurrent": "동시 접속 수",
+        "maxConcurrentHint": "노드 풀 전체에서 동시에 허용할 서로 다른 접속 주소 수입니다. 비워 두면 디바이스 허용 수를 따릅니다."
       }
     },
     "users": {

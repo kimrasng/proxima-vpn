@@ -150,7 +150,14 @@
       "editPlan": "编辑套餐",
       "deleteConfirm": "确定要删除此套餐吗？",
       "empty": "暂无套餐",
-      "unlimited": "无限制"
+      "unlimited": "无限制",
+      "form": {
+        "maxConcurrent": "并发连接数",
+        "maxConcurrentHint": "整个节点池中同时允许的不同来源地址数量。留空则沿用设备数量上限。"
+      },
+      "col": {
+        "maxConcurrent": "并发"
+      }
     },
     "users": {
       "title": "用户管理",
