@@ -240,6 +240,55 @@ export default function NodeDetail() {
           </ColumnLayout>
         </Container>
 
+        <Container header={<Header variant="h2">{t("admin.nodeDetail.health")}</Header>}>
+          <SpaceBetween size="m">
+            <div>
+              <Box variant="awsui-key-label">{t("admin.nodes.col.occupancy")}</Box>
+              <Box>{t("admin.nodes.occupancyValue", { online: node.online_devices, capacity: node.capacity })}</Box>
+              <Box variant="small" color="text-body-secondary">
+                {t("admin.nodeDetail.occupancyHint")}
+              </Box>
+            </div>
+            <div>
+              <Box variant="awsui-key-label">{t("admin.nodeDetail.shaping")}</Box>
+              {node.shaping_ok === false ? (
+                <SpaceBetween size="xxs">
+                  <StatusIndicator type="warning">{t("admin.nodes.shapingNotApplied")}</StatusIndicator>
+                  <Box variant="small">{t("admin.nodeDetail.shapingImpact")}</Box>
+                  {node.shaping_error && (
+                    <Box variant="small" color="text-body-secondary">
+                      {t("admin.nodeDetail.shapingReason", { reason: node.shaping_error })}
+                    </Box>
+                  )}
+                </SpaceBetween>
+              ) : node.shaping_ok === true ? (
+                <StatusIndicator type="success">
+                  {t("admin.nodeDetail.shapingActive", { tiers: node.shaping_tiers ?? 0 })}
+                </StatusIndicator>
+              ) : (
+                <StatusIndicator type="info">{t("admin.nodeDetail.shapingUnknown")}</StatusIndicator>
+              )}
+            </div>
+            <div>
+              <Box variant="awsui-key-label">{t("admin.nodeDetail.xrayVersion")}</Box>
+              {node.xray_too_old ? (
+                <SpaceBetween size="xxs">
+                  <StatusIndicator type="warning">
+                    {t("admin.nodes.xrayTooOld", { minimum: node.xray_minimum })}
+                  </StatusIndicator>
+                  {node.xray_version_warning && (
+                    <Box variant="small" color="text-body-secondary">{node.xray_version_warning}</Box>
+                  )}
+                </SpaceBetween>
+              ) : (
+                <StatusIndicator type="success">
+                  {t("admin.nodeDetail.xrayOk", { minimum: node.xray_minimum })}
+                </StatusIndicator>
+              )}
+            </div>
+          </SpaceBetween>
+        </Container>
+
         <Container header={<Header variant="h2">{t("admin.nodeDetail.currentMetrics")}</Header>}>
           <ColumnLayout columns={2} variant="text-grid">
             <MetricBar label={t("admin.nodes.col.cpu")} value={node.cpu_usage} />

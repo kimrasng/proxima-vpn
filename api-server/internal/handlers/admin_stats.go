@@ -108,15 +108,21 @@ func (h *AdminStatsHandler) GetOnlineUsers(c *fiber.Ctx) error {
 		Email    string `json:"email"`
 		Device   string `json:"device"`
 		NodeName string `json:"node_name"`
+		// The cap applies to distinct source addresses across the user's whole
+		// pool, so it is reported per user rather than per row.
+		OnlineIPs     int  `json:"online_ips"`
+		MaxConcurrent int  `json:"max_concurrent"`
+		OverCap       bool `json:"over_cap"`
 	}
 
 	type deviceInfo struct {
 		email  string
 		device string
+		userID string
 	}
 
 	deviceRows, err := h.db.Query(ctx, `
-		SELECT d.xray_uuid, COALESCE(d.name, 'Unknown'), u.email
+		SELECT d.xray_uuid, COALESCE(d.name, 'Unknown'), u.email, u.id::text
 		FROM devices d
 		JOIN users u ON u.id = d.user_id
 		WHERE d.xray_uuid = ANY($1)
@@ -128,11 +134,11 @@ func (h *AdminStatsHandler) GetOnlineUsers(c *fiber.Ctx) error {
 
 	deviceMap := make(map[string]deviceInfo)
 	for deviceRows.Next() {
-		var uuid, device, email string
-		if err := deviceRows.Scan(&uuid, &device, &email); err != nil {
+		var uuid, device, email, userID string
+		if err := deviceRows.Scan(&uuid, &device, &email, &userID); err != nil {
 			continue
 		}
-		deviceMap[uuid] = deviceInfo{email: email, device: device}
+		deviceMap[uuid] = deviceInfo{email: email, device: device, userID: userID}
 	}
 
 	nodeIDs := make([]string, 0)
@@ -159,6 +165,32 @@ func (h *AdminStatsHandler) GetOnlineUsers(c *fiber.Ctx) error {
 		}
 	}
 
+	// Resolved once per user, not per row: a user with several devices online
+	// shares one cap and one address count.
+	type userCap struct {
+		onlineIPs int
+		maxConc   int
+	}
+	caps := map[string]userCap{}
+	for _, info := range deviceMap {
+		if _, done := caps[info.userID]; done {
+			continue
+		}
+		var maxConc int
+		if err := h.db.QueryRow(ctx,
+			`SELECT COALESCE(p.max_concurrent, p.max_devices, 0)
+			 FROM users u LEFT JOIN plans p ON p.id = u.plan_id
+			 WHERE u.id = $1`, info.userID,
+		).Scan(&maxConc); err != nil {
+			maxConc = 0
+		}
+		ips, _, err := h.tracker.CountDistinctIPsForUser(ctx, h.db, info.userID)
+		if err != nil {
+			ips = 0
+		}
+		caps[info.userID] = userCap{onlineIPs: ips, maxConc: maxConc}
+	}
+
 	result := make([]onlineUserResponse, 0, len(uuidToNode))
 	for uuid, nodeID := range uuidToNode {
 		info, ok := deviceMap[uuid]
@@ -169,10 +201,14 @@ func (h *AdminStatsHandler) GetOnlineUsers(c *fiber.Ctx) error {
 		if nodeName == "" {
 			nodeName = "Unknown"
 		}
+		uc := caps[info.userID]
 		result = append(result, onlineUserResponse{
-			Email:    info.email,
-			Device:   info.device,
-			NodeName: nodeName,
+			Email:         info.email,
+			Device:        info.device,
+			NodeName:      nodeName,
+			OnlineIPs:     uc.onlineIPs,
+			MaxConcurrent: uc.maxConc,
+			OverCap:       uc.maxConc > 0 && uc.onlineIPs > uc.maxConc,
 		})
 	}
 

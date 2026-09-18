@@ -61,10 +61,18 @@
       "nodesRegistered": "nodes registered",
       "noOnlineNodes": "No online nodes",
       "noOnlineUsers": "No users online",
+      "connectionsHint": "Concurrent connections are distinct source addresses, not devices — one device can present two (IPv4 and IPv6). The allowance is observed only; nothing is disconnected for exceeding it.",
+      "connectionsOfCap": "{{current}} of {{cap}}",
+      "connectionsNoCap": "{{current}} (no allowance set)",
+      "overCap": "Above allowance",
+      "withinCap": "Within allowance",
+      "noCapSet": "No allowance set",
       "col": {
         "email": "Email",
         "device": "Device",
-        "node": "Node"
+        "node": "Node",
+        "connections": "Connections",
+        "allowance": "Allowance"
       }
     },
     "nodes": {
@@ -94,8 +102,14 @@
         "disk": "Disk",
         "network": "Network",
         "lastSeen": "Last Seen",
+        "occupancy": "Occupancy",
+        "health": "Health",
         "actions": "Actions"
       },
+      "occupancyValue": "{{online}} of {{capacity}} devices",
+      "shapingNotApplied": "Speed limits not in force",
+      "xrayTooOld": "Xray core too old (needs {{minimum}} or newer)",
+      "healthOk": "No issues",
       "edit": "Edit",
       "details": "Details",
       "metricsTitle": "Metrics",
@@ -124,7 +138,15 @@
       "networkChart": "Network History",
       "noData": "No data yet. Data will appear after the next heartbeat.",
       "xrayVersion": "Xray Version",
-      "createdAt": "Created At"
+      "createdAt": "Created At",
+      "health": "Health",
+      "occupancyHint": "Devices whose credentials live on this node, against how many the plans routed here could place. The capacity figure is an entitlement ceiling, not an enforced one — no connection is rejected for exceeding it.",
+      "shaping": "Speed Shaping",
+      "shapingActive": "Shaping {{tiers}} speed tier(s)",
+      "shapingUnknown": "Not reported yet",
+      "shapingImpact": "Speed-limited users on this node are running unthrottled until shaping is restored.",
+      "shapingReason": "Reported reason: {{reason}}",
+      "xrayOk": "Meets the required minimum ({{minimum}})"
     },
     "nodeGroups": {
       "title": "Node Group Management",

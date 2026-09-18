@@ -49,6 +49,16 @@ export interface Node {
   network_in?: number;
   network_out?: number;
   xray_version?: string;
+  // Nullable because they come from DB columns the node may not have reported yet.
+  shaping_ok: boolean | null;
+  shaping_tiers: number | null;
+  shaping_error: string | null;
+  xray_too_old: boolean;
+  xray_minimum: string;
+  xray_version_warning: string;
+  online_devices: number;
+  // capacity is what the plans routed here could place, not an enforced ceiling.
+  capacity: number;
   created_at: string;
 }
 
@@ -204,10 +214,16 @@ export interface DashboardStats {
   pending_requests: number;
 }
 
+// online_ips/max_concurrent/over_cap are per USER, so several rows of the same
+// user repeat the same numbers: they share one cap.
 export interface OnlineUser {
   email: string;
   device: string;
   node_name: string;
+  online_ips: number;
+  // 0 means no cap is configured for the user's plan.
+  max_concurrent: number;
+  over_cap: boolean;
 }
 
 // User - Devices

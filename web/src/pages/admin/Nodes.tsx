@@ -304,6 +304,36 @@ export default function Nodes() {
               ),
             },
             {
+              id: "occupancy",
+              header: t("admin.nodes.col.occupancy"),
+              cell: (item) =>
+                item.status === "pending" ? (
+                  <Box color="text-status-inactive">—</Box>
+                ) : (
+                  t("admin.nodes.occupancyValue", { online: item.online_devices, capacity: item.capacity })
+                ),
+            },
+            {
+              id: "health",
+              header: t("admin.nodes.col.health"),
+              cell: (item) => {
+                if (item.status === "pending") return <Box color="text-status-inactive">—</Box>;
+                const problems: string[] = [];
+                if (item.shaping_ok === false) problems.push(t("admin.nodes.shapingNotApplied"));
+                if (item.xray_too_old) problems.push(t("admin.nodes.xrayTooOld", { minimum: item.xray_minimum }));
+                if (problems.length === 0) {
+                  return <StatusIndicator type="success">{t("admin.nodes.healthOk")}</StatusIndicator>;
+                }
+                return (
+                  <SpaceBetween size="xxxs">
+                    {problems.map((problem) => (
+                      <StatusIndicator key={problem} type="warning">{problem}</StatusIndicator>
+                    ))}
+                  </SpaceBetween>
+                );
+              },
+            },
+            {
               id: "actions",
               header: t("admin.nodes.col.actions"),
               cell: (item) => (

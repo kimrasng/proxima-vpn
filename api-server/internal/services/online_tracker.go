@@ -86,20 +86,50 @@ func (t *OnlineTracker) IsDeviceOnline(ctx context.Context, xrayUUID string) (bo
 }
 
 // GetAllOnlineUUIDs returns a map of xray UUID -> node ID for all currently online users.
+//
+// Reads the per-IP report rather than the older uuid-list key: that list is
+// derived from traffic counters which are read destructively, so it arrives
+// empty and every caller saw nobody online. Falls back to the old key for an
+// agent too old to send addresses.
 func (t *OnlineTracker) GetAllOnlineUUIDs(ctx context.Context) (map[string]string, error) {
-	keys, err := t.scanKeys(ctx, "node:*:online")
+	result := make(map[string]string)
+
+	ipKeys, err := t.scanKeys(ctx, "node:*:online_ips")
 	if err != nil {
 		return nil, err
 	}
-
-	result := make(map[string]string)
-	for _, key := range keys {
-		parts := strings.SplitN(key, ":", 3)
-		if len(parts) < 3 {
+	for _, key := range ipKeys {
+		nodeID := nodeIDFromKey(key)
+		if nodeID == "" {
 			continue
 		}
-		nodeID := parts[1]
+		data, err := t.redis.Get(ctx, key).Bytes()
+		if err != nil {
+			continue
+		}
+		var byUUID map[string][]struct {
+			IP       string `json:"ip"`
+			LastSeen int64  `json:"last_seen"`
+		}
+		if err := json.Unmarshal(data, &byUUID); err != nil {
+			continue
+		}
+		for uuid, ips := range byUUID {
+			if len(ips) > 0 {
+				result[uuid] = nodeID
+			}
+		}
+	}
 
+	keys, err := t.scanKeys(ctx, "node:*:online")
+	if err != nil {
+		return result, nil
+	}
+	for _, key := range keys {
+		nodeID := nodeIDFromKey(key)
+		if nodeID == "" {
+			continue
+		}
 		data, err := t.redis.Get(ctx, key).Bytes()
 		if err != nil {
 			continue
@@ -109,10 +139,20 @@ func (t *OnlineTracker) GetAllOnlineUUIDs(ctx context.Context) (map[string]strin
 			continue
 		}
 		for _, u := range uuids {
-			result[u] = nodeID
+			if _, better := result[u]; !better {
+				result[u] = nodeID
+			}
 		}
 	}
 	return result, nil
+}
+
+func nodeIDFromKey(key string) string {
+	parts := strings.SplitN(key, ":", 3)
+	if len(parts) < 3 {
+		return ""
+	}
+	return parts[1]
 }
 
 // CountOnlineForUser counts the user's credentials that are online anywhere in

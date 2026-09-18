@@ -61,10 +61,18 @@
       "nodesRegistered": "개 노드 등록됨",
       "noOnlineNodes": "온라인 노드 없음",
       "noOnlineUsers": "온라인 사용자 없음",
+      "connectionsHint": "동시 접속은 디바이스가 아니라 서로 다른 접속 주소 수입니다. 한 디바이스가 IPv4와 IPv6 두 주소를 사용할 수 있습니다. 허용치는 관찰용이며, 초과해도 연결이 끊기지는 않습니다.",
+      "connectionsOfCap": "{{cap}}개 중 {{current}}개",
+      "connectionsNoCap": "{{current}}개 (허용치 미설정)",
+      "overCap": "허용치 초과",
+      "withinCap": "허용치 이내",
+      "noCapSet": "허용치 미설정",
       "col": {
         "email": "이메일",
         "device": "디바이스",
-        "node": "노드"
+        "node": "노드",
+        "connections": "동시 접속",
+        "allowance": "허용치"
       }
     },
     "nodes": {
@@ -94,8 +102,14 @@
         "disk": "디스크",
         "network": "네트워크",
         "lastSeen": "마지막 접속",
+        "occupancy": "수용 현황",
+        "health": "상태 점검",
         "actions": "작업"
       },
+      "occupancyValue": "{{capacity}}대 중 {{online}}대",
+      "shapingNotApplied": "속도 제한이 적용되지 않음",
+      "xrayTooOld": "Xray 코어가 너무 오래됨 ({{minimum}} 이상 필요)",
+      "healthOk": "이상 없음",
       "edit": "편집",
       "details": "상세",
       "metricsTitle": "메트릭",
@@ -124,7 +138,15 @@
       "networkChart": "네트워크 히스토리",
       "noData": "데이터가 없습니다. 다음 heartbeat 이후 표시됩니다.",
       "xrayVersion": "Xray 버전",
-      "createdAt": "생성일"
+      "createdAt": "생성일",
+      "health": "상태 점검",
+      "occupancyHint": "이 노드에 자격 증명이 배치된 디바이스 수와, 이 노드로 연결되는 플랜들이 배치할 수 있는 수입니다. 수용 가능 수치는 부여된 상한값일 뿐 강제되지 않으며, 초과해도 연결이 거부되지 않습니다.",
+      "shaping": "속도 제어",
+      "shapingActive": "{{tiers}}개 속도 등급 적용 중",
+      "shapingUnknown": "아직 보고되지 않음",
+      "shapingImpact": "속도 제한 대상 사용자들이 이 노드에서 제한 없이 사용하고 있습니다. 속도 제어를 복구해야 합니다.",
+      "shapingReason": "보고된 원인: {{reason}}",
+      "xrayOk": "필요 최소 버전 충족 ({{minimum}})"
     },
     "nodeGroups": {
       "title": "노드 그룹 관리",

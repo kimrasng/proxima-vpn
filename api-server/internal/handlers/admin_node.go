@@ -10,6 +10,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/proximavpn/proxima-vpn/api-server/internal/services"
 	"github.com/proximavpn/proxima-vpn/pkg/crypto"
 	"github.com/proximavpn/proxima-vpn/pkg/xrayver"
 	"github.com/redis/go-redis/v9"
@@ -202,6 +203,11 @@ type nodeListItem struct {
 	XrayMinimum        string  `json:"xray_minimum"`
 	XrayVersionWarning string  `json:"xray_version_warning,omitempty"`
 	ConfigHash         *string `json:"config_hash"`
+	// Device credentials live on this node now, against how many the plans
+	// pointing at it are entitled to place. Capacity is an entitlement ceiling,
+	// not a limit - nothing refuses a connection for exceeding it.
+	OnlineDevices int `json:"online_devices"`
+	Capacity      int `json:"capacity"`
 }
 
 // ListNodes returns all nodes including pending ones.
@@ -248,10 +254,64 @@ func (h *AdminNodeHandler) ListNodes(c *fiber.Ctx) error {
 		nodes = append(nodes, n)
 	}
 
+	occupancy := h.nodeOccupancy(context.Background())
 	for i := range nodes {
 		annotateXrayVersion(&nodes[i])
+		if o, ok := occupancy[nodes[i].ID]; ok {
+			nodes[i].OnlineDevices = o.online
+			nodes[i].Capacity = o.capacity
+		}
 	}
 	return c.JSON(nodes)
+}
+
+type nodeOccupancy struct {
+	online   int
+	capacity int
+}
+
+// nodeOccupancy counts live credentials per node and the number the plans
+// routed to it could place there. Live counts come from Redis via the tracker
+// because the database has no notion of who is connected right now.
+func (h *AdminNodeHandler) nodeOccupancy(ctx context.Context) map[string]nodeOccupancy {
+	out := map[string]nodeOccupancy{}
+
+	rows, err := h.db.Query(ctx, `
+		SELECT ngn.node_id::text, COALESCE(SUM(sub.devices), 0)
+		FROM node_group_nodes ngn
+		LEFT JOIN (
+			SELECT p.node_group_id, COUNT(d.id) AS devices
+			FROM plans p
+			JOIN users u ON u.plan_id = p.id
+			JOIN devices d ON d.user_id = u.id
+			WHERE u.status = 'active' AND u.is_active = true
+			GROUP BY p.node_group_id
+		) sub ON sub.node_group_id = ngn.node_group_id
+		GROUP BY ngn.node_id
+	`)
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var nodeID string
+			var capacity int
+			if err := rows.Scan(&nodeID, &capacity); err != nil {
+				continue
+			}
+			out[nodeID] = nodeOccupancy{capacity: capacity}
+		}
+	}
+
+	tracker := services.NewOnlineTracker(h.redis)
+	byUUID, err := tracker.GetAllOnlineUUIDs(ctx)
+	if err != nil {
+		return out
+	}
+	for _, nodeID := range byUUID {
+		entry := out[nodeID]
+		entry.online++
+		out[nodeID] = entry
+	}
+	return out
 }
 
 // annotateXrayVersion fills the version-floor verdict, which is derived rather
@@ -303,6 +363,10 @@ func (h *AdminNodeHandler) GetNode(c *fiber.Ctx) error {
 	}
 
 	annotateXrayVersion(&n)
+	if o, ok := h.nodeOccupancy(context.Background())[n.ID]; ok {
+		n.OnlineDevices = o.online
+		n.Capacity = o.capacity
+	}
 	return c.JSON(n)
 }
 

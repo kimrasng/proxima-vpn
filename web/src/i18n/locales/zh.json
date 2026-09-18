@@ -61,10 +61,18 @@
       "nodesRegistered": "个节点已注册",
       "noOnlineNodes": "暂无在线节点",
       "noOnlineUsers": "暂无在线用户",
+      "connectionsHint": "并发连接指不同的来源地址数量，而非设备数量：一台设备可能同时使用 IPv4 和 IPv6 两个地址。额度仅用于观察，超出不会断开连接。",
+      "connectionsOfCap": "{{current}} / {{cap}}",
+      "connectionsNoCap": "{{current}}（未设置额度）",
+      "overCap": "超出额度",
+      "withinCap": "在额度内",
+      "noCapSet": "未设置额度",
       "col": {
         "email": "邮箱",
         "device": "设备",
-        "node": "节点"
+        "node": "节点",
+        "connections": "并发连接",
+        "allowance": "额度"
       }
     },
     "nodes": {
@@ -95,8 +103,14 @@
         "disk": "磁盘",
         "network": "网络",
         "lastSeen": "最后在线",
+        "occupancy": "承载情况",
+        "health": "健康检查",
         "actions": "操作"
       },
+      "occupancyValue": "{{online}} / {{capacity}} 台设备",
+      "shapingNotApplied": "限速未生效",
+      "xrayTooOld": "Xray 内核版本过旧（需要 {{minimum}} 或更新版本）",
+      "healthOk": "未发现问题",
       "edit": "编辑",
       "details": "详情",
       "metricsTitle": "指标",
@@ -135,7 +149,15 @@
       "networkChart": "网络历史",
       "noData": "暂无数据，下次心跳后将显示。",
       "xrayVersion": "Xray 版本",
-      "createdAt": "创建时间"
+      "createdAt": "创建时间",
+      "health": "健康检查",
+      "occupancyHint": "凭据当前落在此节点上的设备数量，以及路由到此节点的套餐可以放置的数量。承载数量只是授予的上限，并非强制限制，超出也不会拒绝连接。",
+      "shaping": "速度控制",
+      "shapingActive": "正在对 {{tiers}} 个速度档位限速",
+      "shapingUnknown": "尚未上报",
+      "shapingImpact": "此节点上应受限速的用户当前未被限速，需要恢复速度控制。",
+      "shapingReason": "上报原因：{{reason}}",
+      "xrayOk": "已满足所需的最低版本（{{minimum}}）"
     },
     "nodeGroups": {
       "title": "节点组管理",

@@ -97,6 +97,22 @@ export default function Dashboard() {
     download: entry.download,
   }));
 
+  const renderConnections = (item: OnlineUser) =>
+    item.max_concurrent > 0
+      ? t("admin.dashboard.connectionsOfCap", { current: item.online_ips, cap: item.max_concurrent })
+      : t("admin.dashboard.connectionsNoCap", { current: item.online_ips });
+
+  const renderAllowance = (item: OnlineUser) => {
+    if (item.max_concurrent <= 0) {
+      return <StatusIndicator type="info">{t("admin.dashboard.noCapSet")}</StatusIndicator>;
+    }
+    return item.over_cap ? (
+      <StatusIndicator type="warning">{t("admin.dashboard.overCap")}</StatusIndicator>
+    ) : (
+      <StatusIndicator type="success">{t("admin.dashboard.withinCap")}</StatusIndicator>
+    );
+  };
+
   return (
     <ContentLayout header={<Header variant="h1">{t("admin.dashboard.title")}</Header>}>
       <SpaceBetween size="l">
@@ -221,6 +237,7 @@ export default function Dashboard() {
             <Header
               variant="h2"
               counter={`(${filteredOnlineUsers.length})`}
+              description={t("admin.dashboard.connectionsHint")}
               actions={
                 <Select
                   selectedOption={onlineNodeOptions.find((o) => o.value === onlineNodeFilter) ?? onlineNodeOptions[0] ?? null}
@@ -236,6 +253,16 @@ export default function Dashboard() {
             { id: "email", header: t("admin.dashboard.col.email"), cell: (item: OnlineUser) => item.email },
             { id: "device", header: t("admin.dashboard.col.device"), cell: (item: OnlineUser) => item.device },
             { id: "node_name", header: t("admin.dashboard.col.node"), cell: (item: OnlineUser) => item.node_name },
+            {
+              id: "connections",
+              header: t("admin.dashboard.col.connections"),
+              cell: renderConnections,
+            },
+            {
+              id: "allowance",
+              header: t("admin.dashboard.col.allowance"),
+              cell: renderAllowance,
+            },
           ]}
           items={filteredOnlineUsers}
           empty={
