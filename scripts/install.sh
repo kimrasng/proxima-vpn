@@ -124,11 +124,31 @@ fi
 
 # --- Download and install Xray-core ---
 log_step "2/4" "Installing Xray-core..."
-XRAY_VERSION=$(curl -fsSL "https://api.github.com/repos/XTLS/Xray-core/releases/latest" | jq -r .tag_name)
+# The panel reads per-user online IPs through GetStatsOnlineIpList, which older
+# cores do not serve - on one of those the concurrency figures are simply absent
+# and nothing looks wrong. Overridable so a pinned deployment can choose its own
+# version, but never silently below the floor.
+XRAY_MIN_VERSION="v25.1.1"
+XRAY_VERSION="${XRAY_VERSION:-}"
+if [[ -z "$XRAY_VERSION" ]]; then
+    XRAY_VERSION=$(curl -fsSL "https://api.github.com/repos/XTLS/Xray-core/releases/latest" | jq -r .tag_name)
+fi
 if [[ -z "$XRAY_VERSION" || "$XRAY_VERSION" == "null" ]]; then
     log_error "Failed to fetch latest Xray-core version"
     exit 1
 fi
+
+# Compares dot-separated numbers, so 26.3.27 ranks above 26.3.9 where a string
+# comparison would not.
+version_below() {
+    [[ "$(printf '%s\n%s\n' "${1#v}" "${2#v}" | sort -V | head -1)" == "${1#v}" && "${1#v}" != "${2#v}" ]]
+}
+if version_below "$XRAY_VERSION" "$XRAY_MIN_VERSION"; then
+    log_error "Xray-core $XRAY_VERSION is older than the required $XRAY_MIN_VERSION"
+    log_error "Per-user connection counting needs the GetStatsOnlineIpList stats RPC."
+    exit 1
+fi
+log_info "Xray-core $XRAY_VERSION satisfies the $XRAY_MIN_VERSION minimum"
 
 XRAY_FILENAME="Xray-linux-64"
 if [[ "$ARCH" == "arm64" ]]; then

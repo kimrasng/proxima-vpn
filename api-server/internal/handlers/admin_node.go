@@ -11,6 +11,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/proximavpn/proxima-vpn/pkg/crypto"
+	"github.com/proximavpn/proxima-vpn/pkg/xrayver"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -194,7 +195,13 @@ type nodeListItem struct {
 	ShapingOK    *bool   `json:"shaping_ok"`
 	ShapingTiers *int    `json:"shaping_tiers"`
 	ShapingError *string `json:"shaping_error"`
-	ConfigHash   *string `json:"config_hash"`
+	// Set when the node's core predates the stats RPC the panel needs. Reported
+	// rather than refused: the node still carries traffic, and cutting it off
+	// over a version would be worse than telling the operator to upgrade it.
+	XrayTooOld         bool    `json:"xray_too_old"`
+	XrayMinimum        string  `json:"xray_minimum"`
+	XrayVersionWarning string  `json:"xray_version_warning,omitempty"`
+	ConfigHash         *string `json:"config_hash"`
 }
 
 // ListNodes returns all nodes including pending ones.
@@ -241,7 +248,21 @@ func (h *AdminNodeHandler) ListNodes(c *fiber.Ctx) error {
 		nodes = append(nodes, n)
 	}
 
+	for i := range nodes {
+		annotateXrayVersion(&nodes[i])
+	}
 	return c.JSON(nodes)
+}
+
+// annotateXrayVersion fills the version-floor verdict, which is derived rather
+// than stored so raising the floor takes effect without a migration.
+func annotateXrayVersion(n *nodeListItem) {
+	n.XrayMinimum = xrayver.Minimum
+	if xrayver.AtLeastMinimum(n.XrayVersion) {
+		return
+	}
+	n.XrayTooOld = true
+	n.XrayVersionWarning = xrayver.Explain(n.XrayVersion)
 }
 
 // GetNode returns a single node by ID.
@@ -281,6 +302,7 @@ func (h *AdminNodeHandler) GetNode(c *fiber.Ctx) error {
 		})
 	}
 
+	annotateXrayVersion(&n)
 	return c.JSON(n)
 }
 

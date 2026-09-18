@@ -639,10 +639,18 @@ log "PASS: tc has $FILTER_COUNT filter match(es) directing tier traffic"
 # tc prints "Operation not permitted" to stderr and still exits 0, so the agent
 # has to report the outcome or a node serving limited users at full rate looks
 # healthy. Read it back the way an operator would.
-NODE_JSON=$(curl -sf "$BASE_URL/api/v1/admin/nodes/$NODE_ID" -H "Authorization: Bearer $ADMIN_TOKEN")
+# The count arrives on the next heartbeat, which is a separate 30s cycle from
+# the config poll that installed the rules, so wait for it rather than reading
+# whatever the previous heartbeat left.
+SHAPING_TIERS=0
+for _ in $(seq 1 30); do
+  NODE_JSON=$(curl -sf "$BASE_URL/api/v1/admin/nodes/$NODE_ID" -H "Authorization: Bearer $ADMIN_TOKEN")
+  SHAPING_TIERS=$(echo "$NODE_JSON" | jq -r '.shaping_tiers // 0')
+  [[ "$SHAPING_TIERS" -ge 1 ]] && break
+  sleep 2
+done
 assert_eq "the node reports shaping as applied" "true" "$(echo "$NODE_JSON" | jq -r '.shaping_ok')"
-SHAPING_TIERS=$(echo "$NODE_JSON" | jq -r '.shaping_tiers // 0')
-[[ "$SHAPING_TIERS" -ge 1 ]] || fail "node reports $SHAPING_TIERS shaped tiers, expected at least 1"
+[[ "$SHAPING_TIERS" -ge 1 ]] || fail "node reports $SHAPING_TIERS shaped tiers after 60s, expected at least 1"
 log "PASS: node reports shaping_ok with $SHAPING_TIERS tier(s)"
 
 curl -sf -X PUT "$BASE_URL/api/v1/admin/plans/$PLAN_ID" \
