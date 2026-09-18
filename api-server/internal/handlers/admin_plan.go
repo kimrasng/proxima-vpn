@@ -98,7 +98,7 @@ func (h *AdminPlanHandler) Create(c *fiber.Ctx) error {
 	err := h.db.QueryRow(
 		context.Background(),
 		`INSERT INTO plans (name, traffic_limit, duration_days, max_devices, max_concurrent, speed_limit, node_group_id)
-		 VALUES ($1, $2, $3, $4, $5, $6)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7)
 		 RETURNING id, name, traffic_limit, duration_days, max_devices, max_concurrent, speed_limit, node_group_id, is_active, created_at`,
 		req.Name, req.TrafficLimit, req.DurationDays, req.MaxDevices, req.MaxConcurrent, req.SpeedLimit, req.NodeGroupID,
 	).Scan(&plan.ID, &plan.Name, &plan.TrafficLimit, &plan.DurationDays, &plan.MaxDevices, &plan.MaxConcurrent, &plan.SpeedLimit, &plan.NodeGroupID, &plan.IsActive, &plan.CreatedAt)
