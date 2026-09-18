@@ -24,6 +24,7 @@ import AdminLogin from "./pages/auth/AdminLogin";
 import Register from "./pages/auth/Register";
 
 import Devices from "./pages/user/Devices";
+import UserDashboard from "./pages/user/Dashboard";
 import UserNodes from "./pages/user/Nodes";
 import Traffic from "./pages/user/Traffic";
 import PlanInfo from "./pages/user/PlanInfo";
@@ -33,7 +34,7 @@ import UserAnnouncements from "./pages/user/Announcements";
 export const router = createBrowserRouter([
   {
     path: "/",
-    element: <Navigate to="/portal/devices" replace />,
+    element: <Navigate to="/portal/dashboard" replace />,
   },
   {
     element: <AuthLayout />,
@@ -71,6 +72,7 @@ export const router = createBrowserRouter([
       </UserAuthGuard>
     ),
     children: [
+      { path: "/portal/dashboard", element: <UserDashboard /> },
       { path: "/portal/devices", element: <Devices /> },
       { path: "/portal/nodes", element: <UserNodes /> },
       { path: "/portal/traffic", element: <Traffic /> },

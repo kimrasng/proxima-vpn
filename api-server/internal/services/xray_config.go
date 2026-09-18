@@ -103,6 +103,11 @@ type xrayInbound struct {
 type xrayPolicyLevel struct {
 	StatsUserUplink   bool `json:"statsUserUplink"`
 	StatsUserDownlink bool `json:"statsUserDownlink"`
+	// Makes the dispatcher keep a live per-email map of source IPs with
+	// last-seen times, readable over the stats API. Without it the only
+	// concurrency signal is a byte counter, which cannot tell an idle
+	// connection from a closed one.
+	StatsUserOnline bool `json:"statsUserOnline"`
 }
 
 type xraySystemPolicy struct {
@@ -313,7 +318,8 @@ func (s *XrayConfigService) generate(ctx context.Context, nodeID string) ([]byte
 		   AND u.is_active = true
 		   AND u.status = 'active'
 		   AND (u.plan_expires_at IS NULL OR u.plan_expires_at > NOW())
-		   AND (p.traffic_limit IS NULL OR u.traffic_used < p.traffic_limit)`,
+		   AND (p.traffic_limit IS NULL OR u.traffic_used < p.traffic_limit)
+		   AND (d.evicted_until IS NULL OR d.evicted_until <= NOW())`,
 		nodeID,
 	)
 	if err != nil {
@@ -331,7 +337,7 @@ func (s *XrayConfigService) generate(ctx context.Context, nodeID string) ([]byte
 	var trojanClients []xrayTrojanClient
 	tierVless := map[int][]xrayClient{}
 	policyLevels := map[string]xrayPolicyLevel{
-		"0": {StatsUserUplink: true, StatsUserDownlink: true},
+		"0": {StatsUserUplink: true, StatsUserDownlink: true, StatsUserOnline: true},
 	}
 
 	for rows.Next() {

@@ -197,7 +197,7 @@ func runCmd() *cobra.Command {
 			}
 
 			if statsClient != nil {
-				collector := stats.NewCollector(statsClient, apiClient, stats.DefaultInterval)
+				collector := stats.NewCollector(statsClient, apiClient, stats.DefaultInterval, state.ProvisionedEmails)
 				collector.Start(ctx)
 				defer collector.Stop()
 				defer func() { _ = statsClient.Close() }()
@@ -414,6 +414,23 @@ func (s *nodeState) UsersHash() string {
 
 // UsersSnapshot copies the set so callers can diff without holding the lock
 // across gRPC calls.
+// ProvisionedEmails lists the client emails Xray currently serves, which is the
+// only way to address its per-email online map.
+func (s *nodeState) ProvisionedEmails() []string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	seen := make(map[string]struct{}, len(s.users))
+	out := make([]string, 0, len(s.users))
+	for k := range s.users {
+		if _, dup := seen[k.Email]; dup {
+			continue
+		}
+		seen[k.Email] = struct{}{}
+		out = append(out, k.Email)
+	}
+	return out
+}
+
 func (s *nodeState) UsersSnapshot() map[userKey]xray.VLESSUser {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

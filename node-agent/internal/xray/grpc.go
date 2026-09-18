@@ -7,8 +7,10 @@ import (
 	"strings"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/encoding"
+	"google.golang.org/grpc/status"
 )
 
 func init() {
@@ -40,6 +42,13 @@ func (statsCodec) Marshal(v any) ([]byte, error) {
 		return buf, nil
 	case *alterInboundRequest:
 		return marshalAlterInboundRequest(req), nil
+	case *onlineIPListRequest:
+		var buf []byte
+		if req.Name != "" {
+			buf = appendTag(buf, 1, 2)
+			buf = appendBytes(buf, []byte(req.Name))
+		}
+		return buf, nil
 	default:
 		return nil, fmt.Errorf("statsCodec: unsupported marshal type %T", v)
 	}
@@ -50,6 +59,10 @@ func (statsCodec) Unmarshal(data []byte, v any) error {
 	// the expected success case rather than a decode failure.
 	if _, ok := v.(*alterInboundResponse); ok {
 		return nil
+	}
+
+	if ips, ok := v.(*onlineIPListResponse); ok {
+		return unmarshalOnlineIPList(data, ips)
 	}
 
 	resp, ok := v.(*queryStatsResponse)
@@ -181,8 +194,9 @@ type StatsClient struct {
 }
 
 const (
-	statsServicePath = "/xray.app.stats.command.StatsService"
-	queryStatsMethod = statsServicePath + "/QueryStats"
+	statsServicePath   = "/xray.app.stats.command.StatsService"
+	queryStatsMethod   = statsServicePath + "/QueryStats"
+	onlineIPListMethod = statsServicePath + "/GetStatsOnlineIpList"
 )
 
 func NewStatsClient(addr string) (*StatsClient, error) {
@@ -325,4 +339,120 @@ type statProto struct {
 
 type queryStatsResponse struct {
 	Stat []*statProto
+}
+
+type onlineIPListRequest struct {
+	Name string
+}
+
+type onlineIPListResponse struct {
+	IPs map[string]int64
+}
+
+// unmarshalOnlineIPList decodes GetStatsOnlineIpListResponse, whose field 2 is
+// a protobuf map<string,int64>. Maps are encoded as a repeated message with
+// key in field 1 and value in field 2, so each entry is decoded as its own
+// nested message rather than a single pair of scalars.
+func unmarshalOnlineIPList(data []byte, resp *onlineIPListResponse) error {
+	resp.IPs = map[string]int64{}
+	for len(data) > 0 {
+		field, wire, n := consumeTag(data)
+		if n == 0 {
+			return fmt.Errorf("statsCodec: bad online-ip tag")
+		}
+		data = data[n:]
+
+		if field == 2 && wire == 2 {
+			entry, m := consumeBytes(data)
+			if m == 0 {
+				return fmt.Errorf("statsCodec: bad online-ip entry length")
+			}
+			data = data[m:]
+
+			ip, ts, err := parseOnlineIPEntry(entry)
+			if err != nil {
+				return err
+			}
+			if ip != "" {
+				resp.IPs[ip] = ts
+			}
+			continue
+		}
+
+		skip, err := skipField(data, wire)
+		if err != nil {
+			return err
+		}
+		data = data[skip:]
+	}
+	return nil
+}
+
+func parseOnlineIPEntry(data []byte) (ip string, lastSeen int64, err error) {
+	for len(data) > 0 {
+		field, wire, n := consumeTag(data)
+		if n == 0 {
+			return "", 0, fmt.Errorf("statsCodec: bad map entry tag")
+		}
+		data = data[n:]
+
+		switch {
+		case field == 1 && wire == 2:
+			b, m := consumeBytes(data)
+			if m == 0 {
+				return "", 0, fmt.Errorf("statsCodec: bad map key")
+			}
+			ip = string(b)
+			data = data[m:]
+		case field == 2 && wire == 0:
+			v, m := binary.Uvarint(data)
+			if m <= 0 {
+				return "", 0, fmt.Errorf("statsCodec: bad map value")
+			}
+			lastSeen = int64(v)
+			data = data[m:]
+		default:
+			skip, serr := skipField(data, wire)
+			if serr != nil {
+				return "", 0, serr
+			}
+			data = data[skip:]
+		}
+	}
+	return ip, lastSeen, nil
+}
+
+// GetOnlineIPs returns the source IPs currently connected under each device
+// UUID, mapped to the last time Xray saw them. Requires statsUserOnline on the
+// client's policy level; without it Xray keeps no such map and this is empty.
+// Xray skips loopback sources, so a same-host client reports nothing.
+func (c *StatsClient) GetOnlineIPs(ctx context.Context, emails []string) (map[string]map[string]int64, error) {
+	out := make(map[string]map[string]int64, len(emails))
+	for _, email := range emails {
+		req := &onlineIPListRequest{Name: "user>>>" + email + ">>>online"}
+		resp := &onlineIPListResponse{}
+		if err := c.conn.Invoke(ctx, onlineIPListMethod, req, resp); err != nil {
+			// Xray has no online map for a client that has not connected since
+			// it started, and reports that as NotFound. Skipping keeps one
+			// never-used device from hiding every other device's addresses.
+			if status.Code(err) == codes.NotFound {
+				continue
+			}
+			return nil, fmt.Errorf("query online ips for %s: %w", email, err)
+		}
+		if len(resp.IPs) == 0 {
+			continue
+		}
+		uuid := email
+		if at := strings.IndexByte(uuid, '@'); at >= 0 {
+			uuid = uuid[:at]
+		}
+		if out[uuid] == nil {
+			out[uuid] = map[string]int64{}
+		}
+		for ip, ts := range resp.IPs {
+			out[uuid][ip] = ts
+		}
+	}
+	return out, nil
 }

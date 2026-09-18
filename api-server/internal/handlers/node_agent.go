@@ -434,9 +434,15 @@ type statEntry struct {
 	DnBytes  int64  `json:"dn_bytes"`
 }
 
+type onlineIPEntry struct {
+	IP       string `json:"ip"`
+	LastSeen int64  `json:"last_seen"`
+}
+
 type statsRequest struct {
-	Stats       []statEntry `json:"stats"`
-	OnlineUUIDs []string    `json:"online_uuids"`
+	Stats       []statEntry                `json:"stats"`
+	OnlineUUIDs []string                   `json:"online_uuids"`
+	OnlineIPs   map[string][]onlineIPEntry `json:"online_ips"`
 }
 
 func (h *NodeAgentHandler) Stats(c *fiber.Ctx) error {
@@ -479,6 +485,14 @@ func (h *NodeAgentHandler) Stats(c *fiber.Ctx) error {
 	if len(req.OnlineUUIDs) > 0 {
 		data, _ := json.Marshal(req.OnlineUUIDs)
 		key := fmt.Sprintf("node:%s:online", nodeID)
+		h.redis.Set(ctx, key, string(data), 60*time.Second)
+	}
+
+	// Kept in a separate key from online_uuids: an agent too old to report IPs
+	// still populates the coarse set, and this one simply stays absent for it.
+	if len(req.OnlineIPs) > 0 {
+		data, _ := json.Marshal(req.OnlineIPs)
+		key := fmt.Sprintf("node:%s:online_ips", nodeID)
 		h.redis.Set(ctx, key, string(data), 60*time.Second)
 	}
 

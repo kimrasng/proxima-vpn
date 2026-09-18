@@ -237,6 +237,19 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 		       ON inbounds(node_id);
 		   END IF;
 		 END $$`,
+
+		// max_devices caps how many credentials a user may create; it never
+		// capped how many of them connect at once, so a plan sold as "5 devices"
+		// allowed unlimited concurrency. NULL means "fall back to max_devices"
+		// so existing plans keep their advertised number without a data fix.
+		`ALTER TABLE plans ADD COLUMN IF NOT EXISTS max_concurrent INT`,
+		`ALTER TABLE user_templates ADD COLUMN IF NOT EXISTS max_concurrent INT`,
+
+		// Set when a device is over its plan's concurrency cap. A deadline
+		// rather than a boolean: evicting always makes the count look healthy
+		// again, so re-admission has to be driven by time or the device flaps
+		// in and out of the config every poll.
+		`ALTER TABLE devices ADD COLUMN IF NOT EXISTS evicted_until TIMESTAMPTZ`,
 	}
 	for _, m := range migrations {
 		if _, err := pool.Exec(ctx, m); err != nil {

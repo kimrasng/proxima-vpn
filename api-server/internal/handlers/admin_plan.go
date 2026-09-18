@@ -19,22 +19,24 @@ func NewAdminPlanHandler(db *pgxpool.Pool) *AdminPlanHandler {
 }
 
 type createPlanRequest struct {
-	Name         string `json:"name"`
-	TrafficLimit *int64 `json:"traffic_limit"`
-	DurationDays int    `json:"duration_days"`
-	MaxDevices   int    `json:"max_devices"`
-	SpeedLimit   *int   `json:"speed_limit"`
-	NodeGroupID  string `json:"node_group_id"`
+	Name          string `json:"name"`
+	TrafficLimit  *int64 `json:"traffic_limit"`
+	DurationDays  int    `json:"duration_days"`
+	MaxDevices    int    `json:"max_devices"`
+	MaxConcurrent *int   `json:"max_concurrent"`
+	SpeedLimit    *int   `json:"speed_limit"`
+	NodeGroupID   string `json:"node_group_id"`
 }
 
 type updatePlanRequest struct {
-	Name         *string `json:"name"`
-	TrafficLimit *int64  `json:"traffic_limit"`
-	DurationDays *int    `json:"duration_days"`
-	MaxDevices   *int    `json:"max_devices"`
-	SpeedLimit   *int    `json:"speed_limit"`
-	NodeGroupID  *string `json:"node_group_id"`
-	IsActive     *bool   `json:"is_active"`
+	Name          *string `json:"name"`
+	TrafficLimit  *int64  `json:"traffic_limit"`
+	DurationDays  *int    `json:"duration_days"`
+	MaxDevices    *int    `json:"max_devices"`
+	MaxConcurrent *int    `json:"max_concurrent"`
+	SpeedLimit    *int    `json:"speed_limit"`
+	NodeGroupID   *string `json:"node_group_id"`
+	IsActive      *bool   `json:"is_active"`
 }
 
 type planResponse struct {
@@ -43,6 +45,7 @@ type planResponse struct {
 	TrafficLimit  *int64    `json:"traffic_limit"`
 	DurationDays  int       `json:"duration_days"`
 	MaxDevices    int       `json:"max_devices"`
+	MaxConcurrent *int      `json:"max_concurrent"`
 	SpeedLimit    *int      `json:"speed_limit"`
 	NodeGroupID   string    `json:"node_group_id"`
 	NodeGroupName *string   `json:"node_group_name"`
@@ -94,11 +97,11 @@ func (h *AdminPlanHandler) Create(c *fiber.Ctx) error {
 	var plan planResponse
 	err := h.db.QueryRow(
 		context.Background(),
-		`INSERT INTO plans (name, traffic_limit, duration_days, max_devices, speed_limit, node_group_id)
+		`INSERT INTO plans (name, traffic_limit, duration_days, max_devices, max_concurrent, speed_limit, node_group_id)
 		 VALUES ($1, $2, $3, $4, $5, $6)
-		 RETURNING id, name, traffic_limit, duration_days, max_devices, speed_limit, node_group_id, is_active, created_at`,
-		req.Name, req.TrafficLimit, req.DurationDays, req.MaxDevices, req.SpeedLimit, req.NodeGroupID,
-	).Scan(&plan.ID, &plan.Name, &plan.TrafficLimit, &plan.DurationDays, &plan.MaxDevices, &plan.SpeedLimit, &plan.NodeGroupID, &plan.IsActive, &plan.CreatedAt)
+		 RETURNING id, name, traffic_limit, duration_days, max_devices, max_concurrent, speed_limit, node_group_id, is_active, created_at`,
+		req.Name, req.TrafficLimit, req.DurationDays, req.MaxDevices, req.MaxConcurrent, req.SpeedLimit, req.NodeGroupID,
+	).Scan(&plan.ID, &plan.Name, &plan.TrafficLimit, &plan.DurationDays, &plan.MaxDevices, &plan.MaxConcurrent, &plan.SpeedLimit, &plan.NodeGroupID, &plan.IsActive, &plan.CreatedAt)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to create plan",
@@ -120,7 +123,7 @@ func (h *AdminPlanHandler) Create(c *fiber.Ctx) error {
 func (h *AdminPlanHandler) List(c *fiber.Ctx) error {
 	rows, err := h.db.Query(
 		context.Background(),
-		`SELECT p.id, p.name, p.traffic_limit, p.duration_days, p.max_devices, p.speed_limit,
+		`SELECT p.id, p.name, p.traffic_limit, p.duration_days, p.max_devices, p.max_concurrent, p.speed_limit,
 		        p.node_group_id, ng.name AS node_group_name, p.is_active, p.created_at
 		 FROM plans p
 		 LEFT JOIN node_groups ng ON p.node_group_id = ng.id
@@ -136,7 +139,7 @@ func (h *AdminPlanHandler) List(c *fiber.Ctx) error {
 	plans := make([]planResponse, 0)
 	for rows.Next() {
 		var p planResponse
-		if err := rows.Scan(&p.ID, &p.Name, &p.TrafficLimit, &p.DurationDays, &p.MaxDevices, &p.SpeedLimit, &p.NodeGroupID, &p.NodeGroupName, &p.IsActive, &p.CreatedAt); err != nil {
+		if err := rows.Scan(&p.ID, &p.Name, &p.TrafficLimit, &p.DurationDays, &p.MaxDevices, &p.MaxConcurrent, &p.SpeedLimit, &p.NodeGroupID, &p.NodeGroupName, &p.IsActive, &p.CreatedAt); err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 				"error": "failed to scan plan",
 			})
@@ -163,13 +166,13 @@ func (h *AdminPlanHandler) Get(c *fiber.Ctx) error {
 	var plan planResponse
 	err := h.db.QueryRow(
 		context.Background(),
-		`SELECT p.id, p.name, p.traffic_limit, p.duration_days, p.max_devices, p.speed_limit,
+		`SELECT p.id, p.name, p.traffic_limit, p.duration_days, p.max_devices, p.max_concurrent, p.speed_limit,
 		        p.node_group_id, ng.name AS node_group_name, p.is_active, p.created_at
 		 FROM plans p
 		 LEFT JOIN node_groups ng ON p.node_group_id = ng.id
 		 WHERE p.id = $1`,
 		id,
-	).Scan(&plan.ID, &plan.Name, &plan.TrafficLimit, &plan.DurationDays, &plan.MaxDevices, &plan.SpeedLimit, &plan.NodeGroupID, &plan.NodeGroupName, &plan.IsActive, &plan.CreatedAt)
+	).Scan(&plan.ID, &plan.Name, &plan.TrafficLimit, &plan.DurationDays, &plan.MaxDevices, &plan.MaxConcurrent, &plan.SpeedLimit, &plan.NodeGroupID, &plan.NodeGroupName, &plan.IsActive, &plan.CreatedAt)
 	if err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 			"error": "plan not found",
@@ -221,6 +224,11 @@ func (h *AdminPlanHandler) Update(c *fiber.Ctx) error {
 	if req.DurationDays != nil {
 		setClauses += comma(setClauses) + "duration_days = $" + itoa(argIdx)
 		args = append(args, *req.DurationDays)
+		argIdx++
+	}
+	if req.MaxConcurrent != nil {
+		setClauses += comma(setClauses) + "max_concurrent = $" + itoa(argIdx)
+		args = append(args, *req.MaxConcurrent)
 		argIdx++
 	}
 	if req.MaxDevices != nil {

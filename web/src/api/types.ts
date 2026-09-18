@@ -254,6 +254,21 @@ export interface TrafficStats {
   days_remaining?: number;
 }
 
+// online_ips counts distinct live source addresses pool-wide and is the figure
+// max_concurrent applies to; online counts device credentials with a live connection.
+export interface UserSummary {
+  plan_name: string | null;
+  status: string;
+  traffic_used: number;
+  traffic_limit: number | null;
+  plan_expires_at: string | null;
+  devices: number;
+  max_devices: number;
+  online: number;
+  online_ips: number;
+  max_concurrent: number;
+}
+
 export interface TrafficHistoryEntry {
   date: string;
   upload: number;

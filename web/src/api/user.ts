@@ -9,6 +9,7 @@ import type {
   Plan,
   Announcement,
   AvailableNode,
+  UserSummary,
 } from './types';
 
 function applyUserClient() {
@@ -28,6 +29,11 @@ export function updateProfile(req: UpdateProfileRequest): Promise<UserProfile> {
 export function getTrafficStats(): Promise<TrafficStats> {
   applyUserClient();
   return get<TrafficStats>('/api/v1/user/traffic');
+}
+
+export function getSummary(): Promise<UserSummary> {
+  applyUserClient();
+  return get<UserSummary>('/api/v1/user/summary');
 }
 
 export function regenerateSubToken(): Promise<{ sub_token: string }> {

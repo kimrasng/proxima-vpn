@@ -59,9 +59,17 @@ type TrafficStat struct {
 }
 
 // StatsPayload is the payload for sending stats.
+// OnlineIP is one live source address under a device UUID, as Xray's online
+// map reports it.
+type OnlineIP struct {
+	IP       string `json:"ip"`
+	LastSeen int64  `json:"last_seen"`
+}
+
 type StatsPayload struct {
-	Traffic     []TrafficStat `json:"stats"`
-	OnlineUUIDs []string      `json:"online_uuids"`
+	Traffic     []TrafficStat         `json:"stats"`
+	OnlineUUIDs []string              `json:"online_uuids"`
+	OnlineIPs   map[string][]OnlineIP `json:"online_ips,omitempty"`
 }
 
 // HeartbeatPayload is the payload for heartbeat. ConfigHash and XrayRunning let
@@ -400,10 +408,11 @@ func (c *APIClient) GetHysteria2Users(ctx context.Context) ([]string, error) {
 	return uuids, nil
 }
 
-func (c *APIClient) SendStats(ctx context.Context, stats []TrafficStat, onlineUUIDs []string) error {
+func (c *APIClient) SendStats(ctx context.Context, stats []TrafficStat, onlineUUIDs []string, onlineIPs map[string][]OnlineIP) error {
 	payload := StatsPayload{
 		Traffic:     stats,
 		OnlineUUIDs: onlineUUIDs,
+		OnlineIPs:   onlineIPs,
 	}
 
 	body, err := json.Marshal(payload)

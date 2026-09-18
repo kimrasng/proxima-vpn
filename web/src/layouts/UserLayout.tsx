@@ -16,6 +16,7 @@ export default function UserLayout() {
   const { theme, toggle: toggleTheme } = useTheme();
 
   const navItems: SideNavigationProps.Item[] = [
+    { type: "link", text: t("user.nav.dashboard"), href: "/portal/dashboard" },
     { type: "link", text: t("user.nav.devices"), href: "/portal/devices" },
     { type: "link", text: t("user.nav.nodes"), href: "/portal/nodes" },
     { type: "link", text: t("user.nav.traffic"), href: "/portal/traffic" },

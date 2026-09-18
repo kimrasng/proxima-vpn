@@ -7,6 +7,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/proximavpn/proxima-vpn/api-server/internal/services"
 	"github.com/proximavpn/proxima-vpn/pkg/crypto"
 	"github.com/redis/go-redis/v9"
 )
@@ -288,4 +289,67 @@ func (h *UserPortalHandler) ListAnnouncements(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(items)
+}
+
+type userSummary struct {
+	PlanName      *string    `json:"plan_name"`
+	Status        string     `json:"status"`
+	TrafficUsed   int64      `json:"traffic_used"`
+	TrafficLimit  *int64     `json:"traffic_limit"`
+	PlanExpiresAt *time.Time `json:"plan_expires_at"`
+	Devices       int        `json:"devices"`
+	MaxDevices    int        `json:"max_devices"`
+	Online        int        `json:"online"`
+	OnlineIPs     int        `json:"online_ips"`
+	MaxConcurrent int        `json:"max_concurrent"`
+}
+
+// GetSummary returns the dashboard figures for the authenticated user.
+// @Summary Get account summary
+// @Description Traffic usage, device count and live connection count against their caps
+// @Tags user-portal
+// @Produce json
+// @Success 200 {object} userSummary
+// @Failure 500 {object} map[string]string
+// @Security BearerAuth
+// @Router /user/summary [get]
+func (h *UserPortalHandler) GetSummary(c *fiber.Ctx) error {
+	userID := c.Locals("user_id").(string)
+	ctx := context.Background()
+
+	var (
+		s             userSummary
+		maxConcurrent *int
+	)
+	err := h.db.QueryRow(ctx, `
+		SELECT u.status, u.traffic_used, u.plan_expires_at,
+		       p.name, p.traffic_limit, COALESCE(p.max_devices, 0), p.max_concurrent,
+		       (SELECT COUNT(*) FROM devices d WHERE d.user_id = u.id)
+		FROM users u
+		LEFT JOIN plans p ON u.plan_id = p.id
+		WHERE u.id = $1
+	`, userID).Scan(&s.Status, &s.TrafficUsed, &s.PlanExpiresAt,
+		&s.PlanName, &s.TrafficLimit, &s.MaxDevices, &maxConcurrent, &s.Devices)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to fetch summary",
+		})
+	}
+
+	// A NULL max_concurrent means the plan predates the column, so it keeps the
+	// device count it was sold with.
+	s.MaxConcurrent = s.MaxDevices
+	if maxConcurrent != nil {
+		s.MaxConcurrent = *maxConcurrent
+	}
+
+	tracker := services.NewOnlineTracker(h.redis)
+	if ips, _, err := tracker.CountDistinctIPsForUser(ctx, h.db, userID); err == nil {
+		s.OnlineIPs = ips
+	}
+	if devices, err := tracker.CountOnlineForUser(ctx, h.db, userID); err == nil {
+		s.Online = devices
+	}
+
+	return c.JSON(s)
 }

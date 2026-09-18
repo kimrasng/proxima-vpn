@@ -171,6 +171,7 @@ func (s *Server) registerRoutes() {
 	user.Delete("/devices/:id", userDeviceHandler.Delete)
 
 	userPortalHandler := handlers.NewUserPortalHandler(s.db, s.redis)
+	user.Get("/summary", userPortalHandler.GetSummary)
 	user.Get("/profile", userPortalHandler.GetProfile)
 	user.Put("/profile", userPortalHandler.UpdateProfile)
 	user.Get("/traffic", userPortalHandler.GetTrafficStats)

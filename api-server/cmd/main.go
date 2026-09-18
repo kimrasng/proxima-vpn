@@ -70,6 +70,9 @@ func main() {
 	retention := scheduler.NewRetentionScheduler(db)
 	go retention.Start(ctx)
 
+	concurrency := scheduler.NewConcurrencyScheduler(db, rdb)
+	go concurrency.Start(ctx)
+
 	telegramSvc := services.NewTelegramService(db, cfg.Telegram)
 
 	nodeMonitor := scheduler.NewNodeMonitorScheduler(db, telegramSvc)

@@ -49,11 +49,11 @@ func TestPendingTrafficSurvivesAFailedSend(t *testing.T) {
 		NodeID:    "node-1",
 		APIKey:    "key",
 		ServerURL: srv.URL,
-	}), DefaultInterval)
+	}), DefaultInterval, nil)
 
 	// First sample: 100/200 read out of Xray, delivery fails.
 	c.accumulate([]xray.TrafficStat{{UUID: "dev-1", Upload: 100, Download: 200}})
-	if err := c.flush(context.Background(), nil); err == nil {
+	if err := c.flush(context.Background(), nil, nil); err == nil {
 		t.Fatal("expected the first send to fail")
 	}
 	if len(c.pending) != 1 {
@@ -68,7 +68,7 @@ func TestPendingTrafficSurvivesAFailedSend(t *testing.T) {
 	fail = false
 	mu.Unlock()
 
-	if err := c.flush(context.Background(), nil); err != nil {
+	if err := c.flush(context.Background(), nil, nil); err != nil {
 		t.Fatalf("second send should succeed: %v", err)
 	}
 	if len(c.pending) != 0 {
@@ -100,10 +100,10 @@ func TestPendingClearedAfterSuccessfulSend(t *testing.T) {
 
 	c := NewCollector(nil, client.NewAPIClient(&config.AgentConfig{
 		NodeID: "node-1", APIKey: "key", ServerURL: srv.URL,
-	}), DefaultInterval)
+	}), DefaultInterval, nil)
 
 	c.accumulate([]xray.TrafficStat{{UUID: "dev-1", Upload: 10, Download: 20}})
-	if err := c.flush(context.Background(), nil); err != nil {
+	if err := c.flush(context.Background(), nil, nil); err != nil {
 		t.Fatalf("send: %v", err)
 	}
 	if len(c.pending) != 0 {
@@ -111,13 +111,13 @@ func TestPendingClearedAfterSuccessfulSend(t *testing.T) {
 	}
 
 	// A tick with no traffic must not re-post the already-delivered sample.
-	if err := c.flush(context.Background(), nil); err != nil {
+	if err := c.flush(context.Background(), nil, nil); err != nil {
 		t.Fatalf("empty flush should be a no-op, got %v", err)
 	}
 }
 
 func TestAccumulateSumsRepeatedSamplesPerDevice(t *testing.T) {
-	c := NewCollector(nil, nil, DefaultInterval)
+	c := NewCollector(nil, nil, DefaultInterval, nil)
 
 	c.accumulate([]xray.TrafficStat{
 		{UUID: "dev-1", Upload: 1, Download: 2},
