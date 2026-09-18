@@ -85,12 +85,20 @@ type HeartbeatPayload struct {
 	XrayVersion string  `json:"xray_version,omitempty"`
 	ConfigHash  string  `json:"config_hash,omitempty"`
 	XrayRunning bool    `json:"xray_running"`
+	// Reports whether tc shaping is in force. Without this a node that cannot
+	// run tc serves speed-limited users at full rate and nothing says so.
+	ShapingOK    bool   `json:"shaping_ok"`
+	ShapingTiers int    `json:"shaping_tiers"`
+	ShapingError string `json:"shaping_error,omitempty"`
 }
 
 type NodeStatus struct {
-	XrayVersion string
-	ConfigHash  string
-	XrayRunning bool
+	XrayVersion  string
+	ConfigHash   string
+	XrayRunning  bool
+	ShapingOK    bool
+	ShapingTiers int
+	ShapingError string
 }
 
 // Register registers this node with the main server.
@@ -232,15 +240,18 @@ func (c *APIClient) GetConfigDigest(ctx context.Context) (ConfigDigest, error) {
 // SendHeartbeat sends system metrics to the server.
 func (c *APIClient) SendHeartbeat(ctx context.Context, cpu, memory, disk, loadAvg, networkIn, networkOut float64, status NodeStatus) error {
 	payload := HeartbeatPayload{
-		CPU:         cpu,
-		Memory:      memory,
-		Disk:        disk,
-		LoadAvg:     loadAvg,
-		NetworkIn:   networkIn,
-		NetworkOut:  networkOut,
-		XrayVersion: status.XrayVersion,
-		ConfigHash:  status.ConfigHash,
-		XrayRunning: status.XrayRunning,
+		CPU:          cpu,
+		Memory:       memory,
+		Disk:         disk,
+		LoadAvg:      loadAvg,
+		NetworkIn:    networkIn,
+		NetworkOut:   networkOut,
+		XrayVersion:  status.XrayVersion,
+		ConfigHash:   status.ConfigHash,
+		XrayRunning:  status.XrayRunning,
+		ShapingOK:    status.ShapingOK,
+		ShapingTiers: status.ShapingTiers,
+		ShapingError: status.ShapingError,
 	}
 
 	body, err := json.Marshal(payload)

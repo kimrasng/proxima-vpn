@@ -250,6 +250,14 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 		// again, so re-admission has to be driven by time or the device flaps
 		// in and out of the config every poll.
 		`ALTER TABLE devices ADD COLUMN IF NOT EXISTS evicted_until TIMESTAMPTZ`,
+
+		// Speed limits are enforced by tc on the node, which needs root and a
+		// resolvable default route. When that fails the tunnel still works and
+		// limited users simply run uncapped, so the node has to say so or the
+		// silence reads as success.
+		`ALTER TABLE nodes ADD COLUMN IF NOT EXISTS shaping_ok BOOLEAN NOT NULL DEFAULT true`,
+		`ALTER TABLE nodes ADD COLUMN IF NOT EXISTS shaping_tiers INT NOT NULL DEFAULT 0`,
+		`ALTER TABLE nodes ADD COLUMN IF NOT EXISTS shaping_error TEXT NOT NULL DEFAULT ''`,
 	}
 	for _, m := range migrations {
 		if _, err := pool.Exec(ctx, m); err != nil {

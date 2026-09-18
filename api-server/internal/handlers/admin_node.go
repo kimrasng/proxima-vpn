@@ -188,8 +188,13 @@ type nodeListItem struct {
 	LastPingAt  *time.Time `json:"last_ping_at"`
 	// From the heartbeat: status only says the agent checked in, these say
 	// whether Xray is actually serving the published config.
-	XrayRunning *bool   `json:"xray_running"`
-	ConfigHash  *string `json:"config_hash"`
+	XrayRunning *bool `json:"xray_running"`
+	// Surfaces a node that cannot run tc: speed-limited plans on it are not
+	// actually limited, and nothing else about the node looks wrong.
+	ShapingOK    *bool   `json:"shaping_ok"`
+	ShapingTiers *int    `json:"shaping_tiers"`
+	ShapingError *string `json:"shaping_error"`
+	ConfigHash   *string `json:"config_hash"`
 }
 
 // ListNodes returns all nodes including pending ones.
@@ -207,7 +212,8 @@ func (h *AdminNodeHandler) ListNodes(c *fiber.Ctx) error {
 		`SELECT id, name, country, region, ip::text, port, status, xray_version,
 		        cpu_usage, memory_usage, disk_usage, load_avg, network_in, network_out,
 		        last_seen, created_at, updated_at, last_ping_at,
-		        xray_running, config_hash
+		        xray_running, config_hash,
+		        shaping_ok, shaping_tiers, shaping_error
 		 FROM nodes ORDER BY created_at DESC`,
 	)
 	if err != nil {
@@ -226,6 +232,7 @@ func (h *AdminNodeHandler) ListNodes(c *fiber.Ctx) error {
 			&n.CPUUsage, &n.MemoryUsage, &n.DiskUsage, &n.LoadAvg, &n.NetworkIn, &n.NetworkOut,
 			&n.LastSeen, &n.CreatedAt, &n.UpdatedAt, &n.LastPingAt,
 			&n.XrayRunning, &n.ConfigHash,
+			&n.ShapingOK, &n.ShapingTiers, &n.ShapingError,
 		); err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 				"error": "failed to scan node",
@@ -256,7 +263,8 @@ func (h *AdminNodeHandler) GetNode(c *fiber.Ctx) error {
 		`SELECT id, name, country, region, ip::text, port, status, xray_version,
 		        cpu_usage, memory_usage, disk_usage, load_avg, network_in, network_out,
 		        last_seen, created_at, updated_at, last_ping_at,
-		        xray_running, config_hash
+		        xray_running, config_hash,
+		        shaping_ok, shaping_tiers, shaping_error
 		 FROM nodes WHERE id = $1`,
 		id,
 	).Scan(
@@ -265,6 +273,7 @@ func (h *AdminNodeHandler) GetNode(c *fiber.Ctx) error {
 		&n.CPUUsage, &n.MemoryUsage, &n.DiskUsage, &n.LoadAvg, &n.NetworkIn, &n.NetworkOut,
 		&n.LastSeen, &n.CreatedAt, &n.UpdatedAt, &n.LastPingAt,
 		&n.XrayRunning, &n.ConfigHash,
+		&n.ShapingOK, &n.ShapingTiers, &n.ShapingError,
 	)
 	if err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{

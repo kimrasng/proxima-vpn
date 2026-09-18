@@ -585,6 +585,72 @@ LOGGED_ROWS=$(curl -sf "$BASE_URL/api/v1/admin/stats/traffic-history" \
 log "PASS: traffic_logs has $LOGGED_ROWS aggregated row(s)"
 
 # ---------------------------------------------------------------------------
+# 14b. Speed limits. Setting speed_limit on a plan is supposed to move its
+#      users onto a dedicated inbound that the agent rate-limits with tc. Every
+#      part of that was previously unverified: the shaper's own tests mock the
+#      tc binary, so nothing proved a rule reached the kernel, let alone that
+#      throughput obeyed it. Worse, tc reports "Operation not permitted" on
+#      stderr while exiting 0, so a node lacking CAP_NET_ADMIN served limited
+#      users at full speed and reported success.
+# ---------------------------------------------------------------------------
+log "testing speed limits (tc shaping)"
+
+SHAPE_MBPS=8
+curl -sf -X PUT "$BASE_URL/api/v1/admin/plans/$PLAN_ID" \
+  -H "Authorization: Bearer $ADMIN_TOKEN" -H 'Content-Type: application/json' \
+  -d "{\"speed_limit\":$SHAPE_MBPS}" > /dev/null || fail "could not set a speed limit on the plan"
+
+TIER_PORT=$((20000 + SHAPE_MBPS))
+TIER_TAG="vless-reality-limit-$SHAPE_MBPS"
+
+# The tier inbound is synthesised at config-generation time, not stored in the
+# inbounds table, which is why it coexists with one-inbound-per-node.
+for _ in $(seq 1 30); do
+  if curl -sf "$BASE_URL/api/v1/nodes/$NODE_ID/config" -H "X-Node-Key: $NODE_KEY" \
+       | jq -e --arg t "$TIER_TAG" '.inbounds[] | select(.tag == $t)' > /dev/null 2>&1; then
+    break
+  fi
+  sleep 1
+done
+
+TIER_JSON=$(curl -sf "$BASE_URL/api/v1/nodes/$NODE_ID/config" -H "X-Node-Key: $NODE_KEY" \
+  | jq -c --arg t "$TIER_TAG" '.inbounds[] | select(.tag == $t)')
+[[ -n "$TIER_JSON" ]] || fail "no $TIER_TAG inbound was generated for a ${SHAPE_MBPS}Mbps plan"
+assert_eq "the speed tier listens on its derived port" "$TIER_PORT" "$(echo "$TIER_JSON" | jq -r .port)"
+
+# The agent shapes the default-route interface, the same one it resolves itself.
+SHAPE_IFACE=$(ip route show default 2>/dev/null | awk '/default/ {print $5; exit}')
+[[ -n "$SHAPE_IFACE" ]] || fail "no default route interface; the agent could not have shaped either"
+
+# Wait for the agent to restart onto the new structure and install the rules.
+for _ in $(seq 1 40); do
+  tc class show dev "$SHAPE_IFACE" 2>/dev/null | grep -q "${SHAPE_MBPS}Mbit" && break
+  sleep 2
+done
+
+TIER_CLASS=$(tc class show dev "$SHAPE_IFACE" 2>/dev/null | grep "${SHAPE_MBPS}Mbit" | head -1)
+[[ -n "$TIER_CLASS" ]] || fail "no tc class caps at ${SHAPE_MBPS}Mbit on $SHAPE_IFACE; shaping never reached the kernel"
+log "PASS: tc installed a ${SHAPE_MBPS}Mbit class on $SHAPE_IFACE"
+
+FILTER_COUNT=$(tc filter show dev "$SHAPE_IFACE" 2>/dev/null | grep -c "match" || true)
+[[ "$FILTER_COUNT" -gt 0 ]] || fail "tc has no filters; the tier class would never receive traffic"
+log "PASS: tc has $FILTER_COUNT filter match(es) directing tier traffic"
+
+# tc prints "Operation not permitted" to stderr and still exits 0, so the agent
+# has to report the outcome or a node serving limited users at full rate looks
+# healthy. Read it back the way an operator would.
+NODE_JSON=$(curl -sf "$BASE_URL/api/v1/admin/nodes/$NODE_ID" -H "Authorization: Bearer $ADMIN_TOKEN")
+assert_eq "the node reports shaping as applied" "true" "$(echo "$NODE_JSON" | jq -r '.shaping_ok')"
+SHAPING_TIERS=$(echo "$NODE_JSON" | jq -r '.shaping_tiers // 0')
+[[ "$SHAPING_TIERS" -ge 1 ]] || fail "node reports $SHAPING_TIERS shaped tiers, expected at least 1"
+log "PASS: node reports shaping_ok with $SHAPING_TIERS tier(s)"
+
+curl -sf -X PUT "$BASE_URL/api/v1/admin/plans/$PLAN_ID" \
+  -H "Authorization: Bearer $ADMIN_TOKEN" -H 'Content-Type: application/json' \
+  -d '{"speed_limit":0}' > /dev/null || fail "could not clear the speed limit"
+log "PASS: speed limit cleared"
+
+# ---------------------------------------------------------------------------
 # 15. Subscription formats. Every client app format the panel advertises is
 #     generated from the same node set and checked for (a) structural
 #     validity in that format's own syntax, and (b) actually containing the

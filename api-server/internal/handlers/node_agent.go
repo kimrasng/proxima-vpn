@@ -174,6 +174,11 @@ type heartbeatRequest struct {
 	XrayVersion string  `json:"xray_version"`
 	ConfigHash  string  `json:"config_hash"`
 	XrayRunning bool    `json:"xray_running"`
+	// A node that cannot run tc serves speed-limited users at full rate. It
+	// stays otherwise healthy, so the panel has to carry the bad news.
+	ShapingOK    bool   `json:"shaping_ok"`
+	ShapingTiers int    `json:"shaping_tiers"`
+	ShapingError string `json:"shaping_error"`
 }
 
 func (h *NodeAgentHandler) Heartbeat(c *fiber.Ctx) error {
@@ -192,11 +197,13 @@ func (h *NodeAgentHandler) Heartbeat(c *fiber.Ctx) error {
 		 SET cpu_usage = $1, memory_usage = $2, disk_usage = $3, load_avg = $4,
 		     network_in = $5, network_out = $6, last_seen = NOW(), status = 'online',
 		     xray_version = COALESCE(NULLIF($7, ''), xray_version),
-		     config_hash = $8, xray_running = $9
-		 WHERE id = $10`,
+		     config_hash = $8, xray_running = $9,
+		     shaping_ok = $10, shaping_tiers = $11, shaping_error = $12
+		 WHERE id = $13`,
 		req.CPUUsage, req.MemoryUsage, req.DiskUsage, req.LoadAvg,
 		req.NetworkIn, req.NetworkOut, req.XrayVersion,
-		req.ConfigHash, req.XrayRunning, nodeID,
+		req.ConfigHash, req.XrayRunning,
+		req.ShapingOK, req.ShapingTiers, req.ShapingError, nodeID,
 	)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{

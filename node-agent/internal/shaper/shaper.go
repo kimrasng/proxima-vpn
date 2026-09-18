@@ -7,6 +7,7 @@
 package shaper
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os/exec"
@@ -23,8 +24,40 @@ type Tier struct {
 }
 
 // runCmd runs a command; overridable in tests.
+// tc reports some failures - notably "Operation not permitted" without
+// CAP_NET_ADMIN - on stderr while still exiting 0, so an exit-status-only check
+// reads a refused rule as applied. Lines beginning "Warning:" are advisory (htb
+// quantum sizing, for instance) and the rule is installed regardless, so only
+// non-warning stderr counts as failure.
 var runCmd = func(name string, args ...string) error {
-	return exec.Command(name, args...).Run()
+	cmd := exec.Command(name, args...)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	runErr := cmd.Run()
+
+	problem := nonWarningStderr(stderr.String())
+	if runErr != nil {
+		if problem != "" {
+			return fmt.Errorf("%s: %w: %s", name, runErr, problem)
+		}
+		return fmt.Errorf("%s: %w", name, runErr)
+	}
+	if problem != "" {
+		return fmt.Errorf("%s reported: %s", name, problem)
+	}
+	return nil
+}
+
+func nonWarningStderr(out string) string {
+	var kept []string
+	for _, line := range strings.Split(out, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "Warning:") {
+			continue
+		}
+		kept = append(kept, line)
+	}
+	return strings.Join(kept, "; ")
 }
 
 // TiersFromConfig extracts the speed-limited inbounds from an Xray config JSON.

@@ -178,9 +178,9 @@ func runCmd() *cobra.Command {
 				return fmt.Errorf("start xray: %w", err)
 			}
 			defer func() { _ = runner.Stop() }()
-			applyShaping(xrayConfig)
 
 			state := newNodeState(xrayConfig)
+			applyShaping(xrayConfig, state)
 
 			xrayVersion := &versionHolder{}
 			if v, err := runner.Version(); err == nil {
@@ -276,6 +276,24 @@ type nodeState struct {
 	// window, writing the result back would claim users the new process never
 	// received. Comparing the generation across the gap detects that.
 	xrayGen uint64
+
+	shapingOK    bool
+	shapingTiers int
+	shapingErr   string
+}
+
+func (s *nodeState) setShaping(ok bool, tiers int, reason string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.shapingOK = ok
+	s.shapingTiers = tiers
+	s.shapingErr = reason
+}
+
+func (s *nodeState) Shaping() (ok bool, tiers int, reason string) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.shapingOK, s.shapingTiers, s.shapingErr
 }
 
 // userKey keys on email because that is how Xray's RemoveUserOperation
@@ -286,7 +304,7 @@ type userKey struct {
 }
 
 func newNodeState(config []byte) *nodeState {
-	s := &nodeState{users: vlessUsersOfConfig(config)}
+	s := &nodeState{users: vlessUsersOfConfig(config), shapingOK: true}
 	s.setConfig(config, "")
 	return s
 }
@@ -451,10 +469,14 @@ func heartbeatLoop(ctx context.Context, apiClient *client.APIClient, runner *xra
 			return
 		case <-ticker.C:
 			m := stats.CollectSysMetrics()
+			shapingOK, shapingTiers, shapingErr := state.Shaping()
 			status := client.NodeStatus{
-				XrayVersion: xrayVersion.Get(),
-				ConfigHash:  state.ConfigHash(),
-				XrayRunning: runner.IsRunning(),
+				XrayVersion:  xrayVersion.Get(),
+				ConfigHash:   state.ConfigHash(),
+				XrayRunning:  runner.IsRunning(),
+				ShapingOK:    shapingOK,
+				ShapingTiers: shapingTiers,
+				ShapingError: shapingErr,
 			}
 			if err := apiClient.SendHeartbeat(ctx, m.CPU, m.Memory, m.Disk, m.LoadAvg, m.NetworkIn, m.NetworkOut, status); err != nil {
 				log.Printf("heartbeat: %v", err)
@@ -509,7 +531,7 @@ func superviseLoop(ctx context.Context, runner *xray.XrayRunner, state *nodeStat
 
 			backoff = 0
 			nextAttempt = time.Time{}
-			applyShaping(state.Config())
+			applyShaping(state.Config(), state)
 			// A respawned Xray only knows its config file's users, losing any
 			// the agent added over the handler API; the empty hash re-arms
 			// reconciliation on the next poll.
@@ -606,7 +628,7 @@ func xrayUpdateLoop(ctx context.Context, apiClient *client.APIClient, runner *xr
 				continue
 			}
 
-			applyShaping(state.Config())
+			applyShaping(state.Config(), state)
 			if v, err := runner.Version(); err == nil {
 				xrayVersion.Set(v)
 				log.Printf("xray updated to %s", v)
@@ -748,7 +770,7 @@ func configPollLoop(
 				continue
 			}
 
-			applyShaping(newConfig)
+			applyShaping(newConfig, state)
 			state.setConfig(newConfig, digest.StructureHash)
 			state.noteXrayRestartedWith(digest.UsersHash, usersFromDigest(digest))
 		}
@@ -773,7 +795,7 @@ func rollbackConfig(runner *xray.XrayRunner, state *nodeState) {
 		return
 	}
 
-	applyShaping(prev)
+	applyShaping(prev, state)
 	// Clear structureHash: the agent no longer knows the server-side structure
 	// digest for the config now running, and an empty value forces the next
 	// change through the restart path rather than an unsafe incremental one.
@@ -885,13 +907,21 @@ func syncUsers(ctx context.Context, statsClient *xray.StatsClient, state *nodeSt
 }
 
 // applyShaping installs tc bandwidth limits for the speed-limited inbounds
-// present in the given Xray config. Best-effort: failures are logged only.
-func applyShaping(config []byte) {
+// present in the given Xray config, recording the outcome on state so the
+// heartbeat can surface it.
+//
+// A failure here means speed-limited users are running uncapped - tc needs
+// root and a resolvable default route, neither guaranteed. Continuing is right
+// (losing the tunnel is worse than losing the cap) but staying quiet is not:
+// the panel is the only place an operator would ever notice.
+func applyShaping(config []byte, state *nodeState) {
 	tiers := shaper.TiersFromConfig(config)
 	if err := shaper.Apply("", tiers); err != nil {
-		log.Printf("traffic shaping: %v", err)
+		log.Printf("traffic shaping FAILED - speed-limited users are NOT capped: %v", err)
+		state.setShaping(false, len(tiers), err.Error())
 		return
 	}
+	state.setShaping(true, len(tiers), "")
 	if len(tiers) > 0 {
 		log.Printf("applied speed limits to %d tier(s)", len(tiers))
 	}
