@@ -107,7 +107,18 @@
       "editSuccess": "节点更新成功",
       "editError": "更新节点失败",
       "ipReadOnly": "IP（只读）",
-      "portReadOnly": "端口（只读）"
+      "portReadOnly": "端口（只读）",
+      "cancel": "取消",
+      "close": "关闭",
+      "confirmDelete": "删除",
+      "delete": "删除",
+      "deleteConfirmMessage": "确定要删除节点“{{name}}”吗？",
+      "deleteConfirmTitle": "删除节点",
+      "deleteError": "删除节点失败",
+      "fetchError": "加载节点失败",
+      "token": "令牌",
+      "tokenError": "生成令牌失败",
+      "tokenModalTitle": "节点注册令牌"
     },
     "nodeDetail": {
       "title": "节点详情",
@@ -135,7 +146,30 @@
       "deleteConfirm": "确定要删除此节点组吗？",
       "empty": "暂无节点组",
       "manageNodes": "管理节点",
-      "assignNodes": "分配节点"
+      "assignNodes": "分配节点",
+      "cancel": "取消",
+      "confirmDelete": "删除",
+      "create": "创建节点组",
+      "createError": "创建节点组失败",
+      "createTitle": "创建节点组",
+      "delete": "删除",
+      "deleteError": "删除节点组失败",
+      "deleteMessage": "确定要删除节点组“{{name}}”吗？",
+      "deleteTitle": "删除节点组",
+      "detailTitle": "节点组：{{name}}",
+      "edit": "编辑",
+      "editTitle": "编辑节点组",
+      "fetchError": "加载节点组失败",
+      "nameLabel": "节点组名称",
+      "save": "保存",
+      "saveNodes": "保存节点",
+      "updateError": "更新节点组失败",
+      "col": {
+        "name": "名称",
+        "nodeCount": "节点数",
+        "createdAt": "创建时间",
+        "actions": "操作"
+      }
     },
     "plans": {
       "title": "套餐管理",
@@ -153,11 +187,44 @@
       "unlimited": "无限制",
       "form": {
         "maxConcurrent": "并发连接数",
-        "maxConcurrentHint": "整个节点池中同时允许的不同来源地址数量。留空则沿用设备数量上限。"
+        "maxConcurrentHint": "整个节点池中同时允许的不同来源地址数量。留空则沿用设备数量上限。",
+        "name": "套餐名称",
+        "trafficLimit": "流量限制（GB）",
+        "trafficHint": "留空表示无限制",
+        "duration": "时长（天）",
+        "maxDevices": "最大设备数",
+        "speedLimit": "速度限制（Mbps）",
+        "speedHint": "留空表示无限制",
+        "nodeGroup": "节点组",
+        "active": "启用"
       },
       "col": {
-        "maxConcurrent": "并发"
-      }
+        "maxConcurrent": "并发",
+        "name": "名称",
+        "trafficLimit": "流量限制",
+        "duration": "时长",
+        "maxDevices": "最大设备数",
+        "speedLimit": "速度限制",
+        "nodeGroup": "节点组",
+        "active": "启用",
+        "actions": "操作"
+      },
+      "cancel": "取消",
+      "confirmDelete": "删除",
+      "create": "创建套餐",
+      "createError": "创建套餐失败",
+      "createTitle": "创建套餐",
+      "delete": "删除",
+      "deleteError": "删除套餐失败",
+      "deleteMessage": "确定要删除套餐“{{name}}”吗？",
+      "deleteTitle": "删除套餐",
+      "edit": "编辑",
+      "editTitle": "编辑套餐",
+      "fetchError": "加载套餐失败",
+      "no": "否",
+      "save": "保存",
+      "updateError": "更新套餐失败",
+      "yes": "是"
     },
     "users": {
       "title": "用户管理",
@@ -184,7 +251,28 @@
       "editUserSuccess": "用户更新成功",
       "editUserError": "更新用户失败",
       "planLabel": "套餐",
-      "noTrafficLimit": "无限制"
+      "noTrafficLimit": "无限制",
+      "activate": "启用",
+      "suspend": "停用",
+      "fetchError": "加载用户失败",
+      "updateError": "更新用户失败",
+      "loading": "正在加载用户...",
+      "searchPlaceholder": "按邮箱或姓名搜索",
+      "col": {
+        "email": "邮箱",
+        "name": "姓名",
+        "plan": "套餐",
+        "status": "状态",
+        "trafficUsed": "已用流量",
+        "expiresAt": "到期时间",
+        "actions": "操作"
+      },
+      "filter": {
+        "all": "全部状态",
+        "active": "正常",
+        "suspended": "已停用",
+        "expired": "已过期"
+      }
     },
     "planRequests": {
       "title": "套餐申请管理",
@@ -196,7 +284,24 @@
       "pending": "待处理",
       "approved": "已批准",
       "rejected": "已拒绝",
-      "empty": "暂无套餐申请"
+      "empty": "暂无套餐申请",
+      "fetchError": "加载套餐申请失败",
+      "reviewError": "处理申请失败",
+      "loading": "正在加载申请...",
+      "col": {
+        "email": "用户邮箱",
+        "name": "用户姓名",
+        "plan": "套餐",
+        "status": "状态",
+        "requestedAt": "申请时间",
+        "actions": "操作"
+      },
+      "filter": {
+        "all": "全部",
+        "pending": "待处理",
+        "approved": "已批准",
+        "rejected": "已拒绝"
+      }
     },
     "announcements": {
       "title": "公告管理",
@@ -248,7 +353,29 @@
       "backupDownload": "下载",
       "backupTriggerSuccess": "备份已成功启动",
       "backupTriggerError": "启动备份失败",
-      "noBackups": "暂无备份"
+      "noBackups": "暂无备份",
+      "fetchError": "加载设置失败",
+      "saveError": "保存设置失败",
+      "saveSuccess": "设置已保存",
+      "registration": "注册",
+      "selfRegistration": "允许自助注册",
+      "security": "安全",
+      "sessionTimeout": "会话超时",
+      "secondsHint": "以秒为单位",
+      "subscription": "订阅",
+      "updateInterval": "更新间隔",
+      "backup": "备份设置",
+      "backupSchedule": "备份计划",
+      "cronHint": "Cron 表达式（例如 0 2 * * *）",
+      "s3Bucket": "S3 存储桶",
+      "s3Endpoint": "S3 端点",
+      "s3Region": "区域",
+      "s3AccessKey": "访问密钥",
+      "s3SecretKey": "私密密钥",
+      "telegram": "Telegram",
+      "telegramEnabled": "启用 Telegram 通知",
+      "telegramBotToken": "机器人令牌",
+      "telegramChatId": "聊天 ID"
     },
     "twoFactor": {
       "title": "双因素认证",
@@ -259,7 +386,21 @@
       "scanQr": "使用验证器应用扫描二维码",
       "enterCode": "输入验证码",
       "verifyCode": "验证",
-      "disableWarning": "禁用双因素认证将降低账户安全性"
+      "disableWarning": "禁用双因素认证将降低账户安全性",
+      "status": "两步验证",
+      "enableBtn": "启用两步验证",
+      "disableBtn": "停用两步验证",
+      "secret": "密钥",
+      "otpauthUrl": "OTPAuth 链接",
+      "verify": "验证并启用",
+      "verifyHint": "请输入身份验证器应用中的 6 位验证码",
+      "enableSuccess": "两步验证已启用",
+      "enableError": "验证码无效，请重试。",
+      "disableCode": "当前验证码",
+      "disableHint": "请输入当前的两步验证码以停用",
+      "disableSuccess": "两步验证已停用",
+      "disableError": "验证码无效，请重试。",
+      "setupError": "两步验证设置失败"
     }
   },
   "user": {
@@ -319,7 +460,8 @@
       "addError": "添加设备失败",
       "deleteSuccess": "设备删除成功",
       "deleteError": "删除设备失败",
-      "loadError": "加载设备列表失败"
+      "loadError": "加载设备列表失败",
+      "limitReached": "已达到设备数量上限"
     },
     "traffic": {
       "title": "流量概况",
