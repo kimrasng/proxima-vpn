@@ -521,6 +521,7 @@ export default function Nodes() {
               id: "name",
               header: t("admin.nodes.col.name"),
               sortingField: "name",
+              minWidth: 120,
               cell: (item) =>
                 item.status === "pending" ? (
                   <Badge color="grey">{t("admin.nodes.statusPending")}</Badge>
@@ -534,6 +535,7 @@ export default function Nodes() {
               id: "country",
               header: t("admin.nodes.col.countryRegion"),
               sortingField: "country",
+              maxWidth: 150,
               cell: (item) =>
                 item.status === "pending" ? (
                   <Box color="text-status-inactive">—</Box>
@@ -576,7 +578,7 @@ export default function Nodes() {
                   </Popover>
                 </SpaceBetween>
               ),
-              minWidth: 190,
+              minWidth: 165,
               cell: (item) => (
                 <SpaceBetween size="xxxs">
                   <UsageCell label={t("admin.nodes.col.cpu")} value={item.cpu_usage} />
@@ -587,6 +589,7 @@ export default function Nodes() {
             {
               id: "traffic",
               header: t("admin.nodes.col.traffic"),
+              maxWidth: 110,
               cell: (item) =>
                 item.network_in != null && item.network_out != null ? (
                   <SpaceBetween size="xxxs">
@@ -601,6 +604,7 @@ export default function Nodes() {
               id: "connections",
               header: t("admin.nodes.col.connections"),
               sortingField: "online_devices",
+              maxWidth: 110,
               cell: (item) =>
                 item.status === "pending" ? (
                   <Box color="text-status-inactive">—</Box>
@@ -612,6 +616,7 @@ export default function Nodes() {
               id: "multiplier",
               header: t("admin.nodes.col.multiplier"),
               sortingField: "traffic_multiplier",
+              maxWidth: 120,
               cell: (item) => {
                 const factor = item.traffic_multiplier ?? 1;
                 return factor === 1 ? (
@@ -629,6 +634,7 @@ export default function Nodes() {
               id: "lastCheck",
               header: t("admin.nodes.col.lastCheck"),
               sortingField: "last_seen",
+              maxWidth: 105,
               cell: (item) => (
                 <span title={formatAbsoluteTime(item.last_seen)}>
                   {formatRelativeTime(t, item.last_seen)}
