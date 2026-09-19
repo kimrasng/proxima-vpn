@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import {
+  Alert,
   Badge,
   Box,
   Button,
@@ -11,6 +12,7 @@ import {
   Flashbar,
   Header,
   Link,
+  Modal,
   Pagination,
   Select,
   type SelectProps,
@@ -21,8 +23,9 @@ import {
   TextFilter,
 } from "@cloudscape-design/components";
 import { useCollection } from "@cloudscape-design/collection-hooks";
-import { getOnlineUsers } from "../../api/admin";
+import { getOnlineUsers, terminateSession } from "../../api/admin";
 import type { OnlineUser } from "../../api/types";
+import { formatRelativeTime } from "../../utils/relativeTime";
 
 const REFRESH_INTERVAL = 30000;
 const PAGE_SIZE = 25;
@@ -32,14 +35,6 @@ function formatBytes(bytes: number): string {
   const units = ["B", "KB", "MB", "GB", "TB"];
   const i = Math.floor(Math.log(bytes) / Math.log(1024));
   return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${units[i]}`;
-}
-
-function formatRelative(iso: string): string {
-  const seconds = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
-  if (seconds < 60) return `${Math.max(seconds, 0)}s`;
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m`;
-  return `${Math.floor(minutes / 60)}h`;
 }
 
 export default function Connections() {
@@ -53,6 +48,9 @@ export default function Connections() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [nodeFilter, setNodeFilter] = useState("all");
   const [capFilter, setCapFilter] = useState("all");
+  const [terminating, setTerminating] = useState<OnlineUser | null>(null);
+  const [terminateBusy, setTerminateBusy] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const fetchSessions = useCallback(async () => {
     try {
@@ -173,6 +171,26 @@ export default function Connections() {
     setCapFilter("all");
   };
 
+  const confirmTerminate = async () => {
+    if (!terminating) return;
+    setTerminateBusy(true);
+    try {
+      const result = await terminateSession(terminating.device_id);
+      setNotice(
+        t("admin.connections.terminateSuccess", {
+          device: terminating.device || terminating.email,
+          minutes: result.cooldown_minutes,
+        }),
+      );
+      setTerminating(null);
+      await fetchSessions();
+    } catch {
+      setError(t("admin.connections.terminateError"));
+    } finally {
+      setTerminateBusy(false);
+    }
+  };
+
   if (loading) {
     return (
       <ContentLayout header={<Header variant="h1">{t("admin.connections.title")}</Header>}>
@@ -215,6 +233,18 @@ export default function Connections() {
         {error && (
           <Flashbar
             items={[{ type: "error", content: error, dismissible: true, onDismiss: () => setError(null) }]}
+          />
+        )}
+        {notice && (
+          <Flashbar
+            items={[
+              {
+                type: "success",
+                content: notice,
+                dismissible: true,
+                onDismiss: () => setNotice(null),
+              },
+            ]}
           />
         )}
 
@@ -366,7 +396,7 @@ export default function Connections() {
                           <span style={{ fontFamily: "monospace" }}>{address.ip}</span>
                         </Box>
                         <Box variant="small" color="text-body-secondary">
-                          {formatRelative(address.last_seen)}
+                          {formatRelativeTime(t, address.last_seen)}
                         </Box>
                       </div>
                     ))}
@@ -406,9 +436,53 @@ export default function Connections() {
               sortingField: "traffic_today",
               cell: (item) => formatBytes(item.traffic_today),
             },
+            {
+              id: "actions",
+              header: t("admin.connections.col.actions"),
+              minWidth: 110,
+              cell: (item) => (
+                <Button variant="inline-link" onClick={() => setTerminating(item)}>
+                  {t("admin.connections.terminate")}
+                </Button>
+              ),
+            },
           ]}
         />
       </SpaceBetween>
+
+      <Modal
+        visible={terminating !== null}
+        onDismiss={() => setTerminating(null)}
+        header={t("admin.connections.terminateTitle")}
+        footer={
+          <Box float="right">
+            <SpaceBetween direction="horizontal" size="xs">
+              <Button variant="link" onClick={() => setTerminating(null)}>
+                {t("admin.connections.cancel")}
+              </Button>
+              <Button
+                variant="primary"
+                loading={terminateBusy}
+                onClick={() => void confirmTerminate()}
+              >
+                {t("admin.connections.terminate")}
+              </Button>
+            </SpaceBetween>
+          </Box>
+        }
+      >
+        {terminating && (
+          <SpaceBetween size="m">
+            <Box>
+              {t("admin.connections.terminateConfirm", {
+                device: terminating.device || t("admin.connections.unnamedDevice"),
+                email: terminating.email,
+              })}
+            </Box>
+            <Alert type="info">{t("admin.connections.terminateHint")}</Alert>
+          </SpaceBetween>
+        )}
+      </Modal>
     </ContentLayout>
   );
 }

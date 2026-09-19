@@ -404,6 +404,106 @@ func (h *AdminStatsHandler) GetOnlineUsers(c *fiber.Ctx) error {
 	return c.JSON(result)
 }
 
+type terminateSessionRequest struct {
+	CooldownMinutes int `json:"cooldown_minutes"`
+}
+
+// Withdrawing the credential is what ends the session, so it must stay
+// withdrawn long enough for the client to stop retrying: a client that
+// reconnects instantly gets re-provisioned on the next config poll, making the
+// action look like it did nothing.
+const (
+	defaultTerminateCooldown = 10
+	maxTerminateCooldown     = 24 * 60
+)
+
+// TerminateSession withdraws one device's credential so its live session drops.
+//
+// Nodes are polled, never pushed to, so this cannot sever a socket directly: it
+// marks the device evicted, the agent stops receiving it in the config it polls
+// every 30s, and the agent then drops the user from the running Xray. The
+// session therefore ends within one poll interval rather than instantly.
+// @Summary Terminate a device's session
+// @Description Evicts a device so the node agent withdraws its credential on the next config poll
+// @Tags admin-stats
+// @Accept json
+// @Produce json
+// @Param id path string true "Device ID"
+// @Param body body terminateSessionRequest false "Cooldown in minutes"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Security BearerAuth
+// @Router /admin/devices/{id}/terminate [post]
+func (h *AdminStatsHandler) TerminateSession(c *fiber.Ctx) error {
+	ctx := context.Background()
+	deviceID := c.Params("id")
+
+	var req terminateSessionRequest
+	if len(c.Body()) > 0 {
+		if err := c.BodyParser(&req); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+		}
+	}
+
+	cooldown := req.CooldownMinutes
+	if cooldown <= 0 {
+		cooldown = defaultTerminateCooldown
+	}
+	if cooldown > maxTerminateCooldown {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "cooldown_minutes exceeds the maximum",
+		})
+	}
+
+	var xrayUUID, email, deviceName string
+	err := h.db.QueryRow(ctx, `
+		SELECT d.xray_uuid, u.email, COALESCE(d.name, '')
+		FROM devices d
+		JOIN users u ON u.id = d.user_id
+		WHERE d.id = $1
+	`, deviceID).Scan(&xrayUUID, &email, &deviceName)
+	if err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "device not found"})
+	}
+
+	if _, err := h.db.Exec(ctx,
+		`UPDATE devices SET evicted_until = NOW() + make_interval(mins => $1) WHERE id = $2`,
+		cooldown, deviceID,
+	); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to terminate session",
+		})
+	}
+
+	// Clears the cached online report so the row leaves the connections view now
+	// instead of lingering until its TTL lapses.
+	h.tracker.ForgetDevice(ctx, xrayUUID)
+
+	adminLabel, _ := c.Locals("email").(string)
+	adminID, _ := c.Locals("admin_id").(string)
+	h.activity.Log(ctx, services.Record{
+		EventType:  services.EventSessionTerminated,
+		Severity:   services.SeverityWarning,
+		ActorType:  "admin",
+		ActorID:    adminID,
+		ActorLabel: adminLabel,
+		TargetType: "device",
+		TargetID:   deviceID,
+		Detail: map[string]any{
+			"email":            email,
+			"device":           deviceName,
+			"cooldown_minutes": cooldown,
+		},
+	})
+
+	return c.JSON(fiber.Map{
+		"message":          "session terminated",
+		"cooldown_minutes": cooldown,
+	})
+}
+
 // GetTrafficHistory returns daily upload/download traffic for the last 7 days.
 // @Summary Get traffic history
 // @Description Returns daily upload/download traffic aggregated from traffic_logs

@@ -120,6 +120,7 @@ func (s *Server) registerRoutes() {
 	admin.Get("/stats/alerts", adminStatsHandler.GetAlerts)
 	admin.Get("/activity", adminStatsHandler.GetActivity)
 	admin.Get("/online-users", adminStatsHandler.GetOnlineUsers)
+	admin.Post("/devices/:id/terminate", adminStatsHandler.TerminateSession)
 
 	if s.backupService != nil {
 		adminBackupHandler := handlers.NewAdminBackupHandler(s.backupService)

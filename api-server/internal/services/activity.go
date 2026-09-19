@@ -37,6 +37,8 @@ const (
 	EventPlanRequested  = "plan.requested"
 	EventPlanApproved   = "plan.approved"
 	EventPlanRejected   = "plan.rejected"
+
+	EventSessionTerminated = "session.terminated"
 )
 
 // Entry is one row of the activity feed.

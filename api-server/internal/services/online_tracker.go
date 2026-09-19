@@ -270,6 +270,77 @@ func (t *OnlineTracker) CountDistinctIPsForUser(
 	return len(distinct), perDevice, nil
 }
 
+// ForgetDevice drops one device from the cached online reports so a terminated
+// session stops being listed before its TTL lapses. Best-effort: the next agent
+// report is the authority, so a failure here only leaves a stale row behind.
+//
+// The remaining entries are rewritten with the key's own remaining TTL rather
+// than a fresh one, so removing a device cannot extend how long a dead node's
+// report is trusted.
+func (t *OnlineTracker) ForgetDevice(ctx context.Context, xrayUUID string) {
+	if xrayUUID == "" {
+		return
+	}
+
+	t.redis.Del(ctx, "device:"+xrayUUID+":online_since")
+
+	ipKeys, err := t.scanKeys(ctx, "node:*:online_ips")
+	if err == nil {
+		for _, key := range ipKeys {
+			data, err := t.redis.Get(ctx, key).Bytes()
+			if err != nil {
+				continue
+			}
+			var byUUID map[string]json.RawMessage
+			if err := json.Unmarshal(data, &byUUID); err != nil {
+				continue
+			}
+			if _, present := byUUID[xrayUUID]; !present {
+				continue
+			}
+			delete(byUUID, xrayUUID)
+			t.rewrite(ctx, key, byUUID)
+		}
+	}
+
+	keys, err := t.scanKeys(ctx, "node:*:online")
+	if err != nil {
+		return
+	}
+	for _, key := range keys {
+		data, err := t.redis.Get(ctx, key).Bytes()
+		if err != nil {
+			continue
+		}
+		var uuids []string
+		if err := json.Unmarshal(data, &uuids); err != nil {
+			continue
+		}
+		kept := make([]string, 0, len(uuids))
+		for _, u := range uuids {
+			if u != xrayUUID {
+				kept = append(kept, u)
+			}
+		}
+		if len(kept) == len(uuids) {
+			continue
+		}
+		t.rewrite(ctx, key, kept)
+	}
+}
+
+func (t *OnlineTracker) rewrite(ctx context.Context, key string, value any) {
+	ttl, err := t.redis.TTL(ctx, key).Result()
+	if err != nil || ttl <= 0 {
+		return
+	}
+	encoded, err := json.Marshal(value)
+	if err != nil {
+		return
+	}
+	t.redis.Set(ctx, key, encoded, ttl)
+}
+
 func (t *OnlineTracker) freshNodeIDs(ctx context.Context, db *pgxpool.Pool) (map[string]struct{}, error) {
 	rows, err := db.Query(ctx,
 		`SELECT id::text FROM nodes WHERE last_seen > NOW() - INTERVAL '2 minutes'`)

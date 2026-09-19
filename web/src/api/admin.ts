@@ -21,6 +21,7 @@ import type {
   PlanRequest,
   DashboardStats,
   OnlineUser,
+  TerminateSessionResponse,
   LoginRequest,
   LoginResponse,
   TwoFASetup,
@@ -200,6 +201,16 @@ export function getDashboardStats(): Promise<DashboardStats> {
 export function getOnlineUsers(): Promise<OnlineUser[]> {
   applyAdminClient();
   return get<OnlineUser[]>('/api/v1/admin/online-users');
+}
+
+export function terminateSession(
+  deviceId: string,
+  cooldownMinutes?: number,
+): Promise<TerminateSessionResponse> {
+  applyAdminClient();
+  return post<TerminateSessionResponse>(`/api/v1/admin/devices/${deviceId}/terminate`, {
+    cooldown_minutes: cooldownMinutes ?? 0,
+  });
 }
 
 export function getTrafficHistory(): Promise<TrafficHistoryEntry[]> {
