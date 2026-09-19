@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import {
   Badge,
   Box,
+  type BoxProps,
   Button,
   ButtonDropdown,
   CollectionPreferences,
@@ -31,22 +32,10 @@ import {
 import { useCollection } from "@cloudscape-design/collection-hooks";
 import { listNodes, generateNodeToken, deleteNode, updateNode } from "../../api/admin";
 import type { Node, GenerateTokenResponse, UpdateNodeRequest } from "../../api/types";
+import { formatAbsoluteTime, formatRelativeTime } from "../../utils/relativeTime";
 
 const REFRESH_INTERVAL = 30000;
 const DEFAULT_PAGE_SIZE = 20;
-
-function formatRelativeTime(dateStr: string | undefined | null): string {
-  if (!dateStr) return "—";
-  const diffMs = Date.now() - new Date(dateStr).getTime();
-  if (diffMs < 0) return "0s";
-  const seconds = Math.floor(diffMs / 1000);
-  if (seconds < 60) return `${seconds}s`;
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h`;
-  return `${Math.floor(hours / 24)}d`;
-}
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return "0 B";
@@ -107,6 +96,32 @@ function UsageCell({ label, value }: { label: string; value: number | undefined 
   );
 }
 
+function KpiTile({
+  label,
+  value,
+  color,
+  caption,
+}: {
+  label: string;
+  value: number;
+  color?: BoxProps.Color;
+  caption?: string;
+}) {
+  return (
+    <SpaceBetween size="xxxs">
+      <Box variant="awsui-key-label">{label}</Box>
+      <Box fontSize="display-l" fontWeight="bold" color={color ?? "inherit"}>
+        {value}
+      </Box>
+      {caption && (
+        <Box variant="small" color="text-body-secondary">
+          {caption}
+        </Box>
+      )}
+    </SpaceBetween>
+  );
+}
+
 export default function Nodes() {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -118,7 +133,12 @@ export default function Nodes() {
   const [tokenData, setTokenData] = useState<GenerateTokenResponse | null>(null);
   const [deleteModal, setDeleteModal] = useState<Node | null>(null);
   const [editModal, setEditModal] = useState<Node | null>(null);
-  const [editForm, setEditForm] = useState({ name: "", country: "", region: "" });
+  const [editForm, setEditForm] = useState({
+    name: "",
+    country: "",
+    region: "",
+    trafficMultiplier: "1",
+  });
   const [editSuccess, setEditSuccess] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
 
@@ -135,6 +155,7 @@ export default function Nodes() {
       { id: "resources", visible: true },
       { id: "traffic", visible: true },
       { id: "connections", visible: true },
+      { id: "multiplier", visible: true },
       { id: "lastCheck", visible: true },
       { id: "health", visible: false },
       { id: "actions", visible: true },
@@ -272,17 +293,28 @@ export default function Nodes() {
 
   const handleEditOpen = (node: Node) => {
     setEditModal(node);
-    setEditForm({ name: node.name, country: node.country, region: node.region });
+    setEditForm({
+      name: node.name,
+      country: node.country,
+      region: node.region,
+      trafficMultiplier: String(node.traffic_multiplier ?? 1),
+    });
   };
 
   const handleEditSubmit = async () => {
     if (!editModal) return;
     setActionLoading(true);
     try {
+      const multiplier = Number(editForm.trafficMultiplier);
+      if (!Number.isFinite(multiplier) || multiplier <= 0 || multiplier > 100) {
+        setError(t("admin.nodes.multiplierInvalid"));
+        return;
+      }
       const req: UpdateNodeRequest = {
         name: editForm.name,
         country: editForm.country,
         region: editForm.region,
+        traffic_multiplier: multiplier,
       };
       await updateNode(editModal.id, req);
       setEditModal(null);
@@ -373,49 +405,29 @@ export default function Nodes() {
 
         <Container>
           <ColumnLayout columns={4} variant="text-grid">
-            <div>
-              <Box variant="awsui-key-label">{t("admin.nodes.kpi.total")}</Box>
-              <Box fontSize="heading-xl" fontWeight="bold">
-                {healthSummary.total}
-              </Box>
-            </div>
-            <div>
-              <Box variant="awsui-key-label">{t("admin.nodes.kpi.online")}</Box>
-              <SpaceBetween direction="horizontal" size="xs" alignItems="center">
-                <Box fontSize="heading-xl" fontWeight="bold" color="text-status-success">
-                  {healthSummary.online}
-                </Box>
-                <Box variant="small" color="text-body-secondary">
-                  {kpiRatio(healthSummary.online)}%
-                </Box>
-              </SpaceBetween>
-            </div>
-            <div>
-              <Box variant="awsui-key-label">{t("admin.nodes.kpi.offline")}</Box>
-              <SpaceBetween direction="horizontal" size="xs" alignItems="center">
-                <Box
-                  fontSize="heading-xl"
-                  fontWeight="bold"
-                  color={healthSummary.offline > 0 ? "text-status-error" : "inherit"}
-                >
-                  {healthSummary.offline}
-                </Box>
-                <Box variant="small" color="text-body-secondary">
-                  {kpiRatio(healthSummary.offline)}%
-                </Box>
-              </SpaceBetween>
-            </div>
-            <div>
-              <Box variant="awsui-key-label">{t("admin.nodes.kpi.pending")}</Box>
-              <SpaceBetween direction="horizontal" size="xs" alignItems="center">
-                <Box fontSize="heading-xl" fontWeight="bold" color="text-status-inactive">
-                  {healthSummary.pending}
-                </Box>
-                <Box variant="small" color="text-body-secondary">
-                  {kpiRatio(healthSummary.pending)}%
-                </Box>
-              </SpaceBetween>
-            </div>
+            <KpiTile
+              label={t("admin.nodes.kpi.total")}
+              value={healthSummary.total}
+              caption={t("admin.nodes.kpi.totalCaption")}
+            />
+            <KpiTile
+              label={t("admin.nodes.kpi.online")}
+              value={healthSummary.online}
+              color="text-status-success"
+              caption={t("admin.nodes.kpi.shareOfTotal", { percent: kpiRatio(healthSummary.online) })}
+            />
+            <KpiTile
+              label={t("admin.nodes.kpi.offline")}
+              value={healthSummary.offline}
+              color={healthSummary.offline > 0 ? "text-status-error" : "inherit"}
+              caption={t("admin.nodes.kpi.shareOfTotal", { percent: kpiRatio(healthSummary.offline) })}
+            />
+            <KpiTile
+              label={t("admin.nodes.kpi.pending")}
+              value={healthSummary.pending}
+              color="text-status-inactive"
+              caption={t("admin.nodes.kpi.shareOfTotal", { percent: kpiRatio(healthSummary.pending) })}
+            />
           </ColumnLayout>
         </Container>
 
@@ -500,6 +512,7 @@ export default function Nodes() {
                   { id: "resources", label: t("admin.nodes.col.resources") },
                   { id: "traffic", label: t("admin.nodes.col.traffic") },
                   { id: "connections", label: t("admin.nodes.col.connections") },
+                  { id: "multiplier", label: t("admin.nodes.col.multiplier") },
                   { id: "lastCheck", label: t("admin.nodes.col.lastCheck") },
                   { id: "health", label: t("admin.nodes.col.health") },
                   { id: "actions", label: t("admin.nodes.col.actions") },
@@ -600,12 +613,29 @@ export default function Nodes() {
                 ),
             },
             {
+              id: "multiplier",
+              header: t("admin.nodes.col.multiplier"),
+              sortingField: "traffic_multiplier",
+              cell: (item) => {
+                const factor = item.traffic_multiplier ?? 1;
+                return factor === 1 ? (
+                  <Box variant="small" color="text-body-secondary">
+                    {t("admin.nodes.multiplierNormal")}
+                  </Box>
+                ) : (
+                  <Badge color={factor > 1 ? "severity-medium" : "green"}>
+                    {t("admin.nodes.multiplierValue", { factor })}
+                  </Badge>
+                );
+              },
+            },
+            {
               id: "lastCheck",
               header: t("admin.nodes.col.lastCheck"),
               sortingField: "last_seen",
               cell: (item) => (
-                <span title={item.last_seen ? new Date(item.last_seen).toLocaleString() : ""}>
-                  {formatRelativeTime(item.last_seen)}
+                <span title={formatAbsoluteTime(item.last_seen)}>
+                  {formatRelativeTime(t, item.last_seen)}
                 </span>
               ),
             },
@@ -751,6 +781,20 @@ export default function Nodes() {
               <Input
                 value={editForm.region}
                 onChange={({ detail }) => setEditForm((f) => ({ ...f, region: detail.value }))}
+              />
+            </FormField>
+            <FormField
+              label={t("admin.nodes.col.multiplier")}
+              description={t("admin.nodes.multiplierHint")}
+            >
+              <Input
+                value={editForm.trafficMultiplier}
+                type="number"
+                step={0.1}
+                inputMode="decimal"
+                onChange={({ detail }) =>
+                  setEditForm((f) => ({ ...f, trafficMultiplier: detail.value }))
+                }
               />
             </FormField>
           </SpaceBetween>

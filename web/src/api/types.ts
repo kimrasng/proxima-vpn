@@ -49,6 +49,8 @@ export interface Node {
   network_in?: number;
   network_out?: number;
   xray_version?: string;
+  // Quota charged per transferred byte on this node; 1 bills at face value.
+  traffic_multiplier: number;
   // Nullable because they come from DB columns the node may not have reported yet.
   shaping_ok: boolean | null;
   shaping_tiers: number | null;
@@ -182,6 +184,7 @@ export interface UpdateNodeRequest {
   name?: string;
   country?: string;
   region?: string;
+  traffic_multiplier?: number;
 }
 
 export interface ListUsersParams {
@@ -300,6 +303,11 @@ export interface OnlineUser {
   // Null when the session started before the node agent began stamping it.
   connected_since: string | null;
   traffic_today: number;
+}
+
+export interface TerminateSessionResponse {
+  message: string;
+  cooldown_minutes: number;
 }
 
 // User - Devices
@@ -421,28 +429,6 @@ export interface CreateInboundRequest {
   port: number;
   tag: string;
   settings: Record<string, unknown>;
-}
-
-// Admin - User Templates
-export interface UserTemplate {
-  id: string;
-  name: string;
-  traffic_limit?: number;
-  duration_days: number;
-  max_devices: number;
-  speed_limit?: number;
-  node_group_id?: string;
-  node_group_name?: string;
-  created_at: string;
-}
-
-export interface CreateUserTemplateRequest {
-  name: string;
-  traffic_limit?: number;
-  duration_days: number;
-  max_devices: number;
-  speed_limit?: number;
-  node_group_id?: string;
 }
 
 // 2FA
