@@ -22,8 +22,8 @@ import {
   TextFilter,
 } from "@cloudscape-design/components";
 import { useCollection } from "@cloudscape-design/collection-hooks";
-import { getDashboardAlerts, listNodes, acknowledgeAlert, silenceAlert } from "../../api/admin";
-import type { AlertSeverity, DashboardAlerts, Node, NodeIssue } from "../../api/types";
+import { getDashboardAlerts, acknowledgeAlert, silenceAlert } from "../../api/admin";
+import type { AlertSeverity, DashboardAlerts, NodeIssue } from "../../api/types";
 import { useManualRefresh } from "../../hooks/useManualRefresh";
 import { formatDuration } from "../../utils/relativeTime";
 
@@ -55,7 +55,6 @@ export default function Alerts() {
   const navigate = useNavigate();
 
   const [alerts, setAlerts] = useState<DashboardAlerts | null>(null);
-  const [nodes, setNodes] = useState<Node[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [severityFilter, setSeverityFilter] = useState("all");
@@ -63,9 +62,9 @@ export default function Alerts() {
 
   const fetchAll = useCallback(async () => {
     try {
-      const [alertsData, nodesData] = await Promise.all([getDashboardAlerts(), listNodes()]);
-      setAlerts(alertsData);
-      setNodes(nodesData);
+      // The alerts response already carries each row's node name, location, and
+      // status, so the second request this used to make was redundant.
+      setAlerts(await getDashboardAlerts());
       setError(null);
     } catch {
       setError(t("admin.alerts.fetchError"));
@@ -179,12 +178,15 @@ export default function Alerts() {
         return t("admin.dashboard.issue.memoryLabel", { value: issue.value.toFixed(0) });
       case "disk":
         return t("admin.dashboard.issue.diskLabel", { value: issue.value.toFixed(0) });
+      case "xray_down":
+        return t("admin.dashboard.issue.xray_downLabel");
+      case "shaping_failed":
+        return t("admin.dashboard.issue.shaping_failedLabel");
       default:
         return issue.kind;
     }
   };
 
-  const nodeStatus = useMemo(() => new Map(nodes.map((n) => [n.id, n.status])), [nodes]);
 
   const filtersActive =
     Boolean(filterProps.filteringText) || severityFilter !== "all" || kindFilter !== "all";
@@ -428,7 +430,7 @@ export default function Alerts() {
               id: "node",
               header: t("admin.nodes.col.name"),
               sortingField: "node_name",
-              minWidth: 180,
+              minWidth: 130,
               cell: (item) => (
                 <StatusIndicator type={indicatorType(item.severity)}>
                   <Link onFollow={() => navigate(`/admin/nodes/${item.node_id}`)}>
@@ -440,6 +442,7 @@ export default function Alerts() {
             {
               id: "location",
               header: t("admin.nodes.col.countryRegion"),
+              minWidth: 115,
               cell: (item) => [item.country, item.region].filter(Boolean).join(" · ") || "—",
             },
             {
@@ -447,6 +450,7 @@ export default function Alerts() {
               header: t("admin.dashboard.col.issue"),
               sortingField: "kind",
               minWidth: 130,
+              maxWidth: 170,
               cell: (item) => (
                 <Badge color={badgeColor[item.severity]}>
                   {t(`admin.dashboard.issue.${item.kind}`)}
@@ -463,7 +467,7 @@ export default function Alerts() {
               id: "duration",
               header: t("admin.alerts.col.duration"),
               sortingField: "duration_seconds",
-              minWidth: 110,
+              maxWidth: 90,
               cell: (item) =>
                 item.duration_seconds > 0 ? (
                   formatDuration(t, item.duration_seconds)
@@ -489,9 +493,11 @@ export default function Alerts() {
                 if (item.acked) {
                   return <Badge color="blue">{t("admin.alerts.stateAcked")}</Badge>;
                 }
-                return (
-                  <Badge color={badgeColor[item.severity]}>{t("admin.alerts.stateFiring")}</Badge>
-                );
+                // One colour per lifecycle state. Keying this off severity gave two
+                // different colours to the identical word "Firing", which reads as
+                // an undocumented sub-state; severity is already the Issue badge's
+                // job one column over.
+                return <Badge color="red">{t("admin.alerts.stateFiring")}</Badge>;
               },
             },
             {
@@ -537,30 +543,6 @@ export default function Alerts() {
                   }}
                 />
               ),
-            },
-            {
-              id: "status",
-              header: t("admin.nodes.col.status"),
-              cell: (item) => {
-                const status = nodeStatus.get(item.node_id) ?? item.status;
-                if (status === "online") {
-                  return (
-                    <StatusIndicator type="success">
-                      {t("admin.nodes.statusOnline")}
-                    </StatusIndicator>
-                  );
-                }
-                if (status === "offline") {
-                  return (
-                    <StatusIndicator type="error">{t("admin.nodes.statusOffline")}</StatusIndicator>
-                  );
-                }
-                return (
-                  <StatusIndicator type="pending">
-                    {t("admin.nodes.statusPending")}
-                  </StatusIndicator>
-                );
-              },
             },
           ]}
         />

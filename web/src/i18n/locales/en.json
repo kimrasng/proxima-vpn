@@ -42,7 +42,8 @@
       "minutes": "{{count}}m",
       "hours": "{{count}}h",
       "days": "{{count}}d"
-    }
+    },
+    "create": "Create"
   },
   "admin": {
     "nav": {
@@ -158,7 +159,11 @@
         "pending_requests_desc": "New users are waiting.",
         "actionNow": "Act now",
         "actionCheck": "Check",
-        "actionReview": "Review"
+        "actionReview": "Review",
+        "node_xray_down": "{{count}} node(s) with Xray down",
+        "node_xray_down_desc": "The node is reporting but Xray is not running, so it serves nobody.",
+        "node_shaping_failed": "{{count}} node(s) failed to apply shaping",
+        "node_shaping_failed_desc": "Speed limits could not be applied, so plan caps are not enforced there."
       },
       "issue": {
         "offline": "Connection lost",
@@ -168,7 +173,11 @@
         "offlineLabel": "Offline",
         "cpuLabel": "CPU {{value}}%",
         "memoryLabel": "Memory {{value}}%",
-        "diskLabel": "Disk {{value}}%"
+        "diskLabel": "Disk {{value}}%",
+        "xray_down": "Xray down",
+        "shaping_failed": "Shaping failed",
+        "xray_downLabel": "Xray",
+        "shaping_failedLabel": "Shaping"
       },
       "event": {
         "user.login": "signed in to the VPN.",
@@ -451,12 +460,6 @@
       "resetTraffic": "Reset Traffic",
       "resetTrafficSuccess": "Traffic reset successfully",
       "resetTrafficError": "Failed to reset traffic",
-      "editUser": "Edit",
-      "editUserModalTitle": "Edit User",
-      "editUserSuccess": "User updated successfully",
-      "editUserError": "Failed to update user",
-      "planLabel": "Plan",
-      "expiresAt": "Expires At",
       "noTrafficLimit": "Unlimited",
       "status": {
         "active": "Active",
@@ -692,7 +695,7 @@
       "stateFiring": "Firing",
       "stateAcked": "Acknowledged",
       "stateSilenced": "Silenced",
-      "stateStale": "Unknown (not reporting)",
+      "stateStale": "Not reporting",
       "ack": "Acknowledge",
       "unack": "Remove acknowledgement",
       "silenceFor": "Silence for {{minutes}} min",
@@ -879,7 +882,8 @@
       },
       "resetTraffic": "Reset traffic",
       "suspend": "Suspend",
-      "activate": "Activate"
+      "activate": "Activate",
+      "byNodeHint": "Wire traffic measured at the node. The quota above counts charged bytes, which a node traffic multiplier can scale, so these figures need not add up to Used."
     }
   },
   "user": {

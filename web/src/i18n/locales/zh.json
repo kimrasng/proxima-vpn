@@ -42,7 +42,8 @@
       "minutes": "{{count}}分",
       "hours": "{{count}}小时",
       "days": "{{count}}天"
-    }
+    },
+    "create": "创建"
   },
   "admin": {
     "nav": {
@@ -158,7 +159,11 @@
         "pending_requests_desc": "有新用户正在等待。",
         "actionNow": "立即处理",
         "actionCheck": "需要确认",
-        "actionReview": "需要审核"
+        "actionReview": "需要审核",
+        "node_xray_down": "{{count}} 个节点 Xray 已停止",
+        "node_xray_down_desc": "节点仍在上报，但 Xray 未运行，无法承载流量。",
+        "node_shaping_failed": "{{count}} 个节点限速应用失败",
+        "node_shaping_failed_desc": "限速未能应用，套餐限制在该节点上未生效。"
       },
       "issue": {
         "offline": "连接断开",
@@ -168,7 +173,11 @@
         "offlineLabel": "离线",
         "cpuLabel": "CPU {{value}}%",
         "memoryLabel": "内存 {{value}}%",
-        "diskLabel": "磁盘 {{value}}%"
+        "diskLabel": "磁盘 {{value}}%",
+        "xray_down": "Xray 已停止",
+        "shaping_failed": "限速失败",
+        "xray_downLabel": "Xray",
+        "shaping_failedLabel": "限速"
       },
       "event": {
         "user.login": "登录了 VPN。",
@@ -449,7 +458,6 @@
     },
     "users": {
       "title": "用户管理",
-      "editUser": "编辑",
       "empty": "暂无用户",
       "resetTraffic": "重置流量",
       "createUser": "创建用户",
@@ -459,10 +467,6 @@
       "createError": "创建用户失败",
       "resetTrafficSuccess": "流量重置成功",
       "resetTrafficError": "重置流量失败",
-      "editUserModalTitle": "编辑用户",
-      "editUserSuccess": "用户更新成功",
-      "editUserError": "更新用户失败",
-      "planLabel": "套餐",
       "noTrafficLimit": "无限制",
       "activate": "启用",
       "suspend": "停用",
@@ -489,7 +493,6 @@
       "actionsLabel": "操作",
       "viewDetail": "查看详情",
       "email": "邮箱",
-      "expiresAt": "到期时间",
       "status": {
         "active": "正常",
         "suspended": "已停用",
@@ -734,7 +737,7 @@
       "stateFiring": "触发中",
       "stateAcked": "已确认",
       "stateSilenced": "已静默",
-      "stateStale": "未知（已停止上报）",
+      "stateStale": "已停止上报",
       "ack": "确认",
       "unack": "取消确认",
       "silenceFor": "静默 {{minutes}} 分钟",
@@ -921,7 +924,8 @@
       },
       "resetTraffic": "重置流量",
       "suspend": "停用",
-      "activate": "启用"
+      "activate": "启用",
+      "byNodeHint": "节点测得的实际传输量。上方配额按计费字节统计，节点流量倍率会对其缩放，因此两者未必相等。"
     }
   },
   "user": {

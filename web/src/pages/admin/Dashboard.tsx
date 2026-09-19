@@ -222,6 +222,10 @@ export default function Dashboard() {
         return t("admin.dashboard.issue.memoryLabel", { value: issue.value.toFixed(0) });
       case "disk":
         return t("admin.dashboard.issue.diskLabel", { value: issue.value.toFixed(0) });
+      case "xray_down":
+        return t("admin.dashboard.issue.xray_downLabel");
+      case "shaping_failed":
+        return t("admin.dashboard.issue.shaping_failedLabel");
       default:
         return issue.kind;
     }
