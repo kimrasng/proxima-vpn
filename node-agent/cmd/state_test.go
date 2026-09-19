@@ -230,3 +230,58 @@ func TestEveryRestartPathBumpsTheGeneration(t *testing.T) {
 		t.Errorf("users hash = %q, want users-2 preserved", h)
 	}
 }
+
+// A user added before configPollLoop's first tick must still take the
+// incremental path. The agent used to learn the structure hash only when a poll
+// happened to find the digest unchanged, so an edit inside that first interval
+// looked structural and restarted Xray - dropping live connections for a routine
+// account change. run() now learns it at startup; this pins that behaviour to
+// the state machine rather than the timing of the first poll.
+func TestStartupDigestLearnsStructureBeforeTheFirstPoll(t *testing.T) {
+	state := newNodeState([]byte(configWithTwoVlessUsers))
+
+	// What run() does with the digest it fetches immediately after starting Xray.
+	startup := client.ConfigDigest{
+		Hash:          state.ConfigHash(),
+		StructureHash: "structure-1",
+		UsersHash:     "users-1",
+	}
+	if startup.Hash != state.ConfigHash() {
+		t.Fatalf("setup: digest hash should match the running config")
+	}
+	state.setStructureHash(startup.StructureHash)
+
+	// A user arrives seconds later, well inside the first poll interval.
+	if !usersOnlyChange(state, client.ConfigDigest{
+		Hash:          "config-2",
+		StructureHash: "structure-1",
+		UsersHash:     "users-2",
+	}) {
+		t.Error("a user added before the first poll must not force a restart")
+	}
+}
+
+// The startup digest must be ignored when it does not describe the config that
+// actually started, or the agent would claim to know a structure it never ran.
+func TestStartupDigestIgnoredWhenItDescribesAnotherConfig(t *testing.T) {
+	state := newNodeState([]byte(configWithTwoVlessUsers))
+
+	startup := client.ConfigDigest{
+		Hash:          "some-other-config",
+		StructureHash: "structure-9",
+		UsersHash:     "users-9",
+	}
+	if startup.Hash == state.ConfigHash() {
+		t.Fatal("setup: hashes were supposed to differ")
+	}
+	// run() only records the structure hash on a match, so state keeps none.
+	if state.StructureHash() != "" {
+		t.Fatalf("expected no structure hash, got %q", state.StructureHash())
+	}
+	if usersOnlyChange(state, client.ConfigDigest{
+		StructureHash: "structure-9",
+		UsersHash:     "users-9",
+	}) {
+		t.Error("an unlearned structure must still force a restart")
+	}
+}

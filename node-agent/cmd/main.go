@@ -193,6 +193,17 @@ func runCmd() *cobra.Command {
 			state := newNodeState(xrayConfig)
 			applyShaping(xrayConfig, state)
 
+			// Learn the structure digest for the config just started, rather than
+			// waiting for configPollLoop's first tick to happen to find the digest
+			// unchanged. Without this, a user added during that first interval is
+			// indistinguishable from a structural change and forces a restart -
+			// dropping every live connection for a routine account edit.
+			if digest, err := apiClient.GetConfigDigest(ctx); err != nil {
+				log.Printf("warning: initial config digest: %v", err)
+			} else if digest.Hash == state.ConfigHash() {
+				state.setStructureHash(digest.StructureHash)
+			}
+
 			xrayVersion := &versionHolder{}
 			if v, err := runner.Version(); err == nil {
 				xrayVersion.Set(v)
