@@ -37,6 +37,7 @@ import { getActivity, getNode, getNodeMetrics } from "../../api/admin";
 import type { ActivityEntry, Node, NodeMetricsEntry } from "../../api/types";
 import { usePublishBreadcrumbLeaf } from "../../hooks/useBreadcrumbLeaf";
 import { formatAbsoluteTime, formatRelativeTime } from "../../utils/relativeTime";
+import { formatBytes } from "../../utils/format";
 import { useManualRefresh } from "../../hooks/useManualRefresh";
 
 // Matches the node agents' 10s heartbeat, so a change on a node reaches
@@ -61,13 +62,6 @@ const RESOURCE_STROKE: Record<ResourceMetric, string> = {
 // Above this reading the node is treated as actively degraded, not merely busy,
 // and gets an Alert rather than just a coloured indicator.
 const ALERT_THRESHOLD = 90;
-
-function formatBytes(bytes: number): string {
-  if (bytes === 0) return "0 B";
-  const units = ["B", "KB", "MB", "GB", "TB"];
-  const i = Math.floor(Math.log(bytes) / Math.log(1024));
-  return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${units[i]}`;
-}
 
 function formatChartTime(dateStr: string, hours: number): string {
   const d = new Date(dateStr);

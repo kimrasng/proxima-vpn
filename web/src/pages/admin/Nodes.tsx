@@ -33,6 +33,7 @@ import { useCollection } from "@cloudscape-design/collection-hooks";
 import { listNodes, generateNodeToken, deleteNode, updateNode } from "../../api/admin";
 import type { Node, GenerateTokenResponse, UpdateNodeRequest } from "../../api/types";
 import { formatAbsoluteTime, formatRelativeTime } from "../../utils/relativeTime";
+import { HoverTooltip } from "../../components/HoverTooltip";
 import { useManualRefresh } from "../../hooks/useManualRefresh";
 
 // Matches the node agents' 10s heartbeat, so a change on a node reaches
@@ -581,17 +582,10 @@ export default function Nodes() {
               header: t("admin.nodes.col.status"),
               sortingField: "status",
               cell: (item) => (
-                <Popover
-                  dismissButton={false}
-                  position="top"
-                  size="small"
-                  triggerType="custom"
+                <HoverTooltip
                   content={
                     <SpaceBetween size="xxxs">
-                      <Box variant="strong" fontSize="body-s">
-                        {statusLabel(item.status)}
-                      </Box>
-                      <Box variant="small" color="text-body-secondary">
+                      <Box variant="small" color="inherit">
                         {item.status_changed_at
                           ? t("admin.nodes.statusChangedAt", {
                               relative: formatRelativeTime(t, item.status_changed_at),
@@ -599,7 +593,7 @@ export default function Nodes() {
                             })
                           : t("admin.nodes.statusChangedUnknown")}
                       </Box>
-                      <Box variant="small" color="text-body-secondary">
+                      <Box variant="small" color="inherit">
                         {t("admin.nodes.statusLastSeen", {
                           relative: formatRelativeTime(t, item.last_seen),
                         })}
@@ -610,7 +604,7 @@ export default function Nodes() {
                   <StatusIndicator type={getStatusIndicatorType(item.status)}>
                     {statusLabel(item.status)}
                   </StatusIndicator>
-                </Popover>
+                </HoverTooltip>
               ),
             },
             {

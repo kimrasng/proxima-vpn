@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   Box,
   Button,
@@ -23,12 +24,14 @@ import {
   createInbound,
   toggleInbound,
   deleteInbound,
+  getNode,
   getNodeTLSStatus,
   issueNodeCertificate,
   getNodeXrayVersion,
   updateNodeXray,
 } from "../../api/admin";
 import type { Inbound, CreateInboundRequest, NodeTLSStatus, XrayVersionResponse } from "../../api/types";
+import { usePublishBreadcrumbLeaf } from "../../hooks/useBreadcrumbLeaf";
 
 const PROTOCOL_OPTIONS = [
   { value: "vless_reality", label: "VLESS Reality" },
@@ -50,7 +53,8 @@ const SS_METHOD_OPTIONS = [
 
 export default function NodeInbounds() {
   const { nodeId } = useParams<{ nodeId: string }>();
-  const navigate = useNavigate();
+  const { t } = useTranslation();
+  const [nodeName, setNodeName] = useState<string | null>(null);
   const [inbounds, setInbounds] = useState<Inbound[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -78,6 +82,8 @@ export default function NodeInbounds() {
   const [ssMethod, setSsMethod] = useState("2022-blake3-aes-128-gcm");
   const [ssPassword, setSsPassword] = useState("");
 
+  usePublishBreadcrumbLeaf(nodeName);
+
   // A node serves one protocol, so once an inbound exists the choice is fixed
   // to its protocol; the server rejects anything else with a 409.
   const lockedProtocol = inbounds[0]?.protocol ?? null;
@@ -93,7 +99,7 @@ export default function NodeInbounds() {
       setInbounds(data);
       setError(null);
     } catch {
-      setError("Failed to fetch inbounds");
+      setError(t("admin.nodeInbounds.fetchError"));
     } finally {
       setLoading(false);
     }
@@ -101,10 +107,12 @@ export default function NodeInbounds() {
 
   const fetchNodeInfo = async () => {
     if (!nodeId) return;
-    const [tls, xray] = await Promise.allSettled([
+    const [node, tls, xray] = await Promise.allSettled([
+      getNode(nodeId),
       getNodeTLSStatus(nodeId),
       getNodeXrayVersion(nodeId),
     ]);
+    if (node.status === "fulfilled") setNodeName(node.value.name);
     if (tls.status === "fulfilled") setTlsStatus(tls.value);
     if (xray.status === "fulfilled") setXrayVersion(xray.value);
   };
@@ -129,7 +137,7 @@ export default function NodeInbounds() {
       setTlsEmail("");
       await fetchNodeInfo();
     } catch {
-      setError("Failed to issue certificate");
+      setError(t("admin.nodeInbounds.tls.error"));
     } finally {
       setTlsLoading(false);
     }
@@ -144,7 +152,7 @@ export default function NodeInbounds() {
       setXrayTargetVersion("");
       await fetchNodeInfo();
     } catch {
-      setError("Failed to trigger Xray update");
+      setError(t("admin.nodeInbounds.xray.error"));
     } finally {
       setXrayLoading(false);
     }
@@ -189,7 +197,7 @@ export default function NodeInbounds() {
       resetForm();
       await fetchInbounds();
     } catch {
-      setError("Failed to create inbound");
+      setError(t("admin.nodeInbounds.createError"));
     } finally {
       setActionLoading(false);
     }
@@ -200,7 +208,7 @@ export default function NodeInbounds() {
       await toggleInbound(inbound.id);
       await fetchInbounds();
     } catch {
-      setError("Failed to toggle inbound");
+      setError(t("admin.nodeInbounds.toggleError"));
     }
   };
 
@@ -212,7 +220,7 @@ export default function NodeInbounds() {
       setDeleteModal(null);
       await fetchInbounds();
     } catch {
-      setError("Failed to delete inbound");
+      setError(t("admin.nodeInbounds.deleteError"));
     } finally {
       setActionLoading(false);
     }
@@ -220,7 +228,7 @@ export default function NodeInbounds() {
 
   if (loading) {
     return (
-      <ContentLayout header={<Header variant="h1">Node Inbounds</Header>}>
+      <ContentLayout header={<Header variant="h1">{t("admin.nodeInbounds.title")}</Header>}>
         <Box textAlign="center" padding="xl"><Spinner size="large" /></Box>
       </ContentLayout>
     );
@@ -231,13 +239,9 @@ export default function NodeInbounds() {
       header={
         <Header
           variant="h1"
-          actions={
-            <Button variant="link" onClick={() => navigate("/admin/nodes")}>
-              ← Back to Nodes
-            </Button>
-          }
+          description={nodeName ?? undefined}
         >
-          Node Inbounds
+          {t("admin.nodeInbounds.title")}
         </Header>
       }
     >
@@ -253,37 +257,37 @@ export default function NodeInbounds() {
                 variant="h2"
                 actions={
                   <Button onClick={() => setTlsModal(true)}>
-                    {tlsStatus?.has_cert ? "Renew Certificate" : "Issue Certificate"}
+                    {tlsStatus?.has_cert ? t("admin.nodeInbounds.tls.renew") : t("admin.nodeInbounds.tls.issue")}
                   </Button>
                 }
               >
-                TLS Certificate
+                {t("admin.nodeInbounds.tls.title")}
               </Header>
             }
           >
             {tlsStatus ? (
               <SpaceBetween size="s">
                 <div>
-                  <Box variant="awsui-key-label">Status</Box>
+                  <Box variant="awsui-key-label">{t("admin.nodeInbounds.tls.status")}</Box>
                   <StatusIndicator type={tlsStatus.has_cert ? "success" : "warning"}>
-                    {tlsStatus.has_cert ? "Certificate installed" : "No certificate"}
+                    {tlsStatus.has_cert ? t("admin.nodeInbounds.tls.installed") : t("admin.nodeInbounds.tls.missing")}
                   </StatusIndicator>
                 </div>
                 {tlsStatus.domain && (
                   <div>
-                    <Box variant="awsui-key-label">Domain</Box>
+                    <Box variant="awsui-key-label">{t("admin.nodeInbounds.tls.domain")}</Box>
                     <Box>{tlsStatus.domain}</Box>
                   </div>
                 )}
                 {tlsStatus.cert_file && (
                   <div>
-                    <Box variant="awsui-key-label">Cert file</Box>
+                    <Box variant="awsui-key-label">{t("admin.nodeInbounds.tls.certFile")}</Box>
                     <Box variant="code">{tlsStatus.cert_file}</Box>
                   </div>
                 )}
               </SpaceBetween>
             ) : (
-              <Box color="text-status-inactive">Loading…</Box>
+              <Box color="text-status-inactive">{t("admin.nodeInbounds.tls.loading")}</Box>
             )}
           </Container>
 
@@ -293,23 +297,23 @@ export default function NodeInbounds() {
                 variant="h2"
                 actions={
                   <Button onClick={() => setXrayModal(true)}>
-                    Update Xray
+                    {t("admin.nodeInbounds.xray.update")}
                   </Button>
                 }
               >
-                Xray Version
+                {t("admin.nodeInbounds.xray.title")}
               </Header>
             }
           >
             {xrayVersion ? (
               <SpaceBetween size="s">
                 <div>
-                  <Box variant="awsui-key-label">Current version</Box>
-                  <Box>{xrayVersion.current_version || "Unknown"}</Box>
+                  <Box variant="awsui-key-label">{t("admin.nodeInbounds.xray.current")}</Box>
+                  <Box>{xrayVersion.current_version || t("admin.nodeInbounds.xray.unknown")}</Box>
                 </div>
               </SpaceBetween>
             ) : (
-              <Box color="text-status-inactive">Loading…</Box>
+              <Box color="text-status-inactive">{t("admin.nodeInbounds.tls.loading")}</Box>
             )}
           </Container>
         </ColumnLayout>
@@ -319,31 +323,31 @@ export default function NodeInbounds() {
             <Header
               actions={
                 <Button variant="primary" onClick={() => setCreateModal(true)}>
-                  Add Inbound
+                  {t("admin.nodeInbounds.add")}
                 </Button>
               }
               counter={`(${inbounds.length})`}
             >
-              Inbounds
+              {t("admin.nodeInbounds.tableTitle")}
             </Header>
           }
           items={inbounds}
           columnDefinitions={[
-            { id: "protocol", header: "Protocol", cell: (item) => item.protocol },
-            { id: "port", header: "Port", cell: (item) => item.port },
-            { id: "tag", header: "Tag", cell: (item) => item.tag },
+            { id: "protocol", header: t("admin.nodeInbounds.col.protocol"), cell: (item) => item.protocol },
+            { id: "port", header: t("admin.nodeInbounds.col.port"), cell: (item) => item.port },
+            { id: "tag", header: t("admin.nodeInbounds.col.tag"), cell: (item) => item.tag },
             {
               id: "enabled",
-              header: "Enabled",
+              header: t("admin.nodeInbounds.col.enabled"),
               cell: (item) => (
                 <StatusIndicator type={item.enabled ? "success" : "stopped"}>
-                  {item.enabled ? "Enabled" : "Disabled"}
+                  {item.enabled ? t("admin.nodeInbounds.enabled") : t("admin.nodeInbounds.disabled")}
                 </StatusIndicator>
               ),
             },
             {
               id: "actions",
-              header: "Actions",
+              header: t("admin.nodeInbounds.col.actions"),
               cell: (item) => (
                 <SpaceBetween direction="horizontal" size="xs">
                   <Toggle
@@ -351,25 +355,25 @@ export default function NodeInbounds() {
                     onChange={() => void handleToggle(item)}
                   />
                   <Button variant="inline-link" onClick={() => setDeleteModal(item)}>
-                    Delete
+                    {t("admin.nodeInbounds.delete")}
                   </Button>
                 </SpaceBetween>
               ),
             },
           ]}
-          empty={<Box textAlign="center">No inbounds configured for this node.</Box>}
+          empty={<Box textAlign="center">{t("admin.nodeInbounds.empty")}</Box>}
         />
 
         <Modal
           visible={createModal}
           onDismiss={() => { setCreateModal(false); resetForm(); }}
-          header="Add Inbound"
+          header={t("admin.nodeInbounds.add")}
           footer={
             <Box float="right">
               <SpaceBetween direction="horizontal" size="xs">
-                <Button onClick={() => { setCreateModal(false); resetForm(); }}>Cancel</Button>
+                <Button onClick={() => { setCreateModal(false); resetForm(); }}>{t("admin.nodeInbounds.cancel")}</Button>
                 <Button variant="primary" loading={actionLoading} onClick={() => void handleCreate()}>
-                  Create
+                  {t("admin.nodeInbounds.create")}
                 </Button>
               </SpaceBetween>
             </Box>
@@ -377,10 +381,10 @@ export default function NodeInbounds() {
         >
           <SpaceBetween size="m">
             <FormField
-              label="Protocol"
+              label={t("admin.nodeInbounds.field.protocol")}
               description={
                 lockedProtocol
-                  ? `This node already serves ${lockedProtocol}. A node runs one protocol; delete the existing inbound to change it.`
+                  ? t("admin.nodeInbounds.field.protocolLocked", { protocol: lockedProtocol })
                   : undefined
               }
             >
@@ -392,67 +396,67 @@ export default function NodeInbounds() {
               />
             </FormField>
 
-            <FormField label="Port">
+            <FormField label={t("admin.nodeInbounds.field.port")}>
               <Input
                 type="number"
                 value={port}
                 onChange={({ detail }) => setPort(detail.value)}
-                placeholder="e.g. 443"
+                placeholder={t("admin.nodeInbounds.field.portPlaceholder")}
               />
             </FormField>
 
-            <FormField label="Tag">
+            <FormField label={t("admin.nodeInbounds.field.tag")}>
               <Input
                 value={tag}
                 onChange={({ detail }) => setTag(detail.value)}
-                placeholder="e.g. vless-in"
+                placeholder={t("admin.nodeInbounds.field.tagPlaceholder")}
               />
             </FormField>
 
             {protocol === "vless_reality" && (
               <>
-                <FormField label="Destination (dest)">
+                <FormField label={t("admin.nodeInbounds.field.dest")}>
                   <Input
                     value={dest}
                     onChange={({ detail }) => setDest(detail.value)}
-                    placeholder="e.g. www.google.com:443"
+                    placeholder={t("admin.nodeInbounds.field.destPlaceholder")}
                   />
                 </FormField>
-                <FormField label="Server Names (comma-separated)">
+                <FormField label={t("admin.nodeInbounds.field.serverNames")}>
                   <Input
                     value={serverNames}
                     onChange={({ detail }) => setServerNames(detail.value)}
-                    placeholder="e.g. www.google.com,google.com"
+                    placeholder={t("admin.nodeInbounds.field.serverNamesPlaceholder")}
                   />
                 </FormField>
               </>
             )}
 
             {protocol === "vmess_ws" && (
-              <FormField label="WebSocket Path">
+              <FormField label={t("admin.nodeInbounds.field.wsPath")}>
                 <Input
                   value={wsPath}
                   onChange={({ detail }) => setWsPath(detail.value)}
-                  placeholder="e.g. /ws"
+                  placeholder={t("admin.nodeInbounds.field.wsPathPlaceholder")}
                 />
               </FormField>
             )}
 
             {protocol === "shadowsocks" && (
               <>
-                <FormField label="Method">
+                <FormField label={t("admin.nodeInbounds.field.ssMethod")}>
                   <Select
                     selectedOption={SS_METHOD_OPTIONS.find((o) => o.value === ssMethod) ?? null}
                     options={SS_METHOD_OPTIONS}
                     onChange={({ detail }) => setSsMethod(detail.selectedOption.value ?? "2022-blake3-aes-128-gcm")}
                   />
                 </FormField>
-                <FormField label="Password">
+                <FormField label={t("admin.nodeInbounds.field.ssPassword")}>
                   <Input
                     type="password"
                     value={ssPassword}
                     onChange={({ detail }) => setSsPassword(detail.value)}
-                    placeholder="Password"
+                    placeholder={t("admin.nodeInbounds.field.ssPasswordPlaceholder")}
                   />
                 </FormField>
               </>
@@ -463,55 +467,55 @@ export default function NodeInbounds() {
         <Modal
           visible={deleteModal !== null}
           onDismiss={() => setDeleteModal(null)}
-          header="Delete Inbound"
+          header={t("admin.nodeInbounds.deleteTitle")}
           footer={
             <Box float="right">
               <SpaceBetween direction="horizontal" size="xs">
-                <Button onClick={() => setDeleteModal(null)}>Cancel</Button>
+                <Button onClick={() => setDeleteModal(null)}>{t("admin.nodeInbounds.cancel")}</Button>
                 <Button variant="primary" loading={actionLoading} onClick={() => void handleDelete()}>
-                  Delete
+                  {t("admin.nodeInbounds.delete")}
                 </Button>
               </SpaceBetween>
             </Box>
           }
         >
-          Are you sure you want to delete the inbound "{deleteModal?.tag}" (port {deleteModal?.port})?
+          {t("admin.nodeInbounds.deleteConfirm", { tag: deleteModal?.tag ?? "", port: deleteModal?.port ?? "" })}
         </Modal>
 
         <Modal
           visible={tlsModal}
           onDismiss={() => { setTlsModal(false); setTlsDomain(""); setTlsEmail(""); }}
-          header="Issue TLS Certificate"
+          header={t("admin.nodeInbounds.tls.modalTitle")}
           footer={
             <Box float="right">
               <SpaceBetween direction="horizontal" size="xs">
-                <Button onClick={() => { setTlsModal(false); setTlsDomain(""); setTlsEmail(""); }}>Cancel</Button>
+                <Button onClick={() => { setTlsModal(false); setTlsDomain(""); setTlsEmail(""); }}>{t("admin.nodeInbounds.cancel")}</Button>
                 <Button
                   variant="primary"
                   loading={tlsLoading}
                   disabled={!tlsDomain || !tlsEmail}
                   onClick={() => void handleIssueCert()}
                 >
-                  Issue Certificate
+                  {t("admin.nodeInbounds.tls.issue")}
                 </Button>
               </SpaceBetween>
             </Box>
           }
         >
           <SpaceBetween size="m">
-            <FormField label="Domain" description="The domain name to issue a certificate for">
+            <FormField label={t("admin.nodeInbounds.tls.domain")} description={t("admin.nodeInbounds.tls.domainHint")}>
               <Input
                 value={tlsDomain}
                 onChange={({ detail }) => setTlsDomain(detail.value)}
-                placeholder="e.g. vpn.example.com"
+                placeholder={t("admin.nodeInbounds.tls.domainPlaceholder")}
               />
             </FormField>
-            <FormField label="Email" description="Email address for Let's Encrypt notifications">
+            <FormField label={t("admin.nodeInbounds.tls.email")} description={t("admin.nodeInbounds.tls.emailHint")}>
               <Input
                 type="email"
                 value={tlsEmail}
                 onChange={({ detail }) => setTlsEmail(detail.value)}
-                placeholder="e.g. admin@example.com"
+                placeholder={t("admin.nodeInbounds.tls.emailPlaceholder")}
               />
             </FormField>
           </SpaceBetween>
@@ -520,17 +524,17 @@ export default function NodeInbounds() {
         <Modal
           visible={xrayModal}
           onDismiss={() => { setXrayModal(false); setXrayTargetVersion(""); }}
-          header="Update Xray"
+          header={t("admin.nodeInbounds.xray.modalTitle")}
           footer={
             <Box float="right">
               <SpaceBetween direction="horizontal" size="xs">
-                <Button onClick={() => { setXrayModal(false); setXrayTargetVersion(""); }}>Cancel</Button>
+                <Button onClick={() => { setXrayModal(false); setXrayTargetVersion(""); }}>{t("admin.nodeInbounds.cancel")}</Button>
                 <Button
                   variant="primary"
                   loading={xrayLoading}
                   onClick={() => void handleUpdateXray()}
                 >
-                  Update
+                  {t("admin.nodeInbounds.xray.submit")}
                 </Button>
               </SpaceBetween>
             </Box>
@@ -538,13 +542,13 @@ export default function NodeInbounds() {
         >
           <SpaceBetween size="m">
             <FormField
-              label="Target version"
-              description="Leave blank to update to the latest version"
+              label={t("admin.nodeInbounds.xray.targetVersion")}
+              description={t("admin.nodeInbounds.xray.targetHint")}
             >
               <Input
                 value={xrayTargetVersion}
                 onChange={({ detail }) => setXrayTargetVersion(detail.value)}
-                placeholder="e.g. v1.8.4 (leave blank for latest)"
+                placeholder={t("admin.nodeInbounds.xray.targetPlaceholder")}
               />
             </FormField>
           </SpaceBetween>
