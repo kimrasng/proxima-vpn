@@ -36,6 +36,10 @@ import type {
   UserTemplate,
   CreateUserTemplateRequest,
   TrafficHistoryEntry,
+  DashboardAlerts,
+  NodeTraffic,
+  TrafficWindow,
+  ActivityEntry,
   NodeTLSStatus,
   IssueCertificateRequest,
   XrayVersionResponse,
@@ -203,6 +207,32 @@ export function getOnlineUsers(): Promise<OnlineUser[]> {
 export function getTrafficHistory(): Promise<TrafficHistoryEntry[]> {
   applyAdminClient();
   return get<TrafficHistoryEntry[]>('/api/v1/admin/stats/traffic-history');
+}
+
+export function getDashboardAlerts(): Promise<DashboardAlerts> {
+  applyAdminClient();
+  return get<DashboardAlerts>('/api/v1/admin/stats/alerts');
+}
+
+export function getNodeTraffic(window: TrafficWindow = 'today', limit = 10): Promise<NodeTraffic[]> {
+  applyAdminClient();
+  const params = new URLSearchParams({ window, limit: String(limit) });
+  return get<NodeTraffic[]>(`/api/v1/admin/stats/node-traffic?${params.toString()}`);
+}
+
+export interface ActivityTarget {
+  type: string;
+  id: string;
+}
+
+export function getActivity(limit = 20, target?: ActivityTarget): Promise<ActivityEntry[]> {
+  applyAdminClient();
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (target) {
+    params.set('target_type', target.type);
+    params.set('target_id', target.id);
+  }
+  return get<ActivityEntry[]>(`/api/v1/admin/activity?${params.toString()}`);
 }
 
 export function listAnnouncements(): Promise<Announcement[]> {

@@ -203,6 +203,16 @@ export interface PlanRequest {
 }
 
 // Admin - Stats
+export interface DashboardDeltas {
+  // False until a 24h-old baseline exists; shown as "no comparison yet", not zero.
+  available: boolean;
+  active_alerts: number;
+  online_nodes: number;
+  online_users: number;
+  total_users: number;
+  traffic_today: number;
+}
+
 export interface DashboardStats {
   total_users: number;
   active_users: number;
@@ -210,20 +220,86 @@ export interface DashboardStats {
   total_nodes: number;
   online_nodes: number;
   total_traffic_today: number;
+  upload_today: number;
+  download_today: number;
   total_traffic_month: number;
   pending_requests: number;
+  active_alerts: number;
+  deltas: DashboardDeltas;
+  generated_at: string;
+}
+
+export type AlertSeverity = "info" | "warning" | "error" | "success";
+
+export interface DashboardAlert {
+  kind: string;
+  severity: AlertSeverity;
+  count: number;
+}
+
+export interface NodeIssue {
+  node_id: string;
+  node_name: string;
+  country: string;
+  region: string;
+  status: string;
+  kind: string;
+  severity: AlertSeverity;
+  value: number;
+}
+
+export interface DashboardAlerts {
+  items: DashboardAlert[];
+  node_issues: NodeIssue[];
+  total: number;
+  pending_requests: number;
+}
+
+export interface NodeTraffic {
+  node_id: string;
+  node_name: string;
+  status: string;
+  upload: number;
+  download: number;
+}
+
+export type TrafficWindow = "today" | "week" | "month";
+
+export interface ActivityEntry {
+  id: string;
+  event_type: string;
+  severity: AlertSeverity;
+  actor_type: string;
+  actor_id: string;
+  actor_label: string;
+  target_type: string | null;
+  target_id: string | null;
+  detail: Record<string, unknown>;
+  created_at: string;
 }
 
 // online_ips/max_concurrent/over_cap are per USER, so several rows of the same
 // user repeat the same numbers: they share one cap.
+export interface OnlineAddress {
+  ip: string;
+  last_seen: string;
+}
+
 export interface OnlineUser {
   email: string;
+  name: string;
+  device_id: string;
   device: string;
+  node_id: string;
   node_name: string;
+  addresses: OnlineAddress[] | null;
   online_ips: number;
   // 0 means no cap is configured for the user's plan.
   max_concurrent: number;
   over_cap: boolean;
+  // Null when the session started before the node agent began stamping it.
+  connected_since: string | null;
+  traffic_today: number;
 }
 
 // User - Devices
