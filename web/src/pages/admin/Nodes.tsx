@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import {
@@ -33,6 +33,7 @@ import { useCollection } from "@cloudscape-design/collection-hooks";
 import { listNodes, generateNodeToken, deleteNode, updateNode } from "../../api/admin";
 import type { Node, GenerateTokenResponse, UpdateNodeRequest } from "../../api/types";
 import { formatAbsoluteTime, formatRelativeTime } from "../../utils/relativeTime";
+import { useManualRefresh } from "../../hooks/useManualRefresh";
 
 const REFRESH_INTERVAL = 30000;
 const DEFAULT_PAGE_SIZE = 20;
@@ -127,7 +128,6 @@ export default function Nodes() {
   const navigate = useNavigate();
   const [nodes, setNodes] = useState<Node[]>([]);
   const [loading, setLoading] = useState(true);
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tokenModal, setTokenModal] = useState(false);
   const [tokenData, setTokenData] = useState<GenerateTokenResponse | null>(null);
@@ -166,7 +166,6 @@ export default function Nodes() {
     try {
       const data = await listNodes();
       setNodes(data);
-      setLastUpdated(new Date());
       setError(null);
     } catch {
       setError(t("admin.nodes.fetchError"));
@@ -175,11 +174,7 @@ export default function Nodes() {
     }
   }, [t]);
 
-  useEffect(() => {
-    void fetchNodes();
-    const interval = setInterval(() => void fetchNodes(), REFRESH_INTERVAL);
-    return () => clearInterval(interval);
-  }, [fetchNodes]);
+  const { refreshing, lastUpdated, refresh } = useManualRefresh(fetchNodes, REFRESH_INTERVAL);
 
   const healthSummary = useMemo(() => {
     const online = nodes.filter((n) => n.status === "online").length;
@@ -367,7 +362,8 @@ export default function Nodes() {
               <Button
                 iconName="refresh"
                 ariaLabel={t("admin.nodes.refresh")}
-                onClick={() => void fetchNodes()}
+                loading={refreshing}
+                onClick={refresh}
               />
               <Button
                 variant="primary"
