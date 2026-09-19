@@ -42,6 +42,15 @@ type updateAnnouncementRequest struct {
 	ExpiresAt *string `json:"expires_at"`
 }
 
+// List returns every announcement, including inactive and expired ones.
+// @Summary List announcements
+// @Description Returns all announcements for admin management
+// @Tags admin-announcements
+// @Produce json
+// @Success 200 {array} announcementItem
+// @Failure 500 {object} map[string]string
+// @Security BearerAuth
+// @Router /admin/announcements [get]
 func (h *AdminAnnouncementHandler) List(c *fiber.Ctx) error {
 	rows, err := h.db.Query(
 		context.Background(),
@@ -65,6 +74,18 @@ func (h *AdminAnnouncementHandler) List(c *fiber.Ctx) error {
 	return c.JSON(items)
 }
 
+// Create adds a new announcement.
+// @Summary Create announcement
+// @Description Creates a new announcement shown in the user portal
+// @Tags admin-announcements
+// @Accept json
+// @Produce json
+// @Param body body createAnnouncementRequest true "Announcement to create"
+// @Success 201 {object} announcementItem
+// @Failure 400 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Security BearerAuth
+// @Router /admin/announcements [post]
 func (h *AdminAnnouncementHandler) Create(c *fiber.Ctx) error {
 	var req createAnnouncementRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -98,6 +119,19 @@ func (h *AdminAnnouncementHandler) Create(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusCreated).JSON(a)
 }
 
+// Update partially updates an announcement.
+// @Summary Update announcement
+// @Description Partially updates an announcement's fields
+// @Tags admin-announcements
+// @Accept json
+// @Produce json
+// @Param id path string true "Announcement ID"
+// @Param body body updateAnnouncementRequest true "Fields to update"
+// @Success 200 {object} announcementItem
+// @Failure 400 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Security BearerAuth
+// @Router /admin/announcements/{id} [put]
 func (h *AdminAnnouncementHandler) Update(c *fiber.Ctx) error {
 	id := c.Params("id")
 
@@ -165,6 +199,16 @@ func (h *AdminAnnouncementHandler) Update(c *fiber.Ctx) error {
 	return c.JSON(a)
 }
 
+// Delete removes an announcement.
+// @Summary Delete announcement
+// @Description Deletes an announcement by ID
+// @Tags admin-announcements
+// @Produce json
+// @Param id path string true "Announcement ID"
+// @Success 200 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Security BearerAuth
+// @Router /admin/announcements/{id} [delete]
 func (h *AdminAnnouncementHandler) Delete(c *fiber.Ctx) error {
 	id := c.Params("id")
 
