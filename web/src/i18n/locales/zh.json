@@ -165,11 +165,12 @@
         "plan.requested": "提交了套餐申请。",
         "plan.approved": "已完成用户审批。",
         "plan.rejected": "的套餐申请被拒绝。",
-        "unknown": "记录了一项活动。"
+        "unknown": "记录了一项活动。",
+        "session.terminated": "管理员断开了一个连接。"
       },
       "shareOfTotal": "占总量 {{share}}%",
       "nodeSummaryCounts": "正常 {{healthy}} · 注意 {{warning}} · 离线 {{offline}}",
-      "trafficTotal": "合计 {{total}}"
+      "trafficTotal": "合计 {{total}} · 占比以合计为基准"
     },
     "nodes": {
       "title": "节点管理",

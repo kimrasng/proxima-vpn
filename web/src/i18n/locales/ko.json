@@ -165,11 +165,12 @@
         "plan.requested": "플랜 요청이 접수되었습니다.",
         "plan.approved": "사용자 승인을 완료했습니다.",
         "plan.rejected": "플랜 요청을 거절했습니다.",
-        "unknown": "활동이 기록되었습니다."
+        "unknown": "활동이 기록되었습니다.",
+        "session.terminated": "관리자가 접속을 종료했습니다."
       },
       "shareOfTotal": "전체의 {{share}}%",
       "nodeSummaryCounts": "정상 {{healthy}} · 주의 {{warning}} · 오프라인 {{offline}}",
-      "trafficTotal": "합계 {{total}}"
+      "trafficTotal": "합계 {{total}} · 비율은 합계 기준"
     },
     "nodes": {
       "title": "노드 관리",

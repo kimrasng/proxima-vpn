@@ -204,13 +204,6 @@ export default function Dashboard() {
     [nodeTraffic, trafficMetric],
   );
 
-  // Bars scale against the busiest node so the smallest node stays visible;
-  // the percentage next to it is of the pool total instead.
-  const maxNodeTraffic = useMemo(
-    () => Math.max(...nodeTraffic.map((n) => n[trafficMetric]), 0),
-    [nodeTraffic, trafficMetric],
-  );
-
   if (loading) {
     return (
       <ContentLayout header={<Header variant="h1">{t("admin.dashboard.title")}</Header>}>
@@ -543,7 +536,7 @@ export default function Dashboard() {
                       >
                         <div
                           style={{
-                            width: `${maxNodeTraffic ? (value / maxNodeTraffic) * 100 : 0}%`,
+                            width: `${share}%`,
                             height: "100%",
                             borderRadius: "3px",
                             background: "var(--color-background-progress-bar-content-default, #0972d3)",

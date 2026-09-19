@@ -165,11 +165,12 @@
         "plan.requested": "submitted a plan request.",
         "plan.approved": "was approved.",
         "plan.rejected": "had a plan request rejected.",
-        "unknown": "recorded an activity."
+        "unknown": "recorded an activity.",
+        "session.terminated": "terminated a session."
       },
       "shareOfTotal": "{{share}}% of total",
       "nodeSummaryCounts": "Healthy {{healthy}} · Warning {{warning}} · Offline {{offline}}",
-      "trafficTotal": "Total {{total}}"
+      "trafficTotal": "Total {{total}} · shares are of this total"
     },
     "nodes": {
       "title": "Node Management",
