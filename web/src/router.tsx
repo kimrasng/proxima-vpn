@@ -17,6 +17,7 @@ import Settings from "./pages/admin/Settings";
 import TwoFactor from "./pages/admin/TwoFactor";
 import NodeInbounds from "./pages/admin/NodeInbounds";
 import NodeDetail from "./pages/admin/NodeDetail";
+import Connections from "./pages/admin/Connections";
 import UserTemplates from "./pages/admin/UserTemplates";
 
 import Login from "./pages/auth/Login";
@@ -59,6 +60,7 @@ export const router = createBrowserRouter([
       { path: "/admin/plans", element: <Plans /> },
       { path: "/admin/user-templates", element: <UserTemplates /> },
       { path: "/admin/users", element: <Users /> },
+      { path: "/admin/connections", element: <Connections /> },
       { path: "/admin/plan-requests", element: <PlanRequests /> },
       { path: "/admin/announcements", element: <AdminAnnouncements /> },
       { path: "/admin/settings", element: <Settings /> },
