@@ -381,6 +381,13 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 		// Retention sweeps by age, and the global view is newest-first.
 		`CREATE INDEX IF NOT EXISTS idx_login_history_created_at
 			ON login_history(created_at DESC)`,
+
+		// The per-user traffic breakdown reaches a user's rows through devices,
+		// and neither hop was indexed for that direction: without these the
+		// breakdown seq-scans every traffic row in the window for all users.
+		`CREATE INDEX IF NOT EXISTS idx_devices_user ON devices(user_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_traffic_logs_device_created
+			ON traffic_logs(device_id, created_at DESC)`,
 	}
 	for _, m := range migrations {
 		if _, err := pool.Exec(ctx, m); err != nil {

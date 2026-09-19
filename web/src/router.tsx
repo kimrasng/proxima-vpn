@@ -13,6 +13,7 @@ import Nodes from "./pages/admin/Nodes";
 import NodeGroups from "./pages/admin/NodeGroups";
 import Plans from "./pages/admin/Plans";
 import Users from "./pages/admin/Users";
+import UserDetail from "./pages/admin/UserDetail";
 import PlanRequests from "./pages/admin/PlanRequests";
 import AdminAnnouncements from "./pages/admin/Announcements";
 import Settings from "./pages/admin/Settings";
@@ -62,6 +63,7 @@ export const router = createBrowserRouter([
       { path: "/admin/node-groups", element: <NodeGroups /> },
       { path: "/admin/plans", element: <Plans /> },
       { path: "/admin/users", element: <Users /> },
+      { path: "/admin/users/:userId", element: <UserDetail /> },
       { path: "/admin/connections", element: <Connections /> },
       { path: "/admin/plan-requests", element: <PlanRequests /> },
       { path: "/admin/announcements", element: <AdminAnnouncements /> },

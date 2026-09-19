@@ -5,23 +5,32 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math"
+	"regexp"
 	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/proximavpn/proxima-vpn/api-server/internal/services"
 	"github.com/proximavpn/proxima-vpn/pkg/crypto"
 )
 
 // AdminUserHandler handles admin user management endpoints.
 type AdminUserHandler struct {
-	db *pgxpool.Pool
+	db     *pgxpool.Pool
+	stats  *services.StatsService
+	logins *services.LoginHistoryService
 }
 
 // NewAdminUserHandler creates a new AdminUserHandler.
 func NewAdminUserHandler(db *pgxpool.Pool) *AdminUserHandler {
-	return &AdminUserHandler{db: db}
+	return &AdminUserHandler{
+		db:     db,
+		stats:  services.NewStatsService(db),
+		logins: services.NewLoginHistoryService(db),
+	}
 }
 
 type userListItem struct {
@@ -487,4 +496,124 @@ func (h *AdminUserHandler) ResetTraffic(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{"message": "traffic reset"})
+}
+
+// isUUID guards the id-taking read endpoints. Handing a non-UUID path segment
+// straight to a uuid comparison makes Postgres reject the query, which the
+// handler could only report as a 500 for what is really a malformed request.
+var uuidPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
+
+func isUUID(s string) bool {
+	return uuidPattern.MatchString(s)
+}
+
+type userTrafficResponse struct {
+	TrafficUsed      int64                      `json:"traffic_used"`
+	TrafficLimit     *int64                     `json:"traffic_limit"`
+	TrafficRemaining *int64                     `json:"traffic_remaining"`
+	Percentage       float64                    `json:"percentage"`
+	Unlimited        bool                       `json:"unlimited"`
+	Window           string                     `json:"window"`
+	ByNode           []services.UserNodeTraffic `json:"by_node"`
+}
+
+// GetTraffic returns a user's quota position and a per-node usage breakdown.
+// @Summary Get user traffic
+// @Description Returns quota, usage, remaining traffic and a per-node breakdown for one user
+// @Tags admin-users
+// @Produce json
+// @Param id path string true "User ID"
+// @Param window query string false "today, week, or month (default month)"
+// @Success 200 {object} userTrafficResponse
+// @Failure 404 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Security BearerAuth
+// @Router /admin/users/{id}/traffic [get]
+func (h *AdminUserHandler) GetTraffic(c *fiber.Ctx) error {
+	id := c.Params("id")
+	ctx := context.Background()
+
+	if !isUUID(id) {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "invalid user id",
+		})
+	}
+
+	var used int64
+	var limit *int64
+	err := h.db.QueryRow(ctx, `
+		SELECT u.traffic_used, p.traffic_limit
+		FROM users u
+		LEFT JOIN plans p ON u.plan_id = p.id
+		WHERE u.id = $1
+	`, id).Scan(&used, &limit)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+				"error": "user not found",
+			})
+		}
+		log.Printf("admin user traffic %s: %v", id, err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to fetch traffic",
+		})
+	}
+
+	// A plan with no limit and a plan with a zero limit are both "no ceiling":
+	// reporting either as 0 remaining would show an unlimited user as exhausted.
+	resp := userTrafficResponse{TrafficUsed: used, TrafficLimit: limit}
+	if limit == nil || *limit <= 0 {
+		resp.Unlimited = true
+	} else {
+		remaining := *limit - used
+		if remaining < 0 {
+			remaining = 0
+		}
+		resp.TrafficRemaining = &remaining
+		resp.Percentage = math.Min(float64(used)/float64(*limit)*100, 100)
+	}
+
+	window := services.ParseTrafficWindow(c.Query("window", string(services.WindowMonth)))
+	resp.Window = string(window)
+
+	byNode, err := h.stats.GetUserNodeTraffic(ctx, id, window)
+	if err != nil {
+		log.Printf("admin user node traffic %s: %v", id, err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to fetch per-node traffic",
+		})
+	}
+	resp.ByNode = byNode
+
+	return c.JSON(resp)
+}
+
+// GetLoginHistory returns a user's login attempts, newest first.
+// @Summary Get user login history
+// @Description Returns successful and failed login attempts for one user, newest first
+// @Tags admin-users
+// @Produce json
+// @Param id path string true "User ID"
+// @Param limit query int false "Maximum attempts to return (default 50, max 200)"
+// @Success 200 {array} services.LoginEntry
+// @Failure 500 {object} map[string]string
+// @Security BearerAuth
+// @Router /admin/users/{id}/login-history [get]
+func (h *AdminUserHandler) GetLoginHistory(c *fiber.Ctx) error {
+	id := c.Params("id")
+	if !isUUID(id) {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "invalid user id",
+		})
+	}
+
+	entries, err := h.logins.ListForUser(context.Background(), id, c.QueryInt("limit", 50))
+	if err != nil {
+		log.Printf("admin user login history %s: %v", id, err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to fetch login history",
+		})
+	}
+
+	return c.JSON(entries)
 }

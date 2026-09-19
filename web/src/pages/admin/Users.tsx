@@ -1,25 +1,30 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
   Box,
   Button,
+  ButtonDropdown,
   ContentLayout,
   Flashbar,
   FormField,
   Header,
   Input,
+  Link,
   Modal,
   Pagination,
   Select,
   SpaceBetween,
   Spinner,
   StatusIndicator,
+  type StatusIndicatorProps,
   Table,
   TextFilter,
-  Toggle,
 } from "@cloudscape-design/components";
-import { listUsers, updateUser, createUser, resetUserTraffic, getUser, listPlans } from "../../api/admin";
-import type { User, CreateUserRequest, Plan } from "../../api/types";
+import { listUsers, updateUser, createUser, resetUserTraffic } from "../../api/admin";
+import type { User, CreateUserRequest } from "../../api/types";
+import { formatBytes } from "../../utils/format";
+import { formatDate } from "../../utils/relativeTime";
 
 interface CreateUserForm {
   email: string;
@@ -33,24 +38,38 @@ const emptyCreateForm: CreateUserForm = {
   name: "",
 };
 
-interface EditUserForm {
-  name: string;
-  status: string;
-  plan_id: string;
-  plan_expires_at: string;
-  is_active: boolean;
+const knownStatuses = ["active", "suspended", "expired", "pending"] as const;
+
+type KnownStatus = (typeof knownStatuses)[number];
+
+function isKnownStatus(value: string): value is KnownStatus {
+  return (knownStatuses as readonly string[]).includes(value);
 }
 
-const emptyEditForm: EditUserForm = {
-  name: "",
-  status: "active",
-  plan_id: "",
-  plan_expires_at: "",
-  is_active: true,
-};
+// A disabled account denies service whatever its status column says, so
+// is_active decides both the label and the severity. Reporting such a row as
+// "active" because status still reads active is what made a suspended account
+// look enabled. Otherwise the status carries the severity: pending is a neutral
+// waiting state, not a failure.
+function statusIndicatorType(user: User): StatusIndicatorProps.Type {
+  if (!user.is_active) return "error";
+  switch (user.status) {
+    case "active":
+      return "success";
+    case "pending":
+      return "pending";
+    case "expired":
+      return "warning";
+    case "suspended":
+      return "error";
+    default:
+      return "info";
+  }
+}
 
 export default function Users() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [flash, setFlash] = useState<{ type: "success" | "error"; content: string }[]>([]);
@@ -63,11 +82,6 @@ export default function Users() {
   const [createModal, setCreateModal] = useState(false);
   const [createForm, setCreateForm] = useState<CreateUserForm>(emptyCreateForm);
   const [createLoading, setCreateLoading] = useState(false);
-
-  const [editModal, setEditModal] = useState<User | null>(null);
-  const [editForm, setEditForm] = useState<EditUserForm>(emptyEditForm);
-  const [plans, setPlans] = useState<Plan[]>([]);
-  const [editLoading, setEditLoading] = useState(false);
 
   const limit = 20;
 
@@ -125,80 +139,24 @@ export default function Users() {
       setCreateModal(false);
       setCreateForm(emptyCreateForm);
       await fetchUsers();
-      setFlash([{
-        type: "success",
-        content: t("admin.users.createSuccess"),
-      }]);
+      setFlash([{ type: "success", content: t("admin.users.createSuccess") }]);
     } catch {
-      setFlash([{
-        type: "error",
-        content: t("admin.users.createError"),
-      }]);
+      setFlash([{ type: "error", content: t("admin.users.createError") }]);
     } finally {
       setCreateLoading(false);
     }
   };
 
   const handleResetTraffic = async (userId: string) => {
-    setActionLoading(userId + "-reset");
+    setActionLoading(userId);
     try {
       await resetUserTraffic(userId);
       await fetchUsers();
-      setFlash([{
-        type: "success",
-        content: t("admin.users.resetTrafficSuccess"),
-      }]);
+      setFlash([{ type: "success", content: t("admin.users.resetTrafficSuccess") }]);
     } catch {
-      setFlash([{
-        type: "error",
-        content: t("admin.users.resetTrafficError"),
-      }]);
+      setFlash([{ type: "error", content: t("admin.users.resetTrafficError") }]);
     } finally {
       setActionLoading(null);
-    }
-  };
-
-  const handleOpenEdit = async (user: User) => {
-    setEditLoading(true);
-    try {
-      const [detail, plansData] = await Promise.all([getUser(user.id), listPlans()]);
-      setPlans(plansData);
-      setEditForm({
-        name: detail.name,
-        status: detail.status,
-        plan_id: detail.plan_id ?? "",
-        plan_expires_at: detail.plan_expires_at ? (detail.plan_expires_at.split("T")[0] ?? "") : "",
-        is_active: detail.is_active,
-      });
-      setEditModal(user);
-    } catch {
-      setFlash([{ type: "error", content: t("admin.users.fetchError") }]);
-    } finally {
-      setEditLoading(false);
-    }
-  };
-
-  const handleEditUser = async () => {
-    if (!editModal) return;
-    setEditLoading(true);
-    try {
-      await updateUser(editModal.id, {
-        name: editForm.name,
-        status: editForm.status,
-        plan_id: editForm.plan_id || undefined,
-        plan_expires_at: editForm.plan_expires_at
-          ? new Date(editForm.plan_expires_at).toISOString()
-          : undefined,
-        is_active: editForm.is_active,
-      });
-      setEditModal(null);
-      setEditForm(emptyEditForm);
-      await fetchUsers();
-      setFlash([{ type: "success", content: t("admin.users.editUserSuccess") }]);
-    } catch {
-      setFlash([{ type: "error", content: t("admin.users.editUserError") }]);
-    } finally {
-      setEditLoading(false);
     }
   };
 
@@ -209,23 +167,9 @@ export default function Users() {
     { label: t("admin.users.filter.expired"), value: "expired" },
   ];
 
-  const editStatusOptions = [
-    { label: "Active", value: "active" },
-    { label: "Suspended", value: "suspended" },
-    { label: "Expired", value: "expired" },
-    { label: "Pending", value: "pending" },
-  ];
-
-  const planOptions = [
-    { label: "No Plan", value: "" },
-    ...plans.map((p) => ({ label: p.name, value: p.id })),
-  ];
-
-  const formatBytes = (bytes: number): string => {
-    if (bytes === 0) return "0 B";
-    const units = ["B", "KB", "MB", "GB", "TB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(1024));
-    return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${units[i]}`;
+  const statusLabel = (user: User): string => {
+    if (!user.is_active && user.status === "active") return t("admin.users.status.disabled");
+    return isKnownStatus(user.status) ? t(`admin.users.status.${user.status}`) : user.status;
   };
 
   return (
@@ -242,7 +186,11 @@ export default function Users() {
           />
         )}
         {error && (
-          <Flashbar items={[{ type: "error", content: error, dismissible: true, onDismiss: () => setError(null) }]} />
+          <Flashbar
+            items={[
+              { type: "error", content: error, dismissible: true, onDismiss: () => setError(null) },
+            ]}
+          />
         )}
 
         <Table
@@ -287,59 +235,75 @@ export default function Users() {
           }
           items={users}
           columnDefinitions={[
-            { id: "email", header: t("admin.users.col.email"), cell: (item) => item.email },
-            { id: "name", header: t("admin.users.col.name"), cell: (item) => item.name },
+            {
+              id: "email",
+              header: t("admin.users.col.email"),
+              cell: (item) => (
+                <Link
+                  href={`/admin/users/${item.id}`}
+                  onFollow={(event) => {
+                    event.preventDefault();
+                    void navigate(`/admin/users/${item.id}`);
+                  }}
+                >
+                  {item.email}
+                </Link>
+              ),
+            },
+            { id: "name", header: t("admin.users.col.name"), cell: (item) => item.name || "—" },
             {
               id: "status",
               header: t("admin.users.col.status"),
               cell: (item) => (
-                <StatusIndicator type={item.is_active ? "success" : "error"}>
-                  {item.status}
+                <StatusIndicator type={statusIndicatorType(item)}>
+                  {statusLabel(item)}
                 </StatusIndicator>
               ),
             },
-            { id: "plan", header: t("admin.users.col.plan"), cell: (item) => item.plan_name ?? "-" },
-            { id: "traffic", header: t("admin.users.col.trafficUsed"), cell: (item) => formatBytes(item.traffic_used) },
+            {
+              id: "plan",
+              header: t("admin.users.col.plan"),
+              cell: (item) => item.plan_name ?? t("admin.users.noPlan"),
+            },
+            {
+              id: "traffic",
+              header: t("admin.users.col.trafficUsed"),
+              cell: (item) => formatBytes(item.traffic_used),
+            },
             {
               id: "expires",
               header: t("admin.users.col.expiresAt"),
-              cell: (item) => item.plan_expires_at ? new Date(item.plan_expires_at).toLocaleDateString() : "-",
+              cell: (item) =>
+                item.plan_expires_at ? formatDate(item.plan_expires_at) : "—",
             },
             {
               id: "actions",
               header: t("admin.users.col.actions"),
               cell: (item) => (
-                <SpaceBetween direction="horizontal" size="xs">
-                  <Button
-                    variant="inline-link"
-                    loading={actionLoading === item.id + "-edit"}
-                    onClick={() => void handleOpenEdit(item)}
-                  >
-                    {t("admin.users.editUser")}
-                  </Button>
-                  <Button
-                    variant="inline-link"
-                    loading={actionLoading === item.id}
-                    onClick={() => void handleToggleActive(item)}
-                  >
-                    {item.is_active ? t("admin.users.suspend") : t("admin.users.activate")}
-                  </Button>
-                  <Button
-                    variant="inline-link"
-                    loading={actionLoading === item.id + "-reset"}
-                    onClick={() => void handleResetTraffic(item.id)}
-                  >
-                    {t("admin.users.resetTraffic")}
-                  </Button>
-                </SpaceBetween>
+                <ButtonDropdown
+                  expandToViewport
+                  ariaLabel={t("admin.users.actionsLabel")}
+                  loading={actionLoading === item.id}
+                  items={[
+                    { id: "detail", text: t("admin.users.viewDetail") },
+                    {
+                      id: "toggle",
+                      text: item.is_active ? t("admin.users.suspend") : t("admin.users.activate"),
+                    },
+                    { id: "reset", text: t("admin.users.resetTraffic") },
+                  ]}
+                  onItemClick={({ detail }) => {
+                    if (detail.id === "detail") void navigate(`/admin/users/${item.id}`);
+                    if (detail.id === "toggle") void handleToggleActive(item);
+                    if (detail.id === "reset") void handleResetTraffic(item.id);
+                  }}
+                >
+                  {t("admin.users.actionsLabel")}
+                </ButtonDropdown>
               ),
             },
           ]}
-          empty={
-            <Box textAlign="center">
-              {loading ? <Spinner /> : t("admin.users.empty")}
-            </Box>
-          }
+          empty={<Box textAlign="center">{loading ? <Spinner /> : t("admin.users.empty")}</Box>}
         />
       </SpaceBetween>
 
@@ -362,11 +326,7 @@ export default function Users() {
               >
                 {t("common.cancel")}
               </Button>
-              <Button
-                variant="primary"
-                loading={createLoading}
-                onClick={() => void handleCreateUser()}
-              >
+              <Button variant="primary" loading={createLoading} onClick={() => void handleCreateUser()}>
                 {t("common.create")}
               </Button>
             </SpaceBetween>
@@ -393,76 +353,6 @@ export default function Users() {
               value={createForm.name}
               onChange={({ detail }) => setCreateForm((f) => ({ ...f, name: detail.value }))}
             />
-          </FormField>
-        </SpaceBetween>
-      </Modal>
-
-      <Modal
-        visible={editModal !== null}
-        onDismiss={() => {
-          setEditModal(null);
-          setEditForm(emptyEditForm);
-        }}
-        header={t("admin.users.editUserModalTitle")}
-        footer={
-          <Box float="right">
-            <SpaceBetween direction="horizontal" size="xs">
-              <Button
-                variant="link"
-                onClick={() => {
-                  setEditModal(null);
-                  setEditForm(emptyEditForm);
-                }}
-              >
-                {t("common.cancel")}
-              </Button>
-              <Button
-                variant="primary"
-                loading={editLoading}
-                onClick={() => void handleEditUser()}
-              >
-                {t("common.save")}
-              </Button>
-            </SpaceBetween>
-          </Box>
-        }
-      >
-        <SpaceBetween size="m">
-          <FormField label={t("admin.users.col.name")}>
-            <Input
-              value={editForm.name}
-              onChange={({ detail }) => setEditForm((f) => ({ ...f, name: detail.value }))}
-            />
-          </FormField>
-          <FormField label={t("admin.users.col.status")}>
-            <Select
-              selectedOption={editStatusOptions.find((o) => o.value === editForm.status) ?? null}
-              options={editStatusOptions}
-              onChange={({ detail }) => setEditForm((f) => ({ ...f, status: detail.selectedOption.value ?? "active" }))}
-            />
-          </FormField>
-          <FormField label={t("admin.users.planLabel")}>
-            <Select
-              selectedOption={planOptions.find((o) => o.value === editForm.plan_id) ?? null}
-              options={planOptions}
-              onChange={({ detail }) => setEditForm((f) => ({ ...f, plan_id: detail.selectedOption.value ?? "" }))}
-            />
-          </FormField>
-          <FormField label={t("admin.users.expiresAt")}>
-            <input
-              type="date"
-              value={editForm.plan_expires_at}
-              onChange={(e) => setEditForm((f) => ({ ...f, plan_expires_at: e.target.value }))}
-              style={{ width: "100%" }}
-            />
-          </FormField>
-          <FormField label={t("admin.users.col.status")}>
-            <Toggle
-              checked={editForm.is_active}
-              onChange={({ detail }) => setEditForm((f) => ({ ...f, is_active: detail.checked }))}
-            >
-              {editForm.is_active ? t("admin.users.activate") : t("admin.users.suspend")}
-            </Toggle>
           </FormField>
         </SpaceBetween>
       </Modal>
