@@ -1,9 +1,13 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import {
+  Badge,
   Box,
   Button,
+  ButtonDropdown,
+  CollectionPreferences,
+  type CollectionPreferencesProps,
   ColumnLayout,
   Container,
   ContentLayout,
@@ -12,31 +16,36 @@ import {
   Header,
   Input,
   Modal,
+  Pagination,
+  Popover,
   ProgressBar,
+  Select,
+  type SelectProps,
   SpaceBetween,
   Spinner,
   StatusIndicator,
   Table,
   Textarea,
+  TextFilter,
 } from "@cloudscape-design/components";
+import { useCollection } from "@cloudscape-design/collection-hooks";
 import { listNodes, generateNodeToken, deleteNode, updateNode } from "../../api/admin";
 import type { Node, GenerateTokenResponse, UpdateNodeRequest } from "../../api/types";
 
-function formatRelativeTime(dateStr: string | undefined | null): string {
-  if (!dateStr) return "Never";
-  const now = Date.now();
-  const then = new Date(dateStr).getTime();
-  const diffMs = now - then;
-  if (diffMs < 0) return "Just now";
+const REFRESH_INTERVAL = 30000;
+const DEFAULT_PAGE_SIZE = 20;
 
+function formatRelativeTime(dateStr: string | undefined | null): string {
+  if (!dateStr) return "—";
+  const diffMs = Date.now() - new Date(dateStr).getTime();
+  if (diffMs < 0) return "0s";
   const seconds = Math.floor(diffMs / 1000);
-  if (seconds < 60) return `${seconds}s ago`;
+  if (seconds < 60) return `${seconds}s`;
   const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
+  if (minutes < 60) return `${minutes}m`;
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
+  if (hours < 24) return `${hours}h`;
+  return `${Math.floor(hours / 24)}d`;
 }
 
 function formatBytes(bytes: number): string {
@@ -46,21 +55,56 @@ function formatBytes(bytes: number): string {
   return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${units[i]}`;
 }
 
-function getUsageStatus(value: number): "success" | "warning" | "error" {
+function getUsageStatus(value: number): "success" | "in-progress" | "error" {
   if (value < 50) return "success";
-  if (value <= 80) return "warning";
+  if (value <= 80) return "in-progress";
   return "error";
 }
 
 function getStatusIndicatorType(status: string): "success" | "error" | "pending" {
-  switch (status) {
-    case "online":
-      return "success";
-    case "offline":
-      return "error";
-    default:
-      return "pending";
-  }
+  if (status === "online") return "success";
+  if (status === "offline") return "error";
+  return "pending";
+}
+
+/**
+ * Converts an ISO 3166-1 alpha-2 country code to its flag emoji. Node `country`
+ * is free-form text, so anything that is not exactly two letters yields no flag.
+ */
+function countryFlag(code: string): string {
+  const trimmed = code.trim();
+  if (!/^[A-Za-z]{2}$/.test(trimmed)) return "";
+  return String.fromCodePoint(
+    ...trimmed
+      .toUpperCase()
+      .split("")
+      .map((char) => 0x1f1e6 + char.charCodeAt(0) - 65),
+  );
+}
+
+/** Compact inline usage bar: label on the left, thin bar with its percentage on the right. */
+function UsageCell({ label, value }: { label: string; value: number | undefined }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+      <Box variant="small" color="text-body-secondary">
+        <span style={{ display: "inline-block", minWidth: "44px" }}>{label}</span>
+      </Box>
+      {value != null ? (
+        <div style={{ flex: 1, minWidth: "72px" }}>
+          <ProgressBar
+            value={value}
+            status={getUsageStatus(value) === "error" ? "error" : "in-progress"}
+            variant="key-value"
+            ariaLabel={label}
+          />
+        </div>
+      ) : (
+        <Box variant="small" color="text-status-inactive">
+          —
+        </Box>
+      )}
+    </div>
+  );
 }
 
 export default function Nodes() {
@@ -68,40 +112,135 @@ export default function Nodes() {
   const navigate = useNavigate();
   const [nodes, setNodes] = useState<Node[]>([]);
   const [loading, setLoading] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tokenModal, setTokenModal] = useState(false);
   const [tokenData, setTokenData] = useState<GenerateTokenResponse | null>(null);
   const [deleteModal, setDeleteModal] = useState<Node | null>(null);
   const [editModal, setEditModal] = useState<Node | null>(null);
-  const [metricsModal, setMetricsModal] = useState<Node | null>(null);
-  const [editForm, setEditForm] = useState<{ name: string; country: string; region: string }>({ name: "", country: "", region: "" });
+  const [editForm, setEditForm] = useState({ name: "", country: "", region: "" });
   const [editSuccess, setEditSuccess] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
 
-  const fetchNodes = async () => {
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [regionFilter, setRegionFilter] = useState<string>("all");
+  const [preferences, setPreferences] = useState<CollectionPreferencesProps.Preferences>({
+    pageSize: DEFAULT_PAGE_SIZE,
+    wrapLines: false,
+    contentDisplay: [
+      { id: "name", visible: true },
+      { id: "country", visible: true },
+      { id: "ip", visible: true },
+      { id: "status", visible: true },
+      { id: "resources", visible: true },
+      { id: "traffic", visible: true },
+      { id: "connections", visible: true },
+      { id: "lastCheck", visible: true },
+      { id: "health", visible: false },
+      { id: "actions", visible: true },
+    ],
+  });
+
+  const fetchNodes = useCallback(async () => {
     try {
       const data = await listNodes();
       setNodes(data);
+      setLastUpdated(new Date());
       setError(null);
     } catch {
       setError(t("admin.nodes.fetchError"));
     } finally {
       setLoading(false);
     }
-  };
+  }, [t]);
 
-    useEffect(() => {
-      void fetchNodes();
-      const interval = setInterval(() => void fetchNodes(), 30000);
-      return () => clearInterval(interval);
-    }, []);
+  useEffect(() => {
+    void fetchNodes();
+    const interval = setInterval(() => void fetchNodes(), REFRESH_INTERVAL);
+    return () => clearInterval(interval);
+  }, [fetchNodes]);
 
   const healthSummary = useMemo(() => {
     const online = nodes.filter((n) => n.status === "online").length;
     const offline = nodes.filter((n) => n.status === "offline").length;
-    const pending = nodes.length - online - offline;
-    return { online, offline, pending };
+    return { total: nodes.length, online, offline, pending: nodes.length - online - offline };
   }, [nodes]);
+
+  const regionOptions = useMemo<SelectProps.Options>(() => {
+    const regions = Array.from(new Set(nodes.map((n) => n.region).filter(Boolean))).sort();
+    return [
+      { value: "all", label: t("admin.nodes.filterRegionAll") },
+      ...regions.map((region) => ({ value: region, label: region })),
+    ];
+  }, [nodes, t]);
+
+  const statusOptions = useMemo<SelectProps.Options>(
+    () => [
+      { value: "all", label: t("admin.nodes.filterStatusAll") },
+      { value: "online", label: t("admin.nodes.statusOnline") },
+      { value: "offline", label: t("admin.nodes.statusOffline") },
+      { value: "pending", label: t("admin.nodes.statusPending") },
+    ],
+    [t],
+  );
+
+  const statusLabel = useCallback(
+    (status: string) => {
+      if (status === "online") return t("admin.nodes.statusOnline");
+      if (status === "offline") return t("admin.nodes.statusOffline");
+      return t("admin.nodes.statusPending");
+    },
+    [t],
+  );
+
+  const { items, collectionProps, filterProps, filteredItemsCount, paginationProps, actions } =
+    useCollection(nodes, {
+      filtering: {
+        empty: (
+          <Box textAlign="center" padding={{ vertical: "l" }} color="inherit">
+            <Box variant="strong" color="inherit">
+              {t("admin.nodes.empty")}
+            </Box>
+          </Box>
+        ),
+        noMatch: (
+          <Box textAlign="center" padding={{ vertical: "l" }} color="inherit">
+            <SpaceBetween size="xxs">
+              <Box variant="strong" color="inherit">
+                {t("admin.nodes.noMatch")}
+              </Box>
+              <Box variant="small" color="inherit">
+                {t("admin.nodes.noMatchSubtitle")}
+              </Box>
+            </SpaceBetween>
+          </Box>
+        ),
+        filteringFunction: (item, filteringText) => {
+          if (statusFilter !== "all") {
+            const normalized =
+              item.status === "online" || item.status === "offline" ? item.status : "pending";
+            if (normalized !== statusFilter) return false;
+          }
+          if (regionFilter !== "all" && item.region !== regionFilter) return false;
+          const text = filteringText.trim().toLowerCase();
+          if (!text) return true;
+          return [item.name, item.ip, item.country, item.region].some((field) =>
+            (field ?? "").toLowerCase().includes(text),
+          );
+        },
+      },
+      sorting: {},
+      pagination: { pageSize: preferences.pageSize ?? DEFAULT_PAGE_SIZE },
+    });
+
+  const filtersActive =
+    Boolean(filterProps.filteringText) || statusFilter !== "all" || regionFilter !== "all";
+
+  const clearFilters = () => {
+    actions.setFiltering("");
+    setStatusFilter("all");
+    setRegionFilter("all");
+  };
 
   const handleGenerateToken = async () => {
     setActionLoading(true);
@@ -156,134 +295,289 @@ export default function Nodes() {
     }
   };
 
+  const nodeHealthProblems = (node: Node): string[] => {
+    const problems: string[] = [];
+    if (node.shaping_ok === false) problems.push(t("admin.nodes.shapingNotApplied"));
+    if (node.xray_too_old) problems.push(t("admin.nodes.xrayTooOld", { minimum: node.xray_minimum }));
+    return problems;
+  };
+
   if (loading) {
     return (
       <ContentLayout header={<Header variant="h1">{t("admin.nodes.title")}</Header>}>
-        <Box textAlign="center" padding="xl"><Spinner size="large" /></Box>
+        <Box textAlign="center" padding="xxl">
+          <Spinner size="large" />
+        </Box>
       </ContentLayout>
     );
   }
 
+  const kpiRatio = (count: number) =>
+    healthSummary.total ? Math.round((count / healthSummary.total) * 100) : 0;
+
   return (
-    <ContentLayout header={<Header variant="h1">{t("admin.nodes.title")}</Header>}>
-      <SpaceBetween size="l">
+    <ContentLayout
+      header={
+        <Header
+          variant="h1"
+          description={
+            <SpaceBetween size="xxs" direction="horizontal" alignItems="center">
+              <span>{t("admin.nodes.subtitle")}</span>
+              {lastUpdated && (
+                <Box variant="small" color="text-status-inactive">
+                  {`· ${t("admin.nodes.lastUpdated", { time: lastUpdated.toLocaleString() })}`}
+                </Box>
+              )}
+            </SpaceBetween>
+          }
+          actions={
+            <SpaceBetween direction="horizontal" size="xs" alignItems="center">
+              <Button
+                iconName="refresh"
+                ariaLabel={t("admin.nodes.refresh")}
+                onClick={() => void fetchNodes()}
+              />
+              <Button
+                variant="primary"
+                iconName="add-plus"
+                loading={actionLoading}
+                onClick={() => void handleGenerateToken()}
+              >
+                {t("admin.nodes.createNode")}
+              </Button>
+            </SpaceBetween>
+          }
+        >
+          {t("admin.nodes.title")}
+        </Header>
+      }
+    >
+      <SpaceBetween size="m">
         {error && (
-          <Flashbar items={[{ type: "error", content: error, dismissible: true, onDismiss: () => setError(null) }]} />
+          <Flashbar
+            items={[{ type: "error", content: error, dismissible: true, onDismiss: () => setError(null) }]}
+          />
         )}
         {editSuccess && (
-          <Flashbar items={[{ type: "success", content: t("admin.nodes.editSuccess"), dismissible: true, onDismiss: () => setEditSuccess(false) }]} />
+          <Flashbar
+            items={[
+              {
+                type: "success",
+                content: t("admin.nodes.editSuccess"),
+                dismissible: true,
+                onDismiss: () => setEditSuccess(false),
+              },
+            ]}
+          />
         )}
 
         <Container>
-          <ColumnLayout columns={3} variant="text-grid">
+          <ColumnLayout columns={4} variant="text-grid">
             <div>
-              <Box variant="awsui-key-label">Online</Box>
-              <StatusIndicator type="success">
-                {healthSummary.online} {healthSummary.online === 1 ? "node" : "nodes"}
-              </StatusIndicator>
+              <Box variant="awsui-key-label">{t("admin.nodes.kpi.total")}</Box>
+              <Box fontSize="heading-xl" fontWeight="bold">
+                {healthSummary.total}
+              </Box>
             </div>
             <div>
-              <Box variant="awsui-key-label">Offline</Box>
-              <StatusIndicator type="error">
-                {healthSummary.offline} {healthSummary.offline === 1 ? "node" : "nodes"}
-              </StatusIndicator>
+              <Box variant="awsui-key-label">{t("admin.nodes.kpi.online")}</Box>
+              <SpaceBetween direction="horizontal" size="xs" alignItems="center">
+                <Box fontSize="heading-xl" fontWeight="bold" color="text-status-success">
+                  {healthSummary.online}
+                </Box>
+                <Box variant="small" color="text-body-secondary">
+                  {kpiRatio(healthSummary.online)}%
+                </Box>
+              </SpaceBetween>
             </div>
             <div>
-              <Box variant="awsui-key-label">Pending</Box>
-              <StatusIndicator type="pending">
-                {healthSummary.pending} {healthSummary.pending === 1 ? "node" : "nodes"}
-              </StatusIndicator>
+              <Box variant="awsui-key-label">{t("admin.nodes.kpi.offline")}</Box>
+              <SpaceBetween direction="horizontal" size="xs" alignItems="center">
+                <Box
+                  fontSize="heading-xl"
+                  fontWeight="bold"
+                  color={healthSummary.offline > 0 ? "text-status-error" : "inherit"}
+                >
+                  {healthSummary.offline}
+                </Box>
+                <Box variant="small" color="text-body-secondary">
+                  {kpiRatio(healthSummary.offline)}%
+                </Box>
+              </SpaceBetween>
+            </div>
+            <div>
+              <Box variant="awsui-key-label">{t("admin.nodes.kpi.pending")}</Box>
+              <SpaceBetween direction="horizontal" size="xs" alignItems="center">
+                <Box fontSize="heading-xl" fontWeight="bold" color="text-status-inactive">
+                  {healthSummary.pending}
+                </Box>
+                <Box variant="small" color="text-body-secondary">
+                  {kpiRatio(healthSummary.pending)}%
+                </Box>
+              </SpaceBetween>
             </div>
           </ColumnLayout>
         </Container>
 
         <Table
-          header={
-            <Header
-              actions={
-                <Button variant="primary" loading={actionLoading} onClick={() => void handleGenerateToken()}>
-                  {t("admin.nodes.generateToken")}
+          {...collectionProps}
+          variant="container"
+          contentDensity="compact"
+          stickyHeader
+          wrapLines={preferences.wrapLines}
+          columnDisplay={preferences.contentDisplay}
+          items={items}
+          trackBy="id"
+          filter={
+            <SpaceBetween direction="horizontal" size="xs" alignItems="center">
+              <TextFilter
+                {...filterProps}
+                filteringPlaceholder={t("admin.nodes.searchPlaceholder")}
+                filteringAriaLabel={t("admin.nodes.searchPlaceholder")}
+                countText={
+                  filtersActive ? t("admin.nodes.matchCount", { count: filteredItemsCount ?? 0 }) : ""
+                }
+              />
+              <Select
+                selectedOption={
+                  statusOptions.find((option) => "value" in option && option.value === statusFilter) ??
+                  null
+                }
+                options={statusOptions}
+                onChange={({ detail }) => {
+                  setStatusFilter(detail.selectedOption.value ?? "all");
+                  actions.setCurrentPage(1);
+                }}
+                ariaLabel={t("admin.nodes.filterStatusAll")}
+              />
+              <Select
+                selectedOption={
+                  regionOptions.find((option) => "value" in option && option.value === regionFilter) ??
+                  null
+                }
+                options={regionOptions}
+                onChange={({ detail }) => {
+                  setRegionFilter(detail.selectedOption.value ?? "all");
+                  actions.setCurrentPage(1);
+                }}
+                ariaLabel={t("admin.nodes.filterRegionAll")}
+              />
+              {filtersActive && (
+                <Button variant="link" onClick={clearFilters}>
+                  {t("admin.nodes.clearFilters")}
                 </Button>
-              }
-              counter={`(${nodes.length})`}
-            >
-              {t("admin.nodes.title")}
-            </Header>
+              )}
+            </SpaceBetween>
           }
-          items={nodes}
+          pagination={
+            <Pagination
+              {...paginationProps}
+              ariaLabels={{ paginationLabel: t("admin.nodes.paginationLabel") }}
+            />
+          }
+          preferences={
+            <CollectionPreferences
+              title={t("admin.nodes.preferencesTitle")}
+              confirmLabel={t("admin.nodes.save")}
+              cancelLabel={t("admin.nodes.cancel")}
+              preferences={preferences}
+              onConfirm={({ detail }) => setPreferences(detail)}
+              pageSizePreference={{
+                title: t("admin.nodes.pageSize"),
+                options: [10, 20, 50].map((size) => ({
+                  value: size,
+                  label: t("admin.nodes.pageSizeOption", { count: size }),
+                })),
+              }}
+              wrapLinesPreference={{ label: t("admin.nodes.wrapLines"), description: "" }}
+              contentDisplayPreference={{
+                title: t("admin.nodes.visibleColumns"),
+                options: [
+                  { id: "name", label: t("admin.nodes.col.name"), alwaysVisible: true },
+                  { id: "country", label: t("admin.nodes.col.countryRegion") },
+                  { id: "ip", label: t("admin.nodes.col.ip") },
+                  { id: "status", label: t("admin.nodes.col.status") },
+                  { id: "resources", label: t("admin.nodes.col.resources") },
+                  { id: "traffic", label: t("admin.nodes.col.traffic") },
+                  { id: "connections", label: t("admin.nodes.col.connections") },
+                  { id: "lastCheck", label: t("admin.nodes.col.lastCheck") },
+                  { id: "health", label: t("admin.nodes.col.health") },
+                  { id: "actions", label: t("admin.nodes.col.actions") },
+                ],
+              }}
+            />
+          }
           columnDefinitions={[
-            { id: "name", header: t("admin.nodes.col.name"), cell: (item) =>
-              item.status === "pending" ? (
-                <Box color="text-status-inactive">—</Box>
-              ) : (
-                <Button variant="inline-link" onClick={() => navigate(`/admin/nodes/${item.id}`)}>
-                  {item.name}
-                </Button>
-              )
+            {
+              id: "name",
+              header: t("admin.nodes.col.name"),
+              sortingField: "name",
+              cell: (item) =>
+                item.status === "pending" ? (
+                  <Badge color="grey">{t("admin.nodes.statusPending")}</Badge>
+                ) : (
+                  <Button variant="inline-link" onClick={() => navigate(`/admin/nodes/${item.id}`)}>
+                    {item.name}
+                  </Button>
+                ),
             },
-            { id: "country", header: t("admin.nodes.col.country"), cell: (item) =>
-              item.status === "pending" ? <Box color="text-status-inactive">—</Box> : item.country
+            {
+              id: "country",
+              header: t("admin.nodes.col.countryRegion"),
+              sortingField: "country",
+              cell: (item) =>
+                item.status === "pending" ? (
+                  <Box color="text-status-inactive">—</Box>
+                ) : (
+                  `${countryFlag(item.country)} ${item.country || "—"}${
+                    item.region ? ` / ${item.region}` : ""
+                  }`.trim()
+                ),
             },
-            { id: "ip", header: t("admin.nodes.col.ip"), cell: (item) =>
-              item.status === "pending" ? <Box color="text-status-inactive">—</Box> : item.ip
+            {
+              id: "ip",
+              header: t("admin.nodes.col.ip"),
+              sortingField: "ip",
+              cell: (item) =>
+                item.status === "pending" ? <Box color="text-status-inactive">—</Box> : item.ip,
             },
             {
               id: "status",
               header: t("admin.nodes.col.status"),
+              sortingField: "status",
               cell: (item) => (
                 <StatusIndicator type={getStatusIndicatorType(item.status)}>
-                  {item.status}
+                  {statusLabel(item.status)}
                 </StatusIndicator>
               ),
             },
             {
-              id: "cpu",
-              header: t("admin.nodes.col.cpu"),
-              cell: (item) =>
-                item.cpu_usage != null ? (
-                  <ProgressBar
-                    value={item.cpu_usage}
-                    status={getUsageStatus(item.cpu_usage) === "error" ? "error" : "in-progress"}
-                    variant="standalone"
-                    additionalInfo={`${item.cpu_usage.toFixed(1)}%`}
-                  />
-                ) : (
-                  <Box color="text-status-inactive">—</Box>
-                ),
+              id: "resources",
+              header: (
+                <SpaceBetween direction="horizontal" size="xxs" alignItems="center">
+                  <span>{t("admin.nodes.col.resources")}</span>
+                  <Popover
+                    dismissButton={false}
+                    position="top"
+                    size="small"
+                    triggerType="custom"
+                    content={t("admin.nodes.resourcesInfo")}
+                  >
+                    <Button variant="inline-icon" iconName="status-info" ariaLabel="info" />
+                  </Popover>
+                </SpaceBetween>
+              ),
+              minWidth: 190,
+              cell: (item) => (
+                <SpaceBetween size="xxxs">
+                  <UsageCell label={t("admin.nodes.col.cpu")} value={item.cpu_usage} />
+                  <UsageCell label={t("admin.nodes.col.memory")} value={item.memory_usage} />
+                </SpaceBetween>
+              ),
             },
             {
-              id: "memory",
-              header: t("admin.nodes.col.memory"),
-              cell: (item) =>
-                item.memory_usage != null ? (
-                  <ProgressBar
-                    value={item.memory_usage}
-                    status={getUsageStatus(item.memory_usage) === "error" ? "error" : "in-progress"}
-                    variant="standalone"
-                    additionalInfo={`${item.memory_usage.toFixed(1)}%`}
-                  />
-                ) : (
-                  <Box color="text-status-inactive">—</Box>
-                ),
-            },
-            {
-              id: "disk",
-              header: t("admin.nodes.col.disk"),
-              cell: (item) =>
-                item.disk_usage != null ? (
-                  <ProgressBar
-                    value={item.disk_usage}
-                    status={getUsageStatus(item.disk_usage) === "error" ? "error" : "in-progress"}
-                    variant="standalone"
-                    additionalInfo={`${item.disk_usage.toFixed(1)}%`}
-                  />
-                ) : (
-                  <Box color="text-status-inactive">—</Box>
-                ),
-            },
-            {
-              id: "network",
-              header: t("admin.nodes.col.network"),
+              id: "traffic",
+              header: t("admin.nodes.col.traffic"),
               cell: (item) =>
                 item.network_in != null && item.network_out != null ? (
                   <SpaceBetween size="xxxs">
@@ -295,8 +589,20 @@ export default function Nodes() {
                 ),
             },
             {
-              id: "lastSeen",
-              header: t("admin.nodes.col.lastSeen"),
+              id: "connections",
+              header: t("admin.nodes.col.connections"),
+              sortingField: "online_devices",
+              cell: (item) =>
+                item.status === "pending" ? (
+                  <Box color="text-status-inactive">—</Box>
+                ) : (
+                  `${item.online_devices} / ${item.capacity}`
+                ),
+            },
+            {
+              id: "lastCheck",
+              header: t("admin.nodes.col.lastCheck"),
+              sortingField: "last_seen",
               cell: (item) => (
                 <span title={item.last_seen ? new Date(item.last_seen).toLocaleString() : ""}>
                   {formatRelativeTime(item.last_seen)}
@@ -304,30 +610,20 @@ export default function Nodes() {
               ),
             },
             {
-              id: "occupancy",
-              header: t("admin.nodes.col.occupancy"),
-              cell: (item) =>
-                item.status === "pending" ? (
-                  <Box color="text-status-inactive">—</Box>
-                ) : (
-                  t("admin.nodes.occupancyValue", { online: item.online_devices, capacity: item.capacity })
-                ),
-            },
-            {
               id: "health",
               header: t("admin.nodes.col.health"),
               cell: (item) => {
                 if (item.status === "pending") return <Box color="text-status-inactive">—</Box>;
-                const problems: string[] = [];
-                if (item.shaping_ok === false) problems.push(t("admin.nodes.shapingNotApplied"));
-                if (item.xray_too_old) problems.push(t("admin.nodes.xrayTooOld", { minimum: item.xray_minimum }));
+                const problems = nodeHealthProblems(item);
                 if (problems.length === 0) {
                   return <StatusIndicator type="success">{t("admin.nodes.healthOk")}</StatusIndicator>;
                 }
                 return (
                   <SpaceBetween size="xxxs">
                     {problems.map((problem) => (
-                      <StatusIndicator key={problem} type="warning">{problem}</StatusIndicator>
+                      <StatusIndicator key={problem} type="warning">
+                        {problem}
+                      </StatusIndicator>
                     ))}
                   </SpaceBetween>
                 );
@@ -335,117 +631,49 @@ export default function Nodes() {
             },
             {
               id: "actions",
-              header: t("admin.nodes.col.actions"),
+              header: "",
               cell: (item) => (
-                <SpaceBetween direction="horizontal" size="xs">
-                  <Button
-                    variant="inline-link"
-                    disabled={item.status === "pending"}
-                    onClick={() => setMetricsModal(item)}
-                  >
-                    {t("admin.nodes.details")}
-                  </Button>
-                  <Button
-                    variant="inline-link"
-                    disabled={item.status === "pending"}
-                    onClick={() => handleEditOpen(item)}
-                  >
-                    {t("admin.nodes.edit")}
-                  </Button>
-                  <Button variant="inline-link" onClick={() => setDeleteModal(item)}>
-                    {t("admin.nodes.delete")}
-                  </Button>
-                </SpaceBetween>
+                <ButtonDropdown
+                  variant="inline-icon"
+                  ariaLabel={t("admin.nodes.col.actions")}
+                  expandToViewport
+                  items={[
+                    { id: "details", text: t("admin.nodes.details"), disabled: item.status === "pending" },
+                    { id: "edit", text: t("admin.nodes.edit"), disabled: item.status === "pending" },
+                    {
+                      id: "inbounds",
+                      text: t("admin.nodes.panel.inbounds"),
+                      disabled: item.status === "pending",
+                    },
+                    { id: "delete", text: t("admin.nodes.delete") },
+                  ]}
+                  onItemClick={({ detail }) => {
+                    if (detail.id === "details") {
+                      navigate(`/admin/nodes/${item.id}`);
+                    } else if (detail.id === "edit") {
+                      handleEditOpen(item);
+                    } else if (detail.id === "inbounds") {
+                      navigate(`/admin/nodes/${item.id}/inbounds`);
+                    } else if (detail.id === "delete") {
+                      setDeleteModal(item);
+                    }
+                  }}
+                />
               ),
             },
           ]}
-          empty={<Box textAlign="center">{t("admin.nodes.empty")}</Box>}
-        />
-
-        <Modal
-          visible={metricsModal !== null}
-          onDismiss={() => setMetricsModal(null)}
-          header={metricsModal ? `${metricsModal.name} — ${t("admin.nodes.metricsTitle")}` : ""}
-          size="large"
-          footer={
-            <Box float="right">
-              <Button variant="primary" onClick={() => setMetricsModal(null)}>{t("admin.nodes.close")}</Button>
-            </Box>
+          header={
+            <Header
+              counter={
+                filteredItemsCount !== undefined && filteredItemsCount !== nodes.length
+                  ? `(${filteredItemsCount}/${nodes.length})`
+                  : `(${nodes.length})`
+              }
+            >
+              {t("admin.nodes.listTitle")}
+            </Header>
           }
-        >
-          {metricsModal && (
-            <SpaceBetween size="l">
-              <ColumnLayout columns={2} variant="text-grid">
-                <div>
-                  <Box variant="awsui-key-label">{t("admin.nodes.col.status")}</Box>
-                  <StatusIndicator type={getStatusIndicatorType(metricsModal.status)}>
-                    {metricsModal.status}
-                  </StatusIndicator>
-                </div>
-                <div>
-                  <Box variant="awsui-key-label">{t("admin.nodes.col.lastSeen")}</Box>
-                  <Box>{metricsModal.last_seen ? new Date(metricsModal.last_seen).toLocaleString() : "—"}</Box>
-                </div>
-                <div>
-                  <Box variant="awsui-key-label">IP</Box>
-                  <Box>{metricsModal.ip}:{metricsModal.port}</Box>
-                </div>
-                <div>
-                  <Box variant="awsui-key-label">Xray</Box>
-                  <Box>{metricsModal.xray_version ?? "—"}</Box>
-                </div>
-              </ColumnLayout>
-
-              <ColumnLayout columns={2} variant="text-grid">
-                <div>
-                  <Box variant="awsui-key-label">{t("admin.nodes.col.cpu")}</Box>
-                  {metricsModal.cpu_usage != null ? (
-                    <ProgressBar
-                      value={metricsModal.cpu_usage}
-                      status={getUsageStatus(metricsModal.cpu_usage) === "error" ? "error" : "in-progress"}
-                      additionalInfo={`${metricsModal.cpu_usage.toFixed(1)}%`}
-                    />
-                  ) : <Box color="text-status-inactive">—</Box>}
-                </div>
-                <div>
-                  <Box variant="awsui-key-label">{t("admin.nodes.col.memory")}</Box>
-                  {metricsModal.memory_usage != null ? (
-                    <ProgressBar
-                      value={metricsModal.memory_usage}
-                      status={getUsageStatus(metricsModal.memory_usage) === "error" ? "error" : "in-progress"}
-                      additionalInfo={`${metricsModal.memory_usage.toFixed(1)}%`}
-                    />
-                  ) : <Box color="text-status-inactive">—</Box>}
-                </div>
-                <div>
-                  <Box variant="awsui-key-label">{t("admin.nodes.col.disk")}</Box>
-                  {metricsModal.disk_usage != null ? (
-                    <ProgressBar
-                      value={metricsModal.disk_usage}
-                      status={getUsageStatus(metricsModal.disk_usage) === "error" ? "error" : "in-progress"}
-                      additionalInfo={`${metricsModal.disk_usage.toFixed(1)}%`}
-                    />
-                  ) : <Box color="text-status-inactive">—</Box>}
-                </div>
-                <div>
-                  <Box variant="awsui-key-label">Load Avg (1m)</Box>
-                  <Box>{metricsModal.load_avg != null ? metricsModal.load_avg.toFixed(2) : "—"}</Box>
-                </div>
-              </ColumnLayout>
-
-              <ColumnLayout columns={2} variant="text-grid">
-                <div>
-                  <Box variant="awsui-key-label">{t("admin.nodes.networkIn")}</Box>
-                  <Box>{metricsModal.network_in != null ? formatBytes(metricsModal.network_in) : "—"}</Box>
-                </div>
-                <div>
-                  <Box variant="awsui-key-label">{t("admin.nodes.networkOut")}</Box>
-                  <Box>{metricsModal.network_out != null ? formatBytes(metricsModal.network_out) : "—"}</Box>
-                </div>
-              </ColumnLayout>
-            </SpaceBetween>
-          )}
-        </Modal>
+        />
 
         <Modal
           visible={tokenModal}
@@ -453,7 +681,9 @@ export default function Nodes() {
           header={t("admin.nodes.tokenModalTitle")}
           footer={
             <Box float="right">
-              <Button variant="primary" onClick={() => setTokenModal(false)}>{t("admin.nodes.close")}</Button>
+              <Button variant="primary" onClick={() => setTokenModal(false)}>
+                {t("admin.nodes.close")}
+              </Button>
             </Box>
           }
         >
