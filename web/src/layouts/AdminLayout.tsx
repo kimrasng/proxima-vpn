@@ -29,12 +29,24 @@ const rootCrumb = { labelKey: "admin.nav.serviceName", href: "/admin/dashboard" 
 // Deliberately an allowlist: deriving labels from path segments instead would
 // surface a raw segment like "node-groups" as user-visible text on any route
 // nobody remembered to label.
-const ancestorTrails: Record<string, readonly { labelKey: string; href: string }[]> = {
+//
+// `dynamic` marks a crumb whose text is the leaf the page publishes (a record
+// name the route only carries as an opaque id) rather than a translation key.
+const ancestorTrails: Record<
+  string,
+  readonly { labelKey?: string; dynamic?: boolean; href: string }[]
+> = {
   "/admin/nodes/:nodeId": [rootCrumb, { labelKey: "admin.nav.nodes", href: "/admin/nodes" }],
   "/admin/nodes/:nodeId/inbounds": [
     rootCrumb,
     { labelKey: "admin.nav.nodes", href: "/admin/nodes" },
+    { dynamic: true, href: "/admin/nodes/:nodeId" },
   ],
+  "/admin/users/:userId": [rootCrumb, { labelKey: "admin.nav.users", href: "/admin/users" }],
+};
+
+const nestedLeafLabels: Record<string, string> = {
+  "/admin/nodes/:nodeId/inbounds": "admin.nav.inbounds",
 };
 
 const staticPageLabels: Record<string, string> = {
@@ -69,6 +81,22 @@ const helpTopicKeys: Record<string, string> = {
 
 function indicatorType(severity: AlertSeverity) {
   return severity === "info" ? "info" : severity;
+}
+
+// Substitutes every :param in an ancestor href with the value the current path
+// holds at the same position. Keyed off the matched pattern rather than a fixed
+// segment index so a new detail route needs no change here.
+function resolveCrumbHref(href: string, pattern: string, pathname: string): string {
+  const actual = pathname.split("/").filter(Boolean);
+  const declared = pattern.split("/").filter(Boolean);
+  return href
+    .split("/")
+    .map((part) => {
+      if (!part.startsWith(":")) return part;
+      const at = declared.indexOf(part);
+      return at === -1 ? part : (actual[at] ?? part);
+    })
+    .join("/");
 }
 
 function matchTrailPattern(pathname: string): string | null {
@@ -190,10 +218,15 @@ function AdminLayoutShell() {
     : trailPattern && breadcrumbLeaf
       ? [
           ...(ancestorTrails[trailPattern] ?? []).map((crumb) => ({
-            text: t(crumb.labelKey),
-            href: crumb.href,
+            text: crumb.dynamic ? breadcrumbLeaf : t(crumb.labelKey ?? ""),
+            href: resolveCrumbHref(crumb.href, trailPattern, location.pathname),
           })),
-          { text: breadcrumbLeaf, href: location.pathname },
+          {
+            text: nestedLeafLabels[trailPattern]
+              ? t(nestedLeafLabels[trailPattern])
+              : breadcrumbLeaf,
+            href: location.pathname,
+          },
         ]
       : [];
 

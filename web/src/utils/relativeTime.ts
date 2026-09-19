@@ -1,4 +1,12 @@
 import type { TFunction } from "i18next";
+import i18n from "../i18n";
+
+// Date formatting must follow the language the admin picked, not the browser's.
+// A bare toLocaleString() renders "9/17/2026, 1:52:43 PM" inside an otherwise
+// Korean page whenever the two disagree.
+function activeLocale(): string {
+  return i18n.language || "en";
+}
 
 /**
  * Formats an absolute timestamp as translated "N units ago".
@@ -25,7 +33,17 @@ export function formatRelativeTime(t: TFunction, dateStr: string | undefined | n
 
 /** Absolute stamp for the tooltip behind a relative one. */
 export function formatAbsoluteTime(dateStr: string | undefined | null): string {
-  return dateStr ? new Date(dateStr).toLocaleString() : "";
+  return dateStr ? new Date(dateStr).toLocaleString(activeLocale()) : "";
+}
+
+/** Date-only stamp, for columns where the time of day is noise. */
+export function formatDate(dateStr: string | undefined | null): string {
+  return dateStr ? new Date(dateStr).toLocaleDateString(activeLocale()) : "";
+}
+
+/** Clock-only stamp, for a "last refreshed" line. */
+export function formatTime(date: Date): string {
+  return date.toLocaleTimeString(activeLocale());
 }
 
 /**
