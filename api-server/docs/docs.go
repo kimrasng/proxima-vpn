@@ -15,6 +15,63 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/admin/activity": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns the most recent recorded panel events, newest first. Supplying both target_type and target_id narrows the feed to that target.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-stats"
+                ],
+                "summary": "Get recent activity",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Maximum entries to return (default 20)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Restrict to one target type, e.g. node (requires target_id)",
+                        "name": "target_type",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Restrict to one target id (requires target_type)",
+                        "name": "target_id",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/github_com_proximavpn_proxima-vpn_api-server_internal_services.Entry"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/admin/announcements": {
             "get": {
                 "security": [
@@ -22,7 +79,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns all announcements ordered by creation date",
+                "description": "Returns all announcements for admin management",
                 "produces": [
                     "application/json"
                 ],
@@ -36,7 +93,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/handlers.announcementItem"
+                                "$ref": "#/definitions/internal_handlers.announcementItem"
                             }
                         }
                     },
@@ -57,7 +114,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Creates a new announcement",
+                "description": "Creates a new announcement shown in the user portal",
                 "consumes": [
                     "application/json"
                 ],
@@ -70,12 +127,12 @@ const docTemplate = `{
                 "summary": "Create announcement",
                 "parameters": [
                     {
-                        "description": "Announcement details",
+                        "description": "Announcement to create",
                         "name": "body",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handlers.createAnnouncementRequest"
+                            "$ref": "#/definitions/internal_handlers.createAnnouncementRequest"
                         }
                     }
                 ],
@@ -83,7 +140,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/handlers.announcementItem"
+                            "$ref": "#/definitions/internal_handlers.announcementItem"
                         }
                     },
                     "400": {
@@ -114,7 +171,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Partially updates an announcement",
+                "description": "Partially updates an announcement's fields",
                 "consumes": [
                     "application/json"
                 ],
@@ -139,7 +196,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handlers.updateAnnouncementRequest"
+                            "$ref": "#/definitions/internal_handlers.updateAnnouncementRequest"
                         }
                     }
                 ],
@@ -147,7 +204,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handlers.announcementItem"
+                            "$ref": "#/definitions/internal_handlers.announcementItem"
                         }
                     },
                     "400": {
@@ -159,8 +216,8 @@ const docTemplate = `{
                             }
                         }
                     },
-                    "500": {
-                        "description": "Internal Server Error",
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -177,6 +234,9 @@ const docTemplate = `{
                     }
                 ],
                 "description": "Deletes an announcement by ID",
+                "produces": [
+                    "application/json"
+                ],
                 "tags": [
                     "admin-announcements"
                 ],
@@ -191,11 +251,17 @@ const docTemplate = `{
                     }
                 ],
                 "responses": {
-                    "204": {
-                        "description": "No Content"
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
                     },
-                    "500": {
-                        "description": "Internal Server Error",
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -231,7 +297,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handlers.disable2FARequest"
+                            "$ref": "#/definitions/internal_handlers.disable2FARequest"
                         }
                     }
                 ],
@@ -291,7 +357,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handlers.enable2FARequest"
+                            "$ref": "#/definitions/internal_handlers.enable2FARequest"
                         }
                     }
                 ],
@@ -363,6 +429,43 @@ const docTemplate = `{
                 }
             }
         },
+        "/admin/auth/2fa/status": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns whether 2FA is enabled for the admin account",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-auth"
+                ],
+                "summary": "Get 2FA status",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "boolean"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/admin/auth/login": {
             "post": {
                 "description": "Authenticate admin with email/password and optional TOTP",
@@ -383,7 +486,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handlers.loginRequest"
+                            "$ref": "#/definitions/internal_handlers.loginRequest"
                         }
                     }
                 ],
@@ -391,7 +494,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handlers.loginResponse"
+                            "$ref": "#/definitions/internal_handlers.loginResponse"
                         }
                     },
                     "400": {
@@ -538,6 +641,79 @@ const docTemplate = `{
                 }
             }
         },
+        "/admin/devices/{id}/terminate": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Evicts a device so the node agent withdraws its credential on the next config poll",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-stats"
+                ],
+                "summary": "Terminate a device's session",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Device ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Cooldown in minutes",
+                        "name": "body",
+                        "in": "body",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.terminateSessionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/admin/inbounds/{id}": {
             "put": {
                 "security": [
@@ -570,7 +746,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handlers.updateInboundRequest"
+                            "$ref": "#/definitions/internal_handlers.updateInboundRequest"
                         }
                     }
                 ],
@@ -578,7 +754,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handlers.inboundResponse"
+                            "$ref": "#/definitions/internal_handlers.inboundResponse"
                         }
                     },
                     "400": {
@@ -683,7 +859,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handlers.inboundResponse"
+                            "$ref": "#/definitions/internal_handlers.inboundResponse"
                         }
                     },
                     "404": {
@@ -719,7 +895,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/handlers.nodeGroupListItem"
+                                "$ref": "#/definitions/internal_handlers.nodeGroupListItem"
                             }
                         }
                     },
@@ -758,7 +934,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handlers.createNodeGroupRequest"
+                            "$ref": "#/definitions/internal_handlers.createNodeGroupRequest"
                         }
                     }
                 ],
@@ -766,7 +942,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/handlers.nodeGroupListItem"
+                            "$ref": "#/definitions/internal_handlers.nodeGroupListItem"
                         }
                     },
                     "400": {
@@ -818,7 +994,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handlers.nodeGroupDetail"
+                            "$ref": "#/definitions/internal_handlers.nodeGroupDetail"
                         }
                     },
                     "404": {
@@ -872,7 +1048,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handlers.createNodeGroupRequest"
+                            "$ref": "#/definitions/internal_handlers.createNodeGroupRequest"
                         }
                     }
                 ],
@@ -992,7 +1168,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handlers.setNodesRequest"
+                            "$ref": "#/definitions/internal_handlers.setNodesRequest"
                         }
                     }
                 ],
@@ -1041,7 +1217,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns all registered (non-pending) nodes",
+                "description": "Returns all nodes including pending (awaiting registration) ones",
                 "produces": [
                     "application/json"
                 ],
@@ -1055,7 +1231,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/handlers.nodeListItem"
+                                "$ref": "#/definitions/internal_handlers.nodeListItem"
                             }
                         }
                     },
@@ -1090,7 +1266,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handlers.generateTokenResponse"
+                            "$ref": "#/definitions/internal_handlers.generateTokenResponse"
                         }
                     },
                     "500": {
@@ -1133,7 +1309,70 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handlers.nodeListItem"
+                            "$ref": "#/definitions/internal_handlers.nodeListItem"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Partially updates a node's name, country, or region. Cannot edit pending nodes.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-nodes"
+                ],
+                "summary": "Update node",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Node ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Fields to update",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.updateNodeRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
                         }
                     },
                     "404": {
@@ -1229,7 +1468,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handlers.tlsStatusResponse"
+                            "$ref": "#/definitions/internal_handlers.tlsStatusResponse"
                         }
                     },
                     "404": {
@@ -1276,7 +1515,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handlers.issueCertificateRequest"
+                            "$ref": "#/definitions/internal_handlers.issueCertificateRequest"
                         }
                     }
                 ],
@@ -1348,7 +1587,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handlers.xrayVersionResponse"
+                            "$ref": "#/definitions/internal_handlers.xrayVersionResponse"
                         }
                     },
                     "404": {
@@ -1395,7 +1634,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handlers.updateXrayRequest"
+                            "$ref": "#/definitions/internal_handlers.updateXrayRequest"
                         }
                     }
                 ],
@@ -1403,7 +1642,7 @@ const docTemplate = `{
                     "202": {
                         "description": "Accepted",
                         "schema": {
-                            "$ref": "#/definitions/handlers.updateXrayResponse"
+                            "$ref": "#/definitions/internal_handlers.updateXrayResponse"
                         }
                     },
                     "400": {
@@ -1466,7 +1705,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/handlers.inboundResponse"
+                                "$ref": "#/definitions/internal_handlers.inboundResponse"
                             }
                         }
                     },
@@ -1512,7 +1751,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handlers.createInboundRequest"
+                            "$ref": "#/definitions/internal_handlers.createInboundRequest"
                         }
                     }
                 ],
@@ -1520,7 +1759,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/handlers.inboundResponse"
+                            "$ref": "#/definitions/internal_handlers.inboundResponse"
                         }
                     },
                     "400": {
@@ -1622,7 +1861,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/handlers.adminPlanRequestItem"
+                                "$ref": "#/definitions/internal_handlers.adminPlanRequestItem"
                             }
                         }
                     },
@@ -1670,7 +1909,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handlers.reviewRequestBody"
+                            "$ref": "#/definitions/internal_handlers.reviewRequestBody"
                         }
                     }
                 ],
@@ -1678,7 +1917,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handlers.adminPlanRequestItem"
+                            "$ref": "#/definitions/internal_handlers.adminPlanRequestItem"
                         }
                     },
                     "400": {
@@ -1732,7 +1971,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/handlers.planResponse"
+                                "$ref": "#/definitions/internal_handlers.planResponse"
                             }
                         }
                     },
@@ -1771,7 +2010,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handlers.createPlanRequest"
+                            "$ref": "#/definitions/internal_handlers.createPlanRequest"
                         }
                     }
                 ],
@@ -1779,7 +2018,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/handlers.planResponse"
+                            "$ref": "#/definitions/internal_handlers.planResponse"
                         }
                     },
                     "400": {
@@ -1831,7 +2070,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handlers.planResponse"
+                            "$ref": "#/definitions/internal_handlers.planResponse"
                         }
                     },
                     "404": {
@@ -1876,7 +2115,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handlers.updatePlanRequest"
+                            "$ref": "#/definitions/internal_handlers.updatePlanRequest"
                         }
                     }
                 ],
@@ -1884,7 +2123,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handlers.planResponse"
+                            "$ref": "#/definitions/internal_handlers.planResponse"
                         }
                     },
                     "400": {
@@ -1991,7 +2230,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/handlers.settingItem"
+                                "$ref": "#/definitions/internal_handlers.settingItem"
                             }
                         }
                     },
@@ -2101,29 +2340,26 @@ const docTemplate = `{
                 }
             }
         },
-        "/admin/user-templates": {
+        "/admin/stats/alerts": {
             "get": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns all user templates with node group info",
+                "description": "Returns offline nodes, resource-pressured nodes, and pending approvals",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "admin-user-templates"
+                    "admin-stats"
                 ],
-                "summary": "List user templates",
+                "summary": "Get dashboard alerts",
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/handlers.userTemplateResponse"
-                            }
+                            "$ref": "#/definitions/github_com_proximavpn_proxima-vpn_api-server_internal_services.Alerts"
                         }
                     },
                     "500": {
@@ -2136,48 +2372,44 @@ const docTemplate = `{
                         }
                     }
                 }
-            },
-            "post": {
+            }
+        },
+        "/admin/stats/node-traffic": {
+            "get": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "description": "Creates a new user template for quick user provisioning",
-                "consumes": [
-                    "application/json"
-                ],
+                "description": "Returns upload/download per node over the requested window",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "admin-user-templates"
+                    "admin-stats"
                 ],
-                "summary": "Create user template",
+                "summary": "Get per-node traffic",
                 "parameters": [
                     {
-                        "description": "Template details",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handlers.createUserTemplateRequest"
-                        }
+                        "type": "string",
+                        "description": "today, week, or month (default today)",
+                        "name": "window",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Maximum nodes to return (default 10)",
+                        "name": "limit",
+                        "in": "query"
                     }
                 ],
                 "responses": {
-                    "201": {
-                        "description": "Created",
+                    "200": {
+                        "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handlers.userTemplateResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/github_com_proximavpn_proxima-vpn_api-server_internal_services.NodeTraffic"
                             }
                         }
                     },
@@ -2193,108 +2425,29 @@ const docTemplate = `{
                 }
             }
         },
-        "/admin/user-templates/{id}": {
-            "put": {
+        "/admin/stats/traffic-history": {
+            "get": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "description": "Partially updates an existing user template",
-                "consumes": [
-                    "application/json"
-                ],
+                "description": "Returns daily upload/download traffic aggregated from traffic_logs",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "admin-user-templates"
+                    "admin-stats"
                 ],
-                "summary": "Update user template",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Template ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Fields to update",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handlers.updateUserTemplateRequest"
-                        }
-                    }
-                ],
+                "summary": "Get traffic history",
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handlers.userTemplateResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Deletes a user template by ID",
-                "tags": [
-                    "admin-user-templates"
-                ],
-                "summary": "Delete user template",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Template ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "No Content"
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "additionalProperties": true
                             }
                         }
                     },
@@ -2357,7 +2510,71 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handlers.userListResponse"
+                            "$ref": "#/definitions/internal_handlers.userListResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Creates a new user account with active status",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-users"
+                ],
+                "summary": "Create user",
+                "parameters": [
+                    {
+                        "description": "User details",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.createUserRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.createUserResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
                         }
                     },
                     "500": {
@@ -2400,7 +2617,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handlers.userDetailResponse"
+                            "$ref": "#/definitions/internal_handlers.userDetailResponse"
                         }
                     },
                     "404": {
@@ -2454,7 +2671,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handlers.updateUserRequest"
+                            "$ref": "#/definitions/internal_handlers.updateUserRequest"
                         }
                     }
                 ],
@@ -2540,6 +2757,61 @@ const docTemplate = `{
                 }
             }
         },
+        "/admin/users/{id}/reset-traffic": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Resets traffic_used to 0 and sets traffic_reset_at to NOW()",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-users"
+                ],
+                "summary": "Reset user traffic",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "User ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/auth/login": {
             "post": {
                 "description": "Authenticate user with email and password",
@@ -2560,7 +2832,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handlers.userLoginRequest"
+                            "$ref": "#/definitions/internal_handlers.userLoginRequest"
                         }
                     }
                 ],
@@ -2568,7 +2840,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handlers.loginResponse"
+                            "$ref": "#/definitions/internal_handlers.loginResponse"
                         }
                     },
                     "400": {
@@ -2621,7 +2893,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handlers.registerRequest"
+                            "$ref": "#/definitions/internal_handlers.registerRequest"
                         }
                     }
                 ],
@@ -2629,7 +2901,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/handlers.registerResponse"
+                            "$ref": "#/definitions/internal_handlers.registerResponse"
                         }
                     },
                     "400": {
@@ -2643,6 +2915,149 @@ const docTemplate = `{
                     },
                     "409": {
                         "description": "Conflict",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/nodes/{id}/update": {
+            "get": {
+                "description": "Reports the target node-agent version for self-update",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "node-agent"
+                ],
+                "summary": "Node agent update check",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Node ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.updateInfoResponse"
+                        }
+                    },
+                    "204": {
+                        "description": "No update available"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/nodes/{id}/update/download": {
+            "get": {
+                "description": "Serves the node-agent binary matching the requested os/arch",
+                "produces": [
+                    "application/octet-stream"
+                ],
+                "tags": [
+                    "node-agent"
+                ],
+                "summary": "Download node agent binary",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Node ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Target OS (linux)",
+                        "name": "os",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Target architecture (amd64|arm64)",
+                        "name": "arch",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "file"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/nodes/{id}/xray-update": {
+            "get": {
+                "description": "Reports the target Xray-core version requested for the node",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "node-agent"
+                ],
+                "summary": "Node Xray-core update check",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Node ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.xrayUpdateInfoResponse"
+                        }
+                    },
+                    "204": {
+                        "description": "No update available"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -2775,7 +3190,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/handlers.deviceResponse"
+                                "$ref": "#/definitions/internal_handlers.deviceResponse"
                             }
                         }
                     },
@@ -2814,7 +3229,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handlers.createDeviceRequest"
+                            "$ref": "#/definitions/internal_handlers.createDeviceRequest"
                         }
                     }
                 ],
@@ -2822,7 +3237,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/handlers.deviceResponse"
+                            "$ref": "#/definitions/internal_handlers.deviceResponse"
                         }
                     },
                     "400": {
@@ -2901,6 +3316,43 @@ const docTemplate = `{
                 }
             }
         },
+        "/user/nodes": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns name and location of the nodes the user's plan can use",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "user-plans"
+                ],
+                "summary": "List my available nodes",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/internal_handlers.userNodeItem"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/user/plan-requests": {
             "get": {
                 "security": [
@@ -2922,7 +3374,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/handlers.planRequestResponse"
+                                "$ref": "#/definitions/internal_handlers.planRequestResponse"
                             }
                         }
                     },
@@ -2961,7 +3413,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handlers.createPlanRequestBody"
+                            "$ref": "#/definitions/internal_handlers.createPlanRequestBody"
                         }
                     }
                 ],
@@ -2969,7 +3421,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/handlers.planRequestResponse"
+                            "$ref": "#/definitions/internal_handlers.planRequestResponse"
                         }
                     },
                     "400": {
@@ -3023,7 +3475,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/handlers.userPlanItem"
+                                "$ref": "#/definitions/internal_handlers.userPlanItem"
                             }
                         }
                     },
@@ -3097,7 +3549,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handlers.updateProfileRequest"
+                            "$ref": "#/definitions/internal_handlers.updateProfileRequest"
                         }
                     }
                 ],
@@ -3178,6 +3630,40 @@ const docTemplate = `{
                 }
             }
         },
+        "/user/summary": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Traffic usage, device count and live connection count against their caps",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "user-portal"
+                ],
+                "summary": "Get account summary",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.userSummary"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/user/traffic": {
             "get": {
                 "security": [
@@ -3215,7 +3701,129 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "handlers.adminPlanRequestItem": {
+        "github_com_proximavpn_proxima-vpn_api-server_internal_services.Alert": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "severity": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_proximavpn_proxima-vpn_api-server_internal_services.Alerts": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_proximavpn_proxima-vpn_api-server_internal_services.Alert"
+                    }
+                },
+                "node_issues": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_proximavpn_proxima-vpn_api-server_internal_services.NodeIssue"
+                    }
+                },
+                "pending_requests": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "github_com_proximavpn_proxima-vpn_api-server_internal_services.Entry": {
+            "type": "object",
+            "properties": {
+                "actor_id": {
+                    "type": "string"
+                },
+                "actor_label": {
+                    "type": "string"
+                },
+                "actor_type": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "detail": {
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "event_type": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "severity": {
+                    "type": "string"
+                },
+                "target_id": {
+                    "type": "string"
+                },
+                "target_type": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_proximavpn_proxima-vpn_api-server_internal_services.NodeIssue": {
+            "type": "object",
+            "properties": {
+                "country": {
+                    "type": "string"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "node_id": {
+                    "type": "string"
+                },
+                "node_name": {
+                    "type": "string"
+                },
+                "region": {
+                    "type": "string"
+                },
+                "severity": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "value": {
+                    "type": "number"
+                }
+            }
+        },
+        "github_com_proximavpn_proxima-vpn_api-server_internal_services.NodeTraffic": {
+            "type": "object",
+            "properties": {
+                "download": {
+                    "type": "integer"
+                },
+                "node_id": {
+                    "type": "string"
+                },
+                "node_name": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "upload": {
+                    "type": "integer"
+                }
+            }
+        },
+        "internal_handlers.adminPlanRequestItem": {
             "type": "object",
             "properties": {
                 "created_at": {
@@ -3241,7 +3849,7 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.announcementItem": {
+        "internal_handlers.announcementItem": {
             "type": "object",
             "properties": {
                 "content": {
@@ -3250,7 +3858,13 @@ const docTemplate = `{
                 "created_at": {
                     "type": "string"
                 },
+                "expires_at": {
+                    "type": "string"
+                },
                 "id": {
+                    "type": "string"
+                },
+                "image_url": {
                     "type": "string"
                 },
                 "is_active": {
@@ -3261,10 +3875,16 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.createAnnouncementRequest": {
+        "internal_handlers.createAnnouncementRequest": {
             "type": "object",
             "properties": {
                 "content": {
+                    "type": "string"
+                },
+                "expires_at": {
+                    "type": "string"
+                },
+                "image_url": {
                     "type": "string"
                 },
                 "title": {
@@ -3272,7 +3892,7 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.createDeviceRequest": {
+        "internal_handlers.createDeviceRequest": {
             "type": "object",
             "properties": {
                 "name": {
@@ -3280,7 +3900,7 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.createInboundRequest": {
+        "internal_handlers.createInboundRequest": {
             "type": "object",
             "properties": {
                 "enabled": {
@@ -3301,7 +3921,7 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.createNodeGroupRequest": {
+        "internal_handlers.createNodeGroupRequest": {
             "type": "object",
             "properties": {
                 "name": {
@@ -3309,10 +3929,13 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.createPlanRequest": {
+        "internal_handlers.createPlanRequest": {
             "type": "object",
             "properties": {
                 "duration_days": {
+                    "type": "integer"
+                },
+                "max_concurrent": {
                     "type": "integer"
                 },
                 "max_devices": {
@@ -3332,7 +3955,7 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.createPlanRequestBody": {
+        "internal_handlers.createPlanRequestBody": {
             "type": "object",
             "properties": {
                 "plan_id": {
@@ -3340,30 +3963,47 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.createUserTemplateRequest": {
+        "internal_handlers.createUserRequest": {
             "type": "object",
             "properties": {
-                "duration_days": {
-                    "type": "integer"
+                "email": {
+                    "type": "string"
                 },
-                "max_devices": {
-                    "type": "integer"
+                "is_active": {
+                    "type": "boolean"
                 },
                 "name": {
                     "type": "string"
                 },
-                "node_group_id": {
+                "password": {
                     "type": "string"
                 },
-                "speed_limit": {
-                    "type": "integer"
-                },
-                "traffic_limit": {
-                    "type": "integer"
+                "plan_id": {
+                    "type": "string"
                 }
             }
         },
-        "handlers.deviceItem": {
+        "internal_handlers.createUserResponse": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_handlers.deviceItem": {
             "type": "object",
             "properties": {
                 "created_at": {
@@ -3380,7 +4020,7 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.deviceResponse": {
+        "internal_handlers.deviceResponse": {
             "type": "object",
             "properties": {
                 "created_at": {
@@ -3395,12 +4035,18 @@ const docTemplate = `{
                 "subscription_url": {
                     "type": "string"
                 },
+                "wg_address": {
+                    "type": "string"
+                },
+                "wg_public_key": {
+                    "type": "string"
+                },
                 "xray_uuid": {
                     "type": "string"
                 }
             }
         },
-        "handlers.disable2FARequest": {
+        "internal_handlers.disable2FARequest": {
             "type": "object",
             "properties": {
                 "code": {
@@ -3408,7 +4054,7 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.enable2FARequest": {
+        "internal_handlers.enable2FARequest": {
             "type": "object",
             "properties": {
                 "code": {
@@ -3419,7 +4065,7 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.generateTokenResponse": {
+        "internal_handlers.generateTokenResponse": {
             "type": "object",
             "properties": {
                 "install_command": {
@@ -3430,7 +4076,7 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.inboundResponse": {
+        "internal_handlers.inboundResponse": {
             "type": "object",
             "properties": {
                 "created_at": {
@@ -3460,7 +4106,7 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.issueCertificateRequest": {
+        "internal_handlers.issueCertificateRequest": {
             "type": "object",
             "required": [
                 "domain",
@@ -3475,7 +4121,7 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.loginRequest": {
+        "internal_handlers.loginRequest": {
             "type": "object",
             "properties": {
                 "email": {
@@ -3489,7 +4135,7 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.loginResponse": {
+        "internal_handlers.loginResponse": {
             "type": "object",
             "properties": {
                 "token": {
@@ -3497,7 +4143,7 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.nodeGroupDetail": {
+        "internal_handlers.nodeGroupDetail": {
             "type": "object",
             "properties": {
                 "created_at": {
@@ -3512,12 +4158,12 @@ const docTemplate = `{
                 "nodes": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/handlers.nodeGroupNode"
+                        "$ref": "#/definitions/internal_handlers.nodeGroupNode"
                     }
                 }
             }
         },
-        "handlers.nodeGroupListItem": {
+        "internal_handlers.nodeGroupListItem": {
             "type": "object",
             "properties": {
                 "created_at": {
@@ -3534,7 +4180,7 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.nodeGroupNode": {
+        "internal_handlers.nodeGroupNode": {
             "type": "object",
             "properties": {
                 "id": {
@@ -3548,14 +4194,26 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.nodeListItem": {
+        "internal_handlers.nodeListItem": {
             "type": "object",
             "properties": {
+                "capacity": {
+                    "type": "integer"
+                },
+                "config_hash": {
+                    "type": "string"
+                },
                 "country": {
                     "type": "string"
                 },
+                "cpu_usage": {
+                    "type": "number"
+                },
                 "created_at": {
                     "type": "string"
+                },
+                "disk_usage": {
+                    "type": "number"
                 },
                 "id": {
                     "type": "string"
@@ -3566,8 +4224,27 @@ const docTemplate = `{
                 "last_ping_at": {
                     "type": "string"
                 },
+                "last_seen": {
+                    "type": "string"
+                },
+                "load_avg": {
+                    "type": "number"
+                },
+                "memory_usage": {
+                    "type": "number"
+                },
                 "name": {
                     "type": "string"
+                },
+                "network_in": {
+                    "type": "number"
+                },
+                "network_out": {
+                    "type": "number"
+                },
+                "online_devices": {
+                    "description": "Device credentials live on this node now, against how many the plans\npointing at it are entitled to place. Capacity is an entitlement ceiling,\nnot a limit - nothing refuses a connection for exceeding it.",
+                    "type": "integer"
                 },
                 "port": {
                     "type": "integer"
@@ -3575,18 +4252,46 @@ const docTemplate = `{
                 "region": {
                     "type": "string"
                 },
+                "shaping_error": {
+                    "type": "string"
+                },
+                "shaping_ok": {
+                    "description": "Surfaces a node that cannot run tc: speed-limited plans on it are not\nactually limited, and nothing else about the node looks wrong.",
+                    "type": "boolean"
+                },
+                "shaping_tiers": {
+                    "type": "integer"
+                },
                 "status": {
                     "type": "string"
+                },
+                "traffic_multiplier": {
+                    "description": "Factor applied to this node's traffic when charging a user's quota.",
+                    "type": "number"
                 },
                 "updated_at": {
                     "type": "string"
                 },
+                "xray_minimum": {
+                    "type": "string"
+                },
+                "xray_running": {
+                    "description": "From the heartbeat: status only says the agent checked in, these say\nwhether Xray is actually serving the published config.",
+                    "type": "boolean"
+                },
+                "xray_too_old": {
+                    "description": "Set when the node's core predates the stats RPC the panel needs. Reported\nrather than refused: the node still carries traffic, and cutting it off\nover a version would be worse than telling the operator to upgrade it.",
+                    "type": "boolean"
+                },
                 "xray_version": {
+                    "type": "string"
+                },
+                "xray_version_warning": {
                     "type": "string"
                 }
             }
         },
-        "handlers.planRequestResponse": {
+        "internal_handlers.planRequestResponse": {
             "type": "object",
             "properties": {
                 "created_at": {
@@ -3609,7 +4314,7 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.planResponse": {
+        "internal_handlers.planResponse": {
             "type": "object",
             "properties": {
                 "created_at": {
@@ -3623,6 +4328,9 @@ const docTemplate = `{
                 },
                 "is_active": {
                     "type": "boolean"
+                },
+                "max_concurrent": {
+                    "type": "integer"
                 },
                 "max_devices": {
                     "type": "integer"
@@ -3644,7 +4352,7 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.registerRequest": {
+        "internal_handlers.registerRequest": {
             "type": "object",
             "properties": {
                 "email": {
@@ -3658,7 +4366,7 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.registerResponse": {
+        "internal_handlers.registerResponse": {
             "type": "object",
             "properties": {
                 "email": {
@@ -3675,7 +4383,7 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.reviewRequestBody": {
+        "internal_handlers.reviewRequestBody": {
             "type": "object",
             "properties": {
                 "action": {
@@ -3683,7 +4391,7 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.setNodesRequest": {
+        "internal_handlers.setNodesRequest": {
             "type": "object",
             "properties": {
                 "node_ids": {
@@ -3694,7 +4402,7 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.settingItem": {
+        "internal_handlers.settingItem": {
             "type": "object",
             "properties": {
                 "key": {
@@ -3705,7 +4413,15 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.tlsStatusResponse": {
+        "internal_handlers.terminateSessionRequest": {
+            "type": "object",
+            "properties": {
+                "cooldown_minutes": {
+                    "type": "integer"
+                }
+            }
+        },
+        "internal_handlers.tlsStatusResponse": {
             "type": "object",
             "properties": {
                 "cert_file": {
@@ -3722,10 +4438,16 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.updateAnnouncementRequest": {
+        "internal_handlers.updateAnnouncementRequest": {
             "type": "object",
             "properties": {
                 "content": {
+                    "type": "string"
+                },
+                "expires_at": {
+                    "type": "string"
+                },
+                "image_url": {
                     "type": "string"
                 },
                 "is_active": {
@@ -3736,7 +4458,7 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.updateInboundRequest": {
+        "internal_handlers.updateInboundRequest": {
             "type": "object",
             "properties": {
                 "enabled": {
@@ -3757,7 +4479,35 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.updatePlanRequest": {
+        "internal_handlers.updateInfoResponse": {
+            "type": "object",
+            "properties": {
+                "download_url": {
+                    "type": "string"
+                },
+                "target_version": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_handlers.updateNodeRequest": {
+            "type": "object",
+            "properties": {
+                "country": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "region": {
+                    "type": "string"
+                },
+                "traffic_multiplier": {
+                    "type": "number"
+                }
+            }
+        },
+        "internal_handlers.updatePlanRequest": {
             "type": "object",
             "properties": {
                 "duration_days": {
@@ -3765,6 +4515,9 @@ const docTemplate = `{
                 },
                 "is_active": {
                     "type": "boolean"
+                },
+                "max_concurrent": {
+                    "type": "integer"
                 },
                 "max_devices": {
                     "type": "integer"
@@ -3783,7 +4536,7 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.updateProfileRequest": {
+        "internal_handlers.updateProfileRequest": {
             "type": "object",
             "properties": {
                 "email": {
@@ -3797,11 +4550,14 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.updateUserRequest": {
+        "internal_handlers.updateUserRequest": {
             "type": "object",
             "properties": {
                 "is_active": {
                     "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
                 },
                 "plan_expires_at": {
                     "type": "string"
@@ -3817,30 +4573,7 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.updateUserTemplateRequest": {
-            "type": "object",
-            "properties": {
-                "duration_days": {
-                    "type": "integer"
-                },
-                "max_devices": {
-                    "type": "integer"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "node_group_id": {
-                    "type": "string"
-                },
-                "speed_limit": {
-                    "type": "integer"
-                },
-                "traffic_limit": {
-                    "type": "integer"
-                }
-            }
-        },
-        "handlers.updateXrayRequest": {
+        "internal_handlers.updateXrayRequest": {
             "type": "object",
             "properties": {
                 "version": {
@@ -3848,7 +4581,7 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.updateXrayResponse": {
+        "internal_handlers.updateXrayResponse": {
             "type": "object",
             "properties": {
                 "status": {
@@ -3859,7 +4592,7 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.userDetailResponse": {
+        "internal_handlers.userDetailResponse": {
             "type": "object",
             "properties": {
                 "created_at": {
@@ -3868,7 +4601,7 @@ const docTemplate = `{
                 "devices": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/handlers.deviceItem"
+                        "$ref": "#/definitions/internal_handlers.deviceItem"
                     }
                 },
                 "email": {
@@ -3904,15 +4637,15 @@ const docTemplate = `{
                 "traffic_limit": {
                     "type": "integer"
                 },
-                "traffic_reset_day": {
-                    "type": "integer"
+                "traffic_reset_at": {
+                    "type": "string"
                 },
                 "traffic_used": {
                     "type": "integer"
                 }
             }
         },
-        "handlers.userListItem": {
+        "internal_handlers.userListItem": {
             "type": "object",
             "properties": {
                 "created_at": {
@@ -3950,7 +4683,7 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.userListResponse": {
+        "internal_handlers.userListResponse": {
             "type": "object",
             "properties": {
                 "limit": {
@@ -3965,12 +4698,12 @@ const docTemplate = `{
                 "users": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/handlers.userListItem"
+                        "$ref": "#/definitions/internal_handlers.userListItem"
                     }
                 }
             }
         },
-        "handlers.userLoginRequest": {
+        "internal_handlers.userLoginRequest": {
             "type": "object",
             "properties": {
                 "email": {
@@ -3981,7 +4714,24 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.userPlanItem": {
+        "internal_handlers.userNodeItem": {
+            "type": "object",
+            "properties": {
+                "country": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "region": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_handlers.userPlanItem": {
             "type": "object",
             "properties": {
                 "duration_days": {
@@ -4004,39 +4754,50 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.userTemplateResponse": {
+        "internal_handlers.userSummary": {
             "type": "object",
             "properties": {
-                "created_at": {
-                    "type": "string"
-                },
-                "duration_days": {
+                "devices": {
                     "type": "integer"
                 },
-                "id": {
-                    "type": "string"
+                "max_concurrent": {
+                    "type": "integer"
                 },
                 "max_devices": {
                     "type": "integer"
                 },
-                "name": {
-                    "type": "string"
-                },
-                "node_group_id": {
-                    "type": "string"
-                },
-                "node_group_name": {
-                    "type": "string"
-                },
-                "speed_limit": {
+                "online": {
                     "type": "integer"
                 },
+                "online_ips": {
+                    "type": "integer"
+                },
+                "plan_expires_at": {
+                    "type": "string"
+                },
+                "plan_name": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
                 "traffic_limit": {
+                    "type": "integer"
+                },
+                "traffic_used": {
                     "type": "integer"
                 }
             }
         },
-        "handlers.xrayVersionResponse": {
+        "internal_handlers.xrayUpdateInfoResponse": {
+            "type": "object",
+            "properties": {
+                "target_version": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_handlers.xrayVersionResponse": {
             "type": "object",
             "properties": {
                 "current_version": {

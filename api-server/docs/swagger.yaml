@@ -1,6 +1,86 @@
 basePath: /api/v1
 definitions:
-  handlers.adminPlanRequestItem:
+  github_com_proximavpn_proxima-vpn_api-server_internal_services.Alert:
+    properties:
+      count:
+        type: integer
+      kind:
+        type: string
+      severity:
+        type: string
+    type: object
+  github_com_proximavpn_proxima-vpn_api-server_internal_services.Alerts:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/github_com_proximavpn_proxima-vpn_api-server_internal_services.Alert'
+        type: array
+      node_issues:
+        items:
+          $ref: '#/definitions/github_com_proximavpn_proxima-vpn_api-server_internal_services.NodeIssue'
+        type: array
+      pending_requests:
+        type: integer
+      total:
+        type: integer
+    type: object
+  github_com_proximavpn_proxima-vpn_api-server_internal_services.Entry:
+    properties:
+      actor_id:
+        type: string
+      actor_label:
+        type: string
+      actor_type:
+        type: string
+      created_at:
+        type: string
+      detail:
+        additionalProperties: {}
+        type: object
+      event_type:
+        type: string
+      id:
+        type: string
+      severity:
+        type: string
+      target_id:
+        type: string
+      target_type:
+        type: string
+    type: object
+  github_com_proximavpn_proxima-vpn_api-server_internal_services.NodeIssue:
+    properties:
+      country:
+        type: string
+      kind:
+        type: string
+      node_id:
+        type: string
+      node_name:
+        type: string
+      region:
+        type: string
+      severity:
+        type: string
+      status:
+        type: string
+      value:
+        type: number
+    type: object
+  github_com_proximavpn_proxima-vpn_api-server_internal_services.NodeTraffic:
+    properties:
+      download:
+        type: integer
+      node_id:
+        type: string
+      node_name:
+        type: string
+      status:
+        type: string
+      upload:
+        type: integer
+    type: object
+  internal_handlers.adminPlanRequestItem:
     properties:
       created_at:
         type: string
@@ -17,32 +97,40 @@ definitions:
       user_name:
         type: string
     type: object
-  handlers.announcementItem:
+  internal_handlers.announcementItem:
     properties:
       content:
         type: string
       created_at:
         type: string
+      expires_at:
+        type: string
       id:
+        type: string
+      image_url:
         type: string
       is_active:
         type: boolean
       title:
         type: string
     type: object
-  handlers.createAnnouncementRequest:
+  internal_handlers.createAnnouncementRequest:
     properties:
       content:
+        type: string
+      expires_at:
+        type: string
+      image_url:
         type: string
       title:
         type: string
     type: object
-  handlers.createDeviceRequest:
+  internal_handlers.createDeviceRequest:
     properties:
       name:
         type: string
     type: object
-  handlers.createInboundRequest:
+  internal_handlers.createInboundRequest:
     properties:
       enabled:
         type: boolean
@@ -56,14 +144,16 @@ definitions:
       tag:
         type: string
     type: object
-  handlers.createNodeGroupRequest:
+  internal_handlers.createNodeGroupRequest:
     properties:
       name:
         type: string
     type: object
-  handlers.createPlanRequest:
+  internal_handlers.createPlanRequest:
     properties:
       duration_days:
+        type: integer
+      max_concurrent:
         type: integer
       max_devices:
         type: integer
@@ -76,27 +166,38 @@ definitions:
       traffic_limit:
         type: integer
     type: object
-  handlers.createPlanRequestBody:
+  internal_handlers.createPlanRequestBody:
     properties:
       plan_id:
         type: string
     type: object
-  handlers.createUserTemplateRequest:
+  internal_handlers.createUserRequest:
     properties:
-      duration_days:
-        type: integer
-      max_devices:
-        type: integer
+      email:
+        type: string
+      is_active:
+        type: boolean
       name:
         type: string
-      node_group_id:
+      password:
         type: string
-      speed_limit:
-        type: integer
-      traffic_limit:
-        type: integer
+      plan_id:
+        type: string
     type: object
-  handlers.deviceItem:
+  internal_handlers.createUserResponse:
+    properties:
+      created_at:
+        type: string
+      email:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      status:
+        type: string
+    type: object
+  internal_handlers.deviceItem:
     properties:
       created_at:
         type: string
@@ -107,7 +208,7 @@ definitions:
       xray_uuid:
         type: string
     type: object
-  handlers.deviceResponse:
+  internal_handlers.deviceResponse:
     properties:
       created_at:
         type: string
@@ -117,29 +218,33 @@ definitions:
         type: string
       subscription_url:
         type: string
+      wg_address:
+        type: string
+      wg_public_key:
+        type: string
       xray_uuid:
         type: string
     type: object
-  handlers.disable2FARequest:
+  internal_handlers.disable2FARequest:
     properties:
       code:
         type: string
     type: object
-  handlers.enable2FARequest:
+  internal_handlers.enable2FARequest:
     properties:
       code:
         type: string
       secret:
         type: string
     type: object
-  handlers.generateTokenResponse:
+  internal_handlers.generateTokenResponse:
     properties:
       install_command:
         type: string
       token:
         type: string
     type: object
-  handlers.inboundResponse:
+  internal_handlers.inboundResponse:
     properties:
       created_at:
         type: string
@@ -159,7 +264,7 @@ definitions:
       tag:
         type: string
     type: object
-  handlers.issueCertificateRequest:
+  internal_handlers.issueCertificateRequest:
     properties:
       domain:
         type: string
@@ -169,7 +274,7 @@ definitions:
     - domain
     - email
     type: object
-  handlers.loginRequest:
+  internal_handlers.loginRequest:
     properties:
       email:
         type: string
@@ -178,12 +283,12 @@ definitions:
       totp_code:
         type: string
     type: object
-  handlers.loginResponse:
+  internal_handlers.loginResponse:
     properties:
       token:
         type: string
     type: object
-  handlers.nodeGroupDetail:
+  internal_handlers.nodeGroupDetail:
     properties:
       created_at:
         type: string
@@ -193,10 +298,10 @@ definitions:
         type: string
       nodes:
         items:
-          $ref: '#/definitions/handlers.nodeGroupNode'
+          $ref: '#/definitions/internal_handlers.nodeGroupNode'
         type: array
     type: object
-  handlers.nodeGroupListItem:
+  internal_handlers.nodeGroupListItem:
     properties:
       created_at:
         type: string
@@ -207,7 +312,7 @@ definitions:
       node_count:
         type: integer
     type: object
-  handlers.nodeGroupNode:
+  internal_handlers.nodeGroupNode:
     properties:
       id:
         type: string
@@ -216,32 +321,84 @@ definitions:
       status:
         type: string
     type: object
-  handlers.nodeListItem:
+  internal_handlers.nodeListItem:
     properties:
+      capacity:
+        type: integer
+      config_hash:
+        type: string
       country:
         type: string
+      cpu_usage:
+        type: number
       created_at:
         type: string
+      disk_usage:
+        type: number
       id:
         type: string
       ip:
         type: string
       last_ping_at:
         type: string
+      last_seen:
+        type: string
+      load_avg:
+        type: number
+      memory_usage:
+        type: number
       name:
         type: string
+      network_in:
+        type: number
+      network_out:
+        type: number
+      online_devices:
+        description: |-
+          Device credentials live on this node now, against how many the plans
+          pointing at it are entitled to place. Capacity is an entitlement ceiling,
+          not a limit - nothing refuses a connection for exceeding it.
+        type: integer
       port:
         type: integer
       region:
         type: string
+      shaping_error:
+        type: string
+      shaping_ok:
+        description: |-
+          Surfaces a node that cannot run tc: speed-limited plans on it are not
+          actually limited, and nothing else about the node looks wrong.
+        type: boolean
+      shaping_tiers:
+        type: integer
       status:
         type: string
+      traffic_multiplier:
+        description: Factor applied to this node's traffic when charging a user's
+          quota.
+        type: number
       updated_at:
         type: string
+      xray_minimum:
+        type: string
+      xray_running:
+        description: |-
+          From the heartbeat: status only says the agent checked in, these say
+          whether Xray is actually serving the published config.
+        type: boolean
+      xray_too_old:
+        description: |-
+          Set when the node's core predates the stats RPC the panel needs. Reported
+          rather than refused: the node still carries traffic, and cutting it off
+          over a version would be worse than telling the operator to upgrade it.
+        type: boolean
       xray_version:
         type: string
+      xray_version_warning:
+        type: string
     type: object
-  handlers.planRequestResponse:
+  internal_handlers.planRequestResponse:
     properties:
       created_at:
         type: string
@@ -256,7 +413,7 @@ definitions:
       status:
         type: string
     type: object
-  handlers.planResponse:
+  internal_handlers.planResponse:
     properties:
       created_at:
         type: string
@@ -266,6 +423,8 @@ definitions:
         type: string
       is_active:
         type: boolean
+      max_concurrent:
+        type: integer
       max_devices:
         type: integer
       name:
@@ -279,7 +438,7 @@ definitions:
       traffic_limit:
         type: integer
     type: object
-  handlers.registerRequest:
+  internal_handlers.registerRequest:
     properties:
       email:
         type: string
@@ -288,7 +447,7 @@ definitions:
       password:
         type: string
     type: object
-  handlers.registerResponse:
+  internal_handlers.registerResponse:
     properties:
       email:
         type: string
@@ -299,26 +458,31 @@ definitions:
       sub_token:
         type: string
     type: object
-  handlers.reviewRequestBody:
+  internal_handlers.reviewRequestBody:
     properties:
       action:
         type: string
     type: object
-  handlers.setNodesRequest:
+  internal_handlers.setNodesRequest:
     properties:
       node_ids:
         items:
           type: string
         type: array
     type: object
-  handlers.settingItem:
+  internal_handlers.settingItem:
     properties:
       key:
         type: string
       value:
         type: string
     type: object
-  handlers.tlsStatusResponse:
+  internal_handlers.terminateSessionRequest:
+    properties:
+      cooldown_minutes:
+        type: integer
+    type: object
+  internal_handlers.tlsStatusResponse:
     properties:
       cert_file:
         type: string
@@ -329,16 +493,20 @@ definitions:
       key_file:
         type: string
     type: object
-  handlers.updateAnnouncementRequest:
+  internal_handlers.updateAnnouncementRequest:
     properties:
       content:
+        type: string
+      expires_at:
+        type: string
+      image_url:
         type: string
       is_active:
         type: boolean
       title:
         type: string
     type: object
-  handlers.updateInboundRequest:
+  internal_handlers.updateInboundRequest:
     properties:
       enabled:
         type: boolean
@@ -352,12 +520,32 @@ definitions:
       tag:
         type: string
     type: object
-  handlers.updatePlanRequest:
+  internal_handlers.updateInfoResponse:
+    properties:
+      download_url:
+        type: string
+      target_version:
+        type: string
+    type: object
+  internal_handlers.updateNodeRequest:
+    properties:
+      country:
+        type: string
+      name:
+        type: string
+      region:
+        type: string
+      traffic_multiplier:
+        type: number
+    type: object
+  internal_handlers.updatePlanRequest:
     properties:
       duration_days:
         type: integer
       is_active:
         type: boolean
+      max_concurrent:
+        type: integer
       max_devices:
         type: integer
       name:
@@ -369,7 +557,7 @@ definitions:
       traffic_limit:
         type: integer
     type: object
-  handlers.updateProfileRequest:
+  internal_handlers.updateProfileRequest:
     properties:
       email:
         type: string
@@ -378,10 +566,12 @@ definitions:
       password:
         type: string
     type: object
-  handlers.updateUserRequest:
+  internal_handlers.updateUserRequest:
     properties:
       is_active:
         type: boolean
+      name:
+        type: string
       plan_expires_at:
         type: string
       plan_id:
@@ -391,40 +581,25 @@ definitions:
       status:
         type: string
     type: object
-  handlers.updateUserTemplateRequest:
-    properties:
-      duration_days:
-        type: integer
-      max_devices:
-        type: integer
-      name:
-        type: string
-      node_group_id:
-        type: string
-      speed_limit:
-        type: integer
-      traffic_limit:
-        type: integer
-    type: object
-  handlers.updateXrayRequest:
+  internal_handlers.updateXrayRequest:
     properties:
       version:
         type: string
     type: object
-  handlers.updateXrayResponse:
+  internal_handlers.updateXrayResponse:
     properties:
       status:
         type: string
       target_version:
         type: string
     type: object
-  handlers.userDetailResponse:
+  internal_handlers.userDetailResponse:
     properties:
       created_at:
         type: string
       devices:
         items:
-          $ref: '#/definitions/handlers.deviceItem'
+          $ref: '#/definitions/internal_handlers.deviceItem'
         type: array
       email:
         type: string
@@ -448,12 +623,12 @@ definitions:
         type: string
       traffic_limit:
         type: integer
-      traffic_reset_day:
-        type: integer
+      traffic_reset_at:
+        type: string
       traffic_used:
         type: integer
     type: object
-  handlers.userListItem:
+  internal_handlers.userListItem:
     properties:
       created_at:
         type: string
@@ -478,7 +653,7 @@ definitions:
       traffic_used:
         type: integer
     type: object
-  handlers.userListResponse:
+  internal_handlers.userListResponse:
     properties:
       limit:
         type: integer
@@ -488,17 +663,28 @@ definitions:
         type: integer
       users:
         items:
-          $ref: '#/definitions/handlers.userListItem'
+          $ref: '#/definitions/internal_handlers.userListItem'
         type: array
     type: object
-  handlers.userLoginRequest:
+  internal_handlers.userLoginRequest:
     properties:
       email:
         type: string
       password:
         type: string
     type: object
-  handlers.userPlanItem:
+  internal_handlers.userNodeItem:
+    properties:
+      country:
+        type: string
+      name:
+        type: string
+      region:
+        type: string
+      status:
+        type: string
+    type: object
+  internal_handlers.userPlanItem:
     properties:
       duration_days:
         type: integer
@@ -513,28 +699,35 @@ definitions:
       traffic_limit:
         type: integer
     type: object
-  handlers.userTemplateResponse:
+  internal_handlers.userSummary:
     properties:
-      created_at:
-        type: string
-      duration_days:
+      devices:
         type: integer
-      id:
-        type: string
+      max_concurrent:
+        type: integer
       max_devices:
         type: integer
-      name:
-        type: string
-      node_group_id:
-        type: string
-      node_group_name:
-        type: string
-      speed_limit:
+      online:
         type: integer
+      online_ips:
+        type: integer
+      plan_expires_at:
+        type: string
+      plan_name:
+        type: string
+      status:
+        type: string
       traffic_limit:
         type: integer
+      traffic_used:
+        type: integer
     type: object
-  handlers.xrayVersionResponse:
+  internal_handlers.xrayUpdateInfoResponse:
+    properties:
+      target_version:
+        type: string
+    type: object
+  internal_handlers.xrayVersionResponse:
     properties:
       current_version:
         type: string
@@ -548,9 +741,23 @@ info:
   title: Proxima VPN API
   version: 0.1.0
 paths:
-  /admin/announcements:
+  /admin/activity:
     get:
-      description: Returns all announcements ordered by creation date
+      description: Returns the most recent recorded panel events, newest first. Supplying
+        both target_type and target_id narrows the feed to that target.
+      parameters:
+      - description: Maximum entries to return (default 20)
+        in: query
+        name: limit
+        type: integer
+      - description: Restrict to one target type, e.g. node (requires target_id)
+        in: query
+        name: target_type
+        type: string
+      - description: Restrict to one target id (requires target_type)
+        in: query
+        name: target_id
+        type: string
       produces:
       - application/json
       responses:
@@ -558,7 +765,30 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/handlers.announcementItem'
+              $ref: '#/definitions/github_com_proximavpn_proxima-vpn_api-server_internal_services.Entry'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get recent activity
+      tags:
+      - admin-stats
+  /admin/announcements:
+    get:
+      description: Returns all announcements for admin management
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/internal_handlers.announcementItem'
             type: array
         "500":
           description: Internal Server Error
@@ -574,21 +804,21 @@ paths:
     post:
       consumes:
       - application/json
-      description: Creates a new announcement
+      description: Creates a new announcement shown in the user portal
       parameters:
-      - description: Announcement details
+      - description: Announcement to create
         in: body
         name: body
         required: true
         schema:
-          $ref: '#/definitions/handlers.createAnnouncementRequest'
+          $ref: '#/definitions/internal_handlers.createAnnouncementRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/handlers.announcementItem'
+            $ref: '#/definitions/internal_handlers.announcementItem'
         "400":
           description: Bad Request
           schema:
@@ -615,11 +845,17 @@ paths:
         name: id
         required: true
         type: string
+      produces:
+      - application/json
       responses:
-        "204":
-          description: No Content
-        "500":
-          description: Internal Server Error
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
           schema:
             additionalProperties:
               type: string
@@ -632,7 +868,7 @@ paths:
     put:
       consumes:
       - application/json
-      description: Partially updates an announcement
+      description: Partially updates an announcement's fields
       parameters:
       - description: Announcement ID
         in: path
@@ -644,22 +880,22 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/handlers.updateAnnouncementRequest'
+          $ref: '#/definitions/internal_handlers.updateAnnouncementRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handlers.announcementItem'
+            $ref: '#/definitions/internal_handlers.announcementItem'
         "400":
           description: Bad Request
           schema:
             additionalProperties:
               type: string
             type: object
-        "500":
-          description: Internal Server Error
+        "404":
+          description: Not Found
           schema:
             additionalProperties:
               type: string
@@ -680,7 +916,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/handlers.disable2FARequest'
+          $ref: '#/definitions/internal_handlers.disable2FARequest'
       produces:
       - application/json
       responses:
@@ -718,7 +954,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/handlers.enable2FARequest'
+          $ref: '#/definitions/internal_handlers.enable2FARequest'
       produces:
       - application/json
       responses:
@@ -768,6 +1004,29 @@ paths:
       summary: Setup 2FA
       tags:
       - admin-auth
+  /admin/auth/2fa/status:
+    get:
+      description: Returns whether 2FA is enabled for the admin account
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: boolean
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get 2FA status
+      tags:
+      - admin-auth
   /admin/auth/login:
     post:
       consumes:
@@ -779,14 +1038,14 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/handlers.loginRequest'
+          $ref: '#/definitions/internal_handlers.loginRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handlers.loginResponse'
+            $ref: '#/definitions/internal_handlers.loginResponse'
         "400":
           description: Bad Request
           schema:
@@ -879,6 +1138,54 @@ paths:
       summary: Trigger backup
       tags:
       - admin-backup
+  /admin/devices/{id}/terminate:
+    post:
+      consumes:
+      - application/json
+      description: Evicts a device so the node agent withdraws its credential on the
+        next config poll
+      parameters:
+      - description: Device ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Cooldown in minutes
+        in: body
+        name: body
+        schema:
+          $ref: '#/definitions/internal_handlers.terminateSessionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Terminate a device's session
+      tags:
+      - admin-stats
   /admin/inbounds/{id}:
     delete:
       description: Removes an inbound by ID
@@ -923,14 +1230,14 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/handlers.updateInboundRequest'
+          $ref: '#/definitions/internal_handlers.updateInboundRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handlers.inboundResponse'
+            $ref: '#/definitions/internal_handlers.inboundResponse'
         "400":
           description: Bad Request
           schema:
@@ -969,7 +1276,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handlers.inboundResponse'
+            $ref: '#/definitions/internal_handlers.inboundResponse'
         "404":
           description: Not Found
           schema:
@@ -991,7 +1298,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/handlers.nodeGroupListItem'
+              $ref: '#/definitions/internal_handlers.nodeGroupListItem'
             type: array
         "500":
           description: Internal Server Error
@@ -1014,14 +1321,14 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/handlers.createNodeGroupRequest'
+          $ref: '#/definitions/internal_handlers.createNodeGroupRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/handlers.nodeGroupListItem'
+            $ref: '#/definitions/internal_handlers.nodeGroupListItem'
         "400":
           description: Bad Request
           schema:
@@ -1082,7 +1389,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handlers.nodeGroupDetail'
+            $ref: '#/definitions/internal_handlers.nodeGroupDetail'
         "404":
           description: Not Found
           schema:
@@ -1115,7 +1422,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/handlers.createNodeGroupRequest'
+          $ref: '#/definitions/internal_handlers.createNodeGroupRequest'
       produces:
       - application/json
       responses:
@@ -1164,7 +1471,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/handlers.setNodesRequest'
+          $ref: '#/definitions/internal_handlers.setNodesRequest'
       produces:
       - application/json
       responses:
@@ -1198,7 +1505,7 @@ paths:
       - admin-node-groups
   /admin/nodes:
     get:
-      description: Returns all registered (non-pending) nodes
+      description: Returns all nodes including pending (awaiting registration) ones
       produces:
       - application/json
       responses:
@@ -1206,7 +1513,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/handlers.nodeListItem'
+              $ref: '#/definitions/internal_handlers.nodeListItem'
             type: array
         "500":
           description: Internal Server Error
@@ -1268,7 +1575,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handlers.nodeListItem'
+            $ref: '#/definitions/internal_handlers.nodeListItem'
         "404":
           description: Not Found
           schema:
@@ -1278,6 +1585,48 @@ paths:
       security:
       - BearerAuth: []
       summary: Get node
+      tags:
+      - admin-nodes
+    put:
+      consumes:
+      - application/json
+      description: Partially updates a node's name, country, or region. Cannot edit
+        pending nodes.
+      parameters:
+      - description: Node ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Fields to update
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handlers.updateNodeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update node
       tags:
       - admin-nodes
   /admin/nodes/{id}/tls:
@@ -1295,7 +1644,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handlers.tlsStatusResponse'
+            $ref: '#/definitions/internal_handlers.tlsStatusResponse'
         "404":
           description: Not Found
           schema:
@@ -1323,7 +1672,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/handlers.issueCertificateRequest'
+          $ref: '#/definitions/internal_handlers.issueCertificateRequest'
       produces:
       - application/json
       responses:
@@ -1371,7 +1720,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handlers.xrayVersionResponse'
+            $ref: '#/definitions/internal_handlers.xrayVersionResponse'
         "404":
           description: Not Found
           schema:
@@ -1399,14 +1748,14 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/handlers.updateXrayRequest'
+          $ref: '#/definitions/internal_handlers.updateXrayRequest'
       produces:
       - application/json
       responses:
         "202":
           description: Accepted
           schema:
-            $ref: '#/definitions/handlers.updateXrayResponse'
+            $ref: '#/definitions/internal_handlers.updateXrayResponse'
         "400":
           description: Bad Request
           schema:
@@ -1446,7 +1795,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/handlers.inboundResponse'
+              $ref: '#/definitions/internal_handlers.inboundResponse'
             type: array
         "500":
           description: Internal Server Error
@@ -1474,14 +1823,14 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/handlers.createInboundRequest'
+          $ref: '#/definitions/internal_handlers.createInboundRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/handlers.inboundResponse'
+            $ref: '#/definitions/internal_handlers.inboundResponse'
         "400":
           description: Bad Request
           schema:
@@ -1515,7 +1864,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handlers.generateTokenResponse'
+            $ref: '#/definitions/internal_handlers.generateTokenResponse'
         "500":
           description: Internal Server Error
           schema:
@@ -1567,7 +1916,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/handlers.adminPlanRequestItem'
+              $ref: '#/definitions/internal_handlers.adminPlanRequestItem'
             type: array
         "500":
           description: Internal Server Error
@@ -1596,14 +1945,14 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/handlers.reviewRequestBody'
+          $ref: '#/definitions/internal_handlers.reviewRequestBody'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handlers.adminPlanRequestItem'
+            $ref: '#/definitions/internal_handlers.adminPlanRequestItem'
         "400":
           description: Bad Request
           schema:
@@ -1637,7 +1986,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/handlers.planResponse'
+              $ref: '#/definitions/internal_handlers.planResponse'
             type: array
         "500":
           description: Internal Server Error
@@ -1660,14 +2009,14 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/handlers.createPlanRequest'
+          $ref: '#/definitions/internal_handlers.createPlanRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/handlers.planResponse'
+            $ref: '#/definitions/internal_handlers.planResponse'
         "400":
           description: Bad Request
           schema:
@@ -1734,7 +2083,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handlers.planResponse'
+            $ref: '#/definitions/internal_handlers.planResponse'
         "404":
           description: Not Found
           schema:
@@ -1761,14 +2110,14 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/handlers.updatePlanRequest'
+          $ref: '#/definitions/internal_handlers.updatePlanRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handlers.planResponse'
+            $ref: '#/definitions/internal_handlers.planResponse'
         "400":
           description: Bad Request
           schema:
@@ -1802,7 +2151,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/handlers.settingItem'
+              $ref: '#/definitions/internal_handlers.settingItem'
             type: array
         "500":
           description: Internal Server Error
@@ -1875,9 +2224,39 @@ paths:
       summary: Get dashboard stats
       tags:
       - admin-stats
-  /admin/user-templates:
+  /admin/stats/alerts:
     get:
-      description: Returns all user templates with node group info
+      description: Returns offline nodes, resource-pressured nodes, and pending approvals
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_proximavpn_proxima-vpn_api-server_internal_services.Alerts'
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get dashboard alerts
+      tags:
+      - admin-stats
+  /admin/stats/node-traffic:
+    get:
+      description: Returns upload/download per node over the requested window
+      parameters:
+      - description: today, week, or month (default today)
+        in: query
+        name: window
+        type: string
+      - description: Maximum nodes to return (default 10)
+        in: query
+        name: limit
+        type: integer
       produces:
       - application/json
       responses:
@@ -1885,7 +2264,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/handlers.userTemplateResponse'
+              $ref: '#/definitions/github_com_proximavpn_proxima-vpn_api-server_internal_services.NodeTraffic'
             type: array
         "500":
           description: Internal Server Error
@@ -1895,108 +2274,22 @@ paths:
             type: object
       security:
       - BearerAuth: []
-      summary: List user templates
+      summary: Get per-node traffic
       tags:
-      - admin-user-templates
-    post:
-      consumes:
-      - application/json
-      description: Creates a new user template for quick user provisioning
-      parameters:
-      - description: Template details
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/handlers.createUserTemplateRequest'
-      produces:
-      - application/json
-      responses:
-        "201":
-          description: Created
-          schema:
-            $ref: '#/definitions/handlers.userTemplateResponse'
-        "400":
-          description: Bad Request
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "500":
-          description: Internal Server Error
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-      security:
-      - BearerAuth: []
-      summary: Create user template
-      tags:
-      - admin-user-templates
-  /admin/user-templates/{id}:
-    delete:
-      description: Deletes a user template by ID
-      parameters:
-      - description: Template ID
-        in: path
-        name: id
-        required: true
-        type: string
-      responses:
-        "204":
-          description: No Content
-        "404":
-          description: Not Found
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "500":
-          description: Internal Server Error
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-      security:
-      - BearerAuth: []
-      summary: Delete user template
-      tags:
-      - admin-user-templates
-    put:
-      consumes:
-      - application/json
-      description: Partially updates an existing user template
-      parameters:
-      - description: Template ID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Fields to update
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/handlers.updateUserTemplateRequest'
+      - admin-stats
+  /admin/stats/traffic-history:
+    get:
+      description: Returns daily upload/download traffic aggregated from traffic_logs
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handlers.userTemplateResponse'
-        "400":
-          description: Bad Request
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "404":
-          description: Not Found
-          schema:
-            additionalProperties:
-              type: string
-            type: object
+            items:
+              additionalProperties: true
+              type: object
+            type: array
         "500":
           description: Internal Server Error
           schema:
@@ -2005,9 +2298,9 @@ paths:
             type: object
       security:
       - BearerAuth: []
-      summary: Update user template
+      summary: Get traffic history
       tags:
-      - admin-user-templates
+      - admin-stats
   /admin/users:
     get:
       description: Returns paginated users with optional search and status filter
@@ -2036,7 +2329,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handlers.userListResponse'
+            $ref: '#/definitions/internal_handlers.userListResponse'
         "500":
           description: Internal Server Error
           schema:
@@ -2046,6 +2339,47 @@ paths:
       security:
       - BearerAuth: []
       summary: List users
+      tags:
+      - admin-users
+    post:
+      consumes:
+      - application/json
+      description: Creates a new user account with active status
+      parameters:
+      - description: User details
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handlers.createUserRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/internal_handlers.createUserResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "409":
+          description: Conflict
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create user
       tags:
       - admin-users
   /admin/users/{id}:
@@ -2097,7 +2431,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handlers.userDetailResponse'
+            $ref: '#/definitions/internal_handlers.userDetailResponse'
         "404":
           description: Not Found
           schema:
@@ -2130,7 +2464,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/handlers.updateUserRequest'
+          $ref: '#/definitions/internal_handlers.updateUserRequest'
       produces:
       - application/json
       responses:
@@ -2156,6 +2490,41 @@ paths:
       summary: Update user
       tags:
       - admin-users
+  /admin/users/{id}/reset-traffic:
+    post:
+      description: Resets traffic_used to 0 and sets traffic_reset_at to NOW()
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Reset user traffic
+      tags:
+      - admin-users
   /auth/login:
     post:
       consumes:
@@ -2167,14 +2536,14 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/handlers.userLoginRequest'
+          $ref: '#/definitions/internal_handlers.userLoginRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handlers.loginResponse'
+            $ref: '#/definitions/internal_handlers.loginResponse'
         "400":
           description: Bad Request
           schema:
@@ -2207,14 +2576,14 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/handlers.registerRequest'
+          $ref: '#/definitions/internal_handlers.registerRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/handlers.registerResponse'
+            $ref: '#/definitions/internal_handlers.registerResponse'
         "400":
           description: Bad Request
           schema:
@@ -2230,6 +2599,101 @@ paths:
       summary: User registration
       tags:
       - user-auth
+  /nodes/{id}/update:
+    get:
+      description: Reports the target node-agent version for self-update
+      parameters:
+      - description: Node ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handlers.updateInfoResponse'
+        "204":
+          description: No update available
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Node agent update check
+      tags:
+      - node-agent
+  /nodes/{id}/update/download:
+    get:
+      description: Serves the node-agent binary matching the requested os/arch
+      parameters:
+      - description: Node ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Target OS (linux)
+        in: query
+        name: os
+        required: true
+        type: string
+      - description: Target architecture (amd64|arm64)
+        in: query
+        name: arch
+        required: true
+        type: string
+      produces:
+      - application/octet-stream
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: file
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Download node agent binary
+      tags:
+      - node-agent
+  /nodes/{id}/xray-update:
+    get:
+      description: Reports the target Xray-core version requested for the node
+      parameters:
+      - description: Node ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handlers.xrayUpdateInfoResponse'
+        "204":
+          description: No update available
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Node Xray-core update check
+      tags:
+      - node-agent
   /sub/{sub_token}/{device_id}:
     get:
       description: Returns proxy configuration for a device based on subscription
@@ -2307,7 +2771,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/handlers.deviceResponse'
+              $ref: '#/definitions/internal_handlers.deviceResponse'
             type: array
         "500":
           description: Internal Server Error
@@ -2330,14 +2794,14 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/handlers.createDeviceRequest'
+          $ref: '#/definitions/internal_handlers.createDeviceRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/handlers.deviceResponse'
+            $ref: '#/definitions/internal_handlers.deviceResponse'
         "400":
           description: Bad Request
           schema:
@@ -2390,6 +2854,29 @@ paths:
       summary: Delete device
       tags:
       - user-portal
+  /user/nodes:
+    get:
+      description: Returns name and location of the nodes the user's plan can use
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/internal_handlers.userNodeItem'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List my available nodes
+      tags:
+      - user-plans
   /user/plan-requests:
     get:
       description: Returns the authenticated user's plan requests
@@ -2400,7 +2887,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/handlers.planRequestResponse'
+              $ref: '#/definitions/internal_handlers.planRequestResponse'
             type: array
         "500":
           description: Internal Server Error
@@ -2423,14 +2910,14 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/handlers.createPlanRequestBody'
+          $ref: '#/definitions/internal_handlers.createPlanRequestBody'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/handlers.planRequestResponse'
+            $ref: '#/definitions/internal_handlers.planRequestResponse'
         "400":
           description: Bad Request
           schema:
@@ -2464,7 +2951,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/handlers.userPlanItem'
+              $ref: '#/definitions/internal_handlers.userPlanItem'
             type: array
         "500":
           description: Internal Server Error
@@ -2509,7 +2996,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/handlers.updateProfileRequest'
+          $ref: '#/definitions/internal_handlers.updateProfileRequest'
       produces:
       - application/json
       responses:
@@ -2564,6 +3051,28 @@ paths:
       security:
       - BearerAuth: []
       summary: Regenerate subscription token
+      tags:
+      - user-portal
+  /user/summary:
+    get:
+      description: Traffic usage, device count and live connection count against their
+        caps
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handlers.userSummary'
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get account summary
       tags:
       - user-portal
   /user/traffic:
