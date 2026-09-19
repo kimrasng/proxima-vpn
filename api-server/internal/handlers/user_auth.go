@@ -28,6 +28,7 @@ type UserAuthHandler struct {
 	jwtExpiry time.Duration
 	telegram  *services.TelegramService
 	activity  *services.ActivityService
+	logins    *services.LoginHistoryService
 }
 
 // NewUserAuthHandler creates a new UserAuthHandler.
@@ -38,6 +39,7 @@ func NewUserAuthHandler(db *pgxpool.Pool, jwtSecret string, jwtExpiry time.Durat
 		jwtExpiry: jwtExpiry,
 		telegram:  telegram,
 		activity:  services.NewActivityService(db),
+		logins:    services.NewLoginHistoryService(db),
 	}
 }
 
@@ -211,18 +213,21 @@ func (h *UserAuthHandler) Login(c *fiber.Ctx) error {
 		req.Email,
 	).Scan(&id, &email, &passwordHash, &status)
 	if err != nil {
+		h.recordLogin(c, "", req.Email, false, services.LoginFailureUnknownEmail)
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"error": "invalid credentials",
 		})
 	}
 
 	if status == "suspended" {
+		h.recordLogin(c, id, email, false, services.LoginFailureSuspended)
 		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
 			"error": "account suspended",
 		})
 	}
 
 	if !crypto.CheckPassword(passwordHash, req.Password) {
+		h.recordLogin(c, id, email, false, services.LoginFailureBadPassword)
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"error": "invalid credentials",
 		})
@@ -256,8 +261,21 @@ func (h *UserAuthHandler) Login(c *fiber.Ctx) error {
 		ActorLabel: email,
 		Detail:     map[string]any{"ip": c.IP()},
 	})
+	h.recordLogin(c, id, email, true, "")
 
 	return c.JSON(fiber.Map{
 		"token": tokenString,
+	})
+}
+
+func (h *UserAuthHandler) recordLogin(c *fiber.Ctx, userID, email string, success bool, reason string) {
+	h.logins.Record(context.Background(), services.LoginAttempt{
+		UserID:    userID,
+		ActorType: services.LoginActorUser,
+		Email:     email,
+		Success:   success,
+		Reason:    reason,
+		IP:        c.IP(),
+		UserAgent: c.Get(fiber.HeaderUserAgent),
 	})
 }

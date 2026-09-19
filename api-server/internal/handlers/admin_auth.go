@@ -25,6 +25,7 @@ type AdminAuthHandler struct {
 	jwtSecret string
 	jwtExpiry time.Duration
 	activity  *services.ActivityService
+	logins    *services.LoginHistoryService
 }
 
 // NewAdminAuthHandler creates a new AdminAuthHandler.
@@ -34,6 +35,7 @@ func NewAdminAuthHandler(db *pgxpool.Pool, jwtSecret string, jwtExpiry time.Dura
 		jwtSecret: jwtSecret,
 		jwtExpiry: jwtExpiry,
 		activity:  services.NewActivityService(db),
+		logins:    services.NewLoginHistoryService(db),
 	}
 }
 
@@ -87,12 +89,14 @@ func (h *AdminAuthHandler) Login(c *fiber.Ctx) error {
 		req.Email,
 	).Scan(&id, &email, &passwordHash, &totpSecret, &totpEnabled)
 	if err != nil {
+		h.recordLogin(c, req.Email, false, services.LoginFailureUnknownEmail)
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"error": "invalid credentials",
 		})
 	}
 
 	if !crypto.CheckPassword(passwordHash, req.Password) {
+		h.recordLogin(c, email, false, services.LoginFailureBadPassword)
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"error": "invalid credentials",
 		})
@@ -100,11 +104,13 @@ func (h *AdminAuthHandler) Login(c *fiber.Ctx) error {
 
 	if totpEnabled {
 		if req.TOTPCode == "" {
+			h.recordLogin(c, email, false, services.LoginFailureBadTOTP)
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 				"error": "totp_code is required",
 			})
 		}
 		if !crypto.ValidateTOTP(totpSecret, req.TOTPCode) {
+			h.recordLogin(c, email, false, services.LoginFailureBadTOTP)
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 				"error": "invalid totp code",
 			})
@@ -139,6 +145,21 @@ func (h *AdminAuthHandler) Login(c *fiber.Ctx) error {
 		ActorLabel: email,
 		Detail:     map[string]any{"ip": c.IP()},
 	})
+	h.recordLogin(c, email, true, "")
 
 	return c.JSON(loginResponse{Token: tokenString})
+}
+
+// recordLogin persists an admin attempt. user_id is left null on purpose: it is
+// a foreign key into users, and an admin id is not a user id. Admin attempts are
+// identified by attempted_email plus actor_type.
+func (h *AdminAuthHandler) recordLogin(c *fiber.Ctx, email string, success bool, reason string) {
+	h.logins.Record(context.Background(), services.LoginAttempt{
+		ActorType: services.LoginActorAdmin,
+		Email:     email,
+		Success:   success,
+		Reason:    reason,
+		IP:        c.IP(),
+		UserAgent: c.Get(fiber.HeaderUserAgent),
+	})
 }

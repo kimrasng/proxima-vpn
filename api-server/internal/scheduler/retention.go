@@ -20,6 +20,7 @@ const (
 	nodeMetricsRetention   = 14 * 24 * time.Hour
 	activityLogRetention   = 90 * 24 * time.Hour
 	snapshotRetention      = 30 * 24 * time.Hour
+	loginHistoryRetention  = 180 * 24 * time.Hour
 	retentionSweepInterval = 6 * time.Hour
 
 	// deleteBatchSize bounds each DELETE so a first sweep over a large backlog
@@ -72,6 +73,10 @@ func (s *RetentionScheduler) run(ctx context.Context) {
 	s.prune(ctx, "node_metrics_history", "recorded_at", nodeMetricsRetention)
 	s.prune(ctx, "activity_logs", "created_at", activityLogRetention)
 	s.prune(ctx, "dashboard_snapshots", "recorded_at", snapshotRetention)
+	// login_history is append-only and fed by an unauthenticated endpoint, so it
+	// grows without a sweep. Kept longer than the activity feed because it is the
+	// audit trail an operator reaches for after the fact.
+	s.prune(ctx, "login_history", "created_at", loginHistoryRetention)
 }
 
 // prune deletes rows older than the retention window in bounded batches. table
