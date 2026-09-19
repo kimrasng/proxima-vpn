@@ -26,10 +26,15 @@ func NewNodeMonitorScheduler(db *pgxpool.Pool, telegram *services.TelegramServic
 	}
 }
 
-// Start runs the node monitor every 60 seconds.
+// offlineSweepInterval bounds how long a dead node keeps reading as online:
+// worst case is this plus the staleness window in run(). At the old 60s a 40s
+// window would still have taken 100s to notice.
+const offlineSweepInterval = 15 * time.Second
+
+// Start sweeps for nodes that stopped reporting, every offlineSweepInterval.
 func (s *NodeMonitorScheduler) Start(ctx context.Context) {
 	ctx, s.cancel = context.WithCancel(ctx)
-	ticker := time.NewTicker(60 * time.Second)
+	ticker := time.NewTicker(offlineSweepInterval)
 	defer ticker.Stop()
 
 	log.Println("[NodeMonitor] started")
@@ -55,9 +60,12 @@ func (s *NodeMonitorScheduler) Stop() {
 func (s *NodeMonitorScheduler) run(ctx context.Context) {
 	rows, err := s.db.Query(ctx, `
 		UPDATE nodes
-		SET status = 'offline', updated_at = NOW()
+		SET status = 'offline', updated_at = NOW(), status_changed_at = NOW()
 		WHERE status = 'online'
-		  AND last_seen < NOW() - INTERVAL '90 seconds'
+		  -- Four missed 10s heartbeats (node-agent heartbeatInterval). The old
+		  -- 90s was three beats when beats were 30s apart; keeping it would now
+		  -- mean sitting on a dead node for nine.
+		  AND last_seen < NOW() - INTERVAL '40 seconds'
 		RETURNING id::text, name
 	`)
 	if err != nil {

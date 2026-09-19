@@ -459,8 +459,14 @@ func (s *nodeState) UsersSnapshot() map[userKey]xray.VLESSUser {
 	return out
 }
 
+// heartbeatInterval also sets how fresh the panel's resource figures can be:
+// nothing shows a change sooner than the next beat. Kept well under the
+// server's offline threshold (scheduler/node_monitor.go) so a single dropped
+// beat cannot flip a healthy node to offline.
+const heartbeatInterval = 10 * time.Second
+
 func heartbeatLoop(ctx context.Context, apiClient *client.APIClient, runner *xray.XrayRunner, xrayVersion *versionHolder, state *nodeState) {
-	ticker := time.NewTicker(30 * time.Second)
+	ticker := time.NewTicker(heartbeatInterval)
 	defer ticker.Stop()
 
 	for {

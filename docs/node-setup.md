@@ -53,7 +53,7 @@ After installation completes:
 
 1. Go to **Nodes** in the admin panel
 2. The new node should appear with a green "Online" status
-3. If it shows "Offline", wait 30 seconds and refresh
+3. If it shows "Offline", wait about 10 seconds - the agent heartbeats on that interval and the list refreshes itself
 
 ## Step 4: Configure Inbounds
 
