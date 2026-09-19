@@ -29,7 +29,14 @@
     "submit": "Submit",
     "reset": "Reset",
     "copy": "Copy",
-    "copied": "Copied"
+    "copied": "Copied",
+    "relativeTime": {
+      "never": "Never",
+      "justNow": "Just now",
+      "minutesAgo": "{{count}}m ago",
+      "hoursAgo": "{{count}}h ago",
+      "daysAgo": "{{count}}d ago"
+    }
   },
   "admin": {
     "nav": {
@@ -37,7 +44,6 @@
       "nodes": "Nodes",
       "nodeGroups": "Node Groups",
       "plans": "Plans",
-      "userTemplates": "User Templates",
       "users": "Users",
       "planRequests": "Plan Requests",
       "announcements": "Announcements",
@@ -49,7 +55,9 @@
         "system": "System"
       },
       "serviceName": "Proxima VPN",
-      "connections": "Connections"
+      "connections": "Connections",
+      "alerts": "Alerts & Actions",
+      "activity": "Recent Activity"
     },
     "dashboard": {
       "title": "Dashboard",
@@ -206,7 +214,8 @@
         "traffic": "Traffic (today)",
         "connections": "Connections",
         "lastCheck": "Last check",
-        "countryRegion": "Country / Region"
+        "countryRegion": "Country / Region",
+        "multiplier": "Traffic multiplier"
       },
       "occupancyValue": "{{online}} of {{capacity}} devices",
       "shapingNotApplied": "Speed limits not in force",
@@ -240,7 +249,9 @@
         "total": "Total nodes",
         "online": "Online",
         "offline": "Offline",
-        "pending": "Pending"
+        "pending": "Pending",
+        "shareOfTotal": "{{percent}}% of total",
+        "totalCaption": "Nodes registered"
       },
       "statusOnline": "Online",
       "statusOffline": "Offline",
@@ -255,14 +266,17 @@
       "wrapLines": "Wrap lines",
       "visibleColumns": "Visible columns",
       "paginationLabel": "Nodes pagination",
-      "listTitle": "Node list"
+      "listTitle": "Node list",
+      "multiplierValue": "×{{factor}}",
+      "multiplierNormal": "×1",
+      "multiplierHint": "How much of a user’s quota this node’s traffic consumes. 1 charges the bytes transferred, 2 charges double. Per-node traffic stats always report the real bytes.",
+      "multiplierInvalid": "Traffic multiplier must be greater than 0 and at most 100"
     },
     "nodeDetail": {
       "title": "Node Detail",
       "fetchError": "Failed to load node",
       "refresh": "Refresh",
       "manageInbounds": "Manage Inbounds",
-      "back": "Back to Nodes",
       "lastRefreshed": "Last refreshed",
       "autoRefresh": "auto-refreshes every 30s",
       "overview": "Overview",
@@ -552,13 +566,14 @@
       "nodes": "Manage your VPN nodes. Use Create node to issue a registration token for a new node, and review each node’s status, resource usage, traffic, and connection count.",
       "nodeGroups": "Group nodes so plans can target them. A plan bound to a group offers only that group’s nodes to its users.",
       "users": "Manage VPN users. Review each user’s plan, traffic usage, and device count, and create or edit accounts.",
-      "userTemplates": "Templates that cut repetitive input when creating users. Predefine the plan, traffic limit, and expiry.",
       "plans": "Define the plans offered to users: traffic limit, concurrent connections, and which node groups are available.",
       "planRequests": "Approve or reject plan requests submitted by users. Approving applies the plan to that user.",
       "announcements": "Write announcements shown in the user portal. You can set the active state and an expiry date.",
       "settings": "Change panel-wide settings, including operational items such as backups and retention windows.",
       "twoFactor": "Set up two-factor authentication for the admin account. Once enabled, login also requires a code from your authenticator app.",
-      "connections": "Shows every session currently connected to the VPN: which user, on which device, to which node, and from which address. Users past their concurrent-connection allowance are flagged. Refreshes every 30 seconds."
+      "connections": "Shows every session currently connected to the VPN: which user, on which device, to which node, and from which address. Users past their concurrent-connection allowance are flagged. Refreshes every 30 seconds.",
+      "alerts": "Every alert that needs action, plus the nodes reporting a problem. Select a node name to open its detail page.",
+      "activity": "The activity log recorded across the panel and the nodes. Filter by severity or activity type."
     },
     "notifications": {
       "title": "Notifications"
@@ -594,14 +609,88 @@
         "addresses": "Source addresses",
         "connectedFor": "Connected for",
         "cap": "Concurrent",
-        "traffic": "Traffic today"
+        "traffic": "Traffic today",
+        "actions": "Actions"
       },
       "noCap": "{{count}} (no cap)",
       "unknownTime": "Unknown",
       "justNow": "Just now",
       "durationMinutes": "{{count}}m",
       "durationHours": "{{count}}h",
-      "durationDays": "{{count}}d"
+      "durationDays": "{{count}}d",
+      "terminate": "Terminate",
+      "terminateTitle": "Terminate this connection?",
+      "terminateConfirm": "This ends the \"{{device}}\" session for {{email}}.",
+      "terminateHint": "Nodes fetch their config every 30s, so the session drops on the next sync. The device cannot reconnect for 10 minutes afterwards.",
+      "terminateSuccess": "Termination requested for \"{{device}}\". Reconnects are blocked for {{minutes}} minutes.",
+      "terminateError": "Failed to terminate the session",
+      "unnamedDevice": "Unnamed device",
+      "cancel": "Cancel"
+    },
+    "alerts": {
+      "title": "Alerts & Actions",
+      "subtitle": "Items that need action, and the nodes reporting a problem.",
+      "lastUpdated": "Last updated {{time}}",
+      "refresh": "Refresh",
+      "fetchError": "Failed to load alerts",
+      "summaryTitle": "Alert summary",
+      "summaryHint": "Current alerts grouped by kind.",
+      "tableTitle": "Nodes reporting a problem",
+      "tableHint": "Individual issues detected per node.",
+      "searchPlaceholder": "Search by node name, country, region",
+      "matchCount": "{{count}} matches",
+      "clearFilters": "Clear filters",
+      "filterSeverityAll": "Severity: All",
+      "filterKindAll": "Issue: All",
+      "severityError": "Critical",
+      "severityWarning": "Warning",
+      "severityInfo": "Info",
+      "empty": "Nothing needs action",
+      "emptyHint": "Every node is operating within its normal range.",
+      "noMatch": "No matches found",
+      "goToNodes": "View nodes",
+      "goToRequests": "View requests",
+      "col": {
+        "count": "Count"
+      },
+      "kpi": {
+        "total": "Total alerts",
+        "error": "Critical",
+        "warning": "Warning",
+        "affectedNodes": "Affected nodes"
+      }
+    },
+    "activity": {
+      "title": "Recent Activity",
+      "subtitle": "The activity log recorded across the panel and the nodes.",
+      "lastUpdated": "Last updated {{time}}",
+      "refresh": "Refresh",
+      "fetchError": "Failed to load activity",
+      "tableTitle": "Activity log",
+      "tableHint": "Shows up to 200 of the most recent entries.",
+      "searchPlaceholder": "Search by actor or activity",
+      "matchCount": "{{count}} matches",
+      "clearFilters": "Clear filters",
+      "filterSeverityAll": "Severity: All",
+      "filterEventAll": "Activity: All",
+      "severityError": "Critical",
+      "severityWarning": "Warning",
+      "severitySuccess": "Success",
+      "severityInfo": "Info",
+      "empty": "No activity recorded",
+      "emptyHint": "User sign-ins and node status changes will appear here.",
+      "noMatch": "No matches found",
+      "col": {
+        "severity": "Severity",
+        "actor": "Actor",
+        "target": "Resource"
+      },
+      "kpi": {
+        "total": "Total entries",
+        "today": "Today",
+        "error": "Critical",
+        "warning": "Warning"
+      }
     }
   },
   "user": {

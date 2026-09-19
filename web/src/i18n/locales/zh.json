@@ -29,7 +29,14 @@
     "submit": "提交",
     "reset": "重置",
     "copy": "复制",
-    "copied": "已复制"
+    "copied": "已复制",
+    "relativeTime": {
+      "never": "无记录",
+      "justNow": "刚刚",
+      "minutesAgo": "{{count}} 分钟前",
+      "hoursAgo": "{{count}} 小时前",
+      "daysAgo": "{{count}} 天前"
+    }
   },
   "admin": {
     "nav": {
@@ -37,7 +44,6 @@
       "nodes": "节点",
       "nodeGroups": "节点组",
       "plans": "套餐",
-      "userTemplates": "用户模板",
       "users": "用户",
       "planRequests": "套餐申请",
       "announcements": "公告",
@@ -49,7 +55,9 @@
         "system": "系统"
       },
       "serviceName": "Proxima VPN",
-      "connections": "连接情况"
+      "connections": "连接情况",
+      "alerts": "警告与待办",
+      "activity": "最近活动"
     },
     "dashboard": {
       "title": "仪表盘",
@@ -207,7 +215,8 @@
         "traffic": "流量（今日）",
         "connections": "当前连接",
         "lastCheck": "最后检查",
-        "countryRegion": "国家 / 地区"
+        "countryRegion": "国家 / 地区",
+        "multiplier": "流量倍率"
       },
       "occupancyValue": "{{online}} / {{capacity}} 台设备",
       "shapingNotApplied": "限速未生效",
@@ -251,7 +260,9 @@
         "total": "节点总数",
         "online": "在线",
         "offline": "离线",
-        "pending": "待接入"
+        "pending": "待接入",
+        "shareOfTotal": "占总数 {{percent}}%",
+        "totalCaption": "已注册节点"
       },
       "statusOnline": "在线",
       "statusOffline": "离线",
@@ -266,14 +277,17 @@
       "wrapLines": "自动换行",
       "visibleColumns": "显示的列",
       "paginationLabel": "节点列表分页",
-      "listTitle": "节点列表"
+      "listTitle": "节点列表",
+      "multiplierValue": "×{{factor}}",
+      "multiplierNormal": "×1",
+      "multiplierHint": "该节点的流量按几倍从用户配额中扣除。1 表示按实际用量扣除，2 表示扣除两倍。各节点流量统计始终显示真实传输量。",
+      "multiplierInvalid": "流量倍率必须大于 0 且不超过 100"
     },
     "nodeDetail": {
       "title": "节点详情",
       "fetchError": "加载节点信息失败",
       "refresh": "刷新",
       "manageInbounds": "管理入站",
-      "back": "返回节点列表",
       "lastRefreshed": "最后刷新",
       "autoRefresh": "每30秒自动刷新",
       "overview": "概览",
@@ -601,13 +615,14 @@
       "nodes": "管理 VPN 节点。通过“创建节点”签发注册令牌以接入新节点，并查看各节点的状态、资源使用率、流量与连接数。",
       "nodeGroups": "将节点编组，供套餐引用。绑定了分组的套餐只向用户提供该分组内的节点。",
       "users": "管理 VPN 用户。查看每位用户的套餐、流量用量与设备数量，并创建或修改账号。",
-      "userTemplates": "用于减少创建用户时重复输入的模板，可预先定义套餐、流量上限与有效期。",
       "plans": "定义提供给用户的套餐：流量上限、并发连接数以及可用的节点分组。",
       "planRequests": "审批或拒绝用户提交的套餐申请。通过后该套餐将应用到对应用户。",
       "announcements": "编写在用户门户中展示的公告，可设置启用状态与过期时间。",
       "settings": "修改面板全局设置，包含备份、保留周期等运维项。",
       "twoFactor": "为管理员账号配置双重验证。启用后登录还需输入验证器应用生成的验证码。",
-      "connections": "查看当前连接到 VPN 的所有会话：哪位用户、使用哪台设备、连接到哪个节点、来自哪个地址。超出并发连接允许值的用户会被标记。每 30 秒自动刷新。"
+      "connections": "查看当前连接到 VPN 的所有会话：哪位用户、使用哪台设备、连接到哪个节点、来自哪个地址。超出并发连接允许值的用户会被标记。每 30 秒自动刷新。",
+      "alerts": "集中查看需要处理的警告以及报告故障的节点。点击节点名称可进入该节点详情。",
+      "activity": "面板与节点记录的活动日志，可按严重程度或活动类型筛选。"
     },
     "notifications": {
       "title": "通知"
@@ -643,14 +658,88 @@
         "addresses": "来源地址",
         "connectedFor": "连接时长",
         "cap": "并发连接",
-        "traffic": "今日流量"
+        "traffic": "今日流量",
+        "actions": "操作"
       },
       "noCap": "{{count}} 个（无限制）",
       "unknownTime": "未知",
       "justNow": "刚刚",
       "durationMinutes": "{{count}} 分钟",
       "durationHours": "{{count}} 小时",
-      "durationDays": "{{count}} 天"
+      "durationDays": "{{count}} 天",
+      "terminate": "断开连接",
+      "terminateTitle": "确定要断开此连接吗？",
+      "terminateConfirm": "将结束用户 {{email}} 的“{{device}}”会话。",
+      "terminateHint": "节点每 30 秒拉取一次配置，因此连接将在下次同步时断开。之后 10 分钟内该设备无法重新连接。",
+      "terminateSuccess": "已请求断开“{{device}}”。{{minutes}} 分钟内禁止重新连接。",
+      "terminateError": "断开连接失败",
+      "unnamedDevice": "未命名设备",
+      "cancel": "取消"
+    },
+    "alerts": {
+      "title": "警告与待办",
+      "subtitle": "需要处理的项目以及报告故障的节点。",
+      "lastUpdated": "最后更新 {{time}}",
+      "refresh": "刷新",
+      "fetchError": "加载警告信息失败",
+      "summaryTitle": "警告摘要",
+      "summaryHint": "按类型归集的当前警告。",
+      "tableTitle": "报告故障的节点",
+      "tableHint": "按节点检测到的单项问题。",
+      "searchPlaceholder": "按节点名称、国家、地区搜索",
+      "matchCount": "{{count}} 项匹配",
+      "clearFilters": "清除筛选",
+      "filterSeverityAll": "严重程度：全部",
+      "filterKindAll": "问题：全部",
+      "severityError": "严重",
+      "severityWarning": "警告",
+      "severityInfo": "信息",
+      "empty": "没有需要处理的项目",
+      "emptyHint": "所有节点都在正常范围内运行。",
+      "noMatch": "未找到匹配项",
+      "goToNodes": "查看节点",
+      "goToRequests": "查看请求",
+      "col": {
+        "count": "数量"
+      },
+      "kpi": {
+        "total": "警告总数",
+        "error": "严重",
+        "warning": "警告",
+        "affectedNodes": "受影响节点"
+      }
+    },
+    "activity": {
+      "title": "最近活动",
+      "subtitle": "面板与节点记录的活动日志。",
+      "lastUpdated": "最后更新 {{time}}",
+      "refresh": "刷新",
+      "fetchError": "加载活动记录失败",
+      "tableTitle": "活动记录",
+      "tableHint": "最多显示最近 200 条记录。",
+      "searchPlaceholder": "按对象或活动内容搜索",
+      "matchCount": "{{count}} 项匹配",
+      "clearFilters": "清除筛选",
+      "filterSeverityAll": "严重程度：全部",
+      "filterEventAll": "活动：全部",
+      "severityError": "严重",
+      "severityWarning": "警告",
+      "severitySuccess": "成功",
+      "severityInfo": "信息",
+      "empty": "暂无活动记录",
+      "emptyHint": "用户登录或节点状态变化将显示在此处。",
+      "noMatch": "未找到匹配项",
+      "col": {
+        "severity": "严重程度",
+        "actor": "对象",
+        "target": "相关资源"
+      },
+      "kpi": {
+        "total": "记录总数",
+        "today": "今天",
+        "error": "严重",
+        "warning": "警告"
+      }
     }
   },
   "user": {
