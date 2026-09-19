@@ -259,6 +259,23 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 		`ALTER TABLE nodes ADD COLUMN IF NOT EXISTS shaping_tiers INT NOT NULL DEFAULT 0`,
 		`ALTER TABLE nodes ADD COLUMN IF NOT EXISTS shaping_error TEXT NOT NULL DEFAULT ''`,
 
+		// Scarce nodes can bill traffic at a premium: the quota charged to the
+		// user is the transferred bytes times this factor. Only the quota is
+		// scaled, never traffic_logs, so the per-node charts keep reporting the
+		// bytes that actually crossed the wire.
+		`ALTER TABLE nodes ADD COLUMN IF NOT EXISTS traffic_multiplier NUMERIC(5,2) NOT NULL DEFAULT 1.0`,
+		// Guarded by a catalog lookup because ADD CONSTRAINT has no IF NOT
+		// EXISTS, and a bare retry would abort startup on the second run.
+		`DO $$
+		 BEGIN
+		   IF NOT EXISTS (
+		     SELECT 1 FROM pg_constraint WHERE conname = 'nodes_traffic_multiplier_range'
+		   ) THEN
+		     ALTER TABLE nodes ADD CONSTRAINT nodes_traffic_multiplier_range
+		       CHECK (traffic_multiplier > 0 AND traffic_multiplier <= 100);
+		   END IF;
+		 END $$`,
+
 		// actor/target are untyped text rather than FKs: the feed has to outlive
 		// the rows it describes, and a cascade delete would erase the record of
 		// the deletion itself. target_* is null for events about the actor

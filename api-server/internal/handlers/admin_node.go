@@ -196,6 +196,8 @@ type nodeListItem struct {
 	ShapingOK    *bool   `json:"shaping_ok"`
 	ShapingTiers *int    `json:"shaping_tiers"`
 	ShapingError *string `json:"shaping_error"`
+	// Factor applied to this node's traffic when charging a user's quota.
+	TrafficMultiplier float64 `json:"traffic_multiplier"`
 	// Set when the node's core predates the stats RPC the panel needs. Reported
 	// rather than refused: the node still carries traffic, and cutting it off
 	// over a version would be worse than telling the operator to upgrade it.
@@ -226,7 +228,7 @@ func (h *AdminNodeHandler) ListNodes(c *fiber.Ctx) error {
 		        cpu_usage, memory_usage, disk_usage, load_avg, network_in, network_out,
 		        last_seen, created_at, updated_at, last_ping_at,
 		        xray_running, config_hash,
-		        shaping_ok, shaping_tiers, shaping_error
+		        shaping_ok, shaping_tiers, shaping_error, traffic_multiplier
 		 FROM nodes ORDER BY created_at DESC`,
 	)
 	if err != nil {
@@ -245,7 +247,7 @@ func (h *AdminNodeHandler) ListNodes(c *fiber.Ctx) error {
 			&n.CPUUsage, &n.MemoryUsage, &n.DiskUsage, &n.LoadAvg, &n.NetworkIn, &n.NetworkOut,
 			&n.LastSeen, &n.CreatedAt, &n.UpdatedAt, &n.LastPingAt,
 			&n.XrayRunning, &n.ConfigHash,
-			&n.ShapingOK, &n.ShapingTiers, &n.ShapingError,
+			&n.ShapingOK, &n.ShapingTiers, &n.ShapingError, &n.TrafficMultiplier,
 		); err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 				"error": "failed to scan node",
@@ -345,7 +347,7 @@ func (h *AdminNodeHandler) GetNode(c *fiber.Ctx) error {
 		        cpu_usage, memory_usage, disk_usage, load_avg, network_in, network_out,
 		        last_seen, created_at, updated_at, last_ping_at,
 		        xray_running, config_hash,
-		        shaping_ok, shaping_tiers, shaping_error
+		        shaping_ok, shaping_tiers, shaping_error, traffic_multiplier
 		 FROM nodes WHERE id = $1`,
 		id,
 	).Scan(
@@ -354,7 +356,7 @@ func (h *AdminNodeHandler) GetNode(c *fiber.Ctx) error {
 		&n.CPUUsage, &n.MemoryUsage, &n.DiskUsage, &n.LoadAvg, &n.NetworkIn, &n.NetworkOut,
 		&n.LastSeen, &n.CreatedAt, &n.UpdatedAt, &n.LastPingAt,
 		&n.XrayRunning, &n.ConfigHash,
-		&n.ShapingOK, &n.ShapingTiers, &n.ShapingError,
+		&n.ShapingOK, &n.ShapingTiers, &n.ShapingError, &n.TrafficMultiplier,
 	)
 	if err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
@@ -614,10 +616,15 @@ func (h *AdminNodeHandler) UpdateXray(c *fiber.Ctx) error {
 }
 
 type updateNodeRequest struct {
-	Name    *string `json:"name"`
-	Country *string `json:"country"`
-	Region  *string `json:"region"`
+	Name              *string  `json:"name"`
+	Country           *string  `json:"country"`
+	Region            *string  `json:"region"`
+	TrafficMultiplier *float64 `json:"traffic_multiplier"`
 }
+
+// maxTrafficMultiplier mirrors the CHECK on nodes.traffic_multiplier so a bad
+// value returns a message instead of a constraint violation.
+const maxTrafficMultiplier = 100.0
 
 // UpdateNode partially updates a node's name, country, or region.
 // @Summary Update node
@@ -680,6 +687,16 @@ func (h *AdminNodeHandler) UpdateNode(c *fiber.Ctx) error {
 		args = append(args, *req.Region)
 		argIdx++
 	}
+	if req.TrafficMultiplier != nil {
+		if *req.TrafficMultiplier <= 0 || *req.TrafficMultiplier > maxTrafficMultiplier {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": fmt.Sprintf("traffic_multiplier must be greater than 0 and at most %g", maxTrafficMultiplier),
+			})
+		}
+		setClauses = append(setClauses, fmt.Sprintf("traffic_multiplier = $%d", argIdx))
+		args = append(args, *req.TrafficMultiplier)
+		argIdx++
+	}
 
 	if len(setClauses) == 0 {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
@@ -688,7 +705,7 @@ func (h *AdminNodeHandler) UpdateNode(c *fiber.Ctx) error {
 	}
 
 	query := fmt.Sprintf(
-		"UPDATE nodes SET %s WHERE id = $%d RETURNING id, name, country, region, ip::text, port, status, xray_version, created_at",
+		"UPDATE nodes SET %s WHERE id = $%d RETURNING id, name, country, region, ip::text, port, status, xray_version, traffic_multiplier, created_at",
 		strings.Join(setClauses, ", "), argIdx,
 	)
 	args = append(args, id)
@@ -702,12 +719,14 @@ func (h *AdminNodeHandler) UpdateNode(c *fiber.Ctx) error {
 		Port        int       `json:"port"`
 		Status      string    `json:"status"`
 		XrayVersion string    `json:"xray_version"`
-		CreatedAt   time.Time `json:"created_at"`
+
+		TrafficMultiplier float64   `json:"traffic_multiplier"`
+		CreatedAt         time.Time `json:"created_at"`
 	}
 
 	err = h.db.QueryRow(context.Background(), query, args...).Scan(
 		&n.ID, &n.Name, &n.Country, &n.Region, &n.IP, &n.Port,
-		&n.Status, &n.XrayVersion, &n.CreatedAt,
+		&n.Status, &n.XrayVersion, &n.TrafficMultiplier, &n.CreatedAt,
 	)
 	if err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
