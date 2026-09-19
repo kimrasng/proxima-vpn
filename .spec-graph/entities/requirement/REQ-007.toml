@@ -22,3 +22,7 @@ type = "constrained_by"
 [[relations]]
 to = "DEC-008"
 type = "constrained_by"
+
+[[relations]]
+to = "ACT-020"
+type = "has_criterion"

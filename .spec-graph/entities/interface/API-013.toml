@@ -15,5 +15,9 @@ to = "API-012"
 type = "depends_on"
 
 [[relations]]
+to = "API-019"
+type = "depends_on"
+
+[[relations]]
 to = "REQ-021"
 type = "implements"

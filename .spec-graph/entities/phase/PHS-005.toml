@@ -17,6 +17,46 @@ to = "PLN-002"
 type = "belongs_to"
 
 [[relations]]
+to = "ACT-020"
+type = "covers"
+
+[[relations]]
+to = "ACT-021"
+type = "covers"
+
+[[relations]]
+to = "ACT-022"
+type = "covers"
+
+[[relations]]
+to = "ACT-023"
+type = "covers"
+
+[[relations]]
+to = "ACT-024"
+type = "covers"
+
+[[relations]]
+to = "ACT-025"
+type = "covers"
+
+[[relations]]
+to = "ACT-026"
+type = "covers"
+
+[[relations]]
+to = "ACT-027"
+type = "covers"
+
+[[relations]]
+to = "ACT-028"
+type = "covers"
+
+[[relations]]
+to = "ACT-029"
+type = "covers"
+
+[[relations]]
 to = "API-007"
 type = "covers"
 
@@ -77,11 +117,55 @@ to = "TST-008"
 type = "covers"
 
 [[relations]]
+to = "ACT-020"
+type = "delivers"
+
+[[relations]]
+to = "ACT-021"
+type = "delivers"
+
+[[relations]]
+to = "ACT-022"
+type = "delivers"
+
+[[relations]]
+to = "ACT-023"
+type = "delivers"
+
+[[relations]]
+to = "ACT-024"
+type = "delivers"
+
+[[relations]]
+to = "ACT-025"
+type = "delivers"
+
+[[relations]]
+to = "ACT-026"
+type = "delivers"
+
+[[relations]]
+to = "ACT-027"
+type = "delivers"
+
+[[relations]]
+to = "ACT-028"
+type = "delivers"
+
+[[relations]]
+to = "ACT-029"
+type = "delivers"
+
+[[relations]]
 to = "API-007"
 type = "delivers"
 
 [[relations]]
 to = "API-008"
+type = "delivers"
+
+[[relations]]
+to = "API-009"
 type = "delivers"
 
 [[relations]]
@@ -102,6 +186,18 @@ type = "delivers"
 
 [[relations]]
 to = "REQ-010"
+type = "delivers"
+
+[[relations]]
+to = "REQ-011"
+type = "delivers"
+
+[[relations]]
+to = "REQ-012"
+type = "delivers"
+
+[[relations]]
+to = "REQ-013"
 type = "delivers"
 
 [[relations]]
@@ -134,6 +230,18 @@ type = "delivers"
 
 [[relations]]
 to = "TST-008"
+type = "delivers"
+
+[[relations]]
+to = "TST-009"
+type = "delivers"
+
+[[relations]]
+to = "TST-010"
+type = "delivers"
+
+[[relations]]
+to = "TST-011"
 type = "delivers"
 
 [[relations]]

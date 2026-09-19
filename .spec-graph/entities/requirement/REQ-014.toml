@@ -14,3 +14,7 @@ priority = "must"
 [[relations]]
 to = "DEC-011"
 type = "constrained_by"
+
+[[relations]]
+to = "ACT-027"
+type = "has_criterion"

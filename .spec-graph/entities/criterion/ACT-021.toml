@@ -1,0 +1,12 @@
+schema = 1
+id = "ACT-021"
+type = "criterion"
+title = "A reading inside the hysteresis band changes nothing"
+status = "active"
+created_at = 2026-09-19T22:35:49+09:00
+updated_at = 2026-09-19T22:36:01+09:00
+
+[metadata]
+given = "A firing alert whose value sits between the clear and fire thresholds"
+then = "The alert stays firing and emits no further events"
+when = "The value oscillates inside that band"

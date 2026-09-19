@@ -1,15 +1,19 @@
 schema = 1
 id = "TST-005"
 type = "test"
-title = "A node breaching two rules yields two alerts"
-description = "Set a node offline while its disk value is above the disk threshold; assert both an offline alert and a disk alert exist for that node."
+title = "Each rule is evaluated independently for one node"
+description = "Assert an offline node raises its offline alert while its resource alert is frozen rather than suppressed by it, then that the resource alert fires on its own once the node reports again. The old wording claimed both fire together, which DEC-010 makes impossible."
 status = "active"
 created_at = 2026-09-19T21:29:20+09:00
-updated_at = 2026-09-19T22:02:34+09:00
+updated_at = 2026-09-19T22:34:46+09:00
 
 [metadata]
 automated = true
 kind = "unit"
+
+[[relations]]
+to = "ACT-022"
+type = "verifies"
 
 [[relations]]
 to = "REQ-009"

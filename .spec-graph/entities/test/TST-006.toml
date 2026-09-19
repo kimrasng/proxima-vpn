@@ -12,5 +12,9 @@ automated = true
 kind = "unit"
 
 [[relations]]
+to = "ACT-020"
+type = "verifies"
+
+[[relations]]
 to = "REQ-007"
 type = "verifies"

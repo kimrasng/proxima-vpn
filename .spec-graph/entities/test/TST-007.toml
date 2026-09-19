@@ -16,5 +16,9 @@ to = "RSK-003"
 type = "mitigates"
 
 [[relations]]
+to = "ACT-028"
+type = "verifies"
+
+[[relations]]
 to = "REQ-015"
 type = "verifies"

@@ -1,0 +1,65 @@
+schema = 1
+id = "PHS-016"
+type = "phase"
+title = "User rework 6 - Verification defect remediation"
+description = "Fix the defects the parallel verification pass found: rune-boundary truncation closing the audit-suppression hole, a bounded attempted email, the missing common.create key, language-aware date formatting, a labelled wire-versus-charged traffic distinction, removal of the dead edit-modal locale keys, and a client error for malformed user ids."
+status = "resolved"
+created_at = 2026-09-19T22:30:13+09:00
+updated_at = 2026-09-19T22:30:13+09:00
+
+[metadata]
+exit_criteria = "[A long non-ASCII user agent no longer suppresses its login row The create-user button renders a translated label in all three languages Dates follow the selected language The per-node table states it reports wire traffic A malformed user id answers 400, an absent one still 404]"
+goal = "Close every defect the verification pass reported"
+order = 6.0
+
+[[relations]]
+to = "PLN-003"
+type = "belongs_to"
+
+[[relations]]
+to = "API-019"
+type = "covers"
+
+[[relations]]
+to = "DEC-017"
+type = "covers"
+
+[[relations]]
+to = "DEC-018"
+type = "covers"
+
+[[relations]]
+to = "DEC-019"
+type = "covers"
+
+[[relations]]
+to = "RSK-007"
+type = "covers"
+
+[[relations]]
+to = "TST-018"
+type = "covers"
+
+[[relations]]
+to = "API-019"
+type = "delivers"
+
+[[relations]]
+to = "DEC-017"
+type = "delivers"
+
+[[relations]]
+to = "DEC-018"
+type = "delivers"
+
+[[relations]]
+to = "DEC-019"
+type = "delivers"
+
+[[relations]]
+to = "TST-018"
+type = "delivers"
+
+[[relations]]
+to = "PHS-017"
+type = "precedes"

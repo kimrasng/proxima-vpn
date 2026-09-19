@@ -1,0 +1,12 @@
+schema = 1
+id = "ACT-025"
+type = "criterion"
+title = "A silenced alert notifies nobody until the window expires"
+status = "active"
+created_at = 2026-09-19T22:35:49+09:00
+updated_at = 2026-09-19T22:36:01+09:00
+
+[metadata]
+given = "A firing alert silenced for a bounded window"
+then = "No notification is sent and the alert is excluded from the count"
+when = "The evaluator runs during that window"

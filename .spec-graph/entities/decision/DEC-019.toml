@@ -1,0 +1,12 @@
+schema = 1
+id = "DEC-019"
+type = "decision"
+title = "Date and time rendering follows the selected interface language"
+description = "Absolute timestamps, date-only columns, and the last-refreshed clock are formatted with the active i18n language rather than the browser default, so a Korean or Chinese page does not emit an English date format."
+status = "active"
+created_at = 2026-09-19T22:29:57+09:00
+updated_at = 2026-09-19T22:29:58+09:00
+
+[metadata]
+date = "2026-09-19"
+rationale = "A bare toLocaleString follows the browser locale, which leaks English dates into an otherwise translated page whenever the two disagree."

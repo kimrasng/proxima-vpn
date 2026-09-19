@@ -2,14 +2,22 @@ schema = 1
 id = "TST-009"
 type = "test"
 title = "Acknowledgement clears when the alert resolves"
-description = "Acknowledge a firing alert, drive it to resolve, then re-fire it; assert the new episode is unacknowledged."
+description = "Acknowledge a firing alert, drive it to resolve, then re-fire it; assert the new episode is unacknowledged. Covered by TestNewEpisodeStartsItsOwnClock and the acked_at CASE in the upsert."
 status = "active"
 created_at = 2026-09-19T21:29:20+09:00
-updated_at = 2026-09-19T22:02:44+09:00
+updated_at = 2026-09-19T22:34:46+09:00
 
 [metadata]
 automated = true
 kind = "unit"
+
+[[relations]]
+to = "ACT-024"
+type = "verifies"
+
+[[relations]]
+to = "ACT-025"
+type = "verifies"
 
 [[relations]]
 to = "REQ-011"

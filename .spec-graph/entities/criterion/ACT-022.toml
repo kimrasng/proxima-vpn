@@ -1,0 +1,12 @@
+schema = 1
+id = "ACT-022"
+type = "criterion"
+title = "Two breached rules on one node yield two alerts"
+status = "active"
+created_at = 2026-09-19T22:35:49+09:00
+updated_at = 2026-09-19T22:36:01+09:00
+
+[metadata]
+given = "A node breaching two different rules while reporting"
+then = "Both alerts exist independently for that node"
+when = "The evaluator runs"

@@ -1,0 +1,19 @@
+schema = 1
+id = "TST-018"
+type = "test"
+title = "A non-ASCII user agent still yields a persisted login row"
+description = "A check that a successful login carrying a long multi-byte user agent writes exactly one login_history row, with the stored agent valid UTF-8 and within the byte ceiling."
+status = "active"
+created_at = 2026-09-19T22:29:57+09:00
+updated_at = 2026-09-19T22:29:58+09:00
+
+[metadata]
+kind = "integration"
+
+[[relations]]
+to = "ACT-015"
+type = "verifies"
+
+[[relations]]
+to = "REQ-021"
+type = "verifies"

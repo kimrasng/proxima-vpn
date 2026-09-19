@@ -11,5 +11,9 @@ updated_at = 2026-09-19T21:32:19+09:00
 kind = "module"
 
 [[relations]]
+to = "DEC-019"
+type = "constrained_by"
+
+[[relations]]
 to = "REQ-017"
 type = "implements"

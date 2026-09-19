@@ -1,0 +1,15 @@
+schema = 1
+id = "API-019"
+type = "interface"
+title = "Malformed user ids are rejected before the query"
+description = "The id-taking admin user read endpoints validate the path segment as a UUID and answer a malformed id with a client error, keeping a bad request from surfacing as a server error."
+status = "active"
+created_at = 2026-09-19T22:29:57+09:00
+updated_at = 2026-09-19T22:29:58+09:00
+
+[metadata]
+kind = "http"
+
+[[relations]]
+to = "REQ-020"
+type = "implements"

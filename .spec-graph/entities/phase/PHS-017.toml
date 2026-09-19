@@ -1,0 +1,57 @@
+schema = 1
+id = "PHS-017"
+type = "phase"
+title = "User rework 7 - Adversarial review remediation"
+description = "Close the findings from the adversarial code review: field-scoped saves and a route-keyed remount removing the lost-update and cross-user write, a retention sweep for login_history, the missing index path for the per-user traffic breakdown, and an explicit unknown state instead of a fabricated zero when the traffic fetch fails."
+status = "resolved"
+created_at = 2026-09-19T22:38:32+09:00
+updated_at = 2026-09-19T22:38:33+09:00
+
+[metadata]
+exit_criteria = "[A concurrent status change survives a name-only save login_history is pruned by the retention scheduler The per-user traffic lookup has an index path through devices A failed traffic fetch shows an unknown marker rather than 0 B]"
+goal = "Close the adversarial review findings"
+order = 7.0
+
+[[relations]]
+to = "PLN-003"
+type = "belongs_to"
+
+[[relations]]
+to = "API-020"
+type = "covers"
+
+[[relations]]
+to = "DEC-020"
+type = "covers"
+
+[[relations]]
+to = "DEC-021"
+type = "covers"
+
+[[relations]]
+to = "RSK-008"
+type = "covers"
+
+[[relations]]
+to = "RSK-009"
+type = "covers"
+
+[[relations]]
+to = "TST-019"
+type = "covers"
+
+[[relations]]
+to = "API-020"
+type = "delivers"
+
+[[relations]]
+to = "DEC-020"
+type = "delivers"
+
+[[relations]]
+to = "DEC-021"
+type = "delivers"
+
+[[relations]]
+to = "TST-019"
+type = "delivers"

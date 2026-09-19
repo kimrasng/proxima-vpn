@@ -1,0 +1,12 @@
+schema = 1
+id = "RSK-007"
+type = "risk"
+title = "A crafted User-Agent could suppress its own audit row"
+description = "Truncating a caller-supplied user agent on a byte boundary can split a multi-byte character, and Postgres rejects the whole insert for invalid UTF-8. Because the audit write deliberately swallows its error, a client sending a long non-ASCII user agent made its own login attempt vanish from the history."
+status = "active"
+created_at = 2026-09-19T22:29:57+09:00
+updated_at = 2026-09-19T22:29:58+09:00
+
+[metadata]
+impact = "high"
+likelihood = "medium"

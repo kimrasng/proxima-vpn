@@ -1,0 +1,12 @@
+schema = 1
+id = "ACT-028"
+type = "criterion"
+title = "A first deploy notifies nobody for pre-existing conditions"
+status = "active"
+created_at = 2026-09-19T22:35:50+09:00
+updated_at = 2026-09-19T22:36:01+09:00
+
+[metadata]
+given = "Nodes already breaching thresholds and no alert rows"
+then = "State is seeded and no notification is sent"
+when = "The evaluator runs for the first time"

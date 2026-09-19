@@ -1,0 +1,12 @@
+schema = 1
+id = "DEC-018"
+type = "decision"
+title = "Per-node figures are labelled as wire traffic, distinct from the charged quota"
+description = "The per-node breakdown reports bytes measured at the node while the quota counts charged bytes scaled by the node traffic multiplier. The detail page states this next to the table rather than silently pairing two different units."
+status = "active"
+created_at = 2026-09-19T22:29:57+09:00
+updated_at = 2026-09-19T22:29:58+09:00
+
+[metadata]
+date = "2026-09-19"
+rationale = "The two figures are legitimately different units and cannot be reconciled by arithmetic; without a note an admin reads the mismatch as a bug."

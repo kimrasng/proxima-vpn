@@ -1,0 +1,12 @@
+schema = 1
+id = "ACT-020"
+type = "criterion"
+title = "A condition that fires and clears leaves both events in the feed"
+status = "active"
+created_at = 2026-09-19T22:35:49+09:00
+updated_at = 2026-09-19T22:36:01+09:00
+
+[metadata]
+given = "An alert condition fires and later clears"
+then = "Both the fired and the resolved event are present with the episode duration"
+when = "An operator looks at the activity feed afterwards"

@@ -1,0 +1,12 @@
+schema = 1
+id = "ACT-024"
+type = "criterion"
+title = "An acknowledged alert leaves the count but stays visible"
+status = "active"
+created_at = 2026-09-19T22:35:49+09:00
+updated_at = 2026-09-19T22:36:01+09:00
+
+[metadata]
+given = "A firing alert"
+then = "The notifiable count drops by one and the row remains listed as acknowledged"
+when = "An operator acknowledges it"

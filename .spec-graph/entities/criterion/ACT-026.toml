@@ -1,0 +1,12 @@
+schema = 1
+id = "ACT-026"
+type = "criterion"
+title = "A node whose Xray is dead raises an alert"
+status = "active"
+created_at = 2026-09-19T22:35:49+09:00
+updated_at = 2026-09-19T22:36:01+09:00
+
+[metadata]
+given = "A node reporting heartbeats with xray_running false"
+then = "An xray_down alert fires and the panel names it"
+when = "The evaluator runs"

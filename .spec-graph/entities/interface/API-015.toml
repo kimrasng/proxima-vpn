@@ -15,5 +15,9 @@ to = "DEC-013"
 type = "constrained_by"
 
 [[relations]]
+to = "API-020"
+type = "depends_on"
+
+[[relations]]
 to = "REQ-020"
 type = "implements"

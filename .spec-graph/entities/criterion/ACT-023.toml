@@ -1,0 +1,12 @@
+schema = 1
+id = "ACT-023"
+type = "criterion"
+title = "A firing alert reports its elapsed time"
+status = "active"
+created_at = 2026-09-19T22:35:49+09:00
+updated_at = 2026-09-19T22:36:01+09:00
+
+[metadata]
+given = "An alert that fired some time ago"
+then = "The row shows how long it has been firing"
+when = "An operator views the alerts page"

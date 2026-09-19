@@ -12,5 +12,17 @@ automated = false
 kind = "integration"
 
 [[relations]]
+to = "ACT-023"
+type = "verifies"
+
+[[relations]]
+to = "ACT-026"
+type = "verifies"
+
+[[relations]]
+to = "ACT-027"
+type = "verifies"
+
+[[relations]]
 to = "REQ-014"
 type = "verifies"

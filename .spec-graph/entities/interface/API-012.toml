@@ -15,6 +15,10 @@ to = "DEC-012"
 type = "constrained_by"
 
 [[relations]]
+to = "DEC-017"
+type = "constrained_by"
+
+[[relations]]
 to = "API-011"
 type = "depends_on"
 
