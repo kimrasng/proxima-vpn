@@ -35,7 +35,9 @@ import type { Node, GenerateTokenResponse, UpdateNodeRequest } from "../../api/t
 import { formatAbsoluteTime, formatRelativeTime } from "../../utils/relativeTime";
 import { useManualRefresh } from "../../hooks/useManualRefresh";
 
-const REFRESH_INTERVAL = 30000;
+// Matches the node agents' 10s heartbeat, so a change on a node reaches
+// the screen within roughly one beat plus one poll.
+const REFRESH_INTERVAL = 10000;
 const DEFAULT_PAGE_SIZE = 20;
 
 function formatBytes(bytes: number): string {

@@ -25,7 +25,9 @@ import { getDashboardAlerts, listNodes } from "../../api/admin";
 import type { AlertSeverity, DashboardAlerts, Node, NodeIssue } from "../../api/types";
 import { useManualRefresh } from "../../hooks/useManualRefresh";
 
-const REFRESH_INTERVAL = 30000;
+// Matches the node agents' 10s heartbeat, so a change on a node reaches
+// the screen within roughly one beat plus one poll.
+const REFRESH_INTERVAL = 10000;
 const PAGE_SIZE = 25;
 
 const SEVERITY_RANK: Record<AlertSeverity, number> = {

@@ -60,7 +60,9 @@ function formatDateTime(iso: string): string {
 
 // The stamp doubles as refresh feedback, so it needs seconds: two refreshes in
 // the same minute would otherwise look like nothing happened.
-const REFRESH_INTERVAL = 30000;
+// Matches the node agents' 10s heartbeat, so a change on a node reaches
+// the screen within roughly one beat plus one poll.
+const REFRESH_INTERVAL = 10000;
 
 function formatStamp(iso: string): string {
   const date = new Date(iso);

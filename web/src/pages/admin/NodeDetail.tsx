@@ -39,7 +39,9 @@ import { usePublishBreadcrumbLeaf } from "../../hooks/useBreadcrumbLeaf";
 import { formatAbsoluteTime, formatRelativeTime } from "../../utils/relativeTime";
 import { useManualRefresh } from "../../hooks/useManualRefresh";
 
-const REFRESH_INTERVAL = 30000;
+// Matches the node agents' 10s heartbeat, so a change on a node reaches
+// the screen within roughly one beat plus one poll.
+const REFRESH_INTERVAL = 10000;
 
 const EVENT_FETCH_LIMIT = 50;
 const EVENTS_PER_PAGE = 6;

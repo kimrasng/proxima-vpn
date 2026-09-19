@@ -23,7 +23,9 @@ import { getActivity } from "../../api/admin";
 import type { ActivityEntry, AlertSeverity } from "../../api/types";
 import { useManualRefresh } from "../../hooks/useManualRefresh";
 
-const REFRESH_INTERVAL = 30000;
+// Matches the node agents' 10s heartbeat, so a change on a node reaches
+// the screen within roughly one beat plus one poll.
+const REFRESH_INTERVAL = 10000;
 const PAGE_SIZE = 25;
 // The activity endpoint caps at 200 rows, so asking for more silently returns 20.
 const FETCH_LIMIT = 200;
