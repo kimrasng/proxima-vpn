@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import {
@@ -23,6 +23,7 @@ import {
 import { useCollection } from "@cloudscape-design/collection-hooks";
 import { getDashboardAlerts, listNodes } from "../../api/admin";
 import type { AlertSeverity, DashboardAlerts, Node, NodeIssue } from "../../api/types";
+import { useManualRefresh } from "../../hooks/useManualRefresh";
 
 const REFRESH_INTERVAL = 30000;
 const PAGE_SIZE = 25;
@@ -52,9 +53,7 @@ export default function Alerts() {
   const [alerts, setAlerts] = useState<DashboardAlerts | null>(null);
   const [nodes, setNodes] = useState<Node[]>([]);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [severityFilter, setSeverityFilter] = useState("all");
   const [kindFilter, setKindFilter] = useState("all");
 
@@ -63,7 +62,6 @@ export default function Alerts() {
       const [alertsData, nodesData] = await Promise.all([getDashboardAlerts(), listNodes()]);
       setAlerts(alertsData);
       setNodes(nodesData);
-      setLastUpdated(new Date());
       setError(null);
     } catch {
       setError(t("admin.alerts.fetchError"));
@@ -72,17 +70,7 @@ export default function Alerts() {
     }
   }, [t]);
 
-  useEffect(() => {
-    void fetchAll();
-    const interval = setInterval(() => void fetchAll(), REFRESH_INTERVAL);
-    return () => clearInterval(interval);
-  }, [fetchAll]);
-
-  const refresh = async () => {
-    setRefreshing(true);
-    await fetchAll();
-    setRefreshing(false);
-  };
+  const { refreshing, lastUpdated, refresh } = useManualRefresh(fetchAll, REFRESH_INTERVAL);
 
   const issues = useMemo(
     () =>
@@ -215,7 +203,7 @@ export default function Alerts() {
               iconName="refresh"
               ariaLabel={t("admin.alerts.refresh")}
               loading={refreshing}
-              onClick={() => void refresh()}
+              onClick={refresh}
             />
           }
         >

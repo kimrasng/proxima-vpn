@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import {
@@ -26,6 +26,7 @@ import { useCollection } from "@cloudscape-design/collection-hooks";
 import { getOnlineUsers, terminateSession } from "../../api/admin";
 import type { OnlineUser } from "../../api/types";
 import { formatRelativeTime } from "../../utils/relativeTime";
+import { useManualRefresh } from "../../hooks/useManualRefresh";
 
 const REFRESH_INTERVAL = 30000;
 const PAGE_SIZE = 25;
@@ -43,9 +44,7 @@ export default function Connections() {
 
   const [sessions, setSessions] = useState<OnlineUser[]>([]);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [nodeFilter, setNodeFilter] = useState("all");
   const [capFilter, setCapFilter] = useState("all");
   const [terminating, setTerminating] = useState<OnlineUser | null>(null);
@@ -55,7 +54,6 @@ export default function Connections() {
   const fetchSessions = useCallback(async () => {
     try {
       setSessions(await getOnlineUsers());
-      setLastUpdated(new Date());
       setError(null);
     } catch {
       setError(t("admin.connections.fetchError"));
@@ -64,17 +62,7 @@ export default function Connections() {
     }
   }, [t]);
 
-  useEffect(() => {
-    void fetchSessions();
-    const interval = setInterval(() => void fetchSessions(), REFRESH_INTERVAL);
-    return () => clearInterval(interval);
-  }, [fetchSessions]);
-
-  const refresh = async () => {
-    setRefreshing(true);
-    await fetchSessions();
-    setRefreshing(false);
-  };
+  const { refreshing, lastUpdated, refresh } = useManualRefresh(fetchSessions, REFRESH_INTERVAL);
 
   const summary = useMemo(() => {
     const users = new Set(sessions.map((s) => s.email));
@@ -221,7 +209,7 @@ export default function Connections() {
               iconName="refresh"
               ariaLabel={t("admin.connections.refresh")}
               loading={refreshing}
-              onClick={() => void refresh()}
+              onClick={refresh}
             />
           }
         >

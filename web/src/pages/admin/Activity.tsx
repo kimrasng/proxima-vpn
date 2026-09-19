@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Badge,
@@ -21,6 +21,7 @@ import {
 import { useCollection } from "@cloudscape-design/collection-hooks";
 import { getActivity } from "../../api/admin";
 import type { ActivityEntry, AlertSeverity } from "../../api/types";
+import { useManualRefresh } from "../../hooks/useManualRefresh";
 
 const REFRESH_INTERVAL = 30000;
 const PAGE_SIZE = 25;
@@ -52,16 +53,13 @@ export default function Activity() {
 
   const [entries, setEntries] = useState<ActivityEntry[]>([]);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [severityFilter, setSeverityFilter] = useState("all");
   const [eventFilter, setEventFilter] = useState("all");
 
   const fetchEntries = useCallback(async () => {
     try {
       setEntries(await getActivity(FETCH_LIMIT));
-      setLastUpdated(new Date());
       setError(null);
     } catch {
       setError(t("admin.activity.fetchError"));
@@ -70,17 +68,7 @@ export default function Activity() {
     }
   }, [t]);
 
-  useEffect(() => {
-    void fetchEntries();
-    const interval = setInterval(() => void fetchEntries(), REFRESH_INTERVAL);
-    return () => clearInterval(interval);
-  }, [fetchEntries]);
-
-  const refresh = async () => {
-    setRefreshing(true);
-    await fetchEntries();
-    setRefreshing(false);
-  };
+  const { refreshing, lastUpdated, refresh } = useManualRefresh(fetchEntries, REFRESH_INTERVAL);
 
   const describeEvent = useCallback(
     (entry: ActivityEntry) => {
@@ -201,7 +189,7 @@ export default function Activity() {
               iconName="refresh"
               ariaLabel={t("admin.activity.refresh")}
               loading={refreshing}
-              onClick={() => void refresh()}
+              onClick={refresh}
             />
           }
         >

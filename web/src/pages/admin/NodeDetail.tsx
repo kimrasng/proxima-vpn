@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
@@ -37,6 +37,7 @@ import { getActivity, getNode, getNodeMetrics } from "../../api/admin";
 import type { ActivityEntry, Node, NodeMetricsEntry } from "../../api/types";
 import { usePublishBreadcrumbLeaf } from "../../hooks/useBreadcrumbLeaf";
 import { formatAbsoluteTime, formatRelativeTime } from "../../utils/relativeTime";
+import { useManualRefresh } from "../../hooks/useManualRefresh";
 
 const REFRESH_INTERVAL = 30000;
 
@@ -160,7 +161,6 @@ export default function NodeDetail() {
   const [eventsError, setEventsError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
   const [selectedHours, setSelectedHours] = useState(24);
   const [resourceMetric, setResourceMetric] = useState<ResourceMetric>("cpu");
 
@@ -203,7 +203,6 @@ export default function NodeDetail() {
       } else {
         setEventsError(t("admin.nodeDetail.eventsError"));
       }
-      setLastRefreshed(new Date());
       setError(null);
     } catch {
       setError(t("admin.nodeDetail.fetchError"));
@@ -212,11 +211,11 @@ export default function NodeDetail() {
     }
   }, [nodeId, selectedHours, t]);
 
-  useEffect(() => {
-    void fetchAll();
-    const interval = setInterval(() => void fetchAll(), REFRESH_INTERVAL);
-    return () => clearInterval(interval);
-  }, [fetchAll]);
+  const {
+    refreshing,
+    lastUpdated: lastRefreshed,
+    refresh,
+  } = useManualRefresh(fetchAll, REFRESH_INTERVAL);
 
   if (loading) {
     return (
@@ -318,7 +317,8 @@ export default function NodeDetail() {
               <Button
                 iconName="refresh"
                 ariaLabel={t("admin.nodeDetail.refresh")}
-                onClick={() => void fetchAll()}
+                loading={refreshing}
+                onClick={refresh}
               />
               <Button variant="primary" onClick={() => navigate(`/admin/nodes/${nodeId}/inbounds`)}>
                 {t("admin.nodeDetail.manageInbounds")}

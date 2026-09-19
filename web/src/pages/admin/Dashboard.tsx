@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
+import { useManualRefresh } from "../../hooks/useManualRefresh";
 import {
   Badge,
   Box,
@@ -59,6 +60,8 @@ function formatDateTime(iso: string): string {
 
 // The stamp doubles as refresh feedback, so it needs seconds: two refreshes in
 // the same minute would otherwise look like nothing happened.
+const REFRESH_INTERVAL = 30000;
+
 function formatStamp(iso: string): string {
   const date = new Date(iso);
   return `${date.toLocaleDateString()} ${date.toLocaleTimeString(undefined, {
@@ -141,7 +144,6 @@ export default function Dashboard() {
   const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
   const [planRequests, setPlanRequests] = useState<PlanRequest[]>([]);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
 
   const [trafficMetric, setTrafficMetric] = useState<"download" | "upload">("download");
   const [trafficWindow, setTrafficWindow] = useState<TrafficWindow>("today");
@@ -172,17 +174,9 @@ export default function Dashboard() {
     }
   }, [trafficWindow]);
 
-  useEffect(() => {
-    void fetchData();
-    const interval = setInterval(() => void fetchData(), 30000);
-    return () => clearInterval(interval);
-  }, [fetchData]);
-
-  const refresh = async () => {
-    setRefreshing(true);
-    await fetchData();
-    setRefreshing(false);
-  };
+  // The timestamp shown is the server's generated_at, not when the fetch
+  // landed, so the hook's lastUpdated is deliberately unused here.
+  const { refreshing, refresh } = useManualRefresh(fetchData, REFRESH_INTERVAL);
 
   const nodeCounts = useMemo(() => {
     let healthy = 0;
@@ -262,7 +256,7 @@ export default function Dashboard() {
               iconName="refresh"
               ariaLabel={t("admin.dashboard.refresh")}
               loading={refreshing}
-              onClick={() => void refresh()}
+              onClick={refresh}
             />
           }
         >
