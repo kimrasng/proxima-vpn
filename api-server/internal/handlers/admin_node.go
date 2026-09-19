@@ -188,6 +188,8 @@ type nodeListItem struct {
 	CreatedAt   time.Time  `json:"created_at"`
 	UpdatedAt   time.Time  `json:"updated_at"`
 	LastPingAt  *time.Time `json:"last_ping_at"`
+	// When status last flipped; null for nodes that predate the column.
+	StatusChangedAt *time.Time `json:"status_changed_at"`
 	// From the heartbeat: status only says the agent checked in, these say
 	// whether Xray is actually serving the published config.
 	XrayRunning *bool `json:"xray_running"`
@@ -226,7 +228,7 @@ func (h *AdminNodeHandler) ListNodes(c *fiber.Ctx) error {
 		context.Background(),
 		`SELECT id, name, country, region, ip::text, port, status, xray_version,
 		        cpu_usage, memory_usage, disk_usage, load_avg, network_in, network_out,
-		        last_seen, created_at, updated_at, last_ping_at,
+		        last_seen, created_at, updated_at, last_ping_at, status_changed_at,
 		        xray_running, config_hash,
 		        shaping_ok, shaping_tiers, shaping_error, traffic_multiplier
 		 FROM nodes ORDER BY created_at DESC`,
@@ -245,7 +247,7 @@ func (h *AdminNodeHandler) ListNodes(c *fiber.Ctx) error {
 			&n.ID, &n.Name, &n.Country, &n.Region, &n.IP, &n.Port,
 			&n.Status, &n.XrayVersion,
 			&n.CPUUsage, &n.MemoryUsage, &n.DiskUsage, &n.LoadAvg, &n.NetworkIn, &n.NetworkOut,
-			&n.LastSeen, &n.CreatedAt, &n.UpdatedAt, &n.LastPingAt,
+			&n.LastSeen, &n.CreatedAt, &n.UpdatedAt, &n.LastPingAt, &n.StatusChangedAt,
 			&n.XrayRunning, &n.ConfigHash,
 			&n.ShapingOK, &n.ShapingTiers, &n.ShapingError, &n.TrafficMultiplier,
 		); err != nil {
@@ -345,7 +347,7 @@ func (h *AdminNodeHandler) GetNode(c *fiber.Ctx) error {
 		context.Background(),
 		`SELECT id, name, country, region, ip::text, port, status, xray_version,
 		        cpu_usage, memory_usage, disk_usage, load_avg, network_in, network_out,
-		        last_seen, created_at, updated_at, last_ping_at,
+		        last_seen, created_at, updated_at, last_ping_at, status_changed_at,
 		        xray_running, config_hash,
 		        shaping_ok, shaping_tiers, shaping_error, traffic_multiplier
 		 FROM nodes WHERE id = $1`,
@@ -354,7 +356,7 @@ func (h *AdminNodeHandler) GetNode(c *fiber.Ctx) error {
 		&n.ID, &n.Name, &n.Country, &n.Region, &n.IP, &n.Port,
 		&n.Status, &n.XrayVersion,
 		&n.CPUUsage, &n.MemoryUsage, &n.DiskUsage, &n.LoadAvg, &n.NetworkIn, &n.NetworkOut,
-		&n.LastSeen, &n.CreatedAt, &n.UpdatedAt, &n.LastPingAt,
+		&n.LastSeen, &n.CreatedAt, &n.UpdatedAt, &n.LastPingAt, &n.StatusChangedAt,
 		&n.XrayRunning, &n.ConfigHash,
 		&n.ShapingOK, &n.ShapingTiers, &n.ShapingError, &n.TrafficMultiplier,
 	)

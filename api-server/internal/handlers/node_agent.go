@@ -87,6 +87,7 @@ func (h *NodeAgentHandler) Register(c *fiber.Ctx) error {
 		`UPDATE nodes
 		 SET name = $1, ip = $2::inet, port = $3, xray_version = $4,
 		     country = $5, region = $6, api_key = $7, reg_token = NULL, status = 'offline',
+		     status_changed_at = NOW(),
 		     reality_private_key = COALESCE(NULLIF(reality_private_key, ''), $8),
 		     reality_public_key  = COALESCE(NULLIF(reality_public_key, ''), $9),
 		     reality_short_id    = COALESCE(NULLIF(reality_short_id, ''), $10)
@@ -216,7 +217,12 @@ func (h *NodeAgentHandler) Heartbeat(c *fiber.Ctx) error {
 		     network_in = $5, network_out = $6, last_seen = NOW(), status = 'online',
 		     xray_version = COALESCE(NULLIF($7, ''), xray_version),
 		     config_hash = $8, xray_running = $9,
-		     shaping_ok = $10, shaping_tiers = $11, shaping_error = $12
+		     shaping_ok = $10, shaping_tiers = $11, shaping_error = $12,
+		     -- Only on the offline -> online edge: stamping every heartbeat
+		     -- would make the age of the current state always read as seconds.
+		     status_changed_at = CASE
+		       WHEN status <> 'online' THEN NOW() ELSE status_changed_at
+		     END
 		 WHERE id = $13`,
 		req.CPUUsage, req.MemoryUsage, req.DiskUsage, req.LoadAvg,
 		req.NetworkIn, req.NetworkOut, req.XrayVersion,
