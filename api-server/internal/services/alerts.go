@@ -32,24 +32,22 @@ type AlertTransition struct {
 }
 
 // AlertService evaluates node conditions into persisted alert lifecycle state.
+//
+// There is deliberately no startup grace window. Restarting cannot re-page,
+// because a condition that was already firing is read back as firing and crosses
+// no boundary; a blanket window would only swallow alerts that genuinely started
+// in the first minute after a deploy.
 type AlertService struct {
 	db *pgxpool.Pool
-	// startedAt suppresses notifications for a grace window after boot. Without
-	// it, restarting during an outage re-pages for every condition that is still
-	// true.
-	startedAt time.Time
 	// maxGap bounds how long an unobserved window may be before the
 	// sustained-breach clocks reset.
 	maxGap time.Duration
 }
 
-const (
-	alertStartupGrace = 60 * time.Second
-	alertMaxGap       = 45 * time.Second
-)
+const alertMaxGap = 45 * time.Second
 
 func NewAlertService(db *pgxpool.Pool) *AlertService {
-	return &AlertService{db: db, startedAt: time.Now(), maxGap: alertMaxGap}
+	return &AlertService{db: db, maxGap: alertMaxGap}
 }
 
 type nodeReading struct {
@@ -107,7 +105,6 @@ func (s *AlertService) Evaluate(ctx context.Context) ([]AlertTransition, error) 
 		return nil, fmt.Errorf("read evaluation clock: %w", err)
 	}
 
-	inGrace := time.Since(s.startedAt) < alertStartupGrace
 	transitions := make([]AlertTransition, 0, 8)
 
 	for _, n := range readings {
@@ -139,7 +136,7 @@ func (s *AlertService) Evaluate(ctx context.Context) ([]AlertTransition, error) 
 				Value:    st.Value,
 				To:       edge.To,
 				Duration: edge.Duration,
-				Notify:   edge.Notify && !inGrace,
+				Notify:   edge.Notify,
 			})
 		}
 	}

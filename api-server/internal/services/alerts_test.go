@@ -284,3 +284,128 @@ func TestXrayDownOnlyWhileReporting(t *testing.T) {
 		t.Fatal("an offline node must not raise xray_down on top of offline")
 	}
 }
+
+// A frozen episode that resumes is the same episode, so it must not fire again.
+// This was a real defect: only State==firing suppressed the edge, so a node
+// flapping with a full disk re-notified on every reconnect.
+func TestStaleResumptionDoesNotRefire(t *testing.T) {
+	r := ruleFor(t, AlertDisk)
+	st := seeded(AlertStateOK)
+	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	e := st.advance(r, r.observe(true, 95, false), now)
+	if e == nil || e.To != AlertStateFiring {
+		t.Fatalf("setup: expected the first breach to fire, got %+v", e)
+	}
+	firedAt := *st.FiredAt
+
+	// Three offline/online round trips, each still breaching on return.
+	for i := 0; i < 3; i++ {
+		now = now.Add(30 * time.Second)
+		if e := st.advance(r, r.observe(false, 95, false), now); e != nil {
+			t.Fatalf("round %d: going offline emitted %+v", i, e)
+		}
+		if st.State != AlertStateStale {
+			t.Fatalf("round %d: expected stale, got %q", i, st.State)
+		}
+		now = now.Add(30 * time.Second)
+		if e := st.advance(r, r.observe(true, 95, false), now); e != nil {
+			t.Fatalf("round %d: resuming re-fired with %+v", i, e)
+		}
+		if st.State != AlertStateFiring {
+			t.Fatalf("round %d: expected firing on resume, got %q", i, st.State)
+		}
+		if !st.FiredAt.Equal(firedAt) {
+			t.Fatalf("round %d: fired_at moved to %v, want %v", i, st.FiredAt, firedAt)
+		}
+	}
+}
+
+// A breach that never lasted long enough to fire must not be frozen as an open
+// alert, and must not later emit a recovery for something nobody was told about.
+func TestPendingBreachDoesNotSurviveGoingOffline(t *testing.T) {
+	r := ruleFor(t, AlertCPU)
+	st := seeded(AlertStateOK)
+	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	st.advance(r, r.observe(true, 95, false), now)
+	if st.State != AlertStatePending {
+		t.Fatalf("setup: expected pending, got %q", st.State)
+	}
+
+	now = now.Add(30 * time.Second)
+	if e := st.advance(r, r.observe(false, 95, false), now); e != nil {
+		t.Fatalf("going offline emitted %+v", e)
+	}
+	if st.State != AlertStateOK {
+		t.Fatalf("a never-fired breach must return to ok, got %q", st.State)
+	}
+
+	// Come back healthy and hold: there is nothing to recover from, so no edge.
+	now = now.Add(10 * time.Minute)
+	for i := 0; i < 40; i++ {
+		if e := st.advance(r, r.observe(true, 20, false), now); e != nil {
+			t.Fatalf("recovery emitted %+v for an alert that never fired", e)
+		}
+		now = now.Add(15 * time.Second)
+	}
+}
+
+// A resolved episode must not leak its age into the next one.
+func TestNewEpisodeStartsItsOwnClock(t *testing.T) {
+	r := ruleFor(t, AlertOffline)
+	st := seeded(AlertStateOK)
+	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	st.advance(r, r.observe(false, 0, true), now)
+	firstFired := *st.FiredAt
+
+	now = now.Add(2 * time.Hour)
+	st.advance(r, r.observe(true, 0, false), now)
+	now = now.Add(61 * time.Second)
+	if e := st.advance(r, r.observe(true, 0, false), now); e == nil || e.To != AlertStateOK {
+		t.Fatalf("expected resolve, got %+v", e)
+	}
+	if st.FiredAt != nil {
+		t.Fatalf("resolve must clear fired_at, got %v", st.FiredAt)
+	}
+
+	now = now.Add(24 * time.Hour)
+	e := st.advance(r, r.observe(false, 0, true), now)
+	if e == nil || e.To != AlertStateFiring {
+		t.Fatalf("expected a new episode to fire, got %+v", e)
+	}
+	if st.FiredAt == nil || st.FiredAt.Equal(firstFired) {
+		t.Fatalf("new episode reused the old fired_at %v", st.FiredAt)
+	}
+	if !st.FiredAt.Equal(now) {
+		t.Fatalf("new episode should be dated now, got %v want %v", st.FiredAt, now)
+	}
+}
+
+// Once resolved, further healthy samples must not keep rewriting resolved_at.
+func TestResolvedAtIsStampedOnceOnTheEdge(t *testing.T) {
+	r := ruleFor(t, AlertOffline)
+	st := seeded(AlertStateOK)
+	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	st.advance(r, r.observe(false, 0, true), now)
+	now = now.Add(5 * time.Minute)
+	st.advance(r, r.observe(true, 0, false), now)
+	now = now.Add(61 * time.Second)
+	st.advance(r, r.observe(true, 0, false), now)
+	if st.ResolvedAt == nil {
+		t.Fatal("expected resolved_at on the resolve edge")
+	}
+	stamped := *st.ResolvedAt
+
+	for i := 0; i < 20; i++ {
+		now = now.Add(15 * time.Second)
+		if e := st.advance(r, r.observe(true, 0, false), now); e != nil {
+			t.Fatalf("a healthy sample after resolve emitted %+v", e)
+		}
+	}
+	if !st.ResolvedAt.Equal(stamped) {
+		t.Fatalf("resolved_at moved to %v, want it fixed at %v", st.ResolvedAt, stamped)
+	}
+}

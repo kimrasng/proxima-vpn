@@ -147,9 +147,17 @@ func (s *alertState) advance(r alertRule, o alertObservation, now time.Time) *al
 	// saw: resolving here would emit a false resolve and then re-fire, with a
 	// second notification, the moment the node came back.
 	if r.resource && !o.reporting {
-		if s.State == AlertStateFiring || s.State == AlertStatePending {
+		// Only an episode that actually fired is worth freezing. A breach still
+		// short of its duration never became an alert, so carrying it into stale
+		// would surface a problem nobody was ever told about - and later emit a
+		// recovery for it.
+		if s.FiredAt != nil {
 			s.State = AlertStateStale
+		} else {
+			s.State = AlertStateOK
 		}
+		// The breach clock is discarded either way: time in which the node was
+		// not reporting is time nobody observed.
 		s.BreachSince = nil
 		s.ClearSince = nil
 		return nil
@@ -161,17 +169,19 @@ func (s *alertState) advance(r alertRule, o alertObservation, now time.Time) *al
 		if s.BreachSince == nil {
 			s.BreachSince = &now
 		}
-		held := now.Sub(*s.BreachSince) >= r.fireFor
 		if s.State == AlertStateFiring {
 			return nil
 		}
-		if held {
+		// An episode with FiredAt set never resolved - it was only frozen while
+		// the node stopped reporting. Resuming it is not a new boundary, so it
+		// restores firing immediately and notifies nobody a second time.
+		if s.FiredAt != nil {
 			s.State = AlertStateFiring
-			// A stale alert that comes back still breaching keeps the age it had
-			// when it first fired: the condition never actually went away.
-			if s.FiredAt == nil {
-				s.FiredAt = &now
-			}
+			return nil
+		}
+		if now.Sub(*s.BreachSince) >= r.fireFor {
+			s.State = AlertStateFiring
+			s.FiredAt = &now
 			s.ResolvedAt = nil
 			return &alertEdge{To: AlertStateFiring, Notify: !seeding}
 		}
@@ -183,23 +193,26 @@ func (s *alertState) advance(r alertRule, o alertObservation, now time.Time) *al
 		if s.ClearSince == nil {
 			s.ClearSince = &now
 		}
-		wasOpen := s.State == AlertStateFiring || s.State == AlertStateStale
+		// A resolve is only meaningful for an episode that fired. FiredAt, not the
+		// state name, is what distinguishes one: a pending breach that clears has
+		// nothing to recover from.
+		fired := s.FiredAt != nil
 		if now.Sub(*s.ClearSince) < r.clearFor {
 			if s.State == AlertStatePending {
 				s.State = AlertStateOK
 			}
 			return nil
 		}
-		s.State = AlertStateOK
-		s.ResolvedAt = &now
-		if !wasOpen {
+		if s.State == AlertStateOK {
 			return nil
 		}
-		var dur time.Duration
-		if s.FiredAt != nil {
-			dur = now.Sub(*s.FiredAt)
+		s.State = AlertStateOK
+		if !fired {
+			return nil
 		}
+		dur := now.Sub(*s.FiredAt)
 		s.FiredAt = nil
+		s.ResolvedAt = &now
 		return &alertEdge{To: AlertStateOK, Duration: dur, Notify: !seeding}
 	}
 
