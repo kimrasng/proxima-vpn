@@ -3,9 +3,9 @@ id = "REQ-003"
 type = "requirement"
 title = "Resource history is switchable by metric rather than stacked as separate full-width charts"
 description = "CPU, memory, and disk history share one chart area selected by a control, so the page does not stack three equivalent full-width charts."
-status = "active"
+status = "resolved"
 created_at = 2026-09-19T00:38:36+09:00
-updated_at = 2026-09-19T00:38:36+09:00
+updated_at = 2026-09-20T00:58:00+09:00
 
 [metadata]
 kind = "functional"

@@ -3,9 +3,9 @@ id = "REQ-005"
 type = "requirement"
 title = "All node detail text is translated in English, Korean, and Chinese"
 description = "Every user-visible string added or changed by the redesign has a key present in en.json, ko.json, and zh.json with no fallback to another language."
-status = "active"
+status = "resolved"
 created_at = 2026-09-19T00:38:36+09:00
-updated_at = 2026-09-19T00:38:36+09:00
+updated_at = 2026-09-20T00:58:00+09:00
 
 [metadata]
 kind = "non_functional"
