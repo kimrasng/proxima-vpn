@@ -66,6 +66,73 @@
                 }
             }
         },
+        "/admin/alerts/{id}": {
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Acknowledging removes an alert from the notifiable count while leaving it visible. Silencing suppresses notifications for a bounded window without stopping evaluation.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Acknowledge or silence an alert",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Alert ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Acknowledge flag or silence duration in minutes",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.patchAlertRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/admin/announcements": {
             "get": {
                 "security": [
@@ -2751,6 +2818,58 @@
                 }
             }
         },
+        "/admin/users/{id}/login-history": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns successful and failed login attempts for one user, newest first",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-users"
+                ],
+                "summary": "Get user login history",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "User ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Maximum attempts to return (default 50, max 200)",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/github_com_proximavpn_proxima-vpn_api-server_internal_services.LoginEntry"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/admin/users/{id}/reset-traffic": {
             "post": {
                 "security": [
@@ -2783,6 +2902,64 @@
                             "additionalProperties": {
                                 "type": "string"
                             }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/users/{id}/traffic": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns quota, usage, remaining traffic and a per-node breakdown for one user",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-users"
+                ],
+                "summary": "Get user traffic",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "User ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "today, week, or month (default month)",
+                        "name": "window",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.userTrafficResponse"
                         }
                     },
                     "404": {
@@ -3712,6 +3889,9 @@
         "github_com_proximavpn_proxima-vpn_api-server_internal_services.Alerts": {
             "type": "object",
             "properties": {
+                "evaluated_at": {
+                    "type": "string"
+                },
                 "items": {
                     "type": "array",
                     "items": {
@@ -3728,6 +3908,7 @@
                     "type": "integer"
                 },
                 "total": {
+                    "description": "Total counts only what an operator still has to look at: firing conditions\nthat are neither acknowledged nor silenced. Stale rows are excluded because\ntheir readings are frozen, and pending approvals are excluded because they\nare a work queue rather than a system condition.",
                     "type": "integer"
                 }
             }
@@ -3768,10 +3949,58 @@
                 }
             }
         },
+        "github_com_proximavpn_proxima-vpn_api-server_internal_services.LoginEntry": {
+            "type": "object",
+            "properties": {
+                "actor_type": {
+                    "type": "string"
+                },
+                "attempted_email": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "failure_reason": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "ip": {
+                    "type": "string"
+                },
+                "success": {
+                    "type": "boolean"
+                },
+                "user_agent": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "string"
+                }
+            }
+        },
         "github_com_proximavpn_proxima-vpn_api-server_internal_services.NodeIssue": {
             "type": "object",
             "properties": {
+                "acked": {
+                    "type": "boolean"
+                },
+                "acked_by": {
+                    "type": "string"
+                },
+                "alert_id": {
+                    "description": "Lifecycle fields, added when alerts became stateful. Additive on purpose:\nan older client that ignores unknown keys still reads the same response.",
+                    "type": "string"
+                },
                 "country": {
+                    "type": "string"
+                },
+                "duration_seconds": {
+                    "type": "integer"
+                },
+                "fired_at": {
                     "type": "string"
                 },
                 "kind": {
@@ -3787,6 +4016,12 @@
                     "type": "string"
                 },
                 "severity": {
+                    "type": "string"
+                },
+                "silenced_until": {
+                    "type": "string"
+                },
+                "state": {
                     "type": "string"
                 },
                 "status": {
@@ -3811,6 +4046,26 @@
                 },
                 "status": {
                     "type": "string"
+                },
+                "upload": {
+                    "type": "integer"
+                }
+            }
+        },
+        "github_com_proximavpn_proxima-vpn_api-server_internal_services.UserNodeTraffic": {
+            "type": "object",
+            "properties": {
+                "download": {
+                    "type": "integer"
+                },
+                "node_id": {
+                    "type": "string"
+                },
+                "node_name": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
                 },
                 "upload": {
                     "type": "integer"
@@ -4259,6 +4514,10 @@
                 "status": {
                     "type": "string"
                 },
+                "status_changed_at": {
+                    "description": "When status last flipped; null for nodes that predate the column.",
+                    "type": "string"
+                },
                 "traffic_multiplier": {
                     "description": "Factor applied to this node's traffic when charging a user's quota.",
                     "type": "number"
@@ -4282,6 +4541,17 @@
                 },
                 "xray_version_warning": {
                     "type": "string"
+                }
+            }
+        },
+        "internal_handlers.patchAlertRequest": {
+            "type": "object",
+            "properties": {
+                "ack": {
+                    "type": "boolean"
+                },
+                "silence_minutes": {
+                    "type": "integer"
                 }
             }
         },
@@ -4780,6 +5050,35 @@
                 },
                 "traffic_used": {
                     "type": "integer"
+                }
+            }
+        },
+        "internal_handlers.userTrafficResponse": {
+            "type": "object",
+            "properties": {
+                "by_node": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_proximavpn_proxima-vpn_api-server_internal_services.UserNodeTraffic"
+                    }
+                },
+                "percentage": {
+                    "type": "number"
+                },
+                "traffic_limit": {
+                    "type": "integer"
+                },
+                "traffic_remaining": {
+                    "type": "integer"
+                },
+                "traffic_used": {
+                    "type": "integer"
+                },
+                "unlimited": {
+                    "type": "boolean"
+                },
+                "window": {
+                    "type": "string"
                 }
             }
         },

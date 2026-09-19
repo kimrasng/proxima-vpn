@@ -248,6 +248,12 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 		`ALTER TABLE nodes ADD COLUMN IF NOT EXISTS shaping_tiers INT NOT NULL DEFAULT 0`,
 		`ALTER TABLE nodes ADD COLUMN IF NOT EXISTS shaping_error TEXT NOT NULL DEFAULT ''`,
 
+		// When the node last flipped between online and offline. Distinct from
+		// updated_at, which also moves for TLS and Xray config edits, and from
+		// last_seen, which moves on every heartbeat: neither answers "how long
+		// has it been in this state".
+		`ALTER TABLE nodes ADD COLUMN IF NOT EXISTS status_changed_at TIMESTAMPTZ`,
+
 		// Scarce nodes can bill traffic at a premium: the quota charged to the
 		// user is the transferred bytes times this factor. Only the quota is
 		// scaled, never traffic_logs, so the per-node charts keep reporting the
@@ -307,6 +313,74 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 		// user_templates duplicated every plans column and was never read by
 		// anything: users carry plan_id, and nothing ever carried a template id.
 		`DROP TABLE IF EXISTS user_templates`,
+
+		// One row per (node_id, kind), holding the current lifecycle state of one
+		// alert condition. The row IS the dedup key, so "is this already firing"
+		// is a unique-index lookup rather than a scan for the newest open
+		// episode. Bounded at nodes x kinds, so it is deliberately absent from
+		// the retention sweep - pruning it would delete live state.
+		//
+		// breach_since/clear_since carry the sustained-breach windows. Keeping
+		// them here rather than deriving them from node_metrics_history makes
+		// evaluation O(1) per row and survives a process restart.
+		`CREATE TABLE IF NOT EXISTS node_alerts (
+			id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			node_id        UUID NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
+			kind           TEXT NOT NULL,
+			state          TEXT NOT NULL DEFAULT 'ok',
+			severity       TEXT NOT NULL DEFAULT 'warning',
+			value          REAL NOT NULL DEFAULT 0,
+			breach_since   TIMESTAMPTZ,
+			clear_since    TIMESTAMPTZ,
+			fired_at       TIMESTAMPTZ,
+			resolved_at    TIMESTAMPTZ,
+			notified_at    TIMESTAMPTZ,
+			acked_at       TIMESTAMPTZ,
+			acked_by       TEXT NOT NULL DEFAULT '',
+			silenced_until TIMESTAMPTZ,
+			evaluated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+			UNIQUE (node_id, kind)
+		)`,
+		// The read path only ever wants the conditions that are not ok, and a
+		// partial index keeps that lookup off the resolved rows.
+		`CREATE INDEX IF NOT EXISTS idx_node_alerts_open
+			ON node_alerts(state) WHERE state <> 'ok'`,
+
+		// ActivityService.ListForTarget filters on target_type/target_id but only
+		// created_at was indexed, so the per-node feed scanned the whole table.
+		`CREATE INDEX IF NOT EXISTS idx_activity_logs_target
+			ON activity_logs(target_type, target_id, created_at DESC)`,
+
+		// One row per login attempt, successful or not. activity_logs cannot
+		// serve this: with no typed outcome and no failure reason, "this
+		// account's failed attempts" means filtering JSONB across the global
+		// feed.
+		//
+		// user_id is nullable and SET NULL on delete because an attempt against
+		// an address that never existed - or an account since removed - is
+		// exactly the attempt worth keeping; attempted_email preserves what was
+		// typed either way.
+		//
+		// failure_reason is written only from the constants in
+		// services/login_history.go, never from request text: this endpoint is
+		// reachable unauthenticated, so the caller must not choose the content.
+		`CREATE TABLE IF NOT EXISTS login_history (
+			id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			user_id         UUID REFERENCES users(id) ON DELETE SET NULL,
+			actor_type      TEXT NOT NULL DEFAULT 'user',
+			attempted_email TEXT NOT NULL DEFAULT '',
+			success         BOOLEAN NOT NULL DEFAULT false,
+			failure_reason  TEXT NOT NULL DEFAULT '',
+			ip              TEXT NOT NULL DEFAULT '',
+			user_agent      TEXT NOT NULL DEFAULT '',
+			created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		)`,
+		// The admin panel only ever asks for one user's attempts, newest first.
+		`CREATE INDEX IF NOT EXISTS idx_login_history_user_created
+			ON login_history(user_id, created_at DESC)`,
+		// Retention sweeps by age, and the global view is newest-first.
+		`CREATE INDEX IF NOT EXISTS idx_login_history_created_at
+			ON login_history(created_at DESC)`,
 	}
 	for _, m := range migrations {
 		if _, err := pool.Exec(ctx, m); err != nil {

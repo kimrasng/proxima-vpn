@@ -140,6 +140,58 @@ func (s *StatsService) GetNodeTraffic(ctx context.Context, w TrafficWindow, limi
 	return result, rows.Err()
 }
 
+// UserNodeTraffic is one node's share of a single user's traffic.
+type UserNodeTraffic struct {
+	NodeID   string `json:"node_id"`
+	NodeName string `json:"node_name"`
+	Upload   int64  `json:"upload"`
+	Download int64  `json:"download"`
+	Total    int64  `json:"total"`
+}
+
+// GetUserNodeTraffic breaks one user's traffic down by node. Unlike
+// GetNodeTraffic it inner-joins, listing only nodes the user actually used:
+// padding the pool with zero rows per node would bury the answer in a table
+// whose length tracks the node count rather than the user's activity.
+//
+// The join reaches the user through devices because traffic_logs identifies the
+// consumer by device, and the reported bytes are raw - nodes.traffic_multiplier
+// applies to the quota charge on users.traffic_used, not to what crossed the
+// wire, so applying it here would double-count it.
+func (s *StatsService) GetUserNodeTraffic(ctx context.Context, userID string, w TrafficWindow) ([]UserNodeTraffic, error) {
+	// The window bound is a fixed expression selected by ParseTrafficWindow,
+	// never caller text, so it is safe to interpolate; $1 remains a parameter.
+	query := fmt.Sprintf(`
+		SELECT n.id::text, n.name,
+		       COALESCE(SUM(t.up_bytes), 0) AS upload,
+		       COALESCE(SUM(t.dn_bytes), 0) AS download
+		FROM traffic_logs t
+		JOIN devices d ON t.device_id = d.id
+		JOIN nodes n ON t.node_id = n.id
+		WHERE d.user_id = $1 AND t.created_at >= %s
+		GROUP BY n.id, n.name
+		ORDER BY COALESCE(SUM(t.up_bytes + t.dn_bytes), 0) DESC, n.name ASC
+	`, w.since())
+
+	rows, err := s.db.Query(ctx, query, userID)
+	if err != nil {
+		return nil, fmt.Errorf("query user node traffic: %w", err)
+	}
+	defer rows.Close()
+
+	result := make([]UserNodeTraffic, 0)
+	for rows.Next() {
+		var ut UserNodeTraffic
+		if err := rows.Scan(&ut.NodeID, &ut.NodeName, &ut.Upload, &ut.Download); err != nil {
+			return nil, fmt.Errorf("scan user node traffic: %w", err)
+		}
+		ut.Total = ut.Upload + ut.Download
+		result = append(result, ut)
+	}
+
+	return result, rows.Err()
+}
+
 type Alert struct {
 	Kind     string `json:"kind"`
 	Severity string `json:"severity"`
@@ -155,79 +207,90 @@ type NodeIssue struct {
 	Kind     string  `json:"kind"`
 	Severity string  `json:"severity"`
 	Value    float64 `json:"value"`
+
+	// Lifecycle fields, added when alerts became stateful. Additive on purpose:
+	// an older client that ignores unknown keys still reads the same response.
+	AlertID         string  `json:"alert_id"`
+	State           string  `json:"state"`
+	FiredAt         *string `json:"fired_at"`
+	DurationSeconds int64   `json:"duration_seconds"`
+	Acked           bool    `json:"acked"`
+	AckedBy         string  `json:"acked_by"`
+	SilencedUntil   *string `json:"silenced_until"`
 }
 
 type Alerts struct {
-	Items           []Alert     `json:"items"`
-	NodeIssues      []NodeIssue `json:"node_issues"`
-	Total           int         `json:"total"`
-	PendingRequests int         `json:"pending_requests"`
+	Items      []Alert     `json:"items"`
+	NodeIssues []NodeIssue `json:"node_issues"`
+	// Total counts only what an operator still has to look at: firing conditions
+	// that are neither acknowledged nor silenced. Stale rows are excluded because
+	// their readings are frozen, and pending approvals are excluded because they
+	// are a work queue rather than a system condition.
+	Total           int    `json:"total"`
+	PendingRequests int    `json:"pending_requests"`
+	EvaluatedAt     string `json:"evaluated_at"`
 }
 
-// Thresholds for what counts as a problem worth surfacing. High CPU and memory
-// are warnings rather than errors because a node under load is still serving
-// traffic; only losing the node outright is an error.
-const (
-	cpuAlertThreshold    = 80.0
-	memoryAlertThreshold = 85.0
-	diskAlertThreshold   = 90.0
-)
-
-// GetAlerts returns the conditions requiring action. Only non-pending nodes are
-// considered: a node mid-registration has never reported metrics, so its zeroed
-// readings are absence of data rather than a healthy node.
+// GetAlerts reads the persisted alert lifecycle rather than recomputing conditions
+// from current node readings. The evaluator in the node monitor owns the
+// thresholds and the state machine; this is the read side.
 func (s *StatsService) GetAlerts(ctx context.Context) (Alerts, error) {
-	var a Alerts
+	a := Alerts{Items: []Alert{}, NodeIssues: []NodeIssue{}}
 
-	rows, err := s.db.Query(ctx, `
-		SELECT id::text, name, country, region, status,
-		       cpu_usage, memory_usage, disk_usage
-		FROM nodes
-		WHERE status != 'pending'
-		ORDER BY name ASC
-	`)
+	open, err := NewAlertService(s.db).ListOpen(ctx)
 	if err != nil {
-		return a, fmt.Errorf("query node alerts: %w", err)
+		return a, err
 	}
-	defer rows.Close()
 
-	var offline, highCPU, highMemory, highDisk int
-	a.NodeIssues = []NodeIssue{}
+	byKind := map[string]*Alert{}
+	var latest time.Time
 
-	for rows.Next() {
-		var (
-			id, name, country, region, status string
-			cpu, memory, disk                 float64
-		)
-		if err := rows.Scan(&id, &name, &country, &region, &status, &cpu, &memory, &disk); err != nil {
-			return a, fmt.Errorf("scan node alerts: %w", err)
-		}
+	for _, o := range open {
+		suppressed := o.AckedAt != nil ||
+			(o.SilencedUntil != nil && o.SilencedUntil.After(time.Now()))
 
 		issue := NodeIssue{
-			NodeID: id, NodeName: name, Country: country, Region: region, Status: status,
+			NodeID: o.NodeID, NodeName: o.NodeName,
+			Country: o.Country, Region: o.Region, Status: o.NodeStatus,
+			Kind: o.Kind, Severity: o.Severity, Value: o.Value,
+			AlertID: o.ID, State: o.State,
+			Acked: o.AckedAt != nil, AckedBy: o.AckedBy,
+		}
+		if o.FiredAt != nil {
+			stamp := o.FiredAt.Format(time.RFC3339)
+			issue.FiredAt = &stamp
+			issue.DurationSeconds = int64(time.Since(*o.FiredAt).Seconds())
+		}
+		if o.SilencedUntil != nil {
+			stamp := o.SilencedUntil.Format(time.RFC3339)
+			issue.SilencedUntil = &stamp
+		}
+		a.NodeIssues = append(a.NodeIssues, issue)
+
+		if o.EvaluatedAt.After(latest) {
+			latest = o.EvaluatedAt
 		}
 
-		switch {
-		case status == "offline":
-			offline++
-			issue.Kind, issue.Severity, issue.Value = "offline", string(SeverityError), 0
-		case cpu >= cpuAlertThreshold:
-			highCPU++
-			issue.Kind, issue.Severity, issue.Value = "cpu", string(SeverityWarning), cpu
-		case memory >= memoryAlertThreshold:
-			highMemory++
-			issue.Kind, issue.Severity, issue.Value = "memory", string(SeverityWarning), memory
-		case disk >= diskAlertThreshold:
-			highDisk++
-			issue.Kind, issue.Severity, issue.Value = "disk", string(SeverityWarning), disk
-		default:
+		if o.State != AlertStateFiring || suppressed {
 			continue
 		}
-
-		a.NodeIssues = append(a.NodeIssues, issue)
+		key := "node_" + o.Kind
+		if existing, ok := byKind[key]; ok {
+			existing.Count++
+		} else {
+			byKind[key] = &Alert{Kind: key, Severity: o.Severity, Count: 1}
+		}
+		a.Total++
 	}
-	if err := rows.Err(); err != nil {
-		return a, fmt.Errorf("scan node alerts: %w", err)
+
+	// Stable order so the dashboard panel does not reshuffle between polls.
+	for _, kind := range []string{
+		"node_offline", "node_xray_down", "node_shaping_failed",
+		"node_cpu", "node_memory", "node_disk",
+	} {
+		if item, ok := byKind[kind]; ok {
+			a.Items = append(a.Items, *item)
+		}
 	}
 
 	if err := s.db.QueryRow(ctx,
@@ -236,18 +299,8 @@ func (s *StatsService) GetAlerts(ctx context.Context) (Alerts, error) {
 		return a, fmt.Errorf("count pending requests: %w", err)
 	}
 
-	a.Items = []Alert{}
-	for _, candidate := range []Alert{
-		{Kind: "node_offline", Severity: string(SeverityError), Count: offline},
-		{Kind: "node_cpu", Severity: string(SeverityWarning), Count: highCPU},
-		{Kind: "node_memory", Severity: string(SeverityWarning), Count: highMemory},
-		{Kind: "node_disk", Severity: string(SeverityWarning), Count: highDisk},
-		{Kind: "pending_requests", Severity: string(SeverityInfo), Count: a.PendingRequests},
-	} {
-		if candidate.Count > 0 {
-			a.Items = append(a.Items, candidate)
-			a.Total += candidate.Count
-		}
+	if !latest.IsZero() {
+		a.EvaluatedAt = latest.Format(time.RFC3339)
 	}
 
 	return a, nil

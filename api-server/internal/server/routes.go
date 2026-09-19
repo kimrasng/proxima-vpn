@@ -90,6 +90,8 @@ func (s *Server) registerRoutes() {
 	adminUsers.Post("/", adminUserHandler.Create)
 	adminUsers.Get("/", adminUserHandler.List)
 	adminUsers.Get("/:id", adminUserHandler.Get)
+	adminUsers.Get("/:id/traffic", adminUserHandler.GetTraffic)
+	adminUsers.Get("/:id/login-history", adminUserHandler.GetLoginHistory)
 	adminUsers.Put("/:id", adminUserHandler.Update)
 	adminUsers.Delete("/:id", adminUserHandler.Delete)
 	adminUsers.Post("/:id/reset-traffic", adminUserHandler.ResetTraffic)
@@ -121,6 +123,9 @@ func (s *Server) registerRoutes() {
 	admin.Get("/activity", adminStatsHandler.GetActivity)
 	admin.Get("/online-users", adminStatsHandler.GetOnlineUsers)
 	admin.Post("/devices/:id/terminate", adminStatsHandler.TerminateSession)
+
+	adminAlertHandler := handlers.NewAdminAlertHandler(s.db)
+	admin.Patch("/alerts/:id", adminAlertHandler.Patch)
 
 	if s.backupService != nil {
 		adminBackupHandler := handlers.NewAdminBackupHandler(s.backupService)
