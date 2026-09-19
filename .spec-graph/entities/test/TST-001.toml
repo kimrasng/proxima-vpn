@@ -1,0 +1,20 @@
+schema = 1
+id = "TST-001"
+type = "test"
+title = "Activity target filter returns only matching entries"
+description = "A Go test seeds activity entries for two distinct nodes and one user, requests the feed filtered to one node, and asserts the response holds only that node's entries."
+status = "active"
+created_at = 2026-09-19T00:39:40+09:00
+updated_at = 2026-09-19T00:39:40+09:00
+
+[metadata]
+kind = "unit"
+path = "api-server/internal/handlers/admin_stats_activity_test.go"
+
+[[relations]]
+to = "ACT-004"
+type = "verifies"
+
+[[relations]]
+to = "API-001"
+type = "verifies"

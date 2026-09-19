@@ -1,0 +1,29 @@
+schema = 1
+id = "REQ-006"
+type = "requirement"
+title = "Redesign stays within the Cloudscape design system"
+description = "The redesign introduces no bespoke CSS layout primitives or non-Cloudscape UI library; it composes existing Cloudscape components and design tokens."
+status = "active"
+created_at = 2026-09-19T00:38:36+09:00
+updated_at = 2026-09-19T00:38:36+09:00
+
+[metadata]
+kind = "non_functional"
+owner = "admin-web"
+priority = "must"
+
+[[relations]]
+to = "DEC-001"
+type = "constrained_by"
+
+[[relations]]
+to = "DEC-003"
+type = "constrained_by"
+
+[[relations]]
+to = "DEC-004"
+type = "constrained_by"
+
+[[relations]]
+to = "ACT-007"
+type = "has_criterion"

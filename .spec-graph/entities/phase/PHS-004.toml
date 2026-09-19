@@ -1,0 +1,33 @@
+schema = 1
+id = "PHS-004"
+type = "phase"
+title = "Phase 4 - Browser verification across viewports and languages"
+description = "Drive the running panel in a real browser to confirm the layout, the node-scoped feed, the metric switch, and all three languages."
+status = "resolved"
+created_at = 2026-09-19T00:40:32+09:00
+updated_at = 2026-09-19T08:34:17+09:00
+
+[metadata]
+exit_criteria = "[Wide and narrow viewports captured Node-scoped event list confirmed Metric switch confirmed All three languages render with no fallback]"
+goal = "Prove the redesign works in the running application"
+order = 4.0
+
+[[relations]]
+to = "PLN-001"
+type = "belongs_to"
+
+[[relations]]
+to = "ACT-004"
+type = "covers"
+
+[[relations]]
+to = "TST-003"
+type = "covers"
+
+[[relations]]
+to = "ACT-004"
+type = "delivers"
+
+[[relations]]
+to = "TST-003"
+type = "delivers"

@@ -1,0 +1,12 @@
+schema = 1
+id = "ACT-007"
+type = "criterion"
+title = "No non-Cloudscape layout primitive is introduced"
+status = "active"
+created_at = 2026-09-19T00:40:15+09:00
+updated_at = 2026-09-19T00:40:15+09:00
+
+[metadata]
+given = "The redesign is complete"
+then = "Layout and surface come from Cloudscape components and design tokens, with no new stylesheet, no inline pixel layout values, and no additional UI dependency in package.json"
+when = "The changed web files are reviewed and the production bundle is built"

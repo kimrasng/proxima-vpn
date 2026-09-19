@@ -1,0 +1,17 @@
+schema = 1
+id = "API-003"
+type = "interface"
+title = "getActivity client accepts a target filter argument"
+description = "web/src/api/admin.ts getActivity accepts an optional target descriptor and forwards it as query parameters, so the node detail page requests only its own events."
+status = "active"
+created_at = 2026-09-19T00:39:16+09:00
+updated_at = 2026-09-19T00:39:16+09:00
+
+[metadata]
+kind = "module"
+path = "web/src/api/admin.ts"
+stability = "stable"
+
+[[relations]]
+to = "REQ-002"
+type = "implements"

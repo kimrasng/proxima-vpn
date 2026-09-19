@@ -1,0 +1,29 @@
+schema = 1
+id = "REQ-001"
+type = "requirement"
+title = "Node detail page presents identity, health, and live metrics in a paired two-column layout"
+description = "The admin node detail page must surface node identity, health checks, current metrics, and recent node events within the first screen using paired two-column card rows instead of a single vertical stack of full-width cards."
+status = "active"
+created_at = 2026-09-19T00:38:36+09:00
+updated_at = 2026-09-19T00:38:36+09:00
+
+[metadata]
+kind = "functional"
+owner = "admin-web"
+priority = "must"
+
+[[relations]]
+to = "DEC-001"
+type = "constrained_by"
+
+[[relations]]
+to = "DEC-005"
+type = "constrained_by"
+
+[[relations]]
+to = "ACT-001"
+type = "has_criterion"
+
+[[relations]]
+to = "ACT-002"
+type = "has_criterion"

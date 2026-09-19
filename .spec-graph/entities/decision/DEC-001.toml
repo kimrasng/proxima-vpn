@@ -1,0 +1,13 @@
+schema = 1
+id = "DEC-001"
+type = "decision"
+title = "Compose the page from Cloudscape Grid rows of paired Containers"
+description = "Use Cloudscape Grid with explicit colspan per breakpoint to pair Overview with Current metrics and Health with Recent events. Grid is chosen over ColumnLayout because ColumnLayout distributes equal columns and cannot give a metrics card a different width than an identity card, which is what produced the stretched rows in the current page."
+status = "active"
+created_at = 2026-09-19T00:38:56+09:00
+updated_at = 2026-09-19T00:38:56+09:00
+
+[metadata]
+alternatives = "[Keep ColumnLayout with more columns Hand-written CSS grid]"
+rationale = "Grid gives per-breakpoint colspan control that ColumnLayout lacks"
+status = "accepted"

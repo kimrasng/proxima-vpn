@@ -1,0 +1,13 @@
+schema = 1
+id = "RSK-002"
+type = "risk"
+title = "Breadcrumbs in the layout could mislabel pages that are not detail views"
+description = "A route-driven breadcrumb trail derives labels from the path. An unmapped route would render a raw path segment as a user-visible label."
+status = "active"
+created_at = 2026-09-19T00:39:40+09:00
+updated_at = 2026-09-19T00:39:40+09:00
+
+[metadata]
+likelihood = "medium"
+mitigation = "Derive the trail from an explicit route-to-label map and render nothing for routes absent from it"
+severity = "low"

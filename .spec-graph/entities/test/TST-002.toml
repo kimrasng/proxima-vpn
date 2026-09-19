@@ -1,0 +1,20 @@
+schema = 1
+id = "TST-002"
+type = "test"
+title = "Unfiltered activity request preserves the existing feed contract"
+description = "A Go test requests the activity endpoint without target parameters and asserts entries for all targets are returned, proving the dashboard feed is unaffected by the filter."
+status = "active"
+created_at = 2026-09-19T00:39:40+09:00
+updated_at = 2026-09-19T00:39:40+09:00
+
+[metadata]
+kind = "unit"
+path = "api-server/internal/handlers/admin_stats_activity_test.go"
+
+[[relations]]
+to = "RSK-001"
+type = "mitigates"
+
+[[relations]]
+to = "API-001"
+type = "verifies"

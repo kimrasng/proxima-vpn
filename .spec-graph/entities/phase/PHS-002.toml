@@ -1,0 +1,65 @@
+schema = 1
+id = "PHS-002"
+type = "phase"
+title = "Phase 2 - Layout shell, breadcrumbs, and translations"
+description = "Add the breadcrumb trail to the admin layout and land every translation key the redesigned page will read, in all three languages."
+status = "resolved"
+created_at = 2026-09-19T00:40:32+09:00
+updated_at = 2026-09-19T05:47:05+09:00
+
+[metadata]
+exit_criteria = "[Breadcrumb trail renders on the node detail route Every new key exists in en, ko, and zh tsc and vite build pass]"
+goal = "Prepare the layout shell and the complete trilingual key set"
+order = 2.0
+
+[[relations]]
+to = "PLN-001"
+type = "belongs_to"
+
+[[relations]]
+to = "ACT-006"
+type = "covers"
+
+[[relations]]
+to = "API-005"
+type = "covers"
+
+[[relations]]
+to = "API-006"
+type = "covers"
+
+[[relations]]
+to = "DEC-005"
+type = "covers"
+
+[[relations]]
+to = "REQ-005"
+type = "covers"
+
+[[relations]]
+to = "RSK-002"
+type = "covers"
+
+[[relations]]
+to = "ACT-006"
+type = "delivers"
+
+[[relations]]
+to = "API-005"
+type = "delivers"
+
+[[relations]]
+to = "API-006"
+type = "delivers"
+
+[[relations]]
+to = "DEC-005"
+type = "delivers"
+
+[[relations]]
+to = "REQ-005"
+type = "delivers"
+
+[[relations]]
+to = "PHS-003"
+type = "precedes"

@@ -1,0 +1,12 @@
+schema = 1
+id = "ACT-005"
+type = "criterion"
+title = "Resource history switches series without reloading the page"
+status = "active"
+created_at = 2026-09-19T00:39:16+09:00
+updated_at = 2026-09-19T00:39:16+09:00
+
+[metadata]
+given = "The resource history card is showing CPU"
+then = "The same chart area redraws the memory series and the CPU series is no longer plotted"
+when = "The admin selects memory in the metric control"

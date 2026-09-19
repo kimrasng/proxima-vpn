@@ -1,0 +1,13 @@
+schema = 1
+id = "DEC-003"
+type = "decision"
+title = "Render current metrics as a value grid with inline severity, not progress bars"
+description = "Current CPU, memory, disk, load, and traffic are shown as compact labelled tiles carrying a status icon and the numeric value. Progress bars were the source of the horizontally stretched look because a bar consumes the full column width to convey one number."
+status = "active"
+created_at = 2026-09-19T00:38:56+09:00
+updated_at = 2026-09-19T00:38:56+09:00
+
+[metadata]
+alternatives = "[Keep ProgressBar Cloudscape KeyValuePairs without severity]"
+rationale = "Tiles convey the same number at a density that suits a half-width card"
+status = "accepted"

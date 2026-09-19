@@ -1,0 +1,12 @@
+schema = 1
+id = "ACT-006"
+type = "criterion"
+title = "No user-visible string falls back to another language"
+status = "active"
+created_at = 2026-09-19T00:39:16+09:00
+updated_at = 2026-09-19T00:39:16+09:00
+
+[metadata]
+given = "The panel language is set to Korean and then Chinese"
+then = "Every label, heading, and status sentence renders in the selected language with no raw translation key and no English or Korean fallback"
+when = "The node detail page is viewed in each language"

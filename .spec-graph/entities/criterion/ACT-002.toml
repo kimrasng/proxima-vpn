@@ -1,0 +1,12 @@
+schema = 1
+id = "ACT-002"
+type = "criterion"
+title = "Health and recent events sit side by side on a wide viewport"
+status = "active"
+created_at = 2026-09-19T00:39:16+09:00
+updated_at = 2026-09-19T00:39:16+09:00
+
+[metadata]
+given = "An admin opens a node detail page at 1600px width"
+then = "The health card and the recent events card render on the same row"
+when = "The page finishes loading"

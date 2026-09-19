@@ -1,0 +1,22 @@
+schema = 1
+id = "API-001"
+type = "interface"
+title = "GET /api/v1/admin/activity accepts target_type and target_id filters"
+description = "The admin activity endpoint accepts optional target_type and target_id query parameters. When both are supplied the response contains only entries recorded against that target. When either is absent the response is the unfiltered feed, preserving the dashboard contract."
+status = "active"
+created_at = 2026-09-19T00:39:16+09:00
+updated_at = 2026-09-19T00:39:16+09:00
+
+[metadata]
+kind = "http"
+method = "GET"
+path = "/api/v1/admin/activity"
+stability = "stable"
+
+[[relations]]
+to = "DEC-002"
+type = "constrained_by"
+
+[[relations]]
+to = "REQ-002"
+type = "implements"

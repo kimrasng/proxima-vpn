@@ -1,0 +1,4 @@
+graph.db
+graph.db-wal
+graph.db-shm
+.lock

@@ -1,0 +1,60 @@
+schema = 1
+id = "TST-003"
+type = "test"
+title = "Node detail page renders the redesigned layout in a real browser"
+description = "A Playwright pass loads the node detail page at wide and narrow viewports, switches the resource history metric, checks the event list is node-scoped, and cycles the three languages, capturing screenshots as evidence."
+status = "active"
+created_at = 2026-09-19T00:39:40+09:00
+updated_at = 2026-09-19T00:39:40+09:00
+
+[metadata]
+kind = "e2e"
+path = "scripts/qa/node-detail-visual-qa.md"
+
+[[relations]]
+to = "ACT-001"
+type = "verifies"
+
+[[relations]]
+to = "ACT-002"
+type = "verifies"
+
+[[relations]]
+to = "ACT-003"
+type = "verifies"
+
+[[relations]]
+to = "ACT-004"
+type = "verifies"
+
+[[relations]]
+to = "ACT-005"
+type = "verifies"
+
+[[relations]]
+to = "ACT-006"
+type = "verifies"
+
+[[relations]]
+to = "ACT-007"
+type = "verifies"
+
+[[relations]]
+to = "REQ-001"
+type = "verifies"
+
+[[relations]]
+to = "REQ-002"
+type = "verifies"
+
+[[relations]]
+to = "REQ-003"
+type = "verifies"
+
+[[relations]]
+to = "REQ-004"
+type = "verifies"
+
+[[relations]]
+to = "REQ-005"
+type = "verifies"

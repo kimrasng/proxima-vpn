@@ -1,0 +1,13 @@
+schema = 1
+id = "DEC-004"
+type = "decision"
+title = "Select resource history metric with SegmentedControl over one shared chart"
+description = "CPU, memory, and disk history collapse into one chart whose series is chosen by a SegmentedControl, while load average and network history keep their own charts because their units differ from percentages."
+status = "active"
+created_at = 2026-09-19T00:38:56+09:00
+updated_at = 2026-09-19T00:38:56+09:00
+
+[metadata]
+alternatives = "[Tabs component Keep three stacked charts]"
+rationale = "Three percentage charts are redundant; one switchable chart preserves the data at a third of the height"
+status = "accepted"

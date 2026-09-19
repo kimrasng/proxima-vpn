@@ -1,0 +1,17 @@
+schema = 1
+id = "DEC-005"
+type = "decision"
+title = "Add a breadcrumb trail to the admin layout for detail pages"
+description = "AdminLayout gains a breadcrumbs slot driven by the active route so a detail page can show the path from its list page. Placing it in the layout keeps every future detail page consistent instead of each page rendering its own trail."
+status = "active"
+created_at = 2026-09-19T00:38:56+09:00
+updated_at = 2026-09-19T00:38:56+09:00
+
+[metadata]
+alternatives = "[Per-page BreadcrumbGroup No breadcrumbs]"
+rationale = "Layout-level breadcrumbs keep detail pages consistent"
+status = "accepted"
+
+[[relations]]
+to = "RSK-002"
+type = "mitigates"

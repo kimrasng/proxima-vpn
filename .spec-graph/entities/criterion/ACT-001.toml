@@ -1,0 +1,12 @@
+schema = 1
+id = "ACT-001"
+type = "criterion"
+title = "Overview and current metrics sit side by side on a wide viewport"
+status = "active"
+created_at = 2026-09-19T00:39:16+09:00
+updated_at = 2026-09-19T00:39:16+09:00
+
+[metadata]
+given = "An admin opens a node detail page at 1600px width"
+then = "The overview card and the current metrics card render on the same row, each occupying roughly half the content width"
+when = "The page finishes loading"

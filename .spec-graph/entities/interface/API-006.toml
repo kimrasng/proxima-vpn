@@ -1,0 +1,21 @@
+schema = 1
+id = "API-006"
+type = "interface"
+title = "AdminLayout exposes a route-driven breadcrumb trail"
+description = "web/src/layouts/AdminLayout.tsx renders a BreadcrumbGroup for routes present in an explicit label map, giving detail pages a path back to their list page."
+status = "active"
+created_at = 2026-09-19T00:40:15+09:00
+updated_at = 2026-09-19T00:40:15+09:00
+
+[metadata]
+kind = "module"
+path = "web/src/layouts/AdminLayout.tsx"
+stability = "stable"
+
+[[relations]]
+to = "DEC-005"
+type = "constrained_by"
+
+[[relations]]
+to = "REQ-001"
+type = "implements"

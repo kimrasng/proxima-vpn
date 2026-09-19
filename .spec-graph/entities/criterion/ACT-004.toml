@@ -1,0 +1,12 @@
+schema = 1
+id = "ACT-004"
+type = "criterion"
+title = "Recent events list contains only entries for the viewed node"
+status = "active"
+created_at = 2026-09-19T00:39:16+09:00
+updated_at = 2026-09-19T00:39:16+09:00
+
+[metadata]
+given = "The activity feed holds entries for several nodes and for users"
+then = "Every row in the recent events card has target_type node and target_id equal to the viewed node id"
+when = "An admin opens the detail page of one node"

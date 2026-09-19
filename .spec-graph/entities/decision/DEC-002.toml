@@ -1,0 +1,13 @@
+schema = 1
+id = "DEC-002"
+type = "decision"
+title = "Scope the node event feed with a target filter on the existing activity endpoint"
+description = "Extend GET /api/v1/admin/activity with optional target_type and target_id query parameters rather than adding a node-specific activity route. The activity feed already records target_type=node with the node id, so a filter reuses the existing table, index, and handler instead of duplicating query logic per entity type."
+status = "active"
+created_at = 2026-09-19T00:38:56+09:00
+updated_at = 2026-09-19T00:38:56+09:00
+
+[metadata]
+alternatives = "[New GET /admin/nodes/:id/events route Client-side filtering of the global feed]"
+rationale = "The activity table already carries target_type/target_id; a filter avoids a parallel per-entity endpoint"
+status = "accepted"

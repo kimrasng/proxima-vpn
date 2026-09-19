@@ -1,0 +1,25 @@
+schema = 1
+id = "REQ-004"
+type = "requirement"
+title = "Cards avoid horizontally stretched and vertically compressed proportions"
+description = "No card may render sparse content across an over-wide column or squeeze a chart into an under-tall box. Column spans and chart heights are chosen so each card reads at a natural density."
+status = "active"
+created_at = 2026-09-19T00:38:36+09:00
+updated_at = 2026-09-19T00:38:36+09:00
+
+[metadata]
+kind = "non_functional"
+owner = "admin-web"
+priority = "must"
+
+[[relations]]
+to = "DEC-001"
+type = "constrained_by"
+
+[[relations]]
+to = "DEC-003"
+type = "constrained_by"
+
+[[relations]]
+to = "ACT-003"
+type = "has_criterion"

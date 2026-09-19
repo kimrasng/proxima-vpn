@@ -1,0 +1,12 @@
+schema = 1
+id = "ACT-003"
+type = "criterion"
+title = "Cards stack to one column on a narrow viewport"
+status = "active"
+created_at = 2026-09-19T00:39:16+09:00
+updated_at = 2026-09-19T00:39:16+09:00
+
+[metadata]
+given = "An admin opens a node detail page at 900px width"
+then = "Every card spans the full content width in a single column with no horizontal overflow"
+when = "The page finishes loading"
