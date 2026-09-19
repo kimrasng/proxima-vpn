@@ -60,6 +60,8 @@ test.describe("admin navigation", () => {
     // Each admin page fetches on mount; a broken endpoint or a render crash
     // shows up here as a missing heading or a visible error flash.
     const pages: Array<{ nav: string; urlPart: string; heading: RegExp }> = [
+      { nav: "Alerts & Actions", urlPart: "/admin/alerts", heading: /Alert/i },
+      { nav: "Recent Activity", urlPart: "/admin/activity", heading: /Activity/i },
       { nav: "Nodes", urlPart: "/admin/nodes", heading: /Node/i },
       { nav: "Node Groups", urlPart: "/admin/node-groups", heading: /Node Group/i },
       { nav: "Plans", urlPart: "/admin/plans", heading: /Plan/i },
@@ -71,7 +73,9 @@ test.describe("admin navigation", () => {
     ];
 
     for (const p of pages) {
-      await page.getByRole("link", { name: p.nav, exact: true }).click();
+      // Scoped to the side nav: the breadcrumb of the page you are already on
+      // carries the same accessible name, which makes a bare getByRole ambiguous.
+      await page.locator(`nav a[href="${p.urlPart}"]`).click();
       await expect(page).toHaveURL(new RegExp(p.urlPart.replace(/\//g, "\\/")));
       await expect(page.getByRole("heading", { name: p.heading }).first()).toBeVisible();
       // Nothing on a freshly-loaded page should be reporting a load failure.

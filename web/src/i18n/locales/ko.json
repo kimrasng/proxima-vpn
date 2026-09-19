@@ -52,7 +52,8 @@
       "group": {
         "infrastructure": "인프라",
         "customers": "고객 관리",
-        "system": "시스템"
+        "system": "시스템",
+        "monitoring": "모니터링"
       },
       "serviceName": "Proxima VPN",
       "connections": "접속 현황",

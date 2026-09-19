@@ -121,7 +121,22 @@ function AdminLayoutShell() {
       type: "link",
       text: t("admin.nav.dashboard"),
       href: "/admin/dashboard",
-      info: alertCount > 0 ? <Badge color="red">{alertCount}</Badge> : undefined,
+    },
+    {
+      // The two pages the dashboard panels drill into. Grouped with it rather
+      // than under a resource heading: they cut across nodes and users, so they
+      // belong to neither.
+      type: "section-group",
+      title: t("admin.nav.group.monitoring"),
+      items: [
+        {
+          type: "link",
+          text: t("admin.nav.alerts"),
+          href: "/admin/alerts",
+          info: alertCount > 0 ? <Badge color="red">{alertCount}</Badge> : undefined,
+        },
+        { type: "link", text: t("admin.nav.activity"), href: "/admin/activity" },
+      ],
     },
     {
       type: "section-group",
