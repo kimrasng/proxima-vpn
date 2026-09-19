@@ -13,12 +13,17 @@ import (
 type NodeMonitorScheduler struct {
 	db       *pgxpool.Pool
 	telegram *services.TelegramService
+	activity *services.ActivityService
 	cancel   context.CancelFunc
 }
 
 // NewNodeMonitorScheduler creates a NodeMonitorScheduler.
 func NewNodeMonitorScheduler(db *pgxpool.Pool, telegram *services.TelegramService) *NodeMonitorScheduler {
-	return &NodeMonitorScheduler{db: db, telegram: telegram}
+	return &NodeMonitorScheduler{
+		db:       db,
+		telegram: telegram,
+		activity: services.NewActivityService(db),
+	}
 }
 
 // Start runs the node monitor every 60 seconds.
@@ -53,23 +58,43 @@ func (s *NodeMonitorScheduler) run(ctx context.Context) {
 		SET status = 'offline', updated_at = NOW()
 		WHERE status = 'online'
 		  AND last_seen < NOW() - INTERVAL '90 seconds'
-		RETURNING name
+		RETURNING id::text, name
 	`)
 	if err != nil {
 		log.Printf("[NodeMonitor] error detecting offline nodes: %v", err)
 		return
 	}
-	defer rows.Close()
 
-	var count int
+	type offlineNode struct {
+		id   string
+		name string
+	}
+	// Collected before the notify/log calls rather than inside the loop: both
+	// write to the same pool, and holding the UPDATE ... RETURNING cursor open
+	// while issuing them can exhaust it and stall the sweep.
+	var offline []offlineNode
 	for rows.Next() {
-		var name string
-		if err := rows.Scan(&name); err != nil {
+		var n offlineNode
+		if err := rows.Scan(&n.id, &n.name); err != nil {
 			continue
 		}
-		count++
-		if err := s.telegram.NotifyNodeOffline(ctx, name); err != nil {
-			log.Printf("[NodeMonitor] telegram alert failed for %s: %v", name, err)
+		offline = append(offline, n)
+	}
+	rows.Close()
+
+	count := len(offline)
+	for _, n := range offline {
+		s.activity.Log(ctx, services.Record{
+			EventType:  services.EventNodeOffline,
+			Severity:   services.SeverityError,
+			ActorType:  "system",
+			ActorLabel: n.name,
+			TargetType: "node",
+			TargetID:   n.id,
+			Detail:     map[string]any{"node": n.name},
+		})
+		if err := s.telegram.NotifyNodeOffline(ctx, n.name); err != nil {
+			log.Printf("[NodeMonitor] telegram alert failed for %s: %v", n.name, err)
 		}
 	}
 

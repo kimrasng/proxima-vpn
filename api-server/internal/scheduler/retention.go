@@ -18,6 +18,8 @@ import (
 const (
 	trafficLogRetention    = 90 * 24 * time.Hour
 	nodeMetricsRetention   = 14 * 24 * time.Hour
+	activityLogRetention   = 90 * 24 * time.Hour
+	snapshotRetention      = 30 * 24 * time.Hour
 	retentionSweepInterval = 6 * time.Hour
 
 	// deleteBatchSize bounds each DELETE so a first sweep over a large backlog
@@ -68,6 +70,8 @@ func (s *RetentionScheduler) Stop() {
 func (s *RetentionScheduler) run(ctx context.Context) {
 	s.prune(ctx, "traffic_logs", "created_at", trafficLogRetention)
 	s.prune(ctx, "node_metrics_history", "recorded_at", nodeMetricsRetention)
+	s.prune(ctx, "activity_logs", "created_at", activityLogRetention)
+	s.prune(ctx, "dashboard_snapshots", "recorded_at", snapshotRetention)
 }
 
 // prune deletes rows older than the retention window in bounded batches. table

@@ -11,13 +11,18 @@ import (
 
 // AdminPlanRequestHandler handles admin plan request review endpoints.
 type AdminPlanRequestHandler struct {
-	db   *pgxpool.Pool
-	plan *services.PlanService
+	db       *pgxpool.Pool
+	plan     *services.PlanService
+	activity *services.ActivityService
 }
 
 // NewAdminPlanRequestHandler creates a new AdminPlanRequestHandler.
 func NewAdminPlanRequestHandler(db *pgxpool.Pool) *AdminPlanRequestHandler {
-	return &AdminPlanRequestHandler{db: db, plan: services.NewPlanService(db)}
+	return &AdminPlanRequestHandler{
+		db:       db,
+		plan:     services.NewPlanService(db),
+		activity: services.NewActivityService(db),
+	}
 }
 
 type adminPlanRequestItem struct {
@@ -180,6 +185,26 @@ func (h *AdminPlanRequestHandler) Review(c *fiber.Ctx) error {
 			"error": "internal server error",
 		})
 	}
+
+	event := services.EventPlanApproved
+	severity := services.SeveritySuccess
+	if req.Action == "reject" {
+		event = services.EventPlanRejected
+		severity = services.SeverityWarning
+	}
+	h.activity.Log(context.Background(), services.Record{
+		EventType:  event,
+		Severity:   severity,
+		ActorType:  "admin",
+		ActorID:    adminID,
+		ActorLabel: adminEmail(c),
+		TargetType: "user",
+		TargetID:   userID,
+		Detail: map[string]any{
+			"email": result.UserEmail,
+			"plan":  result.PlanName,
+		},
+	})
 
 	return c.JSON(result)
 }

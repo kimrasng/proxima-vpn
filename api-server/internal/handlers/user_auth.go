@@ -27,6 +27,7 @@ type UserAuthHandler struct {
 	jwtSecret string
 	jwtExpiry time.Duration
 	telegram  *services.TelegramService
+	activity  *services.ActivityService
 }
 
 // NewUserAuthHandler creates a new UserAuthHandler.
@@ -36,6 +37,7 @@ func NewUserAuthHandler(db *pgxpool.Pool, jwtSecret string, jwtExpiry time.Durat
 		jwtSecret: jwtSecret,
 		jwtExpiry: jwtExpiry,
 		telegram:  telegram,
+		activity:  services.NewActivityService(db),
 	}
 }
 
@@ -140,6 +142,17 @@ func (h *UserAuthHandler) Register(c *fiber.Ctx) error {
 		})
 	}
 
+	h.activity.Log(context.Background(), services.Record{
+		EventType:  services.EventUserRegistered,
+		Severity:   services.SeverityInfo,
+		ActorType:  "user",
+		ActorID:    id,
+		ActorLabel: req.Name,
+		TargetType: "user",
+		TargetID:   id,
+		Detail:     map[string]any{"email": req.Email},
+	})
+
 	go func() {
 		if err := h.telegram.NotifyNewRegistration(context.Background(), req.Email); err != nil {
 			log.Printf("telegram registration alert: %v", err)
@@ -234,6 +247,15 @@ func (h *UserAuthHandler) Login(c *fiber.Ctx) error {
 			"error": "internal server error",
 		})
 	}
+
+	h.activity.Log(context.Background(), services.Record{
+		EventType:  services.EventUserLogin,
+		Severity:   services.SeverityInfo,
+		ActorType:  "user",
+		ActorID:    id,
+		ActorLabel: email,
+		Detail:     map[string]any{"ip": c.IP()},
+	})
 
 	return c.JSON(fiber.Map{
 		"token": tokenString,

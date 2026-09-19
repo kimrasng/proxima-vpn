@@ -73,6 +73,9 @@ func main() {
 	concurrency := scheduler.NewConcurrencyScheduler(db, rdb)
 	go concurrency.Start(ctx)
 
+	snapshot := scheduler.NewSnapshotScheduler(db, rdb)
+	go snapshot.Start(ctx)
+
 	telegramSvc := services.NewTelegramService(db, cfg.Telegram)
 
 	nodeMonitor := scheduler.NewNodeMonitorScheduler(db, telegramSvc)
@@ -106,6 +109,7 @@ func main() {
 	expiryCheck.Stop()
 	nodeMonitor.Stop()
 	retention.Stop()
+	snapshot.Stop()
 	if backupSvc != nil {
 		backupSvc.Stop()
 	}

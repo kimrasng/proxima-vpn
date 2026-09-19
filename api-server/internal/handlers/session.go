@@ -5,8 +5,16 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/gofiber/fiber/v2"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+// adminEmail reads the email that middleware.AdminJWTMiddleware puts in the
+// request locals, empty when a token carries no such claim.
+func adminEmail(c *fiber.Ctx) string {
+	email, _ := c.Locals("email").(string)
+	return email
+}
 
 // resolveSessionExpiry returns the JWT expiry duration to use for a login:
 // the admin Settings table's 'session_timeout' (seconds, see

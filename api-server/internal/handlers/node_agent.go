@@ -18,6 +18,7 @@ type NodeAgentHandler struct {
 	db            *pgxpool.Pool
 	redis         *redis.Client
 	xrayConfigSvc *services.XrayConfigService
+	activity      *services.ActivityService
 }
 
 func NewNodeAgentHandler(db *pgxpool.Pool, rdb *redis.Client) *NodeAgentHandler {
@@ -25,6 +26,7 @@ func NewNodeAgentHandler(db *pgxpool.Pool, rdb *redis.Client) *NodeAgentHandler 
 		db:            db,
 		redis:         rdb,
 		xrayConfigSvc: services.NewXrayConfigService(db),
+		activity:      services.NewActivityService(db),
 	}
 }
 
@@ -97,6 +99,21 @@ func (h *NodeAgentHandler) Register(c *fiber.Ctx) error {
 			"error": "failed to register node",
 		})
 	}
+
+	h.activity.Log(context.Background(), services.Record{
+		EventType:  services.EventNodeRegistered,
+		Severity:   services.SeveritySuccess,
+		ActorType:  "node",
+		ActorID:    nodeID,
+		ActorLabel: req.Name,
+		TargetType: "node",
+		TargetID:   nodeID,
+		Detail: map[string]any{
+			"node":    req.Name,
+			"country": req.Country,
+			"region":  req.Region,
+		},
+	})
 
 	return c.JSON(registerNodeResponse{
 		NodeID: nodeID,
@@ -503,5 +520,34 @@ func (h *NodeAgentHandler) Stats(c *fiber.Ctx) error {
 		h.redis.Set(ctx, key, string(data), 60*time.Second)
 	}
 
+	h.recordSessionStarts(ctx, req)
+
 	return c.JSON(fiber.Map{"status": "ok"})
+}
+
+// sessionStartTTL outlives the 60s online keys so a device that keeps
+// reconnecting within the window is still reported as one continuous session
+// rather than restarting its timer on every poll.
+const sessionStartTTL = 10 * time.Minute
+
+// recordSessionStarts stamps the first time each device was seen online, which
+// is what the dashboard shows as connection time. SetNX rather than Set: the
+// agent re-reports the same device every poll, and overwriting would reset the
+// start to now and make every session look seconds old.
+func (h *NodeAgentHandler) recordSessionStarts(ctx context.Context, req statsRequest) {
+	now := time.Now().Unix()
+	seen := make(map[string]struct{}, len(req.OnlineIPs)+len(req.OnlineUUIDs))
+
+	for uuid := range req.OnlineIPs {
+		seen[uuid] = struct{}{}
+	}
+	for _, uuid := range req.OnlineUUIDs {
+		seen[uuid] = struct{}{}
+	}
+
+	for uuid := range seen {
+		key := fmt.Sprintf("device:%s:online_since", uuid)
+		h.redis.SetNX(ctx, key, now, sessionStartTTL)
+		h.redis.Expire(ctx, key, sessionStartTTL)
+	}
 }

@@ -6,16 +6,18 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/proximavpn/proxima-vpn/api-server/internal/services"
 )
 
 // UserPlanHandler handles user plan request endpoints.
 type UserPlanHandler struct {
-	db *pgxpool.Pool
+	db       *pgxpool.Pool
+	activity *services.ActivityService
 }
 
 // NewUserPlanHandler creates a new UserPlanHandler.
 func NewUserPlanHandler(db *pgxpool.Pool) *UserPlanHandler {
-	return &UserPlanHandler{db: db}
+	return &UserPlanHandler{db: db, activity: services.NewActivityService(db)}
 }
 
 type createPlanRequestBody struct {
@@ -113,6 +115,27 @@ func (h *UserPlanHandler) CreateRequest(c *fiber.Ctx) error {
 		`SELECT name FROM plans WHERE id = $1`,
 		resp.PlanID,
 	).Scan(&resp.PlanName)
+
+	var userEmail, userName string
+	_ = h.db.QueryRow(
+		context.Background(),
+		`SELECT email, name FROM users WHERE id = $1`,
+		userID,
+	).Scan(&userEmail, &userName)
+
+	h.activity.Log(context.Background(), services.Record{
+		EventType:  services.EventPlanRequested,
+		Severity:   services.SeverityInfo,
+		ActorType:  "user",
+		ActorID:    userID,
+		ActorLabel: userName,
+		TargetType: "plan_request",
+		TargetID:   resp.ID,
+		Detail: map[string]any{
+			"email": userEmail,
+			"plan":  resp.PlanName,
+		},
+	})
 
 	return c.Status(fiber.StatusCreated).JSON(resp)
 }

@@ -258,6 +258,45 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 		`ALTER TABLE nodes ADD COLUMN IF NOT EXISTS shaping_ok BOOLEAN NOT NULL DEFAULT true`,
 		`ALTER TABLE nodes ADD COLUMN IF NOT EXISTS shaping_tiers INT NOT NULL DEFAULT 0`,
 		`ALTER TABLE nodes ADD COLUMN IF NOT EXISTS shaping_error TEXT NOT NULL DEFAULT ''`,
+
+		// actor/target are untyped text rather than FKs: the feed has to outlive
+		// the rows it describes, and a cascade delete would erase the record of
+		// the deletion itself. target_* is null for events about the actor
+		// alone, such as a login.
+		`CREATE TABLE IF NOT EXISTS activity_logs (
+			id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			event_type  TEXT NOT NULL,
+			severity    TEXT NOT NULL DEFAULT 'info',
+			actor_type  TEXT NOT NULL DEFAULT 'system',
+			actor_id    TEXT NOT NULL DEFAULT '',
+			actor_label TEXT NOT NULL DEFAULT '',
+			target_type TEXT,
+			target_id   TEXT,
+			detail      JSONB NOT NULL DEFAULT '{}',
+			created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_activity_logs_created_at ON activity_logs(created_at DESC)`,
+
+		// What the dashboard's period-over-period deltas are measured against.
+		// The live figures cannot supply one: online users and online nodes
+		// exist only in Redis under a 60s TTL, so nothing can be asked what
+		// they were yesterday. Swept by scheduler/retention.go.
+		`CREATE TABLE IF NOT EXISTS dashboard_snapshots (
+			id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			active_alerts       INT NOT NULL DEFAULT 0,
+			online_nodes        INT NOT NULL DEFAULT 0,
+			total_nodes         INT NOT NULL DEFAULT 0,
+			online_users        INT NOT NULL DEFAULT 0,
+			total_users         INT NOT NULL DEFAULT 0,
+			traffic_today       BIGINT NOT NULL DEFAULT 0,
+			recorded_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_dashboard_snapshots_recorded_at
+			ON dashboard_snapshots(recorded_at DESC)`,
+
+		// Keeps the per-node traffic aggregation off a full scan of the window.
+		`CREATE INDEX IF NOT EXISTS idx_traffic_logs_node_created
+			ON traffic_logs(node_id, created_at DESC)`,
 	}
 	for _, m := range migrations {
 		if _, err := pool.Exec(ctx, m); err != nil {

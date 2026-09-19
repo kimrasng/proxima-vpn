@@ -7,6 +7,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/proximavpn/proxima-vpn/api-server/internal/services"
 	"github.com/proximavpn/proxima-vpn/pkg/crypto"
 )
 
@@ -23,6 +24,7 @@ type AdminAuthHandler struct {
 	db        *pgxpool.Pool
 	jwtSecret string
 	jwtExpiry time.Duration
+	activity  *services.ActivityService
 }
 
 // NewAdminAuthHandler creates a new AdminAuthHandler.
@@ -31,6 +33,7 @@ func NewAdminAuthHandler(db *pgxpool.Pool, jwtSecret string, jwtExpiry time.Dura
 		db:        db,
 		jwtSecret: jwtSecret,
 		jwtExpiry: jwtExpiry,
+		activity:  services.NewActivityService(db),
 	}
 }
 
@@ -127,6 +130,15 @@ func (h *AdminAuthHandler) Login(c *fiber.Ctx) error {
 			"error": "failed to generate token",
 		})
 	}
+
+	h.activity.Log(context.Background(), services.Record{
+		EventType:  services.EventAdminLogin,
+		Severity:   services.SeverityInfo,
+		ActorType:  "admin",
+		ActorID:    id,
+		ActorLabel: email,
+		Detail:     map[string]any{"ip": c.IP()},
+	})
 
 	return c.JSON(loginResponse{Token: tokenString})
 }

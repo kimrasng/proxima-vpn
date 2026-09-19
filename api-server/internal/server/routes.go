@@ -123,6 +123,9 @@ func (s *Server) registerRoutes() {
 	adminStatsHandler := handlers.NewAdminStatsHandler(s.db, services.NewOnlineTracker(s.redis))
 	admin.Get("/stats", adminStatsHandler.GetDashboardStats)
 	admin.Get("/stats/traffic-history", adminStatsHandler.GetTrafficHistory)
+	admin.Get("/stats/node-traffic", adminStatsHandler.GetNodeTraffic)
+	admin.Get("/stats/alerts", adminStatsHandler.GetAlerts)
+	admin.Get("/activity", adminStatsHandler.GetActivity)
 	admin.Get("/online-users", adminStatsHandler.GetOnlineUsers)
 
 	if s.backupService != nil {
