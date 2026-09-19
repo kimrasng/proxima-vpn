@@ -1,0 +1,20 @@
+schema = 1
+id = "TST-004"
+type = "test"
+title = "Threshold oscillation produces a single firing episode"
+description = "Drive a node across the fire threshold and back repeatedly inside the hysteresis band; assert exactly one fire transition and no resolve until the value stays below the clear threshold for the clear duration."
+status = "active"
+created_at = 2026-09-19T21:29:20+09:00
+updated_at = 2026-09-19T22:02:34+09:00
+
+[metadata]
+automated = true
+kind = "unit"
+
+[[relations]]
+to = "REQ-008"
+type = "verifies"
+
+[[relations]]
+to = "STT-001"
+type = "verifies"

@@ -1,0 +1,85 @@
+schema = 1
+id = "PHS-012"
+type = "phase"
+title = "User rework 2 - Per-user traffic and per-node usage endpoint"
+description = "Add a per-user per-node traffic aggregation to the stats service and an admin endpoint returning quota, used, remaining, percentage, and the per-node breakdown."
+status = "resolved"
+created_at = 2026-09-19T21:34:16+09:00
+updated_at = 2026-09-19T21:59:03+09:00
+
+[metadata]
+exit_criteria = "[The aggregation returns one row per node the user consumed traffic on Remaining traffic is never negative and an absent limit reports unlimited GET /api/v1/admin/users/:id/traffic serves the summary and the breakdown]"
+goal = "Expose a user plan quota, remaining traffic, and per-node usage to an admin"
+order = 2.0
+
+[[relations]]
+to = "PLN-003"
+type = "belongs_to"
+
+[[relations]]
+to = "ACT-011"
+type = "covers"
+
+[[relations]]
+to = "ACT-012"
+type = "covers"
+
+[[relations]]
+to = "API-014"
+type = "covers"
+
+[[relations]]
+to = "API-015"
+type = "covers"
+
+[[relations]]
+to = "DEC-013"
+type = "covers"
+
+[[relations]]
+to = "REQ-020"
+type = "covers"
+
+[[relations]]
+to = "TST-013"
+type = "covers"
+
+[[relations]]
+to = "TST-017"
+type = "covers"
+
+[[relations]]
+to = "ACT-011"
+type = "delivers"
+
+[[relations]]
+to = "ACT-012"
+type = "delivers"
+
+[[relations]]
+to = "API-014"
+type = "delivers"
+
+[[relations]]
+to = "API-015"
+type = "delivers"
+
+[[relations]]
+to = "DEC-013"
+type = "delivers"
+
+[[relations]]
+to = "REQ-020"
+type = "delivers"
+
+[[relations]]
+to = "TST-013"
+type = "delivers"
+
+[[relations]]
+to = "TST-017"
+type = "delivers"
+
+[[relations]]
+to = "PHS-013"
+type = "precedes"

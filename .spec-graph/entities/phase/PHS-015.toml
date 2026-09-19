@@ -1,0 +1,41 @@
+schema = 1
+id = "PHS-015"
+type = "phase"
+title = "User rework 5 - Build, deploy, and browser verification"
+description = "Build and deploy the stack, then drive the user list and user detail pages in a real browser across English, Korean, and Chinese, exercising editing, traffic display, and login history against live data."
+status = "resolved"
+created_at = 2026-09-19T21:34:17+09:00
+updated_at = 2026-09-19T21:59:04+09:00
+
+[metadata]
+exit_criteria = "[The api-server and web builds exit zero The list and detail pages render with live data in all three languages An edit saved on the detail page survives a reload A failed login appears in the login history list]"
+goal = "Prove the reworked surfaces behave correctly in a running deployment"
+order = 5.0
+
+[[relations]]
+to = "PLN-003"
+type = "belongs_to"
+
+[[relations]]
+to = "TST-014"
+type = "covers"
+
+[[relations]]
+to = "TST-015"
+type = "covers"
+
+[[relations]]
+to = "TST-016"
+type = "covers"
+
+[[relations]]
+to = "TST-014"
+type = "delivers"
+
+[[relations]]
+to = "TST-015"
+type = "delivers"
+
+[[relations]]
+to = "TST-016"
+type = "delivers"

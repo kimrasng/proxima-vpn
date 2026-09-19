@@ -1,0 +1,13 @@
+schema = 1
+id = "ACT-017"
+type = "criterion"
+title = "Saving on the detail page persists and reflects the change"
+description = "Changing a field on the detail page and saving stores the value and the reloaded page shows it."
+status = "active"
+created_at = 2026-09-19T21:31:34+09:00
+updated_at = 2026-09-19T21:32:19+09:00
+
+[metadata]
+given = "An admin on a user detail page"
+then = "The change is persisted and visible after the page reloads"
+when = "A field is changed and saved"

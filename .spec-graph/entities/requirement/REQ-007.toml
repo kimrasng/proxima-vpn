@@ -1,0 +1,24 @@
+schema = 1
+id = "REQ-007"
+type = "requirement"
+title = "An alert that appears and clears between polls must still be recorded"
+description = "Alert state is persisted and transitions are logged, so a condition that starts and ends inside one poll interval remains visible after the fact."
+status = "active"
+created_at = 2026-09-19T21:28:40+09:00
+updated_at = 2026-09-19T22:02:33+09:00
+
+[metadata]
+kind = "functional"
+priority = "must"
+
+[[relations]]
+to = "DEC-006"
+type = "constrained_by"
+
+[[relations]]
+to = "DEC-007"
+type = "constrained_by"
+
+[[relations]]
+to = "DEC-008"
+type = "constrained_by"

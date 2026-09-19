@@ -1,0 +1,16 @@
+schema = 1
+id = "REQ-016"
+type = "requirement"
+title = "An unobserved monitoring gap must not satisfy a sustained-breach condition"
+description = "If the evaluator has not run for several intervals, breach_since and clear_since reset, so a window in which nothing was sampled cannot count toward a for-duration."
+status = "active"
+created_at = 2026-09-19T21:28:40+09:00
+updated_at = 2026-09-19T22:02:34+09:00
+
+[metadata]
+kind = "non_functional"
+priority = "must"
+
+[[relations]]
+to = "DEC-009"
+type = "constrained_by"

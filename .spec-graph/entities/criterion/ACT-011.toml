@@ -1,0 +1,13 @@
+schema = 1
+id = "ACT-011"
+type = "criterion"
+title = "Remaining traffic is shown against the plan quota"
+description = "A user on a plan with a traffic limit shows used, remaining, and percentage consumed; a user with no limit shows an unlimited indication instead of a negative remainder."
+status = "active"
+created_at = 2026-09-19T21:31:34+09:00
+updated_at = 2026-09-19T21:32:19+09:00
+
+[metadata]
+given = "A user assigned a plan with a traffic limit"
+then = "Used, remaining, and percentage consumed are displayed and remaining is never negative"
+when = "The traffic panel renders"

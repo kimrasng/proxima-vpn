@@ -1,0 +1,20 @@
+schema = 1
+id = "TST-008"
+type = "test"
+title = "A stale evaluation gap resets the sustained-breach window"
+description = "Age evaluated_at beyond the gap guard and re-evaluate; assert breach_since restarts so the pre-gap window cannot satisfy the duration."
+status = "active"
+created_at = 2026-09-19T21:29:20+09:00
+updated_at = 2026-09-19T22:02:34+09:00
+
+[metadata]
+automated = true
+kind = "unit"
+
+[[relations]]
+to = "RSK-004"
+type = "mitigates"
+
+[[relations]]
+to = "REQ-016"
+type = "verifies"

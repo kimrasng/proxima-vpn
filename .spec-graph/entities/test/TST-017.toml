@@ -1,0 +1,19 @@
+schema = 1
+id = "TST-017"
+type = "test"
+title = "User traffic summary reports quota, remaining, and the unlimited case"
+description = "A check that a limited plan yields used, remaining, and percentage consumed with a non-negative remainder, and that a user without a traffic limit is reported as unlimited."
+status = "active"
+created_at = 2026-09-19T21:32:45+09:00
+updated_at = 2026-09-19T21:32:46+09:00
+
+[metadata]
+kind = "integration"
+
+[[relations]]
+to = "ACT-011"
+type = "verifies"
+
+[[relations]]
+to = "REQ-020"
+type = "verifies"

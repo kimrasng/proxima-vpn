@@ -1,0 +1,25 @@
+schema = 1
+id = "API-009"
+type = "interface"
+title = "Alert mutation endpoint for acknowledge and silence"
+description = "PATCH /api/v1/admin/alerts/:id accepting {ack:bool} or {silence_minutes:int}. Addressed by the stable alert row id, which survives resolve and re-fire because the row is keyed by node and kind."
+status = "active"
+created_at = 2026-09-19T21:29:20+09:00
+updated_at = 2026-09-19T22:02:44+09:00
+
+[metadata]
+kind = "rest"
+signature = "PATCH /api/v1/admin/alerts/:id {ack?: boolean, silence_minutes?: number}"
+stability = "experimental"
+
+[[relations]]
+to = "API-007"
+type = "depends_on"
+
+[[relations]]
+to = "REQ-011"
+type = "implements"
+
+[[relations]]
+to = "REQ-012"
+type = "implements"

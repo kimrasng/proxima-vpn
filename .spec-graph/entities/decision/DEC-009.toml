@@ -1,0 +1,17 @@
+schema = 1
+id = "DEC-009"
+type = "decision"
+title = "For-duration is tracked as breach_since and clear_since timestamps on the alert row"
+description = "Sustained-breach conditions are evaluated from timestamps on the alert row rather than by querying the node_metrics_history series on every sweep."
+status = "draft"
+created_at = 2026-09-19T21:28:40+09:00
+updated_at = 2026-09-19T21:28:40+09:00
+
+[metadata]
+kind = "architecture"
+rationale = "O(1) per node and kind, survives process restart, and is directly inspectable when debugging why something did not fire."
+status = "accepted"
+
+[[relations]]
+to = "RSK-004"
+type = "mitigates"

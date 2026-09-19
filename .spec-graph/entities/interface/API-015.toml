@@ -1,0 +1,19 @@
+schema = 1
+id = "API-015"
+type = "interface"
+title = "StatsService per-user per-node traffic aggregation"
+description = "A service method returning per-node upload and download totals for one user over a traffic window, joining traffic_logs to devices and nodes."
+status = "active"
+created_at = 2026-09-19T21:31:07+09:00
+updated_at = 2026-09-19T21:32:18+09:00
+
+[metadata]
+kind = "module"
+
+[[relations]]
+to = "DEC-013"
+type = "constrained_by"
+
+[[relations]]
+to = "REQ-020"
+type = "implements"

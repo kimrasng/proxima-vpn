@@ -1,0 +1,16 @@
+schema = 1
+id = "REQ-010"
+type = "requirement"
+title = "An alert must report how long its condition has been firing"
+description = "Each firing alert exposes fired_at and an elapsed duration, so a node that just failed is distinguishable from one that failed days ago."
+status = "active"
+created_at = 2026-09-19T21:28:40+09:00
+updated_at = 2026-09-19T22:02:33+09:00
+
+[metadata]
+kind = "functional"
+priority = "must"
+
+[[relations]]
+to = "DEC-006"
+type = "constrained_by"

@@ -1,0 +1,21 @@
+schema = 1
+id = "API-010"
+type = "interface"
+title = "Alerts response gains additive lifecycle fields"
+description = "NodeIssue gains state, fired_at, duration_seconds, acked, acked_by, silenced_until, alert_id. The envelope gains evaluated_at. Items, Total, and PendingRequests keep their existing meaning and JSON names."
+status = "active"
+created_at = 2026-09-19T21:29:20+09:00
+updated_at = 2026-09-19T22:02:34+09:00
+
+[metadata]
+kind = "rest"
+signature = "GET /api/v1/admin/stats/alerts -> {items,node_issues,total,pending_requests,evaluated_at}"
+stability = "experimental"
+
+[[relations]]
+to = "API-007"
+type = "depends_on"
+
+[[relations]]
+to = "REQ-014"
+type = "implements"

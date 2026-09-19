@@ -1,0 +1,20 @@
+schema = 1
+id = "TST-007"
+type = "test"
+title = "First observation of an existing breach seeds without notifying"
+description = "Evaluate against a node already above threshold with no prior alert row; assert the row is created firing and the returned transition is not notifiable."
+status = "active"
+created_at = 2026-09-19T21:29:20+09:00
+updated_at = 2026-09-19T22:02:34+09:00
+
+[metadata]
+automated = true
+kind = "unit"
+
+[[relations]]
+to = "RSK-003"
+type = "mitigates"
+
+[[relations]]
+to = "REQ-015"
+type = "verifies"

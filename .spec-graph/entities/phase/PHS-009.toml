@@ -1,0 +1,29 @@
+schema = 1
+id = "PHS-009"
+type = "phase"
+title = "Phase 5 - Alert history on the node detail page"
+description = "Index the activity target columns and surface each node's recent alert events where an operator already looks."
+status = "resolved"
+created_at = 2026-09-19T21:30:39+09:00
+updated_at = 2026-09-19T22:02:45+09:00
+
+[metadata]
+exit_criteria = "[activity target index exists node detail shows recent alert events]"
+goal = "Per-node alert history is reachable"
+order = 5.0
+
+[[relations]]
+to = "PLN-002"
+type = "belongs_to"
+
+[[relations]]
+to = "TST-011"
+type = "covers"
+
+[[relations]]
+to = "TST-011"
+type = "delivers"
+
+[[relations]]
+to = "PHS-010"
+type = "precedes"

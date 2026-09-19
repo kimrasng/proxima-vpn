@@ -1,0 +1,27 @@
+schema = 1
+id = "TST-016"
+type = "test"
+title = "Admin user list renders one action control and status-driven severity"
+description = "A browser check that each user row exposes a single action control and that a pending user renders a localized pending label with a non-error severity."
+status = "active"
+created_at = 2026-09-19T21:32:45+09:00
+updated_at = 2026-09-19T21:32:46+09:00
+
+[metadata]
+kind = "e2e"
+
+[[relations]]
+to = "ACT-009"
+type = "verifies"
+
+[[relations]]
+to = "ACT-010"
+type = "verifies"
+
+[[relations]]
+to = "REQ-018"
+type = "verifies"
+
+[[relations]]
+to = "REQ-019"
+type = "verifies"

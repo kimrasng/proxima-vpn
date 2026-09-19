@@ -1,0 +1,13 @@
+schema = 1
+id = "ACT-018"
+type = "criterion"
+title = "The user detail breadcrumb shows the list ancestor and the user"
+description = "The breadcrumb on the detail page reads Dashboard, then Users linking to the list, then the user identity."
+status = "active"
+created_at = 2026-09-19T21:31:34+09:00
+updated_at = 2026-09-19T21:32:19+09:00
+
+[metadata]
+given = "An admin on a user detail page"
+then = "It shows the dashboard root, a Users crumb linking to /admin/users, and the user identity as the leaf"
+when = "The breadcrumb renders"

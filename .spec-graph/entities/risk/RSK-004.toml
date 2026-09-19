@@ -1,0 +1,13 @@
+schema = 1
+id = "RSK-004"
+type = "risk"
+title = "A monitoring gap could satisfy a duration condition across unsampled time"
+description = "breach_since surviving a long outage lets a five-minute condition be met over a window in which nothing was observed."
+status = "draft"
+created_at = 2026-09-19T21:29:20+09:00
+updated_at = 2026-09-19T21:29:20+09:00
+
+[metadata]
+likelihood = "possible"
+severity = "medium"
+status = "mitigated"

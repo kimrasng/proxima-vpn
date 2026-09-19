@@ -1,0 +1,17 @@
+schema = 1
+id = "DEC-011"
+type = "decision"
+title = "Pending plan requests are a work queue, not a system alert"
+description = "pending_requests stops being injected into alert Items and stops contributing to Total. The separate PendingRequests field is retained and surfaced as its own approvals affordance."
+status = "draft"
+created_at = 2026-09-19T21:28:40+09:00
+updated_at = 2026-09-19T21:28:40+09:00
+
+[metadata]
+kind = "architecture"
+rationale = "Mixing paperwork into active_alerts inflates the alert count and has been recording problems and approvals as a single snapshot series."
+status = "accepted"
+
+[[relations]]
+to = "RSK-005"
+type = "mitigates"

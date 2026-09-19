@@ -1,0 +1,13 @@
+schema = 1
+id = "ACT-013"
+type = "criterion"
+title = "A failed login attempt is recorded and visible"
+description = "Submitting a wrong password produces a login-history row marked unsuccessful with the client address, and it appears in the admin login history list."
+status = "active"
+created_at = 2026-09-19T21:31:34+09:00
+updated_at = 2026-09-19T21:32:19+09:00
+
+[metadata]
+given = "A registered user account"
+then = "A login_history row is written with success false, a failure reason, and the client address, and the admin list shows it"
+when = "A login is attempted with an incorrect password"

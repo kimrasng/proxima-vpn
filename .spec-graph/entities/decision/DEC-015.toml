@@ -1,0 +1,12 @@
+schema = 1
+id = "DEC-015"
+type = "decision"
+title = "Reuse the established Cloudscape detail-page pattern for user detail"
+description = "The user detail page follows the NodeDetail composition already in the codebase: ContentLayout with a Header, Grid rows of paired Containers, KeyValuePairs for identity, Table for tabular data, and the breadcrumb leaf published through usePublishBreadcrumbLeaf."
+status = "active"
+created_at = 2026-09-19T21:31:06+09:00
+updated_at = 2026-09-19T21:32:18+09:00
+
+[metadata]
+date = "2026-09-19"
+rationale = "NodeDetail already sets the admin detail-page convention; diverging would fragment the admin UI."

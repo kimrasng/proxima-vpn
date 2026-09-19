@@ -1,0 +1,19 @@
+schema = 1
+id = "TST-014"
+type = "test"
+title = "Admin user list and detail render localized in three languages"
+description = "A browser check that the user list and user detail pages render with no foreign-language fallback in English, Korean, and Chinese."
+status = "active"
+created_at = 2026-09-19T21:31:50+09:00
+updated_at = 2026-09-19T21:32:19+09:00
+
+[metadata]
+kind = "e2e"
+
+[[relations]]
+to = "ACT-008"
+type = "verifies"
+
+[[relations]]
+to = "REQ-017"
+type = "verifies"

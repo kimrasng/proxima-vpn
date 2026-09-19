@@ -1,0 +1,21 @@
+schema = 1
+id = "STT-001"
+type = "state"
+title = "Alert lifecycle state machine"
+description = "ok -> pending on first breach; pending -> firing once the breach holds for the rule duration; firing -> ok once the clear condition holds for the clear duration; firing or pending -> stale when the node stops reporting and the rule is a resource rule; stale -> firing or ok when reporting resumes."
+status = "draft"
+created_at = 2026-09-19T21:29:20+09:00
+updated_at = 2026-09-19T21:29:20+09:00
+
+[metadata]
+initial = "ok"
+states = "[ok pending firing stale]"
+transitions = "[map[from:ok on:breach observed to:pending] map[from:pending on:breach sustained for rule duration to:firing] map[from:pending on:clear observed to:ok] map[from:firing on:clear sustained for clear duration to:ok] map[from:firing on:node stopped reporting to:stale] map[from:pending on:node stopped reporting to:stale] map[from:stale on:reporting resumed still breaching to:firing] map[from:stale on:reporting resumed and cleared to:ok]]"
+
+[[relations]]
+to = "DEC-009"
+type = "constrained_by"
+
+[[relations]]
+to = "DEC-010"
+type = "constrained_by"

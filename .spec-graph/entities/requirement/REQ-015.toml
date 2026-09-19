@@ -1,0 +1,12 @@
+schema = 1
+id = "REQ-015"
+type = "requirement"
+title = "Deploying or restarting must not emit a burst of notifications"
+description = "A first observation of an already-breaching condition is seeded as firing without notifying, and notifications are suppressed for a startup grace window."
+status = "active"
+created_at = 2026-09-19T21:28:40+09:00
+updated_at = 2026-09-19T22:02:33+09:00
+
+[metadata]
+kind = "non_functional"
+priority = "must"

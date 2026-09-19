@@ -1,0 +1,29 @@
+schema = 1
+id = "PHS-013"
+type = "phase"
+title = "User rework 3 - Locale bundles and web API client"
+description = "Extend the en, ko, and zh bundles with the user status labels and the admin.userDetail subtree, and add the TypeScript types and client functions for the two new endpoints."
+status = "resolved"
+created_at = 2026-09-19T21:34:16+09:00
+updated_at = 2026-09-19T21:59:03+09:00
+
+[metadata]
+exit_criteria = "[The three bundles expose an identical key set The new endpoints have typed client functions The web type check passes]"
+goal = "Make every new string translatable and every new endpoint callable from the web app"
+order = 3.0
+
+[[relations]]
+to = "PLN-003"
+type = "belongs_to"
+
+[[relations]]
+to = "API-017"
+type = "covers"
+
+[[relations]]
+to = "API-017"
+type = "delivers"
+
+[[relations]]
+to = "PHS-014"
+type = "precedes"

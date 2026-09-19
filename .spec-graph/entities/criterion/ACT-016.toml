@@ -1,0 +1,13 @@
+schema = 1
+id = "ACT-016"
+type = "criterion"
+title = "Editing a user is reachable only as a page"
+description = "Choosing edit for a user navigates to /admin/users/:userId and the list page renders no edit modal."
+status = "active"
+created_at = 2026-09-19T21:31:34+09:00
+updated_at = 2026-09-19T21:32:19+09:00
+
+[metadata]
+given = "An admin on the user list"
+then = "The browser navigates to the user detail route and no modal is displayed"
+when = "Edit is chosen for a user"

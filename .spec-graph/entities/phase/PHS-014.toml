@@ -1,0 +1,133 @@
+schema = 1
+id = "PHS-014"
+type = "phase"
+title = "User rework 4 - User list cleanup and user detail page"
+description = "Localize the user list, consolidate row actions into one dropdown, remove the edit modal, and add the routed user detail page with identity, edit form, traffic, per-node usage, devices, and login history, including route and breadcrumb registration."
+status = "resolved"
+created_at = 2026-09-19T21:34:16+09:00
+updated_at = 2026-09-19T21:59:03+09:00
+
+[metadata]
+exit_criteria = "[The list renders one action control per row with no hardcoded English The edit modal is gone from the list page /admin/users/:userId renders identity, edit form, traffic, per-node usage, devices, and login history The detail breadcrumb shows the dashboard root, a Users crumb, and the user identity]"
+goal = "Move user editing onto a routed detail page and leave a clean localized list behind"
+order = 4.0
+
+[[relations]]
+to = "PLN-003"
+type = "belongs_to"
+
+[[relations]]
+to = "ACT-008"
+type = "covers"
+
+[[relations]]
+to = "ACT-009"
+type = "covers"
+
+[[relations]]
+to = "ACT-010"
+type = "covers"
+
+[[relations]]
+to = "ACT-016"
+type = "covers"
+
+[[relations]]
+to = "ACT-017"
+type = "covers"
+
+[[relations]]
+to = "ACT-018"
+type = "covers"
+
+[[relations]]
+to = "API-016"
+type = "covers"
+
+[[relations]]
+to = "API-018"
+type = "covers"
+
+[[relations]]
+to = "DEC-014"
+type = "covers"
+
+[[relations]]
+to = "DEC-015"
+type = "covers"
+
+[[relations]]
+to = "REQ-017"
+type = "covers"
+
+[[relations]]
+to = "REQ-018"
+type = "covers"
+
+[[relations]]
+to = "REQ-019"
+type = "covers"
+
+[[relations]]
+to = "REQ-022"
+type = "covers"
+
+[[relations]]
+to = "ACT-008"
+type = "delivers"
+
+[[relations]]
+to = "ACT-009"
+type = "delivers"
+
+[[relations]]
+to = "ACT-010"
+type = "delivers"
+
+[[relations]]
+to = "ACT-016"
+type = "delivers"
+
+[[relations]]
+to = "ACT-017"
+type = "delivers"
+
+[[relations]]
+to = "ACT-018"
+type = "delivers"
+
+[[relations]]
+to = "API-016"
+type = "delivers"
+
+[[relations]]
+to = "API-018"
+type = "delivers"
+
+[[relations]]
+to = "DEC-014"
+type = "delivers"
+
+[[relations]]
+to = "DEC-015"
+type = "delivers"
+
+[[relations]]
+to = "REQ-017"
+type = "delivers"
+
+[[relations]]
+to = "REQ-018"
+type = "delivers"
+
+[[relations]]
+to = "REQ-019"
+type = "delivers"
+
+[[relations]]
+to = "REQ-022"
+type = "delivers"
+
+[[relations]]
+to = "PHS-015"
+type = "precedes"

@@ -1,0 +1,8 @@
+schema = 1
+id = "PLN-003"
+type = "plan"
+title = "Admin user management rework"
+description = "Localize the admin user surfaces, consolidate row actions, expose plan traffic and per-node usage, persist and expose login history, and move user editing from a modal onto a routed detail page. Held in draft because the stateful node alerting plan currently holds the single active plan slot."
+status = "draft"
+created_at = 2026-09-19T21:34:16+09:00
+updated_at = 2026-09-19T21:34:16+09:00

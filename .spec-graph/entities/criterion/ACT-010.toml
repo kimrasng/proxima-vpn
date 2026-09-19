@@ -1,0 +1,13 @@
+schema = 1
+id = "ACT-010"
+type = "criterion"
+title = "Pending status renders as pending, not as failure"
+description = "A user whose status is pending renders a localized pending label with a non-error severity."
+status = "active"
+created_at = 2026-09-19T21:31:34+09:00
+updated_at = 2026-09-19T21:32:19+09:00
+
+[metadata]
+given = "A user with status pending"
+then = "The label is the localized pending text and the severity is not the error severity"
+when = "The status cell renders"

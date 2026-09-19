@@ -1,0 +1,13 @@
+schema = 1
+id = "RSK-003"
+type = "risk"
+title = "First deploy could emit a notification burst"
+description = "Every node already past a threshold transitions to firing in the first sweep. Without seeding, each one notifies at once."
+status = "draft"
+created_at = 2026-09-19T21:29:20+09:00
+updated_at = 2026-09-19T21:29:20+09:00
+
+[metadata]
+likelihood = "likely"
+severity = "high"
+status = "mitigated"

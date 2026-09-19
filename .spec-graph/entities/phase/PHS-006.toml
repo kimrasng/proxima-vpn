@@ -1,0 +1,29 @@
+schema = 1
+id = "PHS-006"
+type = "phase"
+title = "Phase 2 - Separate pending approvals from alerts"
+description = "Stop counting pending plan requests as alerts while keeping the pending_requests field, and surface approvals as their own affordance."
+status = "resolved"
+created_at = 2026-09-19T21:30:39+09:00
+updated_at = 2026-09-19T22:02:44+09:00
+
+[metadata]
+exit_criteria = "[pending requests no longer appear in Items or Total approvals remain visible and reachable]"
+goal = "Alert counts mean system conditions only"
+order = 2.0
+
+[[relations]]
+to = "PLN-002"
+type = "belongs_to"
+
+[[relations]]
+to = "TST-010"
+type = "covers"
+
+[[relations]]
+to = "TST-010"
+type = "delivers"
+
+[[relations]]
+to = "PHS-007"
+type = "precedes"

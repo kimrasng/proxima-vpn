@@ -1,0 +1,25 @@
+schema = 1
+id = "PHS-010"
+type = "phase"
+title = "Phase 6 - Alert on Xray and shaping health"
+description = "Raise alerts for an online node whose Xray is not running and for a node whose shaping failed to apply."
+status = "resolved"
+created_at = 2026-09-19T21:30:39+09:00
+updated_at = 2026-09-19T22:02:45+09:00
+
+[metadata]
+exit_criteria = "[xray_down fires for an online node with xray_running false shaping_failed fires when shaping_ok is false]"
+goal = "A node that is up but not serving is no longer reported as healthy"
+order = 6.0
+
+[[relations]]
+to = "PLN-002"
+type = "belongs_to"
+
+[[relations]]
+to = "REQ-013"
+type = "covers"
+
+[[relations]]
+to = "REQ-013"
+type = "delivers"

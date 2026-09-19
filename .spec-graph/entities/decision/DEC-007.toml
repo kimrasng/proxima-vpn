@@ -1,0 +1,13 @@
+schema = 1
+id = "DEC-007"
+type = "decision"
+title = "Alert history is emitted into the existing activity_logs, not a new table"
+description = "Fire, resolve, and ack transitions are logged as activity_logs events with target_type=node. activity_logs already carries node.offline as a system condition, so it is already an operator event feed rather than a pure audit log."
+status = "draft"
+created_at = 2026-09-19T21:28:39+09:00
+updated_at = 2026-09-19T21:28:39+09:00
+
+[metadata]
+kind = "architecture"
+rationale = "A second near-identical append-only table would duplicate retention and list endpoints for no gain at this scale."
+status = "accepted"

@@ -1,0 +1,16 @@
+schema = 1
+id = "TST-005"
+type = "test"
+title = "A node breaching two rules yields two alerts"
+description = "Set a node offline while its disk value is above the disk threshold; assert both an offline alert and a disk alert exist for that node."
+status = "active"
+created_at = 2026-09-19T21:29:20+09:00
+updated_at = 2026-09-19T22:02:34+09:00
+
+[metadata]
+automated = true
+kind = "unit"
+
+[[relations]]
+to = "REQ-009"
+type = "verifies"

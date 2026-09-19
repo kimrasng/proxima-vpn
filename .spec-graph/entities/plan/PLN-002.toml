@@ -1,0 +1,11 @@
+schema = 1
+id = "PLN-002"
+type = "plan"
+title = "Stateful node alerting"
+description = "Replace the stateless alert recompute with a persisted, deduplicated, hysteresis-damped alert lifecycle that an operator can acknowledge and silence, and that surfaces the node health conditions currently going unreported."
+status = "active"
+created_at = 2026-09-19T21:30:39+09:00
+updated_at = 2026-09-19T21:31:29+09:00
+
+[metadata]
+goal = "Alerts persist, damp, and carry lifecycle so an operator can trust and act on them."

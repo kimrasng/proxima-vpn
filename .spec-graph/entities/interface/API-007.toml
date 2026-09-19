@@ -1,0 +1,21 @@
+schema = 1
+id = "API-007"
+type = "interface"
+title = "node_alerts table schema"
+description = "One row per (node_id, kind) holding state, severity, last value, breach_since, clear_since, fired_at, resolved_at, notified_at, acked_at, acked_by, silenced_until, evaluated_at. UNIQUE (node_id, kind); node_id references nodes ON DELETE CASCADE."
+status = "active"
+created_at = 2026-09-19T21:29:20+09:00
+updated_at = 2026-09-19T22:02:34+09:00
+
+[metadata]
+kind = "module"
+signature = "CREATE TABLE node_alerts (id UUID PK, node_id UUID FK, kind TEXT, state TEXT, severity TEXT, value REAL, breach_since TIMESTAMPTZ, clear_since TIMESTAMPTZ, fired_at TIMESTAMPTZ, resolved_at TIMESTAMPTZ, notified_at TIMESTAMPTZ, acked_at TIMESTAMPTZ, acked_by TEXT, silenced_until TIMESTAMPTZ, evaluated_at TIMESTAMPTZ, UNIQUE(node_id,kind))"
+stability = "experimental"
+
+[[relations]]
+to = "REQ-007"
+type = "implements"
+
+[[relations]]
+to = "REQ-010"
+type = "implements"

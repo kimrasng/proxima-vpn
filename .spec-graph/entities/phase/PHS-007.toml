@@ -1,0 +1,45 @@
+schema = 1
+id = "PHS-007"
+type = "phase"
+title = "Phase 3 - Acknowledge"
+description = "Add the alert mutation endpoint and the acknowledge affordance, and exclude acknowledged alerts from the notifiable count."
+status = "resolved"
+created_at = 2026-09-19T21:30:39+09:00
+updated_at = 2026-09-19T22:02:44+09:00
+
+[metadata]
+exit_criteria = "[acknowledge round-trips through the API acknowledged alerts stay visible but leave the badge count acknowledgement clears on resolve]"
+goal = "An operator can silence the badge without hiding the problem"
+order = 3.0
+
+[[relations]]
+to = "PLN-002"
+type = "belongs_to"
+
+[[relations]]
+to = "API-009"
+type = "covers"
+
+[[relations]]
+to = "REQ-011"
+type = "covers"
+
+[[relations]]
+to = "TST-009"
+type = "covers"
+
+[[relations]]
+to = "API-009"
+type = "delivers"
+
+[[relations]]
+to = "REQ-011"
+type = "delivers"
+
+[[relations]]
+to = "TST-009"
+type = "delivers"
+
+[[relations]]
+to = "PHS-008"
+type = "precedes"

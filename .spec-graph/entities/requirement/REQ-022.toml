@@ -1,0 +1,29 @@
+schema = 1
+id = "REQ-022"
+type = "requirement"
+title = "User editing happens on a routed detail page instead of a modal"
+description = "The admin edits a user on a routed page at /admin/users/:userId that also presents identity, plan, traffic, devices, and login history. The previous edit modal is removed from the list page."
+status = "active"
+created_at = 2026-09-19T21:31:06+09:00
+updated_at = 2026-09-19T21:32:18+09:00
+
+[metadata]
+kind = "functional"
+owner = "web"
+priority = "must"
+
+[[relations]]
+to = "DEC-014"
+type = "constrained_by"
+
+[[relations]]
+to = "ACT-016"
+type = "has_criterion"
+
+[[relations]]
+to = "ACT-017"
+type = "has_criterion"
+
+[[relations]]
+to = "ACT-018"
+type = "has_criterion"

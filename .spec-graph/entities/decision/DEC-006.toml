@@ -1,0 +1,13 @@
+schema = 1
+id = "DEC-006"
+type = "decision"
+title = "Alert state lives in one bounded table keyed by node and kind"
+description = "Alerts are persisted in node_alerts with UNIQUE (node_id, kind). The row IS the dedup key, so 'already firing' is a primary-key lookup. Bounded at nodes x kinds, so no retention sweep is needed. Rejected: an unbounded episode log, and keeping stateless recompute with side tables."
+status = "draft"
+created_at = 2026-09-19T21:28:39+09:00
+updated_at = 2026-09-19T21:28:39+09:00
+
+[metadata]
+kind = "architecture"
+rationale = "A bounded state row makes dedup a PK lookup and lets ack/silence live as columns on a row that exists whether or not the alert fires, which is what enables a pre-emptive maintenance silence."
+status = "accepted"

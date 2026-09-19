@@ -1,0 +1,13 @@
+schema = 1
+id = "RSK-005"
+type = "risk"
+title = "The active_alerts snapshot series changes meaning at deploy"
+description = "Removing pending requests and excluding acked, silenced, and stale alerts steps the historical series down once. Expected, not a regression to chase."
+status = "draft"
+created_at = 2026-09-19T21:29:20+09:00
+updated_at = 2026-09-19T21:29:20+09:00
+
+[metadata]
+likelihood = "certain"
+severity = "low"
+status = "accepted"

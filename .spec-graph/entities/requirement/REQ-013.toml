@@ -1,0 +1,12 @@
+schema = 1
+id = "REQ-013"
+type = "requirement"
+title = "A node whose Xray is dead must not read as healthy"
+description = "xray_running=false on an online node, and shaping_ok=false, each raise an alert. Both columns are already reported by the agent and nothing alerts on them today."
+status = "active"
+created_at = 2026-09-19T21:28:40+09:00
+updated_at = 2026-09-19T22:02:45+09:00
+
+[metadata]
+kind = "functional"
+priority = "must"

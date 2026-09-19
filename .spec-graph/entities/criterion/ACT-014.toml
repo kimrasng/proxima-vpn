@@ -1,0 +1,13 @@
+schema = 1
+id = "ACT-014"
+type = "criterion"
+title = "A successful login is recorded with address and time"
+description = "A successful login produces a login-history row marked successful with the client address and the attempt timestamp."
+status = "active"
+created_at = 2026-09-19T21:31:34+09:00
+updated_at = 2026-09-19T21:32:19+09:00
+
+[metadata]
+given = "A registered user account"
+then = "A login_history row is written with success true, the client address, and a timestamp"
+when = "The user logs in with correct credentials"

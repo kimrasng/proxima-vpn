@@ -1,0 +1,19 @@
+schema = 1
+id = "TST-013"
+type = "test"
+title = "Per-user per-node traffic aggregation returns one row per node"
+description = "A check that the aggregation returns a row per node the user consumed traffic on, with upload and download summed over the requested window."
+status = "active"
+created_at = 2026-09-19T21:31:50+09:00
+updated_at = 2026-09-19T21:32:19+09:00
+
+[metadata]
+kind = "integration"
+
+[[relations]]
+to = "ACT-012"
+type = "verifies"
+
+[[relations]]
+to = "REQ-020"
+type = "verifies"

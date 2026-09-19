@@ -1,0 +1,17 @@
+schema = 1
+id = "DEC-010"
+type = "decision"
+title = "Resource alerts freeze as stale when a node goes offline instead of auto-resolving"
+description = "An offline node stops reporting, so its cpu, memory, and disk columns hold frozen last-known values. Resource alerts keep fired_at, move to state=stale, are excluded from counts, and emit nothing."
+status = "draft"
+created_at = 2026-09-19T21:28:40+09:00
+updated_at = 2026-09-19T21:28:40+09:00
+
+[metadata]
+kind = "architecture"
+rationale = "Auto-resolving would assert a recovery nobody observed, emit a false resolve event, and guarantee a re-fire plus a second notification when the node returns."
+status = "accepted"
+
+[[relations]]
+to = "RSK-003"
+type = "mitigates"

@@ -1,0 +1,29 @@
+schema = 1
+id = "PHS-008"
+type = "phase"
+title = "Phase 4 - Silence"
+description = "Add time-boxed silences per node and kind, suppress notifications while silenced, and show silenced alerts separately."
+status = "resolved"
+created_at = 2026-09-19T21:30:39+09:00
+updated_at = 2026-09-19T22:02:44+09:00
+
+[metadata]
+exit_criteria = "[silence round-trips with preset durations silenced alerts are excluded from the badge and from notification silence expiry restores normal behavior]"
+goal = "Planned maintenance does not page anyone"
+order = 4.0
+
+[[relations]]
+to = "PLN-002"
+type = "belongs_to"
+
+[[relations]]
+to = "REQ-012"
+type = "covers"
+
+[[relations]]
+to = "REQ-012"
+type = "delivers"
+
+[[relations]]
+to = "PHS-009"
+type = "precedes"

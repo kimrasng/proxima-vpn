@@ -1,0 +1,105 @@
+schema = 1
+id = "PHS-011"
+type = "phase"
+title = "User rework 1 - Login history persistence and admin endpoint"
+description = "Add the login_history table, a service to record and list attempts, wire recording into the user and admin login paths for both outcomes, and expose a per-user admin listing endpoint."
+status = "resolved"
+created_at = 2026-09-19T21:34:16+09:00
+updated_at = 2026-09-19T21:59:03+09:00
+
+[metadata]
+exit_criteria = "[login_history table is created on boot A successful and a failed login each write exactly one row No credential material is stored in any column GET /api/v1/admin/users/:id/login-history returns the attempts newest first]"
+goal = "Persist every login attempt with address, agent, and outcome, and expose one user attempts to an admin"
+order = 1.0
+
+[[relations]]
+to = "PLN-003"
+type = "belongs_to"
+
+[[relations]]
+to = "ACT-013"
+type = "covers"
+
+[[relations]]
+to = "ACT-014"
+type = "covers"
+
+[[relations]]
+to = "ACT-015"
+type = "covers"
+
+[[relations]]
+to = "API-011"
+type = "covers"
+
+[[relations]]
+to = "API-012"
+type = "covers"
+
+[[relations]]
+to = "API-013"
+type = "covers"
+
+[[relations]]
+to = "DEC-012"
+type = "covers"
+
+[[relations]]
+to = "DEC-016"
+type = "covers"
+
+[[relations]]
+to = "REQ-021"
+type = "covers"
+
+[[relations]]
+to = "RSK-006"
+type = "covers"
+
+[[relations]]
+to = "TST-012"
+type = "covers"
+
+[[relations]]
+to = "ACT-013"
+type = "delivers"
+
+[[relations]]
+to = "ACT-014"
+type = "delivers"
+
+[[relations]]
+to = "ACT-015"
+type = "delivers"
+
+[[relations]]
+to = "API-011"
+type = "delivers"
+
+[[relations]]
+to = "API-012"
+type = "delivers"
+
+[[relations]]
+to = "API-013"
+type = "delivers"
+
+[[relations]]
+to = "DEC-012"
+type = "delivers"
+
+[[relations]]
+to = "DEC-016"
+type = "delivers"
+
+[[relations]]
+to = "REQ-021"
+type = "delivers"
+
+[[relations]]
+to = "TST-012"
+type = "delivers"
+
+[[relations]]
+to = "PHS-012"
+type = "precedes"

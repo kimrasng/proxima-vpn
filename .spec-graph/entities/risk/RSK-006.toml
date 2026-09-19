@@ -1,0 +1,12 @@
+schema = 1
+id = "RSK-006"
+type = "risk"
+title = "Recording failed logins creates an unauthenticated append path"
+description = "The login endpoint is reachable without credentials, so recording every failed attempt lets an unauthenticated caller append rows to login_history and grow the table."
+status = "active"
+created_at = 2026-09-19T21:31:50+09:00
+updated_at = 2026-09-19T21:32:19+09:00
+
+[metadata]
+impact = "medium"
+likelihood = "medium"
