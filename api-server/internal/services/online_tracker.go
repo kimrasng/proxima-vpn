@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"encoding/json"
+	"strconv"
 	"strings"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -298,4 +299,38 @@ func (t *OnlineTracker) scanKeys(ctx context.Context, pattern string) ([]string,
 		return nil, err
 	}
 	return keys, nil
+}
+
+// GetSessionStarts returns the unix second each device was first seen online in
+// its current session. UUIDs without a stamp are omitted rather than defaulted
+// to now, which would report an unknown session age as a brand new connection.
+func (t *OnlineTracker) GetSessionStarts(ctx context.Context, uuids []string) (map[string]int64, error) {
+	starts := make(map[string]int64, len(uuids))
+	if len(uuids) == 0 {
+		return starts, nil
+	}
+
+	keys := make([]string, 0, len(uuids))
+	for _, uuid := range uuids {
+		keys = append(keys, "device:"+uuid+":online_since")
+	}
+
+	values, err := t.redis.MGet(ctx, keys...).Result()
+	if err != nil {
+		return starts, err
+	}
+
+	for i, raw := range values {
+		text, ok := raw.(string)
+		if !ok {
+			continue
+		}
+		seconds, err := strconv.ParseInt(text, 10, 64)
+		if err != nil {
+			continue
+		}
+		starts[uuids[i]] = seconds
+	}
+
+	return starts, nil
 }
