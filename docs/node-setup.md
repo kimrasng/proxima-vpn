@@ -87,6 +87,38 @@ systemctl stop node-agent
 
 Configuration lives at `/etc/node-agent/config.json`.
 
+## Updating the Node Agent
+
+The agent heartbeats every 10 seconds and the panel marks a node offline after
+40 seconds of silence. An agent older than that change beats every 30 seconds
+and will be reported offline between beats, so the panel and the agents must be
+updated together.
+
+Build the panel with a version stamp, so agents can tell old from new:
+
+```bash
+docker compose build --build-arg AGENT_VERSION=v0.2.0 api
+docker compose up -d api
+```
+
+Then either roll out automatically, or update each node by hand.
+
+**Automatic.** Set the target version once and every agent picks it up within
+five minutes, replaces its own binary, and restarts:
+
+```sql
+INSERT INTO settings (key, value) VALUES ('agent_target_version', 'v0.2.0')
+ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
+```
+
+**By hand**, on each node:
+
+```bash
+bash <(curl -s https://your-panel.com/scripts/update.sh) --agent-only
+```
+
+Confirm what a node is running with `node-agent version`.
+
 ## Uninstalling a Node
 
 ```bash
