@@ -40,9 +40,20 @@ func main() {
 	rootCmd.AddCommand(registerCmd())
 	rootCmd.AddCommand(unregisterCmd())
 	rootCmd.AddCommand(runCmd())
+	rootCmd.AddCommand(versionCmd())
 
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
+	}
+}
+
+func versionCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "version",
+		Short: "Print the agent version",
+		Run: func(cmd *cobra.Command, args []string) {
+			fmt.Println(version)
+		},
 	}
 }
 
@@ -241,7 +252,7 @@ func runCmd() *cobra.Command {
 }
 
 // versionHolder is a concurrency-safe box for the currently-running Xray
-// version, shared between heartbeatLoop (reads it every 30s) and
+// version, shared between heartbeatLoop (reads it every beat) and
 // xrayUpdateLoop (updates it after a successful binary swap).
 type versionHolder struct {
 	mu sync.RWMutex
