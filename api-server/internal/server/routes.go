@@ -85,13 +85,6 @@ func (s *Server) registerRoutes() {
 	plans.Put("/:id", adminPlanHandler.Update)
 	plans.Delete("/:id", adminPlanHandler.Delete)
 
-	adminUserTemplateHandler := handlers.NewAdminUserTemplateHandler(s.db)
-	userTemplates := admin.Group("/user-templates")
-	userTemplates.Post("/", adminUserTemplateHandler.Create)
-	userTemplates.Get("/", adminUserTemplateHandler.List)
-	userTemplates.Put("/:id", adminUserTemplateHandler.Update)
-	userTemplates.Delete("/:id", adminUserTemplateHandler.Delete)
-
 	adminUserHandler := handlers.NewAdminUserHandler(s.db)
 	adminUsers := admin.Group("/users")
 	adminUsers.Post("/", adminUserHandler.Create)

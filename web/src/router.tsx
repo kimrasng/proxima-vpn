@@ -18,7 +18,6 @@ import TwoFactor from "./pages/admin/TwoFactor";
 import NodeInbounds from "./pages/admin/NodeInbounds";
 import NodeDetail from "./pages/admin/NodeDetail";
 import Connections from "./pages/admin/Connections";
-import UserTemplates from "./pages/admin/UserTemplates";
 
 import Login from "./pages/auth/Login";
 import AdminLogin from "./pages/auth/AdminLogin";

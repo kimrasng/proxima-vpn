@@ -139,16 +139,6 @@ CREATE TABLE IF NOT EXISTS announcements (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS user_templates (
-    id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name           TEXT NOT NULL UNIQUE,
-    traffic_limit  BIGINT,
-    duration_days  INT NOT NULL DEFAULT 30,
-    max_devices    INT NOT NULL DEFAULT 1,
-    speed_limit    INT,
-    node_group_id  UUID REFERENCES node_groups(id),
-    created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
 
 CREATE TABLE IF NOT EXISTS inbounds (
     id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -243,7 +233,6 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 		// allowed unlimited concurrency. NULL means "fall back to max_devices"
 		// so existing plans keep their advertised number without a data fix.
 		`ALTER TABLE plans ADD COLUMN IF NOT EXISTS max_concurrent INT`,
-		`ALTER TABLE user_templates ADD COLUMN IF NOT EXISTS max_concurrent INT`,
 
 		// Set when a device is over its plan's concurrency cap. A deadline
 		// rather than a boolean: evicting always makes the count look healthy
@@ -314,6 +303,10 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 		// Keeps the per-node traffic aggregation off a full scan of the window.
 		`CREATE INDEX IF NOT EXISTS idx_traffic_logs_node_created
 			ON traffic_logs(node_id, created_at DESC)`,
+
+		// user_templates duplicated every plans column and was never read by
+		// anything: users carry plan_id, and nothing ever carried a template id.
+		`DROP TABLE IF EXISTS user_templates`,
 	}
 	for _, m := range migrations {
 		if _, err := pool.Exec(ctx, m); err != nil {

@@ -33,8 +33,6 @@ import type {
   Setting,
   Inbound,
   CreateInboundRequest,
-  UserTemplate,
-  CreateUserTemplateRequest,
   TrafficHistoryEntry,
   DashboardAlerts,
   NodeTraffic,
@@ -290,26 +288,6 @@ export function toggleInbound(id: string): Promise<Inbound> {
 export function deleteInbound(id: string): Promise<void> {
   applyAdminClient();
   return del<void>(`/api/v1/admin/inbounds/${id}`);
-}
-
-export function listUserTemplates(): Promise<UserTemplate[]> {
-  applyAdminClient();
-  return get<UserTemplate[]>('/api/v1/admin/user-templates');
-}
-
-export function createUserTemplate(req: CreateUserTemplateRequest): Promise<UserTemplate> {
-  applyAdminClient();
-  return post<UserTemplate>('/api/v1/admin/user-templates', req);
-}
-
-export function updateUserTemplate(id: string, req: Partial<CreateUserTemplateRequest>): Promise<UserTemplate> {
-  applyAdminClient();
-  return put<UserTemplate>(`/api/v1/admin/user-templates/${id}`, req);
-}
-
-export function deleteUserTemplate(id: string): Promise<void> {
-  applyAdminClient();
-  return del<void>(`/api/v1/admin/user-templates/${id}`);
 }
 
 export function getNodeTLSStatus(nodeId: string): Promise<NodeTLSStatus> {

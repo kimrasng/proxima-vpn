@@ -135,7 +135,6 @@ function AdminLayoutShell() {
       items: [
         { type: "link", text: t("admin.nav.users"), href: "/admin/users" },
         { type: "link", text: t("admin.nav.connections"), href: "/admin/connections" },
-        { type: "link", text: t("admin.nav.userTemplates"), href: "/admin/user-templates" },
         { type: "link", text: t("admin.nav.plans"), href: "/admin/plans" },
         {
           type: "link",
