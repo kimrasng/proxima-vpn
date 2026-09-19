@@ -348,7 +348,7 @@ export default function Dashboard() {
                 variant="h2"
                 counter={`(${alerts?.items.length ?? 0})`}
                 actions={
-                  <Link onFollow={() => navigate("/admin/nodes")}>{t("admin.dashboard.viewAll")}</Link>
+                  <Link onFollow={() => navigate("/admin/alerts")}>{t("admin.dashboard.viewAll")}</Link>
                 }
               >
                 {t("admin.dashboard.alertsTitle")}
@@ -573,7 +573,7 @@ export default function Dashboard() {
               <Header
                 variant="h2"
                 actions={
-                  <Link onFollow={() => navigate("/admin/users")}>{t("admin.dashboard.viewAll")}</Link>
+                  <Link onFollow={() => navigate("/admin/activity")}>{t("admin.dashboard.viewAll")}</Link>
                 }
               >
                 {t("admin.dashboard.recentActivity")}

@@ -7,6 +7,8 @@ import AdminAuthGuard from "./components/AdminAuthGuard";
 import UserAuthGuard from "./components/UserAuthGuard";
 
 import Dashboard from "./pages/admin/Dashboard";
+import Alerts from "./pages/admin/Alerts";
+import Activity from "./pages/admin/Activity";
 import Nodes from "./pages/admin/Nodes";
 import NodeGroups from "./pages/admin/NodeGroups";
 import Plans from "./pages/admin/Plans";
@@ -52,12 +54,13 @@ export const router = createBrowserRouter([
     ),
     children: [
       { path: "/admin/dashboard", element: <Dashboard /> },
+      { path: "/admin/alerts", element: <Alerts /> },
+      { path: "/admin/activity", element: <Activity /> },
       { path: "/admin/nodes", element: <Nodes /> },
       { path: "/admin/nodes/:nodeId", element: <NodeDetail /> },
       { path: "/admin/nodes/:nodeId/inbounds", element: <NodeInbounds /> },
       { path: "/admin/node-groups", element: <NodeGroups /> },
       { path: "/admin/plans", element: <Plans /> },
-      { path: "/admin/user-templates", element: <UserTemplates /> },
       { path: "/admin/users", element: <Users /> },
       { path: "/admin/connections", element: <Connections /> },
       { path: "/admin/plan-requests", element: <PlanRequests /> },

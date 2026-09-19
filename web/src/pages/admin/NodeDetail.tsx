@@ -36,6 +36,7 @@ import {
 import { getActivity, getNode, getNodeMetrics } from "../../api/admin";
 import type { ActivityEntry, Node, NodeMetricsEntry } from "../../api/types";
 import { usePublishBreadcrumbLeaf } from "../../hooks/useBreadcrumbLeaf";
+import { formatAbsoluteTime, formatRelativeTime } from "../../utils/relativeTime";
 
 const REFRESH_INTERVAL = 30000;
 
@@ -63,19 +64,6 @@ function formatBytes(bytes: number): string {
   const units = ["B", "KB", "MB", "GB", "TB"];
   const i = Math.floor(Math.log(bytes) / Math.log(1024));
   return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${units[i]}`;
-}
-
-function formatRelativeTime(dateStr: string | undefined | null): string {
-  if (!dateStr) return "—";
-  const diffMs = Date.now() - new Date(dateStr).getTime();
-  if (diffMs < 0) return "Just now";
-  const seconds = Math.floor(diffMs / 1000);
-  if (seconds < 60) return `${seconds}s ago`;
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.floor(hours / 24)}d ago`;
 }
 
 function formatChartTime(dateStr: string, hours: number): string {
@@ -327,11 +315,14 @@ export default function NodeDetail() {
           variant="h1"
           actions={
             <SpaceBetween direction="horizontal" size="xs">
-              <Button onClick={() => void fetchAll()}>{t("admin.nodeDetail.refresh")}</Button>
-              <Button onClick={() => navigate(`/admin/nodes/${nodeId}/inbounds`)}>
+              <Button
+                iconName="refresh"
+                ariaLabel={t("admin.nodeDetail.refresh")}
+                onClick={() => void fetchAll()}
+              />
+              <Button variant="primary" onClick={() => navigate(`/admin/nodes/${nodeId}/inbounds`)}>
                 {t("admin.nodeDetail.manageInbounds")}
               </Button>
-              <Button onClick={() => navigate("/admin/nodes")}>{t("admin.nodeDetail.back")}</Button>
             </SpaceBetween>
           }
           description={
@@ -368,8 +359,8 @@ export default function NodeDetail() {
                 {
                   label: t("admin.nodes.col.lastSeen"),
                   value: (
-                    <span title={node.last_seen ? new Date(node.last_seen).toLocaleString() : ""}>
-                      {formatRelativeTime(node.last_seen)}
+                    <span title={formatAbsoluteTime(node.last_seen)}>
+                      {formatRelativeTime(t, node.last_seen)}
                     </span>
                   ),
                 },

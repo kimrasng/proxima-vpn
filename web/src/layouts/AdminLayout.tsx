@@ -39,11 +39,12 @@ const ancestorTrails: Record<string, readonly { labelKey: string; href: string }
 
 const staticPageLabels: Record<string, string> = {
   "/admin/dashboard": "admin.nav.dashboard",
+  "/admin/alerts": "admin.nav.alerts",
+  "/admin/activity": "admin.nav.activity",
   "/admin/nodes": "admin.nav.nodes",
   "/admin/node-groups": "admin.nav.nodeGroups",
   "/admin/users": "admin.nav.users",
   "/admin/connections": "admin.nav.connections",
-  "/admin/user-templates": "admin.nav.userTemplates",
   "/admin/plans": "admin.nav.plans",
   "/admin/plan-requests": "admin.nav.planRequests",
   "/admin/announcements": "admin.nav.announcements",
@@ -53,11 +54,12 @@ const staticPageLabels: Record<string, string> = {
 
 const helpTopicKeys: Record<string, string> = {
   "/admin/dashboard": "admin.help.dashboard",
+  "/admin/alerts": "admin.help.alerts",
+  "/admin/activity": "admin.help.activity",
   "/admin/nodes": "admin.help.nodes",
   "/admin/node-groups": "admin.help.nodeGroups",
   "/admin/users": "admin.help.users",
   "/admin/connections": "admin.help.connections",
-  "/admin/user-templates": "admin.help.userTemplates",
   "/admin/plans": "admin.help.plans",
   "/admin/plan-requests": "admin.help.planRequests",
   "/admin/announcements": "admin.help.announcements",
