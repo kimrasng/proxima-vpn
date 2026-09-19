@@ -79,20 +79,27 @@ function countryFlag(code: string): string {
  * the right.
  *
  * `stale` is for a node that has stopped reporting. The figure is whatever it
- * last sent - possibly hours old - so it is dimmed and drops its severity
- * colour: a red bar on a node that is not running reads as a live problem.
+ * last sent - possibly hours old - so it is dimmed, drops its severity colour
+ * (a red bar on a node that is not running reads as a live problem), and says
+ * on hover how old it actually is.
  */
 function UsageCell({
   label,
   value,
   stale,
+  ageLabel,
 }: {
   label: string;
   value: number | undefined;
   stale?: boolean;
+  /** Age of the figure, shown on hover. Only meaningful when stale. */
+  ageLabel?: string;
 }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+    <div
+      style={{ display: "flex", alignItems: "center", gap: "8px" }}
+      title={stale ? ageLabel : undefined}
+    >
       <Box variant="small" color="text-body-secondary">
         <span style={{ display: "inline-block", minWidth: "44px" }}>{label}</span>
       </Box>
@@ -627,17 +634,24 @@ export default function Nodes() {
                 // Only an online node is reporting; anything else is showing its
                 // last known figures.
                 const stale = item.status !== "online";
+                const ageLabel = stale
+                  ? t("admin.nodes.statusLastSeen", {
+                      relative: formatRelativeTime(t, item.last_seen),
+                    })
+                  : undefined;
                 return (
                   <SpaceBetween size="xxxs">
                     <UsageCell
                       label={t("admin.nodes.col.cpu")}
                       value={item.cpu_usage}
                       stale={stale}
+                      ageLabel={ageLabel}
                     />
                     <UsageCell
                       label={t("admin.nodes.col.memory")}
                       value={item.memory_usage}
                       stale={stale}
+                      ageLabel={ageLabel}
                     />
                   </SpaceBetween>
                 );
