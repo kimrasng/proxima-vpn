@@ -256,7 +256,7 @@
       "statusOnline": "Online",
       "statusOffline": "Offline",
       "statusPending": "Pending",
-      "resourcesInfo": "CPU and memory usage last reported by the node agent.",
+      "resourcesInfo": "CPU and memory usage, reported by the node agent every 10 seconds. Dimmed figures are the last known values from a node that is no longer reporting.",
       "panel": {
         "inbounds": "Manage inbounds"
       },
@@ -270,7 +270,10 @@
       "multiplierValue": "×{{factor}}",
       "multiplierNormal": "×1",
       "multiplierHint": "How much of a user’s quota this node’s traffic consumes. 1 charges the bytes transferred, 2 charges double. Per-node traffic stats always report the real bytes.",
-      "multiplierInvalid": "Traffic multiplier must be greater than 0 and at most 100"
+      "multiplierInvalid": "Traffic multiplier must be greater than 0 and at most 100",
+      "statusChangedAt": "Entered this state {{relative}} ({{absolute}})",
+      "statusChangedUnknown": "No status change recorded yet",
+      "statusLastSeen": "Last heartbeat {{relative}}"
     },
     "nodeDetail": {
       "title": "Node Detail",

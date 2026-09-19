@@ -267,7 +267,7 @@
       "statusOnline": "在线",
       "statusOffline": "离线",
       "statusPending": "待接入",
-      "resourcesInfo": "节点代理最近上报的 CPU 与内存使用率。",
+      "resourcesInfo": "节点代理每 10 秒上报的 CPU 与内存使用率。灰显数值来自已停止上报的节点，为其最后一次的数据。",
       "panel": {
         "inbounds": "管理入站"
       },
@@ -281,7 +281,10 @@
       "multiplierValue": "×{{factor}}",
       "multiplierNormal": "×1",
       "multiplierHint": "该节点的流量按几倍从用户配额中扣除。1 表示按实际用量扣除，2 表示扣除两倍。各节点流量统计始终显示真实传输量。",
-      "multiplierInvalid": "流量倍率必须大于 0 且不超过 100"
+      "multiplierInvalid": "流量倍率必须大于 0 且不超过 100",
+      "statusChangedAt": "进入此状态：{{relative}}（{{absolute}}）",
+      "statusChangedUnknown": "尚无状态变更记录",
+      "statusLastSeen": "最后心跳：{{relative}}"
     },
     "nodeDetail": {
       "title": "节点详情",

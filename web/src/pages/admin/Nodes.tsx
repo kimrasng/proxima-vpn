@@ -74,18 +74,33 @@ function countryFlag(code: string): string {
   );
 }
 
-/** Compact inline usage bar: label on the left, thin bar with its percentage on the right. */
-function UsageCell({ label, value }: { label: string; value: number | undefined }) {
+/**
+ * Compact inline usage bar: label on the left, thin bar with its percentage on
+ * the right.
+ *
+ * `stale` is for a node that has stopped reporting. The figure is whatever it
+ * last sent - possibly hours old - so it is dimmed and drops its severity
+ * colour: a red bar on a node that is not running reads as a live problem.
+ */
+function UsageCell({
+  label,
+  value,
+  stale,
+}: {
+  label: string;
+  value: number | undefined;
+  stale?: boolean;
+}) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
       <Box variant="small" color="text-body-secondary">
         <span style={{ display: "inline-block", minWidth: "44px" }}>{label}</span>
       </Box>
       {value != null ? (
-        <div style={{ flex: 1, minWidth: "72px" }}>
+        <div style={{ flex: 1, minWidth: "72px", opacity: stale ? 0.4 : 1 }}>
           <ProgressBar
             value={value}
-            status={getUsageStatus(value) === "error" ? "error" : "in-progress"}
+            status={!stale && getUsageStatus(value) === "error" ? "error" : "in-progress"}
             variant="key-value"
             ariaLabel={label}
           />
@@ -559,9 +574,36 @@ export default function Nodes() {
               header: t("admin.nodes.col.status"),
               sortingField: "status",
               cell: (item) => (
-                <StatusIndicator type={getStatusIndicatorType(item.status)}>
-                  {statusLabel(item.status)}
-                </StatusIndicator>
+                <Popover
+                  dismissButton={false}
+                  position="top"
+                  size="small"
+                  triggerType="custom"
+                  content={
+                    <SpaceBetween size="xxxs">
+                      <Box variant="strong" fontSize="body-s">
+                        {statusLabel(item.status)}
+                      </Box>
+                      <Box variant="small" color="text-body-secondary">
+                        {item.status_changed_at
+                          ? t("admin.nodes.statusChangedAt", {
+                              relative: formatRelativeTime(t, item.status_changed_at),
+                              absolute: formatAbsoluteTime(item.status_changed_at),
+                            })
+                          : t("admin.nodes.statusChangedUnknown")}
+                      </Box>
+                      <Box variant="small" color="text-body-secondary">
+                        {t("admin.nodes.statusLastSeen", {
+                          relative: formatRelativeTime(t, item.last_seen),
+                        })}
+                      </Box>
+                    </SpaceBetween>
+                  }
+                >
+                  <StatusIndicator type={getStatusIndicatorType(item.status)}>
+                    {statusLabel(item.status)}
+                  </StatusIndicator>
+                </Popover>
               ),
             },
             {
@@ -581,12 +623,25 @@ export default function Nodes() {
                 </SpaceBetween>
               ),
               minWidth: 165,
-              cell: (item) => (
-                <SpaceBetween size="xxxs">
-                  <UsageCell label={t("admin.nodes.col.cpu")} value={item.cpu_usage} />
-                  <UsageCell label={t("admin.nodes.col.memory")} value={item.memory_usage} />
-                </SpaceBetween>
-              ),
+              cell: (item) => {
+                // Only an online node is reporting; anything else is showing its
+                // last known figures.
+                const stale = item.status !== "online";
+                return (
+                  <SpaceBetween size="xxxs">
+                    <UsageCell
+                      label={t("admin.nodes.col.cpu")}
+                      value={item.cpu_usage}
+                      stale={stale}
+                    />
+                    <UsageCell
+                      label={t("admin.nodes.col.memory")}
+                      value={item.memory_usage}
+                      stale={stale}
+                    />
+                  </SpaceBetween>
+                );
+              },
             },
             {
               id: "traffic",

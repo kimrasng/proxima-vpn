@@ -256,7 +256,7 @@
       "statusOnline": "온라인",
       "statusOffline": "오프라인",
       "statusPending": "대기 중",
-      "resourcesInfo": "에이전트가 마지막으로 보고한 CPU·메모리 사용률입니다.",
+      "resourcesInfo": "노드 에이전트가 10초마다 보고하는 CPU·메모리 사용률입니다. 흐리게 표시된 값은 보고가 끊긴 노드의 마지막 수치입니다.",
       "panel": {
         "inbounds": "인바운드 관리"
       },
@@ -270,7 +270,10 @@
       "multiplierValue": "×{{factor}}",
       "multiplierNormal": "×1",
       "multiplierHint": "이 노드의 트래픽을 사용자 quota에서 몇 배로 차감할지 정합니다. 1은 실제 사용량만큼, 2는 두 배로 차감합니다. 노드별 트래픽 통계는 실제 전송량을 그대로 표시합니다.",
-      "multiplierInvalid": "트래픽 배율은 0보다 크고 100 이하여야 합니다"
+      "multiplierInvalid": "트래픽 배율은 0보다 크고 100 이하여야 합니다",
+      "statusChangedAt": "이 상태로 바뀐 시점: {{relative}} ({{absolute}})",
+      "statusChangedUnknown": "상태가 바뀐 기록이 아직 없습니다",
+      "statusLastSeen": "마지막 heartbeat: {{relative}}"
     },
     "nodeDetail": {
       "title": "노드 상세",
