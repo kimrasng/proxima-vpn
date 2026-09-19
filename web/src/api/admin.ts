@@ -1,4 +1,4 @@
-import { get, post, put, del, setClientTokenType } from './client';
+import { get, post, put, patch, del, setClientTokenType } from './client';
 import type {
   Node,
   NodeMetricsEntry,
@@ -38,6 +38,8 @@ import type {
   DashboardAlerts,
   NodeTraffic,
   TrafficWindow,
+  UserTraffic,
+  LoginHistoryEntry,
   ActivityEntry,
   NodeTLSStatus,
   IssueCertificateRequest,
@@ -182,6 +184,16 @@ export function deleteUser(id: string): Promise<void> {
   return del<void>(`/api/v1/admin/users/${id}`);
 }
 
+export function getUserTraffic(id: string, window: TrafficWindow = 'month'): Promise<UserTraffic> {
+  applyAdminClient();
+  return get<UserTraffic>(`/api/v1/admin/users/${id}/traffic?window=${window}`);
+}
+
+export function getUserLoginHistory(id: string, limit = 50): Promise<LoginHistoryEntry[]> {
+  applyAdminClient();
+  return get<LoginHistoryEntry[]>(`/api/v1/admin/users/${id}/login-history?limit=${limit}`);
+}
+
 export function listPlanRequests(status?: string): Promise<PlanRequest[]> {
   applyAdminClient();
   const query = status ? `?status=${encodeURIComponent(status)}` : '';
@@ -221,6 +233,16 @@ export function getTrafficHistory(): Promise<TrafficHistoryEntry[]> {
 export function getDashboardAlerts(): Promise<DashboardAlerts> {
   applyAdminClient();
   return get<DashboardAlerts>('/api/v1/admin/stats/alerts');
+}
+
+export function acknowledgeAlert(alertId: string, ack: boolean): Promise<void> {
+  applyAdminClient();
+  return patch<void>(`/api/v1/admin/alerts/${alertId}`, { ack });
+}
+
+export function silenceAlert(alertId: string, minutes: number): Promise<void> {
+  applyAdminClient();
+  return patch<void>(`/api/v1/admin/alerts/${alertId}`, { silence_minutes: minutes });
 }
 
 export function getNodeTraffic(window: TrafficWindow = 'today', limit = 10): Promise<NodeTraffic[]> {

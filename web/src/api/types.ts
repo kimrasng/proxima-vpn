@@ -41,6 +41,9 @@ export interface Node {
   ip: string;
   port: number;
   status: string;
+  // When status last flipped online/offline. Null for nodes that have not
+  // changed state since the column was introduced.
+  status_changed_at?: string | null;
   last_seen?: string;
   cpu_usage?: number;
   memory_usage?: number;
@@ -147,6 +150,9 @@ export interface User {
 export interface UserDetail extends User {
   devices: Device[];
   traffic_limit?: number;
+  sub_token: string;
+  plan_started_at?: string;
+  traffic_reset_at?: string;
 }
 
 export interface PaginatedUsers {
@@ -177,6 +183,36 @@ export interface CreateUserResponse {
   email: string;
   name: string;
   status: string;
+  created_at: string;
+}
+
+export interface UserNodeTraffic {
+  node_id: string;
+  node_name: string;
+  upload: number;
+  download: number;
+  total: number;
+}
+
+export interface UserTraffic {
+  traffic_used: number;
+  traffic_limit: number | null;
+  traffic_remaining: number | null;
+  percentage: number;
+  unlimited: boolean;
+  window: TrafficWindow;
+  by_node: UserNodeTraffic[];
+}
+
+export interface LoginHistoryEntry {
+  id: string;
+  user_id: string | null;
+  actor_type: string;
+  attempted_email: string;
+  success: boolean;
+  failure_reason: string;
+  ip: string;
+  user_agent: string;
   created_at: string;
 }
 
@@ -249,13 +285,29 @@ export interface NodeIssue {
   kind: string;
   severity: AlertSeverity;
   value: number;
+
+  // Lifecycle, added when alerts became stateful.
+  alert_id: string;
+  // "firing" is a live condition; "stale" is one frozen because the node stopped
+  // reporting, so its reading is last-known rather than current.
+  state: "firing" | "stale";
+  fired_at: string | null;
+  duration_seconds: number;
+  acked: boolean;
+  acked_by: string;
+  silenced_until: string | null;
 }
 
 export interface DashboardAlerts {
   items: DashboardAlert[];
   node_issues: NodeIssue[];
+  // Counts only firing alerts that are neither acknowledged nor silenced, so it
+  // is the number of things still waiting on somebody.
   total: number;
   pending_requests: number;
+  // When the evaluator last ran. The panel polls faster than the sweep, so this
+  // explains a screen that legitimately shows the same data twice.
+  evaluated_at: string;
 }
 
 export interface NodeTraffic {

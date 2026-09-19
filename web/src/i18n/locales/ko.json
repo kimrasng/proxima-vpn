@@ -36,6 +36,12 @@
       "minutesAgo": "{{count}}분 전",
       "hoursAgo": "{{count}}시간 전",
       "daysAgo": "{{count}}일 전"
+    },
+    "duration": {
+      "seconds": "{{count}}초",
+      "minutes": "{{count}}분",
+      "hours": "{{count}}시간",
+      "days": "{{count}}일"
     }
   },
   "admin": {
@@ -58,7 +64,8 @@
       "serviceName": "Proxima VPN",
       "connections": "접속 현황",
       "alerts": "경고 및 조치 필요",
-      "activity": "최근 활동"
+      "activity": "최근 활동",
+      "inbounds": "인바운드 관리"
     },
     "dashboard": {
       "title": "대시보드",
@@ -175,7 +182,12 @@
         "plan.approved": "사용자 승인을 완료했습니다.",
         "plan.rejected": "플랜 요청을 거절했습니다.",
         "unknown": "활동이 기록되었습니다.",
-        "session.terminated": "관리자가 접속을 종료했습니다."
+        "session.terminated": "관리자가 접속을 종료했습니다.",
+        "node.online": "다시 온라인이 되었습니다.",
+        "node.alert_fired": "알림이 발생했습니다.",
+        "node.alert_resolved": "알림이 해소되었습니다.",
+        "node.alert_acked": "알림을 확인 처리했습니다.",
+        "node.alert_silenced": "알림을 묵음 처리했습니다."
       },
       "shareOfTotal": "전체의 {{share}}%",
       "nodeSummaryCounts": "정상 {{healthy}} · 주의 {{warning}} · 오프라인 {{offline}}",
@@ -445,7 +457,17 @@
       "editUserError": "유저 수정에 실패했습니다",
       "planLabel": "플랜",
       "expiresAt": "만료일",
-      "noTrafficLimit": "무제한"
+      "noTrafficLimit": "무제한",
+      "status": {
+        "active": "활성",
+        "suspended": "정지됨",
+        "expired": "만료됨",
+        "pending": "대기 중",
+        "disabled": "비활성화됨"
+      },
+      "noPlan": "플랜 없음",
+      "actionsLabel": "작업",
+      "viewDetail": "상세 보기"
     },
     "planRequests": {
       "title": "플랜 요청 관리",
@@ -577,7 +599,8 @@
       "twoFactor": "관리자 계정의 2단계 인증을 설정합니다. 활성화하면 로그인 시 인증 앱의 코드가 추가로 필요합니다.",
       "connections": "현재 VPN에 접속 중인 모든 세션을 봅니다. 어떤 사용자가 어떤 디바이스로 어느 노드에, 어떤 주소에서 접속했는지 확인할 수 있습니다. 동시 접속 허용치를 초과한 사용자는 경고로 표시됩니다. 30초마다 자동 갱신됩니다.",
       "alerts": "조치가 필요한 경고와, 문제가 보고된 노드를 한 곳에서 확인합니다. 노드 이름을 누르면 해당 노드 상세로 이동합니다.",
-      "activity": "패널과 노드에서 기록된 활동 로그입니다. 심각도와 활동 종류로 걸러 볼 수 있습니다."
+      "activity": "패널과 노드에서 기록된 활동 로그입니다. 심각도와 활동 종류로 걸러 볼 수 있습니다.",
+      "inbounds": "이 노드의 인바운드(프로토콜·포트)를 관리하고, TLS 인증서 발급과 Xray 코어 업데이트를 실행합니다. 노드 하나는 한 가지 프로토콜만 운영합니다."
     },
     "notifications": {
       "title": "알림"
@@ -655,14 +678,32 @@
       "goToNodes": "노드 목록",
       "goToRequests": "요청 보기",
       "col": {
-        "count": "건수"
+        "count": "건수",
+        "duration": "지속 시간",
+        "lifecycle": "알림 상태",
+        "actions": "작업"
       },
       "kpi": {
         "total": "전체 경고",
         "error": "심각",
         "warning": "주의",
         "affectedNodes": "영향받는 노드"
-      }
+      },
+      "stateFiring": "발생 중",
+      "stateAcked": "확인함",
+      "stateSilenced": "묵음",
+      "stateStale": "알 수 없음 (보고 중단)",
+      "ack": "확인 처리",
+      "unack": "확인 해제",
+      "silenceFor": "{{minutes}}분 묵음",
+      "silenceForDay": "24시간 묵음",
+      "unsilence": "묵음 해제",
+      "actionError": "작업에 실패했습니다. 알림은 변경되지 않았습니다.",
+      "approvalsTitle": "대기 중 승인",
+      "approvalsHint": "결정을 기다리는 플랜 요청입니다. 시스템 알림이 아닙니다.",
+      "approvalsCount": "{{count}}건 대기",
+      "approvalsNone": "대기 중인 항목 없음",
+      "evaluatedAt": "평가 시각 {{time}}"
     },
     "activity": {
       "title": "최근 활동",
@@ -695,6 +736,150 @@
         "error": "심각",
         "warning": "주의"
       }
+    },
+    "nodeInbounds": {
+      "title": "인바운드 관리",
+      "subtitle": "이 노드가 받아들이는 프로토콜과 포트를 설정합니다.",
+      "fetchError": "인바운드 목록을 불러오는데 실패했습니다",
+      "refresh": "새로 고침",
+      "tableTitle": "인바운드",
+      "empty": "이 노드에 설정된 인바운드가 없습니다.",
+      "add": "인바운드 추가",
+      "create": "생성",
+      "cancel": "취소",
+      "delete": "삭제",
+      "createError": "인바운드 생성에 실패했습니다",
+      "toggleError": "인바운드 활성 상태 변경에 실패했습니다",
+      "deleteError": "인바운드 삭제에 실패했습니다",
+      "deleteTitle": "인바운드 삭제",
+      "deleteConfirm": "\"{{tag}}\" 인바운드(포트 {{port}})를 삭제하시겠습니까?",
+      "col": {
+        "protocol": "프로토콜",
+        "port": "포트",
+        "tag": "태그",
+        "enabled": "활성 상태",
+        "actions": "작업"
+      },
+      "enabled": "활성",
+      "disabled": "비활성",
+      "field": {
+        "protocol": "프로토콜",
+        "protocolLocked": "이 노드는 이미 {{protocol}}을 사용 중입니다. 노드 하나는 한 가지 프로토콜만 운영하므로, 변경하려면 기존 인바운드를 삭제해야 합니다.",
+        "port": "포트",
+        "portPlaceholder": "예: 443",
+        "tag": "태그",
+        "tagPlaceholder": "예: vless-in",
+        "dest": "목적지 (dest)",
+        "destPlaceholder": "예: www.google.com:443",
+        "serverNames": "서버 이름 (쉼표로 구분)",
+        "serverNamesPlaceholder": "예: www.google.com,google.com",
+        "wsPath": "WebSocket 경로",
+        "wsPathPlaceholder": "예: /ws",
+        "ssMethod": "암호화 방식",
+        "ssPassword": "비밀번호",
+        "ssPasswordPlaceholder": "비밀번호"
+      },
+      "tls": {
+        "title": "TLS 인증서",
+        "issue": "인증서 발급",
+        "renew": "인증서 갱신",
+        "status": "상태",
+        "installed": "인증서가 설치되어 있습니다",
+        "missing": "인증서가 없습니다",
+        "domain": "도메인",
+        "certFile": "인증서 파일",
+        "loading": "불러오는 중…",
+        "modalTitle": "TLS 인증서 발급",
+        "domainHint": "인증서를 발급할 도메인 이름입니다",
+        "domainPlaceholder": "예: vpn.example.com",
+        "email": "이메일",
+        "emailHint": "Let's Encrypt 알림을 받을 이메일 주소입니다",
+        "emailPlaceholder": "예: admin@example.com",
+        "error": "인증서 발급에 실패했습니다"
+      },
+      "xray": {
+        "title": "Xray 버전",
+        "update": "Xray 업데이트",
+        "current": "현재 버전",
+        "unknown": "알 수 없음",
+        "loading": "불러오는 중…",
+        "modalTitle": "Xray 업데이트",
+        "targetVersion": "대상 버전",
+        "targetHint": "비워두면 최신 버전으로 업데이트합니다",
+        "targetPlaceholder": "예: v1.8.4 (비우면 최신)",
+        "submit": "업데이트",
+        "error": "Xray 업데이트 요청에 실패했습니다"
+      }
+    },
+    "userDetail": {
+      "fetchError": "유저 정보를 불러오지 못했습니다",
+      "notFound": "유저를 찾을 수 없습니다",
+      "refresh": "새로고침",
+      "backToList": "유저 목록으로",
+      "identity": "계정",
+      "editSection": "유저 편집",
+      "save": "변경 사항 저장",
+      "saveSuccess": "유저가 수정되었습니다",
+      "saveError": "유저 수정에 실패했습니다",
+      "subToken": "구독 토큰",
+      "createdAt": "가입일",
+      "planStartedAt": "플랜 시작일",
+      "planExpiresAt": "플랜 만료일",
+      "trafficResetAt": "최근 트래픽 초기화",
+      "never": "없음",
+      "none": "없음",
+      "nameLabel": "이름",
+      "statusLabel": "상태",
+      "planLabel": "플랜",
+      "expiresAtLabel": "만료일",
+      "activeLabel": "계정 활성화",
+      "traffic": "트래픽",
+      "trafficUsed": "사용량",
+      "trafficLimit": "할당량",
+      "trafficRemaining": "남은 용량",
+      "trafficPercentage": "소진율",
+      "unlimited": "무제한",
+      "trafficFetchError": "트래픽 정보를 불러오지 못했습니다",
+      "byNode": "노드별 사용량",
+      "byNodeEmpty": "이 기간에 기록된 노드 트래픽이 없습니다",
+      "window": {
+        "today": "오늘",
+        "week": "최근 7일",
+        "month": "이번 달"
+      },
+      "nodeCol": {
+        "node": "노드",
+        "upload": "업로드",
+        "download": "다운로드",
+        "total": "합계"
+      },
+      "devices": "디바이스",
+      "devicesEmpty": "등록된 디바이스가 없습니다",
+      "deviceCol": {
+        "name": "이름",
+        "uuid": "클라이언트 UUID",
+        "createdAt": "등록일"
+      },
+      "loginHistory": "로그인 기록",
+      "loginHistoryEmpty": "기록된 로그인 시도가 없습니다",
+      "loginHistoryFetchError": "로그인 기록을 불러오지 못했습니다",
+      "loginCol": {
+        "time": "시각",
+        "ip": "접속 주소",
+        "outcome": "결과",
+        "agent": "클라이언트"
+      },
+      "loginSuccess": "성공",
+      "loginFailure": "실패",
+      "reason": {
+        "unknown_email": "존재하지 않는 계정",
+        "bad_password": "비밀번호 불일치",
+        "suspended": "정지된 계정",
+        "bad_totp": "2단계 인증 코드 오류"
+      },
+      "resetTraffic": "트래픽 초기화",
+      "suspend": "정지",
+      "activate": "활성화"
     }
   },
   "user": {

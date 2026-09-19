@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import {
   Badge,
   Box,
+  ButtonDropdown,
   Button,
   ColumnLayout,
   Container,
@@ -21,9 +22,10 @@ import {
   TextFilter,
 } from "@cloudscape-design/components";
 import { useCollection } from "@cloudscape-design/collection-hooks";
-import { getDashboardAlerts, listNodes } from "../../api/admin";
+import { getDashboardAlerts, listNodes, acknowledgeAlert, silenceAlert } from "../../api/admin";
 import type { AlertSeverity, DashboardAlerts, Node, NodeIssue } from "../../api/types";
 import { useManualRefresh } from "../../hooks/useManualRefresh";
+import { formatDuration } from "../../utils/relativeTime";
 
 // Matches the node agents' 10s heartbeat, so a change on a node reaches
 // the screen within roughly one beat plus one poll.
@@ -73,6 +75,24 @@ export default function Alerts() {
   }, [t]);
 
   const { refreshing, lastUpdated, refresh } = useManualRefresh(fetchAll, REFRESH_INTERVAL);
+  const [actionBusy, setActionBusy] = useState<string | null>(null);
+
+  // Mutating an alert refetches rather than patching local state: the evaluator
+  // owns the row, so the server's version is the only one worth trusting.
+  const runAction = useCallback(
+    async (alertId: string, action: () => Promise<void>) => {
+      setActionBusy(alertId);
+      try {
+        await action();
+        await fetchAll();
+      } catch {
+        setError(t("admin.alerts.actionError"));
+      } finally {
+        setActionBusy(null);
+      }
+    },
+    [fetchAll, t],
+  );
 
   const issues = useMemo(
     () =>
@@ -304,16 +324,11 @@ export default function Alerts() {
                 id: "action",
                 header: t("admin.dashboard.col.action"),
                 minWidth: 120,
-                cell: (item) =>
-                  item.kind === "pending_requests" ? (
-                    <Link onFollow={() => navigate("/admin/plan-requests")}>
-                      {t("admin.alerts.goToRequests")}
-                    </Link>
-                  ) : (
-                    <Link onFollow={() => navigate("/admin/nodes")}>
-                      {t("admin.alerts.goToNodes")}
-                    </Link>
-                  ),
+                cell: () => (
+                  <Link onFollow={() => navigate("/admin/nodes")}>
+                    {t("admin.alerts.goToNodes")}
+                  </Link>
+                ),
               },
             ]}
             empty={
@@ -322,6 +337,29 @@ export default function Alerts() {
               </Box>
             }
           />
+        </Container>
+
+        <Container
+          header={
+            <Header variant="h2" description={t("admin.alerts.approvalsHint")}>
+              {t("admin.alerts.approvalsTitle")}
+            </Header>
+          }
+        >
+          <SpaceBetween direction="horizontal" size="s" alignItems="center">
+            {(alerts?.pending_requests ?? 0) > 0 ? (
+              <>
+                <Badge color="blue">
+                  {t("admin.alerts.approvalsCount", { count: alerts?.pending_requests ?? 0 })}
+                </Badge>
+                <Link onFollow={() => navigate("/admin/plan-requests")}>
+                  {t("admin.alerts.goToRequests")}
+                </Link>
+              </>
+            ) : (
+              <StatusIndicator type="success">{t("admin.alerts.approvalsNone")}</StatusIndicator>
+            )}
+          </SpaceBetween>
         </Container>
 
         <Table
@@ -420,6 +458,85 @@ export default function Alerts() {
               header: t("admin.dashboard.col.reading"),
               sortingField: "value",
               cell: renderReading,
+            },
+            {
+              id: "duration",
+              header: t("admin.alerts.col.duration"),
+              sortingField: "duration_seconds",
+              minWidth: 110,
+              cell: (item) =>
+                item.duration_seconds > 0 ? (
+                  formatDuration(t, item.duration_seconds)
+                ) : (
+                  <Box color="text-status-inactive">—</Box>
+                ),
+            },
+            {
+              id: "lifecycle",
+              header: t("admin.alerts.col.lifecycle"),
+              minWidth: 150,
+              cell: (item) => {
+                const silenced =
+                  item.silenced_until != null && new Date(item.silenced_until) > new Date();
+                if (item.state === "stale") {
+                  return (
+                    <StatusIndicator type="pending">{t("admin.alerts.stateStale")}</StatusIndicator>
+                  );
+                }
+                if (silenced) {
+                  return <Badge color="grey">{t("admin.alerts.stateSilenced")}</Badge>;
+                }
+                if (item.acked) {
+                  return <Badge color="blue">{t("admin.alerts.stateAcked")}</Badge>;
+                }
+                return (
+                  <Badge color={badgeColor[item.severity]}>{t("admin.alerts.stateFiring")}</Badge>
+                );
+              },
+            },
+            {
+              id: "actions",
+              header: "",
+              minWidth: 60,
+              cell: (item) => (
+                <ButtonDropdown
+                  variant="inline-icon"
+                  ariaLabel={t("admin.alerts.col.actions")}
+                  expandToViewport
+                  loading={actionBusy === item.alert_id}
+                  items={[
+                    {
+                      id: item.acked ? "unack" : "ack",
+                      text: item.acked ? t("admin.alerts.unack") : t("admin.alerts.ack"),
+                    },
+                    { id: "silence-15", text: t("admin.alerts.silenceFor", { minutes: 15 }) },
+                    { id: "silence-60", text: t("admin.alerts.silenceFor", { minutes: 60 }) },
+                    { id: "silence-240", text: t("admin.alerts.silenceFor", { minutes: 240 }) },
+                    { id: "silence-1440", text: t("admin.alerts.silenceForDay") },
+                    {
+                      id: "unsilence",
+                      text: t("admin.alerts.unsilence"),
+                      disabled:
+                        item.silenced_until == null ||
+                        new Date(item.silenced_until) <= new Date(),
+                    },
+                  ]}
+                  onItemClick={({ detail }) => {
+                    if (detail.id === "ack" || detail.id === "unack") {
+                      void runAction(item.alert_id, () =>
+                        acknowledgeAlert(item.alert_id, detail.id === "ack"),
+                      );
+                      return;
+                    }
+                    if (detail.id === "unsilence") {
+                      void runAction(item.alert_id, () => silenceAlert(item.alert_id, 0));
+                      return;
+                    }
+                    const minutes = Number(detail.id.replace("silence-", ""));
+                    void runAction(item.alert_id, () => silenceAlert(item.alert_id, minutes));
+                  }}
+                />
+              ),
             },
             {
               id: "status",

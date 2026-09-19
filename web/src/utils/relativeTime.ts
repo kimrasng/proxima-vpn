@@ -27,3 +27,28 @@ export function formatRelativeTime(t: TFunction, dateStr: string | undefined | n
 export function formatAbsoluteTime(dateStr: string | undefined | null): string {
   return dateStr ? new Date(dateStr).toLocaleString() : "";
 }
+
+/**
+ * Formats an elapsed number of seconds as a compact duration, coarsening as it
+ * grows so a long outage reads as "3d 4h" rather than a five-figure minute count.
+ */
+export function formatDuration(t: TFunction, seconds: number): string {
+  if (seconds < 60) return t("common.duration.seconds", { count: Math.max(1, Math.round(seconds)) });
+
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return t("common.duration.minutes", { count: minutes });
+
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) {
+    const restMinutes = minutes % 60;
+    return restMinutes > 0
+      ? `${t("common.duration.hours", { count: hours })} ${t("common.duration.minutes", { count: restMinutes })}`
+      : t("common.duration.hours", { count: hours });
+  }
+
+  const days = Math.floor(hours / 24);
+  const restHours = hours % 24;
+  return restHours > 0
+    ? `${t("common.duration.days", { count: days })} ${t("common.duration.hours", { count: restHours })}`
+    : t("common.duration.days", { count: days });
+}

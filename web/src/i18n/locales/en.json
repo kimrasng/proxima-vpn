@@ -36,6 +36,12 @@
       "minutesAgo": "{{count}}m ago",
       "hoursAgo": "{{count}}h ago",
       "daysAgo": "{{count}}d ago"
+    },
+    "duration": {
+      "seconds": "{{count}}s",
+      "minutes": "{{count}}m",
+      "hours": "{{count}}h",
+      "days": "{{count}}d"
     }
   },
   "admin": {
@@ -58,7 +64,8 @@
       "serviceName": "Proxima VPN",
       "connections": "Connections",
       "alerts": "Alerts & Actions",
-      "activity": "Recent Activity"
+      "activity": "Recent Activity",
+      "inbounds": "Inbounds"
     },
     "dashboard": {
       "title": "Dashboard",
@@ -175,7 +182,12 @@
         "plan.approved": "was approved.",
         "plan.rejected": "had a plan request rejected.",
         "unknown": "recorded an activity.",
-        "session.terminated": "terminated a session."
+        "session.terminated": "terminated a session.",
+        "node.online": "came back online.",
+        "node.alert_fired": "raised an alert.",
+        "node.alert_resolved": "cleared an alert.",
+        "node.alert_acked": "alert acknowledged.",
+        "node.alert_silenced": "alert silenced."
       },
       "shareOfTotal": "{{share}}% of total",
       "nodeSummaryCounts": "Healthy {{healthy}} · Warning {{warning}} · Offline {{offline}}",
@@ -445,7 +457,17 @@
       "editUserError": "Failed to update user",
       "planLabel": "Plan",
       "expiresAt": "Expires At",
-      "noTrafficLimit": "Unlimited"
+      "noTrafficLimit": "Unlimited",
+      "status": {
+        "active": "Active",
+        "suspended": "Suspended",
+        "expired": "Expired",
+        "pending": "Pending",
+        "disabled": "Disabled"
+      },
+      "noPlan": "No plan",
+      "actionsLabel": "Actions",
+      "viewDetail": "View details"
     },
     "planRequests": {
       "title": "Plan Request Management",
@@ -577,7 +599,8 @@
       "twoFactor": "Set up two-factor authentication for the admin account. Once enabled, login also requires a code from your authenticator app.",
       "connections": "Shows every session currently connected to the VPN: which user, on which device, to which node, and from which address. Users past their concurrent-connection allowance are flagged. Refreshes every 30 seconds.",
       "alerts": "Every alert that needs action, plus the nodes reporting a problem. Select a node name to open its detail page.",
-      "activity": "The activity log recorded across the panel and the nodes. Filter by severity or activity type."
+      "activity": "The activity log recorded across the panel and the nodes. Filter by severity or activity type.",
+      "inbounds": "Manage this node's inbounds (protocol and port), issue TLS certificates, and update the Xray core. A node serves one protocol at a time."
     },
     "notifications": {
       "title": "Notifications"
@@ -655,14 +678,32 @@
       "goToNodes": "View nodes",
       "goToRequests": "View requests",
       "col": {
-        "count": "Count"
+        "count": "Count",
+        "duration": "Duration",
+        "lifecycle": "Alert state",
+        "actions": "Actions"
       },
       "kpi": {
         "total": "Total alerts",
         "error": "Critical",
         "warning": "Warning",
         "affectedNodes": "Affected nodes"
-      }
+      },
+      "stateFiring": "Firing",
+      "stateAcked": "Acknowledged",
+      "stateSilenced": "Silenced",
+      "stateStale": "Unknown (not reporting)",
+      "ack": "Acknowledge",
+      "unack": "Remove acknowledgement",
+      "silenceFor": "Silence for {{minutes}} min",
+      "silenceForDay": "Silence for 24 hours",
+      "unsilence": "End silence",
+      "actionError": "That action failed. The alert was left unchanged.",
+      "approvalsTitle": "Pending approvals",
+      "approvalsHint": "Plan requests waiting on a decision. Not a system alert.",
+      "approvalsCount": "{{count}} waiting",
+      "approvalsNone": "Nothing waiting",
+      "evaluatedAt": "Evaluated {{time}}"
     },
     "activity": {
       "title": "Recent Activity",
@@ -695,6 +736,150 @@
         "error": "Critical",
         "warning": "Warning"
       }
+    },
+    "nodeInbounds": {
+      "title": "Inbounds",
+      "subtitle": "Configure the protocols and ports this node accepts.",
+      "fetchError": "Failed to fetch inbounds",
+      "refresh": "Refresh",
+      "tableTitle": "Inbounds",
+      "empty": "No inbounds configured for this node.",
+      "add": "Add inbound",
+      "create": "Create",
+      "cancel": "Cancel",
+      "delete": "Delete",
+      "createError": "Failed to create inbound",
+      "toggleError": "Failed to toggle inbound",
+      "deleteError": "Failed to delete inbound",
+      "deleteTitle": "Delete inbound",
+      "deleteConfirm": "Delete the inbound \"{{tag}}\" (port {{port}})?",
+      "col": {
+        "protocol": "Protocol",
+        "port": "Port",
+        "tag": "Tag",
+        "enabled": "Enabled",
+        "actions": "Actions"
+      },
+      "enabled": "Enabled",
+      "disabled": "Disabled",
+      "field": {
+        "protocol": "Protocol",
+        "protocolLocked": "This node already serves {{protocol}}. A node runs one protocol; delete the existing inbound to change it.",
+        "port": "Port",
+        "portPlaceholder": "e.g. 443",
+        "tag": "Tag",
+        "tagPlaceholder": "e.g. vless-in",
+        "dest": "Destination (dest)",
+        "destPlaceholder": "e.g. www.google.com:443",
+        "serverNames": "Server names (comma-separated)",
+        "serverNamesPlaceholder": "e.g. www.google.com,google.com",
+        "wsPath": "WebSocket path",
+        "wsPathPlaceholder": "e.g. /ws",
+        "ssMethod": "Method",
+        "ssPassword": "Password",
+        "ssPasswordPlaceholder": "Password"
+      },
+      "tls": {
+        "title": "TLS certificate",
+        "issue": "Issue certificate",
+        "renew": "Renew certificate",
+        "status": "Status",
+        "installed": "Certificate installed",
+        "missing": "No certificate",
+        "domain": "Domain",
+        "certFile": "Cert file",
+        "loading": "Loading…",
+        "modalTitle": "Issue TLS certificate",
+        "domainHint": "The domain name to issue a certificate for",
+        "domainPlaceholder": "e.g. vpn.example.com",
+        "email": "Email",
+        "emailHint": "Email address for Let's Encrypt notifications",
+        "emailPlaceholder": "e.g. admin@example.com",
+        "error": "Failed to issue certificate"
+      },
+      "xray": {
+        "title": "Xray version",
+        "update": "Update Xray",
+        "current": "Current version",
+        "unknown": "Unknown",
+        "loading": "Loading…",
+        "modalTitle": "Update Xray",
+        "targetVersion": "Target version",
+        "targetHint": "Leave blank to update to the latest version",
+        "targetPlaceholder": "e.g. v1.8.4 (leave blank for latest)",
+        "submit": "Update",
+        "error": "Failed to trigger Xray update"
+      }
+    },
+    "userDetail": {
+      "fetchError": "Failed to load user",
+      "notFound": "User not found",
+      "refresh": "Refresh",
+      "backToList": "Back to users",
+      "identity": "Account",
+      "editSection": "Edit user",
+      "save": "Save changes",
+      "saveSuccess": "User updated successfully",
+      "saveError": "Failed to update user",
+      "subToken": "Subscription token",
+      "createdAt": "Registered",
+      "planStartedAt": "Plan started",
+      "planExpiresAt": "Plan expires",
+      "trafficResetAt": "Traffic last reset",
+      "never": "Never",
+      "none": "None",
+      "nameLabel": "Name",
+      "statusLabel": "Status",
+      "planLabel": "Plan",
+      "expiresAtLabel": "Expiry date",
+      "activeLabel": "Account enabled",
+      "traffic": "Traffic",
+      "trafficUsed": "Used",
+      "trafficLimit": "Quota",
+      "trafficRemaining": "Remaining",
+      "trafficPercentage": "Consumed",
+      "unlimited": "Unlimited",
+      "trafficFetchError": "Failed to load traffic",
+      "byNode": "Usage by node",
+      "byNodeEmpty": "No traffic recorded on any node in this period",
+      "window": {
+        "today": "Today",
+        "week": "Last 7 days",
+        "month": "This month"
+      },
+      "nodeCol": {
+        "node": "Node",
+        "upload": "Upload",
+        "download": "Download",
+        "total": "Total"
+      },
+      "devices": "Devices",
+      "devicesEmpty": "No devices registered",
+      "deviceCol": {
+        "name": "Name",
+        "uuid": "Client UUID",
+        "createdAt": "Added"
+      },
+      "loginHistory": "Login history",
+      "loginHistoryEmpty": "No login attempts recorded",
+      "loginHistoryFetchError": "Failed to load login history",
+      "loginCol": {
+        "time": "Time",
+        "ip": "Address",
+        "outcome": "Outcome",
+        "agent": "Client"
+      },
+      "loginSuccess": "Success",
+      "loginFailure": "Failed",
+      "reason": {
+        "unknown_email": "Unknown account",
+        "bad_password": "Wrong password",
+        "suspended": "Account suspended",
+        "bad_totp": "Invalid two-factor code"
+      },
+      "resetTraffic": "Reset traffic",
+      "suspend": "Suspend",
+      "activate": "Activate"
     }
   },
   "user": {
