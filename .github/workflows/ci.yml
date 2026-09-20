@@ -68,12 +68,16 @@ jobs:
         env:
           DATABASE_URL: postgres://vpnuser:vpnpass@localhost:5432/vpnpanel
         run: cd api-server && go run ./cmd/migrate
+      # -race: the agent supervises processes from several goroutines and the
+      # server runs schedulers beside request handling, where an unlocked shared
+      # map corrupts quota or eviction state silently instead of crashing. Adds
+      # no measurable time here - the slow package is slow from sleeps, not CPU.
       - name: Test api-server
-        run: cd api-server && go test ./...
+        run: cd api-server && go test -race ./...
       - name: Test node-agent
-        run: cd node-agent && go test ./...
+        run: cd node-agent && go test -race ./...
       - name: Test pkg
-        run: cd pkg && go test ./...
+        run: cd pkg && go test -race ./...
 
   # version is pinned (not "latest") because golangci-lint-action's "latest"
   # resolved to a binary built with an older Go toolchain than go.work's
