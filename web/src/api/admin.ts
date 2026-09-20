@@ -240,6 +240,13 @@ export function acknowledgeAlert(alertId: string, ack: boolean): Promise<void> {
   return patch<void>(`/api/v1/admin/alerts/${alertId}`, { ack });
 }
 
+// One request, because the endpoint accepts both fields and two calls would leave
+// the alert acknowledged but un-silenced if the second failed.
+export function acknowledgeAndSilenceAlert(alertId: string, minutes: number): Promise<void> {
+  applyAdminClient();
+  return patch<void>(`/api/v1/admin/alerts/${alertId}`, { ack: true, silence_minutes: minutes });
+}
+
 export function silenceAlert(alertId: string, minutes: number): Promise<void> {
   applyAdminClient();
   return patch<void>(`/api/v1/admin/alerts/${alertId}`, { silence_minutes: minutes });

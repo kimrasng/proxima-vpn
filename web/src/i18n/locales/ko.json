@@ -699,6 +699,8 @@
       "stateStale": "보고 중단",
       "ack": "확인 처리",
       "unack": "확인 해제",
+      "ackSilence": "확인 후 {{minutes}}분 숨기기",
+      "ackHint": "조치 중임을 표시합니다. 목록에는 남고 알림 집계에서만 빠집니다.",
       "silenceFor": "{{minutes}}분 묵음",
       "silenceForDay": "24시간 묵음",
       "unsilence": "묵음 해제",

@@ -22,7 +22,7 @@ import {
   TextFilter,
 } from "@cloudscape-design/components";
 import { useCollection } from "@cloudscape-design/collection-hooks";
-import { getDashboardAlerts, acknowledgeAlert, silenceAlert } from "../../api/admin";
+import { getDashboardAlerts, acknowledgeAlert, acknowledgeAndSilenceAlert, silenceAlert } from "../../api/admin";
 import type { AlertSeverity, DashboardAlerts, NodeIssue } from "../../api/types";
 import { useManualRefresh } from "../../hooks/useManualRefresh";
 import { formatDuration } from "../../utils/relativeTime";
@@ -525,6 +525,12 @@ export default function Alerts() {
                     {
                       id: item.acked ? "unack" : "ack",
                       text: item.acked ? t("admin.alerts.unack") : t("admin.alerts.ack"),
+                      description: item.acked ? undefined : t("admin.alerts.ackHint"),
+                    },
+                    {
+                      id: "ack-silence-60",
+                      text: t("admin.alerts.ackSilence", { minutes: 60 }),
+                      disabled: item.acked && isSilenced(item),
                     },
                     { id: "silence-15", text: t("admin.alerts.silenceFor", { minutes: 15 }) },
                     { id: "silence-60", text: t("admin.alerts.silenceFor", { minutes: 60 }) },
@@ -540,6 +546,12 @@ export default function Alerts() {
                     if (detail.id === "ack" || detail.id === "unack") {
                       void runAction(item.alert_id, () =>
                         acknowledgeAlert(item.alert_id, detail.id === "ack"),
+                      );
+                      return;
+                    }
+                    if (detail.id === "ack-silence-60") {
+                      void runAction(item.alert_id, () =>
+                        acknowledgeAndSilenceAlert(item.alert_id, 60),
                       );
                       return;
                     }

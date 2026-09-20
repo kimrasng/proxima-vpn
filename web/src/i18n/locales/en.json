@@ -699,6 +699,8 @@
       "stateStale": "Not reporting",
       "ack": "Acknowledge",
       "unack": "Remove acknowledgement",
+      "ackSilence": "Acknowledge and hide for {{minutes}} min",
+      "ackHint": "Marks it as being handled. It stays listed, only the alert count drops it.",
       "silenceFor": "Silence for {{minutes}} min",
       "silenceForDay": "Silence for 24 hours",
       "unsilence": "End silence",
