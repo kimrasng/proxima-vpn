@@ -197,7 +197,8 @@
         "node.alert_resolved": "cleared an alert.",
         "node.alert_escalated": "alert escalated to error.",
         "node.alert_acked": "alert acknowledged.",
-        "node.alert_silenced": "alert silenced."
+        "node.alert_silenced": "alert silenced.",
+        "node.alert_closed": "alert was closed by hand."
       },
       "shareOfTotal": "{{share}}% of total",
       "nodeSummaryCounts": "Healthy {{healthy}} · Warning {{warning}} · Offline {{offline}}",
@@ -704,6 +705,9 @@
       "silenceFor": "Silence for {{minutes}} min",
       "silenceForDay": "Silence for 24 hours",
       "unsilence": "End silence",
+      "close": "Close alert",
+      "closeHint": "Retires an alert evaluation can no longer resolve, because its node is gone.",
+      "nodeDeleted": "Node deleted",
       "actionError": "That action failed. The alert was left unchanged.",
       "approvalsTitle": "Pending approvals",
       "approvalsHint": "Plan requests waiting on a decision. Not a system alert.",

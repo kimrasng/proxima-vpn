@@ -323,9 +323,21 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 		// breach_since/clear_since carry the sustained-breach windows. Keeping
 		// them here rather than deriving them from node_metrics_history makes
 		// evaluation O(1) per row and survives a process restart.
+		//
+		// node_id deliberately carries NO foreign key. An alert is a record of
+		// something that happened, not a property of the node it happened on, so
+		// deleting a node must not erase the evidence that it was at 97% disk
+		// when it was retired - the same reason activity_logs holds a bare
+		// target_id. node_name/country/region are snapshots rather than joins for
+		// the same reason: after the node row is gone there is nothing left to
+		// join to. They are rewritten on every evaluation, so a rename is picked
+		// up while the node exists and frozen once it does not.
 		`CREATE TABLE IF NOT EXISTS node_alerts (
 			id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-			node_id        UUID NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
+			node_id        UUID NOT NULL,
+			node_name      TEXT NOT NULL DEFAULT '',
+			node_country   TEXT NOT NULL DEFAULT '',
+			node_region    TEXT NOT NULL DEFAULT '',
 			kind           TEXT NOT NULL,
 			state          TEXT NOT NULL DEFAULT 'ok',
 			severity       TEXT NOT NULL DEFAULT 'warning',
@@ -338,6 +350,8 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 			acked_at       TIMESTAMPTZ,
 			acked_by       TEXT NOT NULL DEFAULT '',
 			silenced_until TIMESTAMPTZ,
+			closed_at      TIMESTAMPTZ,
+			closed_by      TEXT NOT NULL DEFAULT '',
 			evaluated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 			UNIQUE (node_id, kind)
 		)`,
@@ -395,6 +409,56 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 		`CREATE INDEX IF NOT EXISTS idx_devices_user ON devices(user_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_traffic_logs_device_created
 			ON traffic_logs(device_id, created_at DESC)`,
+
+		// Provisioning intent captured before the install command is issued. The
+		// agent reports name/country/region again at registration, so these record
+		// what the operator asked for and let registration keep it rather than
+		// overwrite it with autodetection.
+		`ALTER TABLE nodes ADD COLUMN IF NOT EXISTS os_family TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE nodes ADD COLUMN IF NOT EXISTS max_concurrent_conns INT NOT NULL DEFAULT 0`,
+		`ALTER TABLE nodes ADD COLUMN IF NOT EXISTS firewall_preset TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE nodes ADD COLUMN IF NOT EXISTS firewall_ports TEXT NOT NULL DEFAULT ''`,
+		// 0 means no cap rather than "refuse everything".
+		`DO $$ BEGIN
+			IF NOT EXISTS (
+				SELECT 1 FROM pg_constraint WHERE conname = 'nodes_max_concurrent_conns_check'
+			) THEN
+				ALTER TABLE nodes ADD CONSTRAINT nodes_max_concurrent_conns_check
+					CHECK (max_concurrent_conns >= 0);
+			END IF;
+		END $$`,
+
+		// Alerts were originally a child of nodes: a foreign key with ON DELETE
+		// CASCADE, plus a join for the node's name and location. That made
+		// retiring a node silently destroy every alert it had ever raised, and
+		// the join meant a surviving row would have been invisible anyway. An
+		// alert outlives its node, so both links are cut here.
+		//
+		// The constraint is found by catalog lookup rather than by name: the
+		// generated name is predictable but not guaranteed, and a database
+		// restored through a tool that renamed it would silently keep cascading.
+		`DO $$ DECLARE fk TEXT; BEGIN
+			SELECT conname INTO fk FROM pg_constraint
+			WHERE conrelid = 'node_alerts'::regclass AND contype = 'f'
+			  AND confrelid = 'nodes'::regclass
+			LIMIT 1;
+			IF fk IS NOT NULL THEN
+				EXECUTE format('ALTER TABLE node_alerts DROP CONSTRAINT %I', fk);
+			END IF;
+		END $$`,
+		`ALTER TABLE node_alerts ADD COLUMN IF NOT EXISTS node_name TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE node_alerts ADD COLUMN IF NOT EXISTS node_country TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE node_alerts ADD COLUMN IF NOT EXISTS node_region TEXT NOT NULL DEFAULT ''`,
+		// Operator-owned closure, for an alert the evaluator can never resolve
+		// because the node it describes stopped reporting or no longer exists.
+		`ALTER TABLE node_alerts ADD COLUMN IF NOT EXISTS closed_at TIMESTAMPTZ`,
+		`ALTER TABLE node_alerts ADD COLUMN IF NOT EXISTS closed_by TEXT NOT NULL DEFAULT ''`,
+		// Backfill the snapshots for rows written before they existed. Only rows
+		// whose node still exists can be recovered; the rest keep the empty
+		// string, which the read path renders as an unknown node.
+		`UPDATE node_alerts a SET
+			node_name = n.name, node_country = n.country, node_region = n.region
+		 FROM nodes n WHERE n.id = a.node_id AND a.node_name = ''`,
 	}
 	for _, m := range migrations {
 		if _, err := pool.Exec(ctx, m); err != nil {

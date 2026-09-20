@@ -197,7 +197,8 @@
         "node.alert_resolved": "告警已解除。",
         "node.alert_escalated": "告警已升级为错误。",
         "node.alert_acked": "告警已确认。",
-        "node.alert_silenced": "告警已静默。"
+        "node.alert_silenced": "告警已静默。",
+        "node.alert_closed": "告警已手动关闭。"
       },
       "shareOfTotal": "占总量 {{share}}%",
       "nodeSummaryCounts": "正常 {{healthy}} · 注意 {{warning}} · 离线 {{offline}}",
@@ -746,6 +747,9 @@
       "silenceFor": "静默 {{minutes}} 分钟",
       "silenceForDay": "静默 24 小时",
       "unsilence": "结束静默",
+      "close": "关闭告警",
+      "closeHint": "手动结束因节点已不存在而无法由评估解除的告警。",
+      "nodeDeleted": "节点已删除",
       "actionError": "操作失败，告警未做更改。",
       "approvalsTitle": "待处理审批",
       "approvalsHint": "等待决定的套餐申请，不属于系统告警。",

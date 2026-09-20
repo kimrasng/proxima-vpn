@@ -291,6 +291,9 @@ export interface NodeIssue {
   // "firing" is a live condition; "stale" is one frozen because the node stopped
   // reporting, so its reading is last-known rather than current.
   state: "firing" | "stale";
+  // True when the node has been removed. Evaluation can never resolve such an
+  // alert, because nothing reports for it, so it has to be closed by hand.
+  node_deleted: boolean;
   fired_at: string | null;
   duration_seconds: number;
   acked: boolean;

@@ -252,6 +252,14 @@ export function silenceAlert(alertId: string, minutes: number): Promise<void> {
   return patch<void>(`/api/v1/admin/alerts/${alertId}`, { silence_minutes: minutes });
 }
 
+// Resolves an alert the evaluator cannot resolve itself. The server refuses this
+// with 409 for anything still being measured, so callers should only offer it on
+// a stale alert or one whose node is gone.
+export function closeAlert(alertId: string): Promise<void> {
+  applyAdminClient();
+  return patch<void>(`/api/v1/admin/alerts/${alertId}`, { close: true });
+}
+
 export function getNodeTraffic(window: TrafficWindow = 'today', limit = 10): Promise<NodeTraffic[]> {
   applyAdminClient();
   const params = new URLSearchParams({ window, limit: String(limit) });

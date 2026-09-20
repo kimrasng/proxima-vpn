@@ -22,7 +22,13 @@ import {
   TextFilter,
 } from "@cloudscape-design/components";
 import { useCollection } from "@cloudscape-design/collection-hooks";
-import { getDashboardAlerts, acknowledgeAlert, acknowledgeAndSilenceAlert, silenceAlert } from "../../api/admin";
+import {
+  getDashboardAlerts,
+  acknowledgeAlert,
+  acknowledgeAndSilenceAlert,
+  silenceAlert,
+  closeAlert,
+} from "../../api/admin";
 import type { AlertSeverity, DashboardAlerts, NodeIssue } from "../../api/types";
 import { useManualRefresh } from "../../hooks/useManualRefresh";
 import { formatDuration } from "../../utils/relativeTime";
@@ -52,6 +58,13 @@ function indicatorType(severity: AlertSeverity) {
 
 function isSilenced(issue: NodeIssue) {
   return issue.silenced_until != null && new Date(issue.silenced_until) > new Date();
+}
+
+// Mirrors the server's rule in AlertService.Close: an alert can be retired by hand
+// only when no future reading can contradict it. Anything still being measured is
+// refused with 409, so offering the action there would only produce errors.
+function isClosable(issue: NodeIssue) {
+  return issue.state === "stale" || issue.node_deleted;
 }
 
 // Must stay in step with the server's `total` (services/stats.go): acked and
@@ -445,9 +458,18 @@ export default function Alerts() {
               minWidth: 130,
               cell: (item) => (
                 <StatusIndicator type={indicatorType(item.severity)}>
-                  <Link onFollow={() => navigate(`/admin/nodes/${item.node_id}`)}>
-                    {item.node_name}
-                  </Link>
+                  {item.node_deleted ? (
+                    // The detail page would 404, so the name is shown as the
+                    // snapshot it now is rather than as a link.
+                    <SpaceBetween size="xxs" direction="horizontal" alignItems="center">
+                      <span>{item.node_name || "—"}</span>
+                      <Badge color="grey">{t("admin.alerts.nodeDeleted")}</Badge>
+                    </SpaceBetween>
+                  ) : (
+                    <Link onFollow={() => navigate(`/admin/nodes/${item.node_id}`)}>
+                      {item.node_name}
+                    </Link>
+                  )}
                 </StatusIndicator>
               ),
             },
@@ -473,13 +495,14 @@ export default function Alerts() {
               id: "reading",
               header: t("admin.dashboard.col.reading"),
               sortingField: "value",
+              minWidth: 110,
               cell: renderReading,
             },
             {
               id: "duration",
               header: t("admin.alerts.col.duration"),
               sortingField: "duration_seconds",
-              maxWidth: 90,
+              minWidth: 110,
               cell: (item) =>
                 item.duration_seconds > 0 ? (
                   formatDuration(t, item.duration_seconds)
@@ -541,6 +564,12 @@ export default function Alerts() {
                       text: t("admin.alerts.unsilence"),
                       disabled: !isSilenced(item),
                     },
+                    {
+                      id: "close",
+                      text: t("admin.alerts.close"),
+                      description: t("admin.alerts.closeHint"),
+                      disabled: !isClosable(item),
+                    },
                   ]}
                   onItemClick={({ detail }) => {
                     if (detail.id === "ack" || detail.id === "unack") {
@@ -553,6 +582,10 @@ export default function Alerts() {
                       void runAction(item.alert_id, () =>
                         acknowledgeAndSilenceAlert(item.alert_id, 60),
                       );
+                      return;
+                    }
+                    if (detail.id === "close") {
+                      void runAction(item.alert_id, () => closeAlert(item.alert_id));
                       return;
                     }
                     if (detail.id === "unsilence") {

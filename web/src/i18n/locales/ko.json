@@ -197,7 +197,8 @@
         "node.alert_resolved": "알림이 해소되었습니다.",
         "node.alert_escalated": "알림이 오류 수준으로 상향되었습니다.",
         "node.alert_acked": "알림을 확인 처리했습니다.",
-        "node.alert_silenced": "알림을 묵음 처리했습니다."
+        "node.alert_silenced": "알림을 묵음 처리했습니다.",
+        "node.alert_closed": "알림을 직접 닫았습니다."
       },
       "shareOfTotal": "전체의 {{share}}%",
       "nodeSummaryCounts": "정상 {{healthy}} · 주의 {{warning}} · 오프라인 {{offline}}",
@@ -704,6 +705,9 @@
       "silenceFor": "{{minutes}}분 묵음",
       "silenceForDay": "24시간 묵음",
       "unsilence": "묵음 해제",
+      "close": "알림 닫기",
+      "closeHint": "노드가 사라져 평가로는 해소될 수 없는 알림을 직접 종료합니다.",
+      "nodeDeleted": "삭제된 노드",
       "actionError": "작업에 실패했습니다. 알림은 변경되지 않았습니다.",
       "approvalsTitle": "대기 중 승인",
       "approvalsHint": "결정을 기다리는 플랜 요청입니다. 시스템 알림이 아닙니다.",

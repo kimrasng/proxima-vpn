@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"errors"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -26,25 +27,27 @@ func NewAdminAlertHandler(db *pgxpool.Pool) *AdminAlertHandler {
 type patchAlertRequest struct {
 	Ack            *bool `json:"ack"`
 	SilenceMinutes *int  `json:"silence_minutes"`
+	Close          *bool `json:"close"`
 }
 
 // silenceMaxMinutes caps a silence at one day. An indefinite silence is how a
 // condition gets forgotten about entirely.
 const silenceMaxMinutes = 24 * 60
 
-// Patch acknowledges or silences an alert.
+// Patch acknowledges, silences or closes an alert.
 //
-// @Summary Acknowledge or silence an alert
-// @Description Acknowledging removes an alert from the notifiable count while leaving it visible. Silencing suppresses notifications for a bounded window without stopping evaluation.
+// @Summary Acknowledge, silence or close an alert
+// @Description Acknowledging removes an alert from the notifiable count while leaving it visible. Silencing suppresses notifications for a bounded window without stopping evaluation. Closing resolves an alert the evaluator cannot resolve itself, and is accepted only for a stale alert or one whose node no longer exists.
 // @Tags admin
 // @Accept json
 // @Produce json
 // @Security BearerAuth
 // @Param id path string true "Alert ID"
-// @Param request body patchAlertRequest true "Acknowledge flag or silence duration in minutes"
+// @Param request body patchAlertRequest true "Acknowledge flag, silence duration in minutes, or close flag"
 // @Success 200 {object} map[string]string
 // @Failure 400 {object} map[string]string
 // @Failure 404 {object} map[string]string
+// @Failure 409 {object} map[string]string
 // @Router /admin/alerts/{id} [patch]
 func (h *AdminAlertHandler) Patch(c *fiber.Ctx) error {
 	alertID := c.Params("id")
@@ -56,14 +59,40 @@ func (h *AdminAlertHandler) Patch(c *fiber.Ctx) error {
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
 	}
-	if req.Ack == nil && req.SilenceMinutes == nil {
+	if req.Ack == nil && req.SilenceMinutes == nil && req.Close == nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "one of ack or silence_minutes is required",
+			"error": "one of ack, silence_minutes or close is required",
 		})
 	}
 
 	ctx := context.Background()
 	adminID, _ := c.Locals("admin_id").(string)
+
+	// Closing ends the episode, which clears the acknowledgement and silence the
+	// other two branches set. Handling it alone keeps a combined request from
+	// looking like it did something it then undid.
+	if req.Close != nil && *req.Close {
+		alert, err := h.alerts.Close(ctx, alertID, adminID)
+		if err != nil {
+			if errors.Is(err, services.ErrAlertNotClosable) {
+				return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": err.Error()})
+			}
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": err.Error()})
+		}
+		h.activity.Log(ctx, services.Record{
+			EventType:  services.EventNodeAlertClosed,
+			Severity:   services.SeverityInfo,
+			ActorType:  "admin",
+			ActorID:    adminID,
+			ActorLabel: alert.NodeName,
+			TargetType: "node",
+			TargetID:   alert.NodeID,
+			Detail: map[string]any{
+				"node": alert.NodeName, "kind": alert.Kind, "value": alert.Value,
+			},
+		})
+		return c.JSON(fiber.Map{"status": "ok"})
+	}
 
 	if req.Ack != nil {
 		alert, err := h.alerts.Acknowledge(ctx, alertID, adminID, *req.Ack)

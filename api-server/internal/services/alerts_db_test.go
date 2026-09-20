@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"testing"
@@ -34,28 +35,29 @@ func alertTestPool(t *testing.T) *pgxpool.Pool {
 	return pool
 }
 
-// seedAlertNode makes a node for the alert rows to hang off, since node_alerts
-// has a foreign key onto it. The name is per-test and per-process so parallel
-// packages cannot collide on it.
-func seedAlertNode(t *testing.T, pool *pgxpool.Pool, tag string) string {
+// seedAlertNode makes a node for the alert rows to describe. The name is per-test
+// and per-process so parallel packages cannot collide on it.
+func seedAlertNode(t *testing.T, pool *pgxpool.Pool, tag string) nodeReading {
 	t.Helper()
 	ctx := context.Background()
 	name := fmt.Sprintf("alert-db-%s-%d", tag, os.Getpid())
 
 	var nodeID string
 	if err := pool.QueryRow(ctx,
-		`INSERT INTO nodes (name, ip, api_key, status, last_seen, shaping_ok)
-		 VALUES ($1, '198.51.100.30', $2, 'online', NOW(), true)
+		`INSERT INTO nodes (name, ip, api_key, status, last_seen, shaping_ok, country, region)
+		 VALUES ($1, '198.51.100.30', $2, 'online', NOW(), true, 'JP', 'Tokyo')
 		 RETURNING id::text`,
 		name, name+"-key",
 	).Scan(&nodeID); err != nil {
 		t.Fatalf("seed node: %v", err)
 	}
-	// ON DELETE CASCADE takes the alert rows with it.
+	// node_alerts no longer cascades, so the alert rows have to go explicitly.
 	t.Cleanup(func() {
-		_, _ = pool.Exec(context.Background(), `DELETE FROM nodes WHERE id = $1`, nodeID)
+		bg := context.Background()
+		_, _ = pool.Exec(bg, `DELETE FROM node_alerts WHERE node_id = $1`, nodeID)
+		_, _ = pool.Exec(bg, `DELETE FROM nodes WHERE id = $1`, nodeID)
 	})
-	return nodeID
+	return nodeReading{id: nodeID, name: name, country: "JP", region: "Tokyo", status: "online"}
 }
 
 type storedAlert struct {
@@ -125,7 +127,7 @@ func TestSeverityRankSQLAgreesWithGo(t *testing.T) {
 // after it reaches 96%.
 func TestEscalationDropsAnAcknowledgementTakenAtTheLowerTier(t *testing.T) {
 	pool := alertTestPool(t)
-	nodeID := seedAlertNode(t, pool, "escalate")
+	node := seedAlertNode(t, pool, "escalate")
 
 	svc := NewAlertService(pool)
 	r := ruleFor(t, AlertCPU)
@@ -136,14 +138,14 @@ func TestEscalationDropsAnAcknowledgementTakenAtTheLowerTier(t *testing.T) {
 	warning := &alertState{
 		State: AlertStateFiring, Severity: SeverityWarning, Value: 82, FiredAt: &fired,
 	}
-	if err := svc.persist(ctx, nodeID, r, warning, now); err != nil {
+	if err := svc.persist(ctx, node, r, warning, now); err != nil {
 		t.Fatalf("persist warning: %v", err)
 	}
 
 	// The operator takes ownership at the warning tier.
 	if _, err := pool.Exec(ctx,
 		`UPDATE node_alerts SET acked_at = NOW(), acked_by = 'operator'
-		 WHERE node_id = $1 AND kind = $2`, nodeID, string(AlertCPU),
+		 WHERE node_id = $1 AND kind = $2`, node.id, string(AlertCPU),
 	); err != nil {
 		t.Fatalf("seed acknowledgement: %v", err)
 	}
@@ -151,11 +153,11 @@ func TestEscalationDropsAnAcknowledgementTakenAtTheLowerTier(t *testing.T) {
 	escalated := &alertState{
 		State: AlertStateFiring, Severity: SeverityError, Value: 96, FiredAt: &fired,
 	}
-	if err := svc.persist(ctx, nodeID, r, escalated, now.Add(15*time.Second)); err != nil {
+	if err := svc.persist(ctx, node, r, escalated, now.Add(15*time.Second)); err != nil {
 		t.Fatalf("persist escalation: %v", err)
 	}
 
-	got := readAlert(t, pool, nodeID, AlertCPU)
+	got := readAlert(t, pool, node.id, AlertCPU)
 	if got.severity != string(SeverityError) {
 		t.Errorf("severity = %q, want error", got.severity)
 	}
@@ -180,7 +182,7 @@ func TestEscalationDropsAnAcknowledgementTakenAtTheLowerTier(t *testing.T) {
 // and the operator could never make one stick.
 func TestDeescalationAndSteadySamplesKeepTheAcknowledgement(t *testing.T) {
 	pool := alertTestPool(t)
-	nodeID := seedAlertNode(t, pool, "deescalate")
+	node := seedAlertNode(t, pool, "deescalate")
 
 	svc := NewAlertService(pool)
 	r := ruleFor(t, AlertCPU)
@@ -191,12 +193,12 @@ func TestDeescalationAndSteadySamplesKeepTheAcknowledgement(t *testing.T) {
 	errorState := &alertState{
 		State: AlertStateFiring, Severity: SeverityError, Value: 96, FiredAt: &fired,
 	}
-	if err := svc.persist(ctx, nodeID, r, errorState, now); err != nil {
+	if err := svc.persist(ctx, node, r, errorState, now); err != nil {
 		t.Fatalf("persist error tier: %v", err)
 	}
 	if _, err := pool.Exec(ctx,
 		`UPDATE node_alerts SET acked_at = NOW(), acked_by = 'operator'
-		 WHERE node_id = $1 AND kind = $2`, nodeID, string(AlertCPU),
+		 WHERE node_id = $1 AND kind = $2`, node.id, string(AlertCPU),
 	); err != nil {
 		t.Fatalf("seed acknowledgement: %v", err)
 	}
@@ -205,21 +207,21 @@ func TestDeescalationAndSteadySamplesKeepTheAcknowledgement(t *testing.T) {
 	steady := &alertState{
 		State: AlertStateFiring, Severity: SeverityError, Value: 95, FiredAt: &fired,
 	}
-	if err := svc.persist(ctx, nodeID, r, steady, now.Add(15*time.Second)); err != nil {
+	if err := svc.persist(ctx, node, r, steady, now.Add(15*time.Second)); err != nil {
 		t.Fatalf("persist steady sample: %v", err)
 	}
-	if got := readAlert(t, pool, nodeID, AlertCPU); !got.acked {
+	if got := readAlert(t, pool, node.id, AlertCPU); !got.acked {
 		t.Error("an unchanged tier must not clear the acknowledgement")
 	}
 
 	lower := &alertState{
 		State: AlertStateFiring, Severity: SeverityWarning, Value: 85, FiredAt: &fired,
 	}
-	if err := svc.persist(ctx, nodeID, r, lower, now.Add(30*time.Second)); err != nil {
+	if err := svc.persist(ctx, node, r, lower, now.Add(30*time.Second)); err != nil {
 		t.Fatalf("persist de-escalation: %v", err)
 	}
 
-	got := readAlert(t, pool, nodeID, AlertCPU)
+	got := readAlert(t, pool, node.id, AlertCPU)
 	if got.severity != string(SeverityWarning) {
 		t.Errorf("severity = %q, want warning", got.severity)
 	}
@@ -236,7 +238,7 @@ func TestDeescalationAndSteadySamplesKeepTheAcknowledgement(t *testing.T) {
 // inheriting a decision made about a condition that has since come and gone.
 func TestResolvingClearsTheAcknowledgementSoARefireIsUnacknowledged(t *testing.T) {
 	pool := alertTestPool(t)
-	nodeID := seedAlertNode(t, pool, "resolve")
+	node := seedAlertNode(t, pool, "resolve")
 
 	svc := NewAlertService(pool)
 	r := ruleFor(t, AlertCPU)
@@ -247,12 +249,12 @@ func TestResolvingClearsTheAcknowledgementSoARefireIsUnacknowledged(t *testing.T
 	firing := &alertState{
 		State: AlertStateFiring, Severity: SeverityWarning, Value: 82, FiredAt: &fired,
 	}
-	if err := svc.persist(ctx, nodeID, r, firing, now); err != nil {
+	if err := svc.persist(ctx, node, r, firing, now); err != nil {
 		t.Fatalf("persist firing: %v", err)
 	}
 	if _, err := pool.Exec(ctx,
 		`UPDATE node_alerts SET acked_at = NOW(), acked_by = 'operator'
-		 WHERE node_id = $1 AND kind = $2`, nodeID, string(AlertCPU),
+		 WHERE node_id = $1 AND kind = $2`, node.id, string(AlertCPU),
 	); err != nil {
 		t.Fatalf("seed acknowledgement: %v", err)
 	}
@@ -261,11 +263,11 @@ func TestResolvingClearsTheAcknowledgementSoARefireIsUnacknowledged(t *testing.T
 	ok := &alertState{
 		State: AlertStateOK, Severity: SeverityWarning, Value: 40, ResolvedAt: &resolved,
 	}
-	if err := svc.persist(ctx, nodeID, r, ok, resolved); err != nil {
+	if err := svc.persist(ctx, node, r, ok, resolved); err != nil {
 		t.Fatalf("persist resolve: %v", err)
 	}
 
-	got := readAlert(t, pool, nodeID, AlertCPU)
+	got := readAlert(t, pool, node.id, AlertCPU)
 	if got.acked {
 		t.Error("resolving must clear the acknowledgement for the episode that ended")
 	}
@@ -280,7 +282,7 @@ func TestResolvingClearsTheAcknowledgementSoARefireIsUnacknowledged(t *testing.T
 // field the evaluator owns.
 func TestPersistWritesEveryFieldTheEvaluatorOwns(t *testing.T) {
 	pool := alertTestPool(t)
-	nodeID := seedAlertNode(t, pool, "roundtrip")
+	node := seedAlertNode(t, pool, "roundtrip")
 
 	svc := NewAlertService(pool)
 	r := ruleFor(t, AlertDisk)
@@ -298,7 +300,7 @@ func TestPersistWritesEveryFieldTheEvaluatorOwns(t *testing.T) {
 		ClearSince:  &clear,
 		FiredAt:     &fired,
 	}
-	if err := svc.persist(ctx, nodeID, r, st, now); err != nil {
+	if err := svc.persist(ctx, node, r, st, now); err != nil {
 		t.Fatalf("persist: %v", err)
 	}
 
@@ -311,7 +313,7 @@ func TestPersistWritesEveryFieldTheEvaluatorOwns(t *testing.T) {
 	if err := pool.QueryRow(ctx,
 		`SELECT state, severity, value, breach_since, clear_since, fired_at, evaluated_at
 		 FROM node_alerts WHERE node_id = $1 AND kind = $2`,
-		nodeID, string(AlertDisk),
+		node.id, string(AlertDisk),
 	).Scan(&state, &severity, &value, &breachOut, &clearOut, &firedOut, &evaluatedOut); err != nil {
 		t.Fatalf("read back: %v", err)
 	}
@@ -344,5 +346,314 @@ func TestPersistWritesEveryFieldTheEvaluatorOwns(t *testing.T) {
 	// calculation reads it.
 	if st.EvaluatedAt == nil || !st.EvaluatedAt.Equal(now) {
 		t.Errorf("persist must stamp EvaluatedAt on the state, got %v", st.EvaluatedAt)
+	}
+}
+
+// findOpen locates one alert in the ListOpen result, which is the read path the
+// dashboard actually uses.
+func findOpen(t *testing.T, svc *AlertService, alertID string) (OpenAlert, bool) {
+	t.Helper()
+	open, err := svc.ListOpen(context.Background())
+	if err != nil {
+		t.Fatalf("list open alerts: %v", err)
+	}
+	for _, o := range open {
+		if o.ID == alertID {
+			return o, true
+		}
+	}
+	return OpenAlert{}, false
+}
+
+func alertIDFor(t *testing.T, pool *pgxpool.Pool, nodeID string, kind AlertKind) string {
+	t.Helper()
+	var id string
+	if err := pool.QueryRow(context.Background(),
+		`SELECT id::text FROM node_alerts WHERE node_id = $1 AND kind = $2`,
+		nodeID, string(kind),
+	).Scan(&id); err != nil {
+		t.Fatalf("read alert id: %v", err)
+	}
+	return id
+}
+
+// An alert records something that happened. Retiring the node it happened on used
+// to erase it outright - a foreign key with ON DELETE CASCADE - and the read path
+// joined the node for its name, so even a surviving row would have dropped out of
+// the list. Both of those are what this covers.
+func TestAnAlertOutlivesTheNodeItDescribes(t *testing.T) {
+	pool := alertTestPool(t)
+	node := seedAlertNode(t, pool, "outlive")
+	t.Cleanup(func() {
+		_, _ = pool.Exec(context.Background(),
+			`DELETE FROM node_alerts WHERE node_id = $1`, node.id)
+	})
+
+	svc := NewAlertService(pool)
+	r := ruleFor(t, AlertDisk)
+	ctx := context.Background()
+	now := time.Now().UTC().Truncate(time.Second)
+	fired := now.Add(-2 * time.Hour)
+
+	st := &alertState{
+		State: AlertStateFiring, Severity: SeverityError, Value: 98, FiredAt: &fired,
+	}
+	if err := svc.persist(ctx, node, r, st, now); err != nil {
+		t.Fatalf("persist: %v", err)
+	}
+	alertID := alertIDFor(t, pool, node.id, AlertDisk)
+
+	if _, err := pool.Exec(ctx, `DELETE FROM nodes WHERE id = $1`, node.id); err != nil {
+		t.Fatalf("delete node: %v", err)
+	}
+
+	var count int
+	if err := pool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM node_alerts WHERE id = $1`, alertID,
+	).Scan(&count); err != nil {
+		t.Fatalf("count alert rows: %v", err)
+	}
+	if count != 1 {
+		t.Fatal("deleting a node must not delete the alerts it raised")
+	}
+
+	got, ok := findOpen(t, svc, alertID)
+	if !ok {
+		t.Fatal("an alert whose node is gone must still be listed, or nobody can act on it")
+	}
+	// The snapshot is the whole point: with the node row gone there is nothing to
+	// join to, so without it the row could not even say what it was about.
+	if got.NodeName != node.name {
+		t.Errorf("node_name = %q, want the snapshot %q", got.NodeName, node.name)
+	}
+	if got.Country != "JP" || got.Region != "Tokyo" {
+		t.Errorf("location = %q/%q, want the snapshot JP/Tokyo", got.Country, got.Region)
+	}
+	if !got.NodeDeleted {
+		t.Error("NodeDeleted must mark an alert whose node no longer exists")
+	}
+	if got.NodeStatus != "" {
+		t.Errorf("NodeStatus = %q, want empty for a deleted node", got.NodeStatus)
+	}
+	if got.Value != 98 || got.Severity != string(SeverityError) {
+		t.Errorf("reading = %v/%s, want the frozen 98/error", got.Value, got.Severity)
+	}
+}
+
+// The snapshot is rewritten every tick, so it tracks a rename while the node is
+// alive rather than freezing whatever was true when the alert first fired.
+func TestTheNodeSnapshotFollowsARenameWhileTheNodeExists(t *testing.T) {
+	pool := alertTestPool(t)
+	node := seedAlertNode(t, pool, "rename")
+
+	svc := NewAlertService(pool)
+	r := ruleFor(t, AlertCPU)
+	ctx := context.Background()
+	now := time.Now().UTC().Truncate(time.Second)
+	fired := now.Add(-time.Hour)
+
+	st := &alertState{
+		State: AlertStateFiring, Severity: SeverityWarning, Value: 82, FiredAt: &fired,
+	}
+	if err := svc.persist(ctx, node, r, st, now); err != nil {
+		t.Fatalf("persist: %v", err)
+	}
+
+	renamed := node
+	renamed.name = node.name + "-renamed"
+	renamed.region = "Osaka"
+	if err := svc.persist(ctx, renamed, r, st, now.Add(15*time.Second)); err != nil {
+		t.Fatalf("persist after rename: %v", err)
+	}
+
+	got, ok := findOpen(t, svc, alertIDFor(t, pool, node.id, AlertCPU))
+	if !ok {
+		t.Fatal("alert missing from the open list")
+	}
+	if got.NodeName != renamed.name {
+		t.Errorf("node_name = %q, want the current %q", got.NodeName, renamed.name)
+	}
+	if got.Region != "Osaka" {
+		t.Errorf("node_region = %q, want the current Osaka", got.Region)
+	}
+}
+
+// Close is the only exit for an alert the evaluator cannot resolve. It is
+// restricted to exactly those, because clearing a live firing row would be undone
+// on the next tick and would reset the episode's age on the way.
+func TestCloseAcceptsOnlyWhatTheEvaluatorCannotResolve(t *testing.T) {
+	pool := alertTestPool(t)
+	svc := NewAlertService(pool)
+	ctx := context.Background()
+	now := time.Now().UTC().Truncate(time.Second)
+	fired := now.Add(-time.Hour)
+
+	t.Run("refuses a firing alert on a live node", func(t *testing.T) {
+		node := seedAlertNode(t, pool, "closefiring")
+		r := ruleFor(t, AlertCPU)
+		st := &alertState{
+			State: AlertStateFiring, Severity: SeverityWarning, Value: 82, FiredAt: &fired,
+		}
+		if err := svc.persist(ctx, node, r, st, now); err != nil {
+			t.Fatalf("persist: %v", err)
+		}
+		alertID := alertIDFor(t, pool, node.id, AlertCPU)
+
+		if _, err := svc.Close(ctx, alertID, "operator"); !errors.Is(err, ErrAlertNotClosable) {
+			t.Fatalf("want ErrAlertNotClosable, got %v", err)
+		}
+		got := readAlert(t, pool, node.id, AlertCPU)
+		if got.state != AlertStateFiring {
+			t.Errorf("a refused close must leave the row alone, state = %q", got.state)
+		}
+		if got.firedAt == nil || !got.firedAt.Equal(fired) {
+			t.Errorf("a refused close must not touch fired_at, got %v", got.firedAt)
+		}
+	})
+
+	t.Run("closes a stale alert and ends its episode", func(t *testing.T) {
+		node := seedAlertNode(t, pool, "closestale")
+		r := ruleFor(t, AlertDisk)
+		st := &alertState{
+			State: AlertStateStale, Severity: SeverityWarning, Value: 95, FiredAt: &fired,
+		}
+		if err := svc.persist(ctx, node, r, st, now); err != nil {
+			t.Fatalf("persist: %v", err)
+		}
+		alertID := alertIDFor(t, pool, node.id, AlertDisk)
+		if _, err := pool.Exec(ctx,
+			`UPDATE node_alerts SET acked_at = NOW(), acked_by = 'operator',
+			        silenced_until = NOW() + INTERVAL '30 minutes'
+			 WHERE id = $1`, alertID,
+		); err != nil {
+			t.Fatalf("seed ack and silence: %v", err)
+		}
+
+		closed, err := svc.Close(ctx, alertID, "operator")
+		if err != nil {
+			t.Fatalf("close a stale alert: %v", err)
+		}
+		if closed.NodeName != node.name {
+			t.Errorf("returned node name = %q, want %q", closed.NodeName, node.name)
+		}
+
+		var (
+			state, closedBy string
+			closedAt        *time.Time
+			firedAt         *time.Time
+			ackedAt         *time.Time
+			silenced        *time.Time
+		)
+		if err := pool.QueryRow(ctx,
+			`SELECT state, closed_by, closed_at, fired_at, acked_at, silenced_until
+			 FROM node_alerts WHERE id = $1`, alertID,
+		).Scan(&state, &closedBy, &closedAt, &firedAt, &ackedAt, &silenced); err != nil {
+			t.Fatalf("read back: %v", err)
+		}
+		if state != AlertStateOK {
+			t.Errorf("state = %q, want ok so the row leaves the open list", state)
+		}
+		if closedAt == nil || closedBy != "operator" {
+			t.Errorf("closure must be attributed, got %v by %q", closedAt, closedBy)
+		}
+		// The episode is over. Leaving fired_at set would let a later breach
+		// resume this one and report an age measured from the retired problem.
+		if firedAt != nil {
+			t.Errorf("fired_at = %v, want cleared so a later breach fires anew", firedAt)
+		}
+		if ackedAt != nil || silenced != nil {
+			t.Error("the acknowledgement and silence belonged to the closed episode")
+		}
+
+		if _, ok := findOpen(t, svc, alertID); ok {
+			t.Error("a closed alert must not appear in the open list")
+		}
+	})
+
+	t.Run("closes a firing alert once its node is gone", func(t *testing.T) {
+		node := seedAlertNode(t, pool, "closeorphan")
+		r := ruleFor(t, AlertCPU)
+		st := &alertState{
+			State: AlertStateFiring, Severity: SeverityError, Value: 96, FiredAt: &fired,
+		}
+		if err := svc.persist(ctx, node, r, st, now); err != nil {
+			t.Fatalf("persist: %v", err)
+		}
+		alertID := alertIDFor(t, pool, node.id, AlertCPU)
+		if _, err := pool.Exec(ctx, `DELETE FROM nodes WHERE id = $1`, node.id); err != nil {
+			t.Fatalf("delete node: %v", err)
+		}
+
+		// Firing would normally be refused; with no node left, no reading can
+		// ever contradict the closure.
+		if _, err := svc.Close(ctx, alertID, "operator"); err != nil {
+			t.Fatalf("close an orphaned alert: %v", err)
+		}
+		if _, ok := findOpen(t, svc, alertID); ok {
+			t.Error("a closed orphan must not appear in the open list")
+		}
+	})
+
+	t.Run("reports a missing alert apart from a refused one", func(t *testing.T) {
+		_, err := svc.Close(ctx, "00000000-0000-0000-0000-000000000000", "operator")
+		if err == nil || errors.Is(err, ErrAlertNotClosable) {
+			t.Fatalf("an unknown id is not a refusal, got %v", err)
+		}
+	})
+}
+
+// Closing retires one episode, not the condition. A node that comes back and
+// breaches again has to fire as new, which means the closure stamp must not linger
+// and claim the fresh problem was already dealt with.
+func TestARefireAfterCloseIsANewEpisode(t *testing.T) {
+	pool := alertTestPool(t)
+	node := seedAlertNode(t, pool, "refire")
+
+	svc := NewAlertService(pool)
+	r := ruleFor(t, AlertDisk)
+	ctx := context.Background()
+	now := time.Now().UTC().Truncate(time.Second)
+	fired := now.Add(-time.Hour)
+
+	stale := &alertState{
+		State: AlertStateStale, Severity: SeverityWarning, Value: 95, FiredAt: &fired,
+	}
+	if err := svc.persist(ctx, node, r, stale, now); err != nil {
+		t.Fatalf("persist stale: %v", err)
+	}
+	alertID := alertIDFor(t, pool, node.id, AlertDisk)
+	if _, err := svc.Close(ctx, alertID, "operator"); err != nil {
+		t.Fatalf("close: %v", err)
+	}
+
+	refired := now.Add(time.Hour)
+	fresh := &alertState{
+		State: AlertStateFiring, Severity: SeverityWarning, Value: 93, FiredAt: &refired,
+	}
+	if err := svc.persist(ctx, node, r, fresh, refired); err != nil {
+		t.Fatalf("persist refire: %v", err)
+	}
+
+	var (
+		state, closedBy string
+		closedAt        *time.Time
+		firedAt         *time.Time
+	)
+	if err := pool.QueryRow(ctx,
+		`SELECT state, closed_by, closed_at, fired_at FROM node_alerts WHERE id = $1`, alertID,
+	).Scan(&state, &closedBy, &closedAt, &firedAt); err != nil {
+		t.Fatalf("read back: %v", err)
+	}
+	if state != AlertStateFiring {
+		t.Errorf("state = %q, want firing", state)
+	}
+	if closedAt != nil || closedBy != "" {
+		t.Errorf("a new episode must not carry the old closure, got %v by %q", closedAt, closedBy)
+	}
+	if firedAt == nil || !firedAt.Equal(refired) {
+		t.Errorf("fired_at = %v, want the new episode's %v", firedAt, refired)
+	}
+	if _, ok := findOpen(t, svc, alertID); !ok {
+		t.Error("the refired alert must be back in the open list")
 	}
 }

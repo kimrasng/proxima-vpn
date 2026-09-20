@@ -210,8 +210,12 @@ type NodeIssue struct {
 
 	// Lifecycle fields, added when alerts became stateful. Additive on purpose:
 	// an older client that ignores unknown keys still reads the same response.
-	AlertID         string  `json:"alert_id"`
-	State           string  `json:"state"`
+	AlertID string `json:"alert_id"`
+	State   string `json:"state"`
+	// NodeDeleted marks an alert whose node has been removed. Such an alert can
+	// never be resolved by evaluation - nothing reports for it - so the UI offers
+	// closing it by hand.
+	NodeDeleted     bool    `json:"node_deleted"`
 	FiredAt         *string `json:"fired_at"`
 	DurationSeconds int64   `json:"duration_seconds"`
 	Acked           bool    `json:"acked"`
@@ -253,7 +257,7 @@ func (s *StatsService) GetAlerts(ctx context.Context) (Alerts, error) {
 			NodeID: o.NodeID, NodeName: o.NodeName,
 			Country: o.Country, Region: o.Region, Status: o.NodeStatus,
 			Kind: o.Kind, Severity: o.Severity, Value: o.Value,
-			AlertID: o.ID, State: o.State,
+			AlertID: o.ID, State: o.State, NodeDeleted: o.NodeDeleted,
 			Acked: o.AckedAt != nil, AckedBy: o.AckedBy,
 		}
 		if o.FiredAt != nil {
