@@ -50,6 +50,17 @@ function indicatorType(severity: AlertSeverity) {
   return severity === "info" ? "info" : severity;
 }
 
+function isSilenced(issue: NodeIssue) {
+  return issue.silenced_until != null && new Date(issue.silenced_until) > new Date();
+}
+
+// Must stay in step with the server's `total` (services/stats.go): acked and
+// silenced rows are excluded because the operator already acted on them, stale
+// ones because their readings are frozen rather than current.
+function needsAttention(issue: NodeIssue) {
+  return issue.state === "firing" && !issue.acked && !isSilenced(issue);
+}
+
 export default function Alerts() {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -105,12 +116,13 @@ export default function Alerts() {
 
   const summary = useMemo(() => {
     const counts = { error: 0, warning: 0, info: 0 };
-    for (const issue of issues) {
+    const actionable = issues.filter(needsAttention);
+    for (const issue of actionable) {
       if (issue.severity === "error") counts.error++;
       else if (issue.severity === "warning") counts.warning++;
       else counts.info++;
     }
-    const affected = new Set(issues.map((i) => i.node_id)).size;
+    const affected = new Set(actionable.map((i) => i.node_id)).size;
     return { ...counts, affected };
   }, [issues]);
 
@@ -480,8 +492,7 @@ export default function Alerts() {
               header: t("admin.alerts.col.lifecycle"),
               minWidth: 150,
               cell: (item) => {
-                const silenced =
-                  item.silenced_until != null && new Date(item.silenced_until) > new Date();
+                const silenced = isSilenced(item);
                 if (item.state === "stale") {
                   return (
                     <StatusIndicator type="pending">{t("admin.alerts.stateStale")}</StatusIndicator>
@@ -522,9 +533,7 @@ export default function Alerts() {
                     {
                       id: "unsilence",
                       text: t("admin.alerts.unsilence"),
-                      disabled:
-                        item.silenced_until == null ||
-                        new Date(item.silenced_until) <= new Date(),
+                      disabled: !isSilenced(item),
                     },
                   ]}
                   onItemClick={({ detail }) => {
