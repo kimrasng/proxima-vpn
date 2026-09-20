@@ -195,6 +195,7 @@
         "node.online": "重新上线。",
         "node.alert_fired": "触发了告警。",
         "node.alert_resolved": "告警已解除。",
+        "node.alert_escalated": "告警已升级为错误。",
         "node.alert_acked": "告警已确认。",
         "node.alert_silenced": "告警已静默。"
       },

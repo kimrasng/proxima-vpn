@@ -195,6 +195,7 @@
         "node.online": "came back online.",
         "node.alert_fired": "raised an alert.",
         "node.alert_resolved": "cleared an alert.",
+        "node.alert_escalated": "alert escalated to error.",
         "node.alert_acked": "alert acknowledged.",
         "node.alert_silenced": "alert silenced."
       },

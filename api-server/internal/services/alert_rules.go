@@ -41,6 +41,17 @@ type alertRule struct {
 	clear    float64
 	fireFor  time.Duration
 	clearFor time.Duration
+	// escalate and deescalate are a second, higher band inside an episode that is
+	// already firing, carrying severity to escalateSeverity while the value stays
+	// above it. They need their own hysteresis for the same reason fire/clear do,
+	// and they are left zero for a rule with no higher tier to reach.
+	//
+	// There is deliberately no escalateFor: an escalation can only happen inside
+	// an episode that already sustained its breach for fireFor, so the spike
+	// protection has already been paid for once.
+	escalate         float64
+	deescalate       float64
+	escalateSeverity Severity
 	// numeric distinguishes a threshold rule from a boolean one.
 	numeric bool
 	// resource marks a rule whose input comes from node-reported metrics, and
@@ -59,18 +70,63 @@ type alertRule struct {
 // is exempt because node_monitor's staleness window already damps it; its
 // damping belongs on the recovery side, where 60 seconds of heartbeats stop a
 // node in a reboot loop from re-notifying every cycle.
+//
+// The escalation tiers mark where degraded turns into effectively unusable, which
+// is why they are all error: a node pinned at 95% CPU is not serving traffic well,
+// and a disk at 97% is close to the point where Xray cannot write its own logs.
+// Memory and disk escalate later than CPU because their warning thresholds
+// already start higher, so the same 15-point gap would put the tier past 100.
+// offline, xray_down and shaping_failed have no tier: the first two are already
+// error, and shaping_failed is a bounded degradation that never becomes an outage.
 var alertRules = []alertRule{
 	{kind: AlertOffline, severity: SeverityError, clearFor: 60 * time.Second},
 	{kind: AlertXrayDown, severity: SeverityError, fireFor: 30 * time.Second, clearFor: 30 * time.Second, resource: true},
 	{kind: AlertShapingFailed, severity: SeverityWarning, fireFor: 30 * time.Second, clearFor: 30 * time.Second, resource: true},
-	{kind: AlertCPU, severity: SeverityWarning, fire: 80, clear: 70, fireFor: 5 * time.Minute, clearFor: 5 * time.Minute, numeric: true, resource: true},
-	{kind: AlertMemory, severity: SeverityWarning, fire: 85, clear: 75, fireFor: 5 * time.Minute, clearFor: 5 * time.Minute, numeric: true, resource: true},
-	{kind: AlertDisk, severity: SeverityWarning, fire: 90, clear: 85, clearFor: 1 * time.Minute, numeric: true, resource: true},
+	{kind: AlertCPU, severity: SeverityWarning, fire: 80, clear: 70, escalate: 95, deescalate: 90, escalateSeverity: SeverityError, fireFor: 5 * time.Minute, clearFor: 5 * time.Minute, numeric: true, resource: true},
+	{kind: AlertMemory, severity: SeverityWarning, fire: 85, clear: 75, escalate: 97, deescalate: 93, escalateSeverity: SeverityError, fireFor: 5 * time.Minute, clearFor: 5 * time.Minute, numeric: true, resource: true},
+	{kind: AlertDisk, severity: SeverityWarning, fire: 90, clear: 85, escalate: 97, deescalate: 94, escalateSeverity: SeverityError, clearFor: 1 * time.Minute, numeric: true, resource: true},
+}
+
+// severityRank orders severities so an escalation can be told from a
+// de-escalation. Only the two levels the rule table uses are ranked above the
+// default; the rest share a floor because no rule escalates to them.
+func severityRank(s Severity) int {
+	switch s {
+	case SeverityError:
+		return 2
+	case SeverityWarning:
+		return 1
+	default:
+		return 0
+	}
+}
+
+// severityFor picks the tier a value belongs in, holding the current one while
+// the reading sits inside the escalation band.
+func (r alertRule) severityFor(current Severity, value float64) Severity {
+	if r.escalateSeverity == "" {
+		return r.severity
+	}
+	switch {
+	case value >= r.escalate:
+		return r.escalateSeverity
+	case value < r.deescalate:
+		return r.severity
+	default:
+		if current == "" {
+			return r.severity
+		}
+		return current
+	}
 }
 
 // alertState is the mutable part of one alert row.
 type alertState struct {
-	State       string
+	State string
+	// Severity is the tier the current reading falls in, not the rule's static
+	// level: an escalation mutates this in place, so persist writes it rather
+	// than the rule's own severity.
+	Severity    Severity
 	Value       float64
 	BreachSince *time.Time
 	ClearSince  *time.Time
@@ -99,10 +155,20 @@ type alertObservation struct {
 type alertEdge struct {
 	To       string
 	Duration time.Duration
+	// SeverityFrom and SeverityTo are set only when the edge is a severity change
+	// inside an episode that keeps firing. They let the caller report an
+	// escalation as its own event rather than a second fire.
+	SeverityFrom Severity
+	SeverityTo   Severity
 	// Notify is false for a seeded first observation: the condition was already
 	// true before anything was watching, so reporting it as new is a lie and, on
 	// first deploy, a notification burst.
 	Notify bool
+}
+
+// escalated reports whether this edge is a mid-episode severity rise.
+func (e *alertEdge) escalated() bool {
+	return e.SeverityTo != "" && severityRank(e.SeverityTo) > severityRank(e.SeverityFrom)
 }
 
 // observe turns a rule plus a node's readings into that rule's input.
@@ -157,11 +223,18 @@ func (s *alertState) advance(r alertRule, o alertObservation, now time.Time) *al
 			s.State = AlertStateOK
 		}
 		// The breach clock is discarded either way: time in which the node was
-		// not reporting is time nobody observed.
+		// not reporting is time nobody observed. Severity is left alone: it
+		// belongs to the frozen reading, and recomputing it from a stale value
+		// would assert a tier change nobody measured.
 		s.BreachSince = nil
 		s.ClearSince = nil
 		return nil
 	}
+
+	// Recomputed on every observed sample, including a seed, so a row always
+	// carries the tier its value belongs in.
+	prevSeverity := s.Severity
+	s.Severity = r.severityFor(prevSeverity, o.value)
 
 	switch {
 	case o.breaching:
@@ -170,6 +243,19 @@ func (s *alertState) advance(r alertRule, o alertObservation, now time.Time) *al
 			s.BreachSince = &now
 		}
 		if s.State == AlertStateFiring {
+			// The episode continues, so fired_at must not move - its age is how
+			// long the condition has actually been true. A rise in tier is still
+			// worth reporting, which a de-escalation is not: that is an
+			// improvement, and paging about improvements trains people to ignore
+			// the channel.
+			if severityRank(s.Severity) > severityRank(prevSeverity) {
+				return &alertEdge{
+					To:           AlertStateFiring,
+					SeverityFrom: prevSeverity,
+					SeverityTo:   s.Severity,
+					Notify:       !seeding,
+				}
+			}
 			return nil
 		}
 		// An episode with FiredAt set never resolved - it was only frozen while

@@ -346,6 +346,13 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 		`CREATE INDEX IF NOT EXISTS idx_node_alerts_open
 			ON node_alerts(state) WHERE state <> 'ok'`,
 
+		// Ranks severities so the alert upsert can tell an escalation from a
+		// de-escalation and drop an acknowledgement that was made at the lower
+		// tier. Must stay in step with severityRank in services/alert_rules.go.
+		`CREATE OR REPLACE FUNCTION severity_rank(s TEXT) RETURNS INT AS $$
+			SELECT CASE s WHEN 'error' THEN 2 WHEN 'warning' THEN 1 ELSE 0 END
+		$$ LANGUAGE SQL IMMUTABLE`,
+
 		// ActivityService.ListForTarget filters on target_type/target_id but only
 		// created_at was indexed, so the per-node feed scanned the whole table.
 		`CREATE INDEX IF NOT EXISTS idx_activity_logs_target

@@ -22,6 +22,63 @@ func seeded(state string) *alertState {
 	return &alertState{State: state, exists: true}
 }
 
+// The rule table is the one place thresholds are declared, and the state machine
+// trusts it rather than re-checking these relations on every sample. Asserting
+// them here is what keeps that trust honest: a table edited into an inconsistent
+// shape fails in CI instead of producing an alert that flaps or never clears.
+func TestAlertRulesAreWellFormed(t *testing.T) {
+	for _, r := range alertRules {
+		if r.severity == "" {
+			t.Errorf("%s: no severity", r.kind)
+		}
+		if r.clearFor <= 0 {
+			t.Errorf("%s: clearFor must be positive, or a recovery never settles", r.kind)
+		}
+
+		if !r.numeric {
+			// A boolean rule is read from a flag, so a threshold on it would be
+			// silently ignored rather than wrong-but-visible.
+			if r.fire != 0 || r.clear != 0 || r.escalate != 0 || r.deescalate != 0 {
+				t.Errorf("%s: boolean rule carries numeric thresholds", r.kind)
+			}
+			if r.escalateSeverity != "" {
+				t.Errorf("%s: boolean rule carries an escalation tier", r.kind)
+			}
+			continue
+		}
+
+		if r.clear >= r.fire {
+			t.Errorf("%s: clear %.0f must sit below fire %.0f, or the band cannot damp a value at the boundary",
+				r.kind, r.clear, r.fire)
+		}
+
+		if r.escalateSeverity == "" {
+			if r.escalate != 0 || r.deescalate != 0 {
+				t.Errorf("%s: escalation thresholds set without an escalated severity", r.kind)
+			}
+			continue
+		}
+		if r.escalate <= 0 {
+			t.Errorf("%s: escalateSeverity set without an escalate threshold", r.kind)
+		}
+		if r.deescalate >= r.escalate {
+			t.Errorf("%s: deescalate %.0f must sit below escalate %.0f, for the same reason clear sits below fire",
+				r.kind, r.deescalate, r.escalate)
+		}
+		if r.escalate < r.fire {
+			t.Errorf("%s: escalate %.0f below fire %.0f would tier before the alert exists",
+				r.kind, r.escalate, r.fire)
+		}
+		if r.deescalate < r.clear {
+			t.Errorf("%s: deescalate %.0f below clear %.0f would resolve before de-escalating",
+				r.kind, r.deescalate, r.clear)
+		}
+		if severityRank(r.escalateSeverity) <= severityRank(r.severity) {
+			t.Errorf("%s: escalateSeverity %q does not outrank %q", r.kind, r.escalateSeverity, r.severity)
+		}
+	}
+}
+
 // TST-004: a value oscillating around the fire threshold must produce one firing
 // episode, and must not resolve until it holds below the clear threshold.
 func TestOscillationProducesSingleFiringEpisode(t *testing.T) {
@@ -86,7 +143,7 @@ func TestShortBreachDoesNotFire(t *testing.T) {
 	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 
 	for i := 0; i < 4; i++ {
-		if e := st.advance(r, r.observe(true, 95, false), now); e != nil {
+		if e := st.advance(r, r.observe(true, 92, false), now); e != nil {
 			t.Fatalf("fired after only %s, expected to wait %s", time.Duration(i)*15*time.Second, r.fireFor)
 		}
 		now = now.Add(15 * time.Second)
@@ -117,7 +174,7 @@ func TestConcurrentBreachesOnOneNode(t *testing.T) {
 
 	// Once the node reports again while still above the disk threshold, the disk
 	// alert fires on its own, independently of the offline alert.
-	if e := diskState.advance(disk, disk.observe(true, 95, false), now); e == nil || e.To != AlertStateFiring {
+	if e := diskState.advance(disk, disk.observe(true, 92, false), now); e == nil || e.To != AlertStateFiring {
 		t.Fatalf("disk rule should fire once the node reports, got %+v", e)
 	}
 }
@@ -130,7 +187,7 @@ func TestOfflineFreezesResourceAlertAsStale(t *testing.T) {
 	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 
 	for i := 0; i < 40; i++ {
-		st.advance(r, r.observe(true, 95, false), now)
+		st.advance(r, r.observe(true, 92, false), now)
 		now = now.Add(15 * time.Second)
 	}
 	if st.State != AlertStateFiring {
@@ -138,7 +195,7 @@ func TestOfflineFreezesResourceAlertAsStale(t *testing.T) {
 	}
 	firedAt := *st.FiredAt
 
-	if e := st.advance(r, r.observe(false, 95, false), now); e != nil {
+	if e := st.advance(r, r.observe(false, 92, false), now); e != nil {
 		t.Fatalf("going offline must not emit an edge, got %+v", e)
 	}
 	if st.State != AlertStateStale {
@@ -152,7 +209,7 @@ func TestOfflineFreezesResourceAlertAsStale(t *testing.T) {
 	// reset, because the condition never went away.
 	now = now.Add(time.Hour)
 	for i := 0; i < 40; i++ {
-		st.advance(r, r.observe(true, 95, false), now)
+		st.advance(r, r.observe(true, 92, false), now)
 		now = now.Add(15 * time.Second)
 	}
 	if st.FiredAt == nil || !st.FiredAt.Equal(firedAt) {
@@ -203,7 +260,7 @@ func TestEvaluationGapResetsBreachWindow(t *testing.T) {
 	if st.BreachSince != nil {
 		t.Fatal("a gap longer than maxGap must clear breach_since")
 	}
-	if e := st.advance(r, r.observe(true, 95, false), now); e != nil {
+	if e := st.advance(r, r.observe(true, 92, false), now); e != nil {
 		t.Fatalf("the first sample after a gap must not fire, got %+v", e)
 	}
 
@@ -225,7 +282,7 @@ func TestDiskFiresImmediately(t *testing.T) {
 	st := seeded(AlertStateOK)
 	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 
-	e := st.advance(r, r.observe(true, 95, false), now)
+	e := st.advance(r, r.observe(true, 92, false), now)
 	if e == nil || e.To != AlertStateFiring {
 		t.Fatalf("disk should fire on first breach, got %+v", e)
 	}
@@ -293,7 +350,7 @@ func TestStaleResumptionDoesNotRefire(t *testing.T) {
 	st := seeded(AlertStateOK)
 	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 
-	e := st.advance(r, r.observe(true, 95, false), now)
+	e := st.advance(r, r.observe(true, 92, false), now)
 	if e == nil || e.To != AlertStateFiring {
 		t.Fatalf("setup: expected the first breach to fire, got %+v", e)
 	}
@@ -302,14 +359,14 @@ func TestStaleResumptionDoesNotRefire(t *testing.T) {
 	// Three offline/online round trips, each still breaching on return.
 	for i := 0; i < 3; i++ {
 		now = now.Add(30 * time.Second)
-		if e := st.advance(r, r.observe(false, 95, false), now); e != nil {
+		if e := st.advance(r, r.observe(false, 92, false), now); e != nil {
 			t.Fatalf("round %d: going offline emitted %+v", i, e)
 		}
 		if st.State != AlertStateStale {
 			t.Fatalf("round %d: expected stale, got %q", i, st.State)
 		}
 		now = now.Add(30 * time.Second)
-		if e := st.advance(r, r.observe(true, 95, false), now); e != nil {
+		if e := st.advance(r, r.observe(true, 92, false), now); e != nil {
 			t.Fatalf("round %d: resuming re-fired with %+v", i, e)
 		}
 		if st.State != AlertStateFiring {
@@ -328,13 +385,13 @@ func TestPendingBreachDoesNotSurviveGoingOffline(t *testing.T) {
 	st := seeded(AlertStateOK)
 	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 
-	st.advance(r, r.observe(true, 95, false), now)
+	st.advance(r, r.observe(true, 92, false), now)
 	if st.State != AlertStatePending {
 		t.Fatalf("setup: expected pending, got %q", st.State)
 	}
 
 	now = now.Add(30 * time.Second)
-	if e := st.advance(r, r.observe(false, 95, false), now); e != nil {
+	if e := st.advance(r, r.observe(false, 92, false), now); e != nil {
 		t.Fatalf("going offline emitted %+v", e)
 	}
 	if st.State != AlertStateOK {
@@ -407,5 +464,153 @@ func TestResolvedAtIsStampedOnceOnTheEdge(t *testing.T) {
 	}
 	if !st.ResolvedAt.Equal(stamped) {
 		t.Fatalf("resolved_at moved to %v, want it fixed at %v", st.ResolvedAt, stamped)
+	}
+}
+
+// An escalation happens inside an episode that is already firing, so it must
+// report the tier change while leaving fired_at where it was: the age is how long
+// the condition has been true, not how long it has been severe.
+func TestEscalationKeepsTheEpisodeAndItsAge(t *testing.T) {
+	r := ruleFor(t, AlertCPU)
+	st := seeded(AlertStateOK)
+	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	for i := 0; i < 40; i++ {
+		st.advance(r, r.observe(true, 82, false), now)
+		now = now.Add(15 * time.Second)
+	}
+	if st.State != AlertStateFiring {
+		t.Fatalf("setup: expected firing, got %q", st.State)
+	}
+	if st.Severity != SeverityWarning {
+		t.Fatalf("setup: expected warning tier at 82, got %q", st.Severity)
+	}
+	firedAt := *st.FiredAt
+
+	e := st.advance(r, r.observe(true, 96, false), now)
+	if e == nil {
+		t.Fatal("crossing the escalate threshold must emit an edge")
+	}
+	if !e.escalated() {
+		t.Fatalf("expected an escalation edge, got %+v", e)
+	}
+	if e.SeverityFrom != SeverityWarning || e.SeverityTo != SeverityError {
+		t.Fatalf("expected warning->error, got %q->%q", e.SeverityFrom, e.SeverityTo)
+	}
+	if !e.Notify {
+		t.Fatal("an escalation on an existing row must notify")
+	}
+	if e.To != AlertStateFiring {
+		t.Fatalf("an escalation stays firing, got %q", e.To)
+	}
+	if st.FiredAt == nil || !st.FiredAt.Equal(firedAt) {
+		t.Fatalf("escalation moved fired_at to %v, want %v", st.FiredAt, firedAt)
+	}
+
+	// Holding at the higher tier is not a fresh escalation.
+	now = now.Add(15 * time.Second)
+	if e := st.advance(r, r.observe(true, 97, false), now); e != nil {
+		t.Fatalf("staying escalated emitted %+v", e)
+	}
+}
+
+// The escalation band damps a value hovering at the threshold, and a genuine
+// de-escalation is silent: it is an improvement, not a recovery.
+func TestDeescalationIsSilentAndBanded(t *testing.T) {
+	r := ruleFor(t, AlertCPU)
+	st := seeded(AlertStateOK)
+	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	for i := 0; i < 40; i++ {
+		st.advance(r, r.observe(true, 96, false), now)
+		now = now.Add(15 * time.Second)
+	}
+	if st.Severity != SeverityError {
+		t.Fatalf("setup: expected error tier at 96, got %q", st.Severity)
+	}
+
+	// 92 sits inside the 90..95 band, so the tier must hold rather than flip.
+	for i := 0; i < 10; i++ {
+		if e := st.advance(r, r.observe(true, 92, false), now); e != nil {
+			t.Fatalf("a reading inside the escalation band emitted %+v", e)
+		}
+		if st.Severity != SeverityError {
+			t.Fatalf("band reading dropped the tier to %q", st.Severity)
+		}
+		now = now.Add(15 * time.Second)
+	}
+
+	// Below the de-escalate threshold the tier drops, silently.
+	if e := st.advance(r, r.observe(true, 85, false), now); e != nil {
+		t.Fatalf("de-escalation must not emit an edge, got %+v", e)
+	}
+	if st.Severity != SeverityWarning {
+		t.Fatalf("expected warning after dropping below deescalate, got %q", st.Severity)
+	}
+	if st.State != AlertStateFiring {
+		t.Fatalf("de-escalation must not resolve the alert, got %q", st.State)
+	}
+}
+
+// A first observation already above the escalate threshold must record the error
+// tier without notifying, for the same reason any seed does not notify.
+func TestSeedRecordsTheEscalatedTierWithoutNotifying(t *testing.T) {
+	r := ruleFor(t, AlertDisk)
+	st := &alertState{State: AlertStateOK} // never evaluated: exists == false
+	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	e := st.advance(r, r.observe(true, 99, false), now)
+	if e == nil {
+		t.Fatal("disk fires on first breach, so the seed must record an edge")
+	}
+	if e.Notify {
+		t.Fatal("a seeded first observation must not notify, even at the error tier")
+	}
+	if st.Severity != SeverityError {
+		t.Fatalf("expected the seed to land on the error tier, got %q", st.Severity)
+	}
+}
+
+// A rule with no higher tier keeps its declared severity whatever the value is,
+// so a boolean condition cannot be escalated by a stray reading.
+func TestRulesWithoutATierNeverEscalate(t *testing.T) {
+	r := ruleFor(t, AlertOffline)
+	st := seeded(AlertStateOK)
+	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	if e := st.advance(r, r.observe(false, 0, true), now); e == nil || e.escalated() {
+		t.Fatalf("offline should fire without escalating, got %+v", e)
+	}
+	if st.Severity != SeverityError {
+		t.Fatalf("expected the rule's own severity, got %q", st.Severity)
+	}
+}
+
+// A stale row is holding a frozen reading, so its tier must not move: a value
+// nobody measured cannot justify an escalation, and recomputing one would page
+// about a change that never happened.
+func TestStaleFreezesTheSeverityTier(t *testing.T) {
+	r := ruleFor(t, AlertCPU)
+	st := seeded(AlertStateOK)
+	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	for i := 0; i < 40; i++ {
+		st.advance(r, r.observe(true, 82, false), now)
+		now = now.Add(15 * time.Second)
+	}
+	if st.Severity != SeverityWarning {
+		t.Fatalf("setup: expected warning, got %q", st.Severity)
+	}
+
+	// The node stops reporting while its last sample was pinned high. The frozen
+	// value must not be read as a fresh escalation.
+	if e := st.advance(r, r.observe(false, 99, false), now); e != nil {
+		t.Fatalf("freezing emitted %+v", e)
+	}
+	if st.State != AlertStateStale {
+		t.Fatalf("expected stale, got %q", st.State)
+	}
+	if st.Severity != SeverityWarning {
+		t.Fatalf("stale must keep the tier it was last measured at, got %q", st.Severity)
 	}
 }

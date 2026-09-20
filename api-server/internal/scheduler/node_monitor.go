@@ -102,9 +102,13 @@ func (s *NodeMonitorScheduler) record(ctx context.Context, t services.AlertTrans
 		eventType = services.EventNodeAlertResolved
 		severity = services.SeveritySuccess
 	}
-	// The offline edge keeps its long-standing event names so existing feed
-	// entries and their translations stay meaningful.
-	if t.Kind == services.AlertOffline {
+	// An escalation keeps firing but is not a new alert, so it gets its own event
+	// rather than a second fire the feed would read as a duplicate.
+	if t.Escalated {
+		eventType = services.EventNodeAlertEscalated
+	} else if t.Kind == services.AlertOffline {
+		// The offline edge keeps its long-standing event names so existing feed
+		// entries and their translations stay meaningful.
 		if firing {
 			eventType = services.EventNodeOffline
 		} else {
@@ -118,6 +122,10 @@ func (s *NodeMonitorScheduler) record(ctx context.Context, t services.AlertTrans
 	}
 	if !firing && t.Duration > 0 {
 		detail["duration_seconds"] = int64(t.Duration.Seconds())
+	}
+	if t.Escalated {
+		detail["severity_from"] = string(t.SeverityFrom)
+		detail["severity_to"] = string(t.Severity)
 	}
 
 	s.activity.Log(ctx, services.Record{
@@ -145,6 +153,12 @@ func alertMessage(t services.AlertTransition) string {
 				t.NodeName, t.Kind, t.Duration.Round(time.Second))
 		}
 		return fmt.Sprintf("\u2705 <b>Recovered</b>\n<code>%s</code> %s cleared.", t.NodeName, t.Kind)
+	}
+	// An escalation reports the tier it crossed, because the condition itself was
+	// already announced when the episode fired.
+	if t.Escalated {
+		return fmt.Sprintf("\U0001F53A <b>Escalated</b>\nNode <code>%s</code> %s is at %.0f%% (%s to %s).",
+			t.NodeName, t.Kind, t.Value, t.SeverityFrom, t.Severity)
 	}
 	switch t.Kind {
 	case services.AlertOffline:

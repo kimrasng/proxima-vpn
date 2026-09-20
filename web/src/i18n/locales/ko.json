@@ -195,6 +195,7 @@
         "node.online": "다시 온라인이 되었습니다.",
         "node.alert_fired": "알림이 발생했습니다.",
         "node.alert_resolved": "알림이 해소되었습니다.",
+        "node.alert_escalated": "알림이 오류 수준으로 상향되었습니다.",
         "node.alert_acked": "알림을 확인 처리했습니다.",
         "node.alert_silenced": "알림을 묵음 처리했습니다."
       },

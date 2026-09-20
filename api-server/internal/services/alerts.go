@@ -12,11 +12,12 @@ import (
 // Alert event types. EventNodeOffline already exists for the offline edge; the
 // resolve side needed a counterpart, and the generic pair covers every other kind.
 const (
-	EventNodeOnline        = "node.online"
-	EventNodeAlertFired    = "node.alert_fired"
-	EventNodeAlertResolved = "node.alert_resolved"
-	EventNodeAlertAcked    = "node.alert_acked"
-	EventNodeAlertSilenced = "node.alert_silenced"
+	EventNodeOnline         = "node.online"
+	EventNodeAlertFired     = "node.alert_fired"
+	EventNodeAlertResolved  = "node.alert_resolved"
+	EventNodeAlertEscalated = "node.alert_escalated"
+	EventNodeAlertAcked     = "node.alert_acked"
+	EventNodeAlertSilenced  = "node.alert_silenced"
 )
 
 // AlertTransition is one boundary crossing the caller should record and notify.
@@ -28,7 +29,12 @@ type AlertTransition struct {
 	Value    float64
 	To       string
 	Duration time.Duration
-	Notify   bool
+	// Escalated marks a severity rise inside an episode that keeps firing, which
+	// is neither a new alert nor a recovery. SeverityFrom carries the tier it left
+	// so the report can name both ends.
+	Escalated    bool
+	SeverityFrom Severity
+	Notify       bool
 }
 
 // AlertService evaluates node conditions into persisted alert lifecycle state.
@@ -129,14 +135,16 @@ func (s *AlertService) Evaluate(ctx context.Context) ([]AlertTransition, error) 
 				continue
 			}
 			transitions = append(transitions, AlertTransition{
-				NodeID:   n.id,
-				NodeName: n.name,
-				Kind:     rule.kind,
-				Severity: rule.severity,
-				Value:    st.Value,
-				To:       edge.To,
-				Duration: edge.Duration,
-				Notify:   edge.Notify,
+				NodeID:       n.id,
+				NodeName:     n.name,
+				Kind:         rule.kind,
+				Severity:     st.Severity,
+				Value:        st.Value,
+				To:           edge.To,
+				Duration:     edge.Duration,
+				Escalated:    edge.escalated(),
+				SeverityFrom: edge.SeverityFrom,
+				Notify:       edge.Notify,
 			})
 		}
 	}
@@ -173,7 +181,7 @@ type alertKey struct {
 
 func (s *AlertService) loadStates(ctx context.Context) (map[alertKey]*alertState, error) {
 	rows, err := s.db.Query(ctx, `
-		SELECT node_id::text, kind, state, value,
+		SELECT node_id::text, kind, state, severity, value,
 		       breach_since, clear_since, fired_at, resolved_at, evaluated_at
 		FROM node_alerts
 	`)
@@ -185,16 +193,16 @@ func (s *AlertService) loadStates(ctx context.Context) (map[alertKey]*alertState
 	out := map[alertKey]*alertState{}
 	for rows.Next() {
 		var (
-			nodeID, kind, state                       string
+			nodeID, kind, state, severity             string
 			value                                     float64
 			breach, clear, fired, resolved, evaluated *time.Time
 		)
-		if err := rows.Scan(&nodeID, &kind, &state, &value,
+		if err := rows.Scan(&nodeID, &kind, &state, &severity, &value,
 			&breach, &clear, &fired, &resolved, &evaluated); err != nil {
 			return nil, fmt.Errorf("scan alert state: %w", err)
 		}
 		out[alertKey{nodeID, AlertKind(kind)}] = &alertState{
-			State: state, Value: value,
+			State: state, Severity: Severity(severity), Value: value,
 			BreachSince: breach, ClearSince: clear,
 			FiredAt: fired, ResolvedAt: resolved, EvaluatedAt: evaluated,
 			exists: true,
@@ -204,6 +212,10 @@ func (s *AlertService) loadStates(ctx context.Context) (map[alertKey]*alertState
 }
 
 func (s *AlertService) persist(ctx context.Context, nodeID string, r alertRule, st *alertState, now time.Time) error {
+	severity := st.Severity
+	if severity == "" {
+		severity = r.severity
+	}
 	_, err := s.db.Exec(ctx, `
 		INSERT INTO node_alerts (node_id, kind, state, severity, value,
 		                         breach_since, clear_since, fired_at, resolved_at, evaluated_at)
@@ -218,10 +230,21 @@ func (s *AlertService) persist(ctx context.Context, nodeID string, r alertRule, 
 			resolved_at = EXCLUDED.resolved_at,
 			evaluated_at = EXCLUDED.evaluated_at,
 			-- An acknowledgement belongs to the episode it was made against, so a
-			-- resolve clears it and a later re-fire starts unacknowledged.
-			acked_at = CASE WHEN EXCLUDED.state = 'ok' THEN NULL ELSE node_alerts.acked_at END,
-			acked_by = CASE WHEN EXCLUDED.state = 'ok' THEN ''   ELSE node_alerts.acked_by END
-	`, nodeID, string(r.kind), st.State, string(r.severity), st.Value,
+			-- resolve clears it and a later re-fire starts unacknowledged. An
+			-- escalation clears it for the same reason: the operator accepted a
+			-- warning, not the error it has since become. Ranked against the stored
+			-- row rather than a value carried in from the evaluator, so the
+			-- comparison is against what was actually acknowledged. A de-escalation
+			-- keeps the ack, because nothing new was asserted.
+			acked_at = CASE
+				WHEN EXCLUDED.state = 'ok' THEN NULL
+				WHEN severity_rank(EXCLUDED.severity) > severity_rank(node_alerts.severity) THEN NULL
+				ELSE node_alerts.acked_at END,
+			acked_by = CASE
+				WHEN EXCLUDED.state = 'ok' THEN ''
+				WHEN severity_rank(EXCLUDED.severity) > severity_rank(node_alerts.severity) THEN ''
+				ELSE node_alerts.acked_by END
+	`, nodeID, string(r.kind), st.State, string(severity), st.Value,
 		st.BreachSince, st.ClearSince, st.FiredAt, st.ResolvedAt, now)
 	if err != nil {
 		return fmt.Errorf("persist alert state for %s/%s: %w", nodeID, r.kind, err)
