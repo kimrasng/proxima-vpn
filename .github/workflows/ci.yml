@@ -9,9 +9,10 @@ jobs:
   backend:
     runs-on: ubuntu-latest
 
-    # Postgres is provided so the DB-backed tests (e.g. the Telegram bot
-    # command tests in internal/telegram) actually run instead of skipping
-    # themselves - they no-op unless TEST_DATABASE_URL is set.
+    # Postgres and Redis are provided so the DB- and Redis-backed tests actually
+    # run instead of skipping themselves - they no-op unless TEST_DATABASE_URL /
+    # TEST_REDIS_ADDR are set, and a skip is not a failure, so the online-tracker
+    # tests passed as green while never executing.
     services:
       postgres:
         image: postgres:16-alpine
@@ -24,9 +25,19 @@ jobs:
         options: >-
           --health-cmd "pg_isready -U vpnuser -d vpnpanel"
           --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 5s --health-retries 10
 
     env:
       TEST_DATABASE_URL: postgres://vpnuser:vpnpass@localhost:5432/vpnpanel
+      # host:port, not a redis:// URL - this reaches redis.Options.Addr directly,
+      # unlike the REDIS_URL the server itself parses.
+      TEST_REDIS_ADDR: localhost:6379
 
     steps:
       - uses: actions/checkout@v7
