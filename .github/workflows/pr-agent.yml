@@ -1,0 +1,116 @@
+name: PR Security Review (PR-Agent)
+
+# Automated security review using the open-source PR-Agent
+# (https://github.com/the-pr-agent/pr-agent) pointed at a self-hosted
+# OpenAI-compatible Chat Completions endpoint. No reviewer code lives in this
+# repo - behaviour is configured entirely in /.pr_agent.toml.
+#
+# PR-Agent reaches the model through LiteLLM. Setting OPENAI__API_BASE makes
+# LiteLLM POST to <base>/chat/completions (verified against v0.45.0:
+# litellm_ai_handler.py sets `litellm.api_base = get_settings().openai.api_base`
+# and calls `acompletion`), so the Responses API is never used.
+#
+# Independent of ci.yml and e2e.yml: separate workflow, no shared jobs, and it
+# never gates them. Findings surface as PR comments, not a failed build.
+#
+# Uses `pull_request` rather than `pull_request_target`: this job receives the AI
+# credentials, and pull_request_target would expose them to a fork's code. Fork
+# PRs therefore get no secrets and the job self-skips.
+
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review, synchronize]
+    branches: [main]
+    paths:
+      - 'api-server/**'
+      - 'node-agent/**'
+      - 'pkg/**'
+      - 'web/src/**'
+      - 'scripts/**'
+      - 'postgres/**'
+      - 'docker-compose*.yml'
+      - '.pr_agent.toml'
+      - '.github/SECURITY_CONTEXT.md'
+      - '.github/workflows/pr-agent.yml'
+  # Lets a maintainer re-trigger with /review or /improve in a PR comment.
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: pr-agent-${{ github.event.pull_request.number || github.event.issue.number }}
+  cancel-in-progress: true
+
+jobs:
+  security_review:
+    # Skip bot-authored events to avoid the agent reacting to its own comments.
+    if: ${{ github.event.sender.type != 'Bot' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      # Without the endpoint configured PR-Agent would fail trying to reach
+      # api.openai.com, so check first and no-op instead (fork PRs, or secrets
+      # not yet set).
+      - name: Check AI endpoint is configured
+        id: guard
+        env:
+          AI_BASE_URL: ${{ secrets.AI_BASE_URL }}
+          AI_API_KEY: ${{ secrets.AI_API_KEY }}
+        run: |
+          if [ -z "$AI_BASE_URL" ] || [ -z "$AI_API_KEY" ]; then
+            echo "::notice::AI_BASE_URL / AI_API_KEY not set (fork PR, or secrets not configured) - skipping security review"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: PR-Agent security review
+        if: steps.guard.outputs.ready == 'true'
+        uses: the-pr-agent/pr-agent@v0.45.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+          # --- Self-hosted OpenAI-compatible endpoint -----------------------
+          # Nested TOML settings map to env vars with a double underscore:
+          # [openai].api_base -> OPENAI__API_BASE
+          OPENAI__API_BASE: ${{ secrets.AI_BASE_URL }}
+          OPENAI__KEY: ${{ secrets.AI_API_KEY }}
+
+          # `openai/` prefix routes the request through LiteLLM's
+          # OpenAI-compatible (chat/completions) path for an arbitrary model name.
+          CONFIG__MODEL: openai/${{ vars.AI_MODEL || secrets.AI_MODEL }}
+          CONFIG__FALLBACK_MODELS: '[]'
+
+          # claude-sonnet-5 has a 1M context, but sending all of it is expensive per
+          # PR and accuracy degrades on very long inputs, so cap the actual request.
+          CONFIG__CUSTOM_MODEL_MAX_TOKENS: '1000000'
+          CONFIG__MAX_MODEL_TOKENS: '200000'
+
+          # Required for the Claude 5 family, which rejects `temperature`. PR-Agent
+          # decides whether to send it by exact model-name match against
+          # NO_SUPPORT_TEMPERATURE_MODELS, and that list carries "claude-sonnet-5"
+          # and "anthropic/claude-sonnet-5" but no "openai/..." form - so the
+          # OpenAI-compatible route would otherwise send one. Safe for the prompt:
+          # this merges the system message into the user message instead of dropping
+          # it, so the .pr_agent.toml instructions still arrive. Drop this flag if
+          # AI_MODEL becomes a GPT model.
+          CONFIG__CUSTOM_REASONING_MODEL: 'true'
+
+          # --- What runs automatically on PR open / new commits -------------
+          # auto_review  -> /review  : one summary comment incl. security concerns
+          # auto_improve -> /improve : inline comments on the offending lines
+          #                            (commitable_code_suggestions in .pr_agent.toml)
+          github_action_config.auto_review: 'true'
+          github_action_config.auto_improve: 'true'
+          github_action_config.auto_describe: 'false'
+          github_action_config.pr_actions: '["opened","reopened","ready_for_review","synchronize"]'
+
+          # Review behaviour, severity focus and false-positive rules all live in
+          # /.pr_agent.toml so they are reviewable in version control.
+          CONFIG__USE_REPO_SETTINGS_FILE: 'true'
+          # This job only comments; it never needs to push code.
+          CONFIG__RESTRICTED_MODE: 'true'

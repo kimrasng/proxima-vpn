@@ -1,0 +1,97 @@
+# PR-Agent repo-level settings for Proxima VPN.
+#
+# Read automatically from the repo root on every PR (config.use_repo_settings_file
+# defaults to true). Keys mirror pr_agent/settings/configuration.toml in
+# the-pr-agent/pr-agent; tune the review by editing this file only.
+#
+# Goal: security findings first, style/refactor noise last.
+
+[config]
+# Feed the reviewer this repo's security model in addition to the diff, so it can
+# judge a change against real trust boundaries instead of guessing. The upstream
+# default is ["AGENTS.md"], which this repo .gitignore's - so point at a file that
+# is actually committed.
+repo_context_files = [".github/SECURITY_CONTEXT.md"]
+
+# Read that context from the default branch, never from the PR branch. Otherwise a
+# PR could edit SECURITY_CONTEXT.md to tell the reviewer to ignore its own
+# vulnerability. Upstream already defaults to true; pinned so it cannot regress.
+repo_context_from_default_branch = true
+
+# Show the model more surrounding code than the bare hunk, so it can see whether
+# a guard still holds after the change.
+patch_extra_lines_before = 12
+patch_extra_lines_after = 6
+
+[pr_reviewer]
+# Built-in security pass (on by default upstream; pinned here so it cannot
+# silently regress) plus a "security concerns" section in the summary comment.
+require_security_review = true
+enable_review_labels_security = true
+
+# Drop the noise sections: this reviewer exists for vulnerabilities, not for
+# effort scoring or test-coverage nagging.
+require_score_review = false
+require_tests_review = false
+require_estimate_effort_to_review = false
+require_can_be_split_review = false
+require_ticket_analysis_review = false
+
+persistent_comment = true          # edit one review comment in place instead of piling up per push
+final_update_message = false
+
+extra_instructions = """
+You are reviewing Proxima VPN, a multi-protocol VPN management panel (Go api-server + node-agent, React web, shell install/update scripts). Report exploitable security vulnerabilities and ignore style, naming, formatting, refactoring and performance.
+
+Priority order - inspect these first:
+1. Authentication and authorization bypass: JWT validation, admin-only checks, the node API key path, middleware attached to the wrong route group.
+2. IDOR / resource ownership: a handler that takes an id from the path or body and queries it WITHOUT scoping to the authenticated user (the codebase pattern is `WHERE id = $1 AND user_id = $2`). Any authenticated user reaching another user's row is HIGH or CRITICAL.
+3. Privilege escalation to admin.
+4. Credential handling: JWT secret, node API key, subscription token - generation (crypto/rand vs math/rand), comparison (constant-time vs ==), storage, expiry.
+5. Secret leakage: WireGuard private keys, Xray UUIDs, Reality private keys, Shadowsocks passwords appearing in logs, errors, metrics, or a response reachable by a principal who does not own them.
+6. api-server <-> node-agent trust boundary: a node is only semi-trusted. Data a node reports (traffic stats, TLS cert paths, heartbeat) is attacker-controlled if that node is compromised. Stats drive billing/quota.
+7. Command injection: user or panel-supplied strings interpolated into os/exec calls or shell scripts.
+8. SSRF: a URL built from DB or request data that the server then fetches.
+9. Path traversal: file paths built from request data without a whitelist or containment check.
+10. SQL injection: only real string-built SQL (fmt.Sprintf into a query, concatenation). This codebase uses pgx with $1 placeholders - do not report parameterized queries.
+11. File upload and download handlers.
+12. Xray/WireGuard configuration generation - injection into generated config.
+13. Update mechanism and arbitrary code execution: version/URL construction, signature or checksum verification, who can trigger an update.
+14. TLS and network security: InsecureSkipVerify, disabled verification, downgrade to plain HTTP across a machine boundary.
+15. Multi-component attack paths: trace a chain that crosses web -> api-server -> node-agent even when each step looks benign alone.
+16. Race conditions and validation ordering: check-then-act on quota, device limits, expiry or token reuse without a transaction; state mutated or secrets returned before the ownership check completes.
+
+False positive suppression - a finding must clear this bar:
+- Name the attacker principal, the entry point, and the security boundary crossed. If you cannot state a concrete attack path, do not report it.
+- Auth is enforced by middleware on route groups, not inside each handler. Before claiming a missing auth check, assume the route group already enforces it.
+- Secrets legitimately delivered to their owner are not leaks: WireGuard private keys and Shadowsocks passwords go to the subscribing device, Reality private keys go to the node. Only cross-principal delivery is a finding.
+- The node-agent update scripts download over HTTPS without signature verification. This is pre-existing and known - do not report it unless the diff makes it worse.
+- Do not report pre-existing code that the diff only moves, renames or reindents. Review what the change does.
+- Prefer three findings you can prove over ten you suspect. Finding nothing is a valid result - say so plainly.
+
+For each issue state: severity, the exact file and line, why it is exploitable, the attack path or precondition, and the recommended fix.
+"""
+
+[pr_code_suggestions]
+# This is what produces INLINE comments on the changed lines; /review alone only
+# leaves a summary comment.
+commitable_code_suggestions = true
+
+# Only surface high-confidence suggestions. Upstream warns against going above 8
+# because it clips relevant findings; 7 keeps security issues while dropping
+# cosmetic ones.
+suggestions_score_threshold = 7
+num_code_suggestions_per_chunk = 3
+
+# Security fixes only - suppress the usual style/perf suggestion stream.
+extra_instructions = """
+Only suggest changes that fix a security vulnerability in Proxima VPN: authentication or authorization bypass, IDOR and missing resource-ownership scoping, privilege escalation, credential or secret leakage (JWT, node API key, subscription token, WireGuard private key, Xray UUID, Reality key), api-server <-> node-agent trust boundary violations, command injection, SSRF, path traversal, SQL injection, unsafe file upload/download, unsafe Xray/WireGuard config generation, unverified update mechanisms or arbitrary code execution, TLS downgrades, and security-relevant race conditions or validation-ordering bugs.
+
+Do not suggest style, naming, formatting, refactoring, performance, logging or test changes. If the diff contains no security defect, return no suggestions.
+"""
+
+[github_app]
+# Applies when triggered via push/synchronize handling.
+push_commands = [
+    "/review",
+]
