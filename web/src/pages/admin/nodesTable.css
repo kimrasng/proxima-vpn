@@ -1,0 +1,51 @@
+.nodes-table {
+  min-inline-size: 0;
+  max-inline-size: 100%;
+}
+
+/* Size columns from their labels and values, without distributing spare
+   viewport space across every column. Cloudscape handles overflow internally. */
+.nodes-table table {
+  /* Cloudscape's scoped rules use :not(#...) specificity and measured widths.
+     Override those only here so intrinsic content, not stale measurements,
+     determines the column sizes. */
+  table-layout: auto !important;
+  inline-size: max-content !important;
+  min-inline-size: 0 !important;
+}
+
+/* Keep labels (including sorting and info controls) on a single line.
+   Scope the override to this table; do not alter Cloudscape's resizer. */
+.nodes-table th,
+.nodes-table th [data-focus-id^="sorting-control"],
+.nodes-table th [class*="awsui_header-content"] {
+  white-space: nowrap !important;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+.nodes-table__header {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 6px;
+  inline-size: max-content;
+}
+
+.nodes-table__header > * {
+  flex-shrink: 0;
+}
+
+.nodes-table__identity {
+  display: inline-block;
+  inline-size: max-content;
+}
+
+/* Buttons and badges define their own wrapping rules, so inheritance alone
+   does not keep node names or translated role labels intact. */
+.nodes-table__identity,
+.nodes-table__identity * {
+  white-space: nowrap !important;
+  overflow-wrap: normal !important;
+  word-break: normal !important;
+}
