@@ -1,0 +1,21 @@
+/* CJK line-breaking for the order audit view.
+ *
+ * The section descriptions and the fingerprint hint are full sentences, and the
+ * default `word-break` breaks Korean mid-word and Chinese mid-term: measured at
+ * 375px the Korean hints stranded "다." alone on a third line, and at 768px the
+ * Chinese fingerprint hint stranded "性。". `keep-all` suppresses those
+ * intra-word opportunities so a line breaks at a phrase boundary instead.
+ *
+ * Scoped to this view rather than applied to `body`: it is the wrapping of this
+ * page's prose that was measured, and a global rule would silently reflow every
+ * other page in the panel. Latin text is unaffected - `keep-all` only removes
+ * break opportunities that the CJK ruleset adds.
+ *
+ * `overflow-wrap: anywhere` is the escape hatch `keep-all` needs: an unbroken
+ * token wider than its column (a session id, a fingerprint, a user agent) would
+ * otherwise push past the container instead of wrapping.
+ */
+.order-audit-view {
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}

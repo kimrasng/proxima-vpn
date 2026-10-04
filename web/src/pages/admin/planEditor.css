@@ -1,0 +1,11 @@
+.plan-editor-preview {
+  position: sticky;
+  top: var(--space-scaled-m, 16px);
+  min-width: 0;
+}
+
+@media (max-width: 900px) {
+  .plan-editor-preview {
+    position: static;
+  }
+}
