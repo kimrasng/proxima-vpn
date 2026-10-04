@@ -52,6 +52,8 @@ func (s *Server) registerRoutes() {
 	adminNodes := admin.Group("/nodes")
 	adminNodes.Post("/token", adminNodeHandler.GenerateToken)
 	adminNodes.Get("/", adminNodeHandler.ListNodes)
+	// Registered before "/:id" so the literal path is not captured as a node id.
+	adminNodes.Get("/event-filters", adminNodeHandler.GetNodeEventFilters)
 	adminNodes.Get("/:id", adminNodeHandler.GetNode)
 	adminNodes.Put("/:id", adminNodeHandler.UpdateNode)
 	adminNodes.Delete("/:id", adminNodeHandler.DeleteNode)
@@ -60,6 +62,7 @@ func (s *Server) registerRoutes() {
 	adminNodes.Get("/:id/tls", adminNodeHandler.GetTLSStatus)
 	adminNodes.Post("/:id/tls/issue", adminNodeHandler.IssueCertificate)
 	adminNodes.Get("/:id/metrics", adminNodeHandler.GetMetricsHistory)
+	adminNodes.Get("/:id/events", adminNodeHandler.GetNodeEvents)
 
 	adminInboundHandler := handlers.NewAdminInboundHandler(s.db)
 	admin.Get("/nodes/:nodeId/inbounds", adminInboundHandler.List)
@@ -77,6 +80,15 @@ func (s *Server) registerRoutes() {
 	nodeGroups.Delete("/:id", adminNodeGroupHandler.Delete)
 	nodeGroups.Put("/:id/nodes", adminNodeGroupHandler.SetNodes)
 
+	adminNodeChainHandler := handlers.NewAdminNodeChainHandler(s.db)
+	nodeChains := admin.Group("/node-chains")
+	nodeChains.Get("/", adminNodeChainHandler.List)
+	nodeChains.Post("/", adminNodeChainHandler.Create)
+	nodeChains.Post("/batch", adminNodeChainHandler.Batch)
+	nodeChains.Patch("/:id", adminNodeChainHandler.Update)
+	nodeChains.Delete("/:id", adminNodeChainHandler.Delete)
+	nodeChains.Put("/:id/groups", adminNodeChainHandler.SetGroups)
+
 	adminPlanHandler := handlers.NewAdminPlanHandler(s.db)
 	plans := admin.Group("/plans")
 	plans.Post("/", adminPlanHandler.Create)
@@ -84,6 +96,8 @@ func (s *Server) registerRoutes() {
 	plans.Get("/:id", adminPlanHandler.Get)
 	plans.Put("/:id", adminPlanHandler.Update)
 	plans.Delete("/:id", adminPlanHandler.Delete)
+	plans.Get("/:id/routes", adminPlanHandler.GetRoutes)
+	plans.Put("/:id/routes", adminPlanHandler.SetRoutes)
 
 	adminUserHandler := handlers.NewAdminUserHandler(s.db)
 	adminUsers := admin.Group("/users")
@@ -96,10 +110,19 @@ func (s *Server) registerRoutes() {
 	adminUsers.Delete("/:id", adminUserHandler.Delete)
 	adminUsers.Post("/:id/reset-traffic", adminUserHandler.ResetTraffic)
 
-	adminPlanRequestHandler := handlers.NewAdminPlanRequestHandler(s.db)
-	adminPlanRequests := admin.Group("/plan-requests")
-	adminPlanRequests.Get("/", adminPlanRequestHandler.List)
-	adminPlanRequests.Put("/:id", adminPlanRequestHandler.Review)
+	adminOrderHandler := handlers.NewAdminOrderHandler(s.db)
+	adminOrders := admin.Group("/orders")
+	adminOrders.Get("/", adminOrderHandler.List)
+	adminOrders.Get("/:id/audit", adminOrderHandler.Audit)
+	adminOrders.Post("/:id/pay", adminOrderHandler.MarkPaid)
+	adminOrders.Post("/:id/cancel", adminOrderHandler.Cancel)
+
+	adminPromotionHandler := handlers.NewAdminPromotionHandler(s.db)
+	adminPromotions := admin.Group("/promotions")
+	adminPromotions.Get("/", adminPromotionHandler.List)
+	adminPromotions.Post("/", adminPromotionHandler.Create)
+	adminPromotions.Put("/:id", adminPromotionHandler.Update)
+	adminPromotions.Delete("/:id", adminPromotionHandler.Delete)
 
 	adminSettingsHandler := handlers.NewAdminSettingsHandler(s.db)
 	admin.Get("/settings", adminSettingsHandler.List)
@@ -122,10 +145,21 @@ func (s *Server) registerRoutes() {
 	admin.Get("/stats/alerts", adminStatsHandler.GetAlerts)
 	admin.Get("/activity", adminStatsHandler.GetActivity)
 	admin.Get("/online-users", adminStatsHandler.GetOnlineUsers)
+	adminEvictions := handlers.NewAdminUUIDEvictionHandler(s.db)
+	admin.Get("/uuid-evictions", adminEvictions.List)
+	admin.Post("/uuid-evictions/:uuid/retry", adminEvictions.Retry)
 	admin.Post("/devices/:id/terminate", adminStatsHandler.TerminateSession)
 
 	adminAlertHandler := handlers.NewAdminAlertHandler(s.db)
 	admin.Patch("/alerts/:id", adminAlertHandler.Patch)
+
+	adminSubDomainHandler := handlers.NewAdminSubscriptionDomainHandler(s.db)
+	subDomains := admin.Group("/subscription-domains")
+	subDomains.Get("/", adminSubDomainHandler.List)
+	subDomains.Post("/", adminSubDomainHandler.Create)
+	subDomains.Get("/health", adminSubDomainHandler.Health)
+	subDomains.Put("/:id", adminSubDomainHandler.Update)
+	subDomains.Delete("/:id", adminSubDomainHandler.Delete)
 
 	if s.backupService != nil {
 		adminBackupHandler := handlers.NewAdminBackupHandler(s.backupService)
@@ -134,7 +168,10 @@ func (s *Server) registerRoutes() {
 		admin.Get("/backup/download", adminBackupHandler.DownloadBackup)
 	}
 
-	nodeAgentHandler := handlers.NewNodeAgentHandler(s.db, s.redis)
+	nodeAgentHandler := handlers.NewNodeAgentHandler(s.db, s.redis, services.ManagedEntryDNSIntentConfig{
+		Enabled: s.config.ManagedEntryDNS.Active(), ZoneID: s.config.ManagedEntryDNS.ZoneID,
+		BaseDomain: s.config.ManagedEntryDNS.BaseDomain,
+	})
 	api.Post("/nodes/register", nodeAgentHandler.Register)
 
 	nodeAgent := api.Group("/nodes/:id")
@@ -144,8 +181,18 @@ func (s *Server) registerRoutes() {
 	nodeAgent.Get("/config/digest", nodeAgentHandler.ConfigDigest)
 	nodeAgent.Post("/heartbeat", nodeAgentHandler.Heartbeat)
 	nodeAgent.Post("/stats", nodeAgentHandler.Stats)
+	nodeAgent.Post("/bandwidth/permit", nodeAgentHandler.BandwidthPermit)
+	nodeAgent.Post("/active-uuids", nodeAgentHandler.ActiveUUIDReport)
+	// Literal path registered separately; both remain under node authentication.
+	nodeAgent.Post("/active-uuids/generation", nodeAgentHandler.BeginActiveUUIDGeneration)
+	nodeAgent.Post("/devices/admit", nodeAgentHandler.AdmitDevice)
+	nodeAgent.Get("/revoked-devices", nodeAgentHandler.RevokedDevices)
+	nodeAgent.Post("/revoked-devices/ack", nodeAgentHandler.AcknowledgeRevocation)
 	nodeAgent.Get("/inbounds", nodeAgentHandler.GetInbounds)
 	nodeAgent.Get("/wireguard/peers", nodeAgentHandler.GetWireGuardPeers)
+	nodeAgent.Get("/relay-rules", nodeAgentHandler.GetRelayRules)
+	nodeAgent.Get("/exit-rules", nodeAgentHandler.GetExitRules)
+	nodeAgent.Get("/role", nodeAgentHandler.GetRole)
 	nodeAgent.Get("/hysteria2/users", nodeAgentHandler.GetHysteria2Users)
 	nodeAgent.Get("/tls-domain", nodeAgentHandler.GetTLSDomain)
 	nodeAgent.Post("/tls-cert", nodeAgentHandler.ReportTLSCert)
@@ -162,15 +209,26 @@ func (s *Server) registerRoutes() {
 	user.Use(middleware.UserJWTMiddleware(s.config.JWT.Secret, s.db))
 
 	userPlanHandler := handlers.NewUserPlanHandler(s.db)
-	user.Post("/plan-requests", userPlanHandler.CreateRequest)
-	user.Get("/plan-requests", userPlanHandler.ListRequests)
 	user.Get("/plans", userPlanHandler.ListPlans)
 	user.Get("/nodes", userPlanHandler.ListNodes)
+
+	userOrderHandler := handlers.NewUserOrderHandler(s.db, s.config.Payments)
+	user.Post("/orders", userOrderHandler.Create)
+	user.Get("/orders", userOrderHandler.List)
+	user.Post("/orders/:id/cancel", userOrderHandler.Cancel)
+	user.Patch("/orders/:id/promotion", userOrderHandler.ApplyPromotion)
+
+	userCheckoutHandler := handlers.NewUserCheckoutHandler(s.db, s.payments)
+	user.Post("/orders/:id/checkout", userCheckoutHandler.Start)
+	user.Get("/payment-providers", userCheckoutHandler.ListProviders)
 
 	userDeviceHandler := handlers.NewUserDeviceHandler(s.db)
 	user.Post("/devices", userDeviceHandler.Create)
 	user.Get("/devices", userDeviceHandler.List)
 	user.Delete("/devices/:id", userDeviceHandler.Delete)
+
+	userSubDomainHandler := handlers.NewUserSubscriptionDomainHandler(s.db)
+	user.Get("/subscription-domains", userSubDomainHandler.List)
 
 	userPortalHandler := handlers.NewUserPortalHandler(s.db, s.redis)
 	user.Get("/summary", userPortalHandler.GetSummary)
@@ -195,6 +253,14 @@ func (s *Server) registerRoutes() {
 	})
 	sub := s.app.Group("/sub")
 	sub.Get("/:sub_token/:device_id", subLimiter, subscriptionHandler.GetSubscription)
+	sub.Get("/:sub_token", subLimiter, subscriptionHandler.GetHWIDSubscription)
+
+	// Outside /api/v1 and outside any JWT-protected group: a hosted payment
+	// provider authenticates its callback with a signature, not a bearer
+	// token, and the rate limiter above already exempts this prefix.
+	paymentWebhookHandler := handlers.NewPaymentWebhookHandler(s.db, s.payments)
+	webhooks := s.app.Group("/webhooks/payments")
+	webhooks.Post("/:provider", paymentWebhookHandler.Receive)
 
 	s.app.Get("/health", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{"status": "ok"})

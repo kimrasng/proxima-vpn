@@ -11,15 +11,20 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/proximavpn/proxima-vpn/api-server/internal/services"
 	"github.com/proximavpn/proxima-vpn/pkg/crypto"
 )
 
 type AdminInboundHandler struct {
-	db *pgxpool.Pool
+	db       *pgxpool.Pool
+	activity *services.ActivityService
 }
 
 func NewAdminInboundHandler(db *pgxpool.Pool) *AdminInboundHandler {
-	return &AdminInboundHandler{db: db}
+	return &AdminInboundHandler{
+		db:       db,
+		activity: services.NewActivityService(db),
+	}
 }
 
 var allowedProtocols = map[string]bool{
@@ -147,11 +152,18 @@ func (h *AdminInboundHandler) Create(c *fiber.Ctx) error {
 		})
 	}
 
+	ctx := c.UserContext()
+	tx, locked, err := h.lockInboundRealityNode(ctx, nodeID)
+	if err != nil {
+		return inboundRealityError(c, err, "create")
+	}
+	defer tx.Rollback(ctx)
+
 	// A node serves one protocol. Xray takes a single config per node, and
 	// mixing protocols let a speed-limited user reach an uncapped inbound.
 	var existing string
-	err := h.db.QueryRow(
-		context.Background(),
+	err = tx.QueryRow(
+		ctx,
 		`SELECT protocol FROM inbounds WHERE node_id = $1 LIMIT 1`,
 		nodeID,
 	).Scan(&existing)
@@ -192,28 +204,37 @@ func (h *AdminInboundHandler) Create(c *fiber.Ctx) error {
 
 	var ib inboundResponse
 	var settingsRaw json.RawMessage
-	err = h.db.QueryRow(
-		context.Background(),
+	err = tx.QueryRow(
+		ctx,
 		`INSERT INTO inbounds (node_id, protocol, port, tag, settings, enabled)
 		 VALUES ($1, $2, $3, $4, $5, $6)
 		 RETURNING id, node_id, protocol, port, tag, settings, enabled, created_at`,
 		nodeID, req.Protocol, req.Port, req.Tag, settingsJSON, enabled,
 	).Scan(&ib.ID, &ib.NodeID, &ib.Protocol, &ib.Port, &ib.Tag, &settingsRaw, &ib.Enabled, &ib.CreatedAt)
 	if err != nil {
-		if strings.Contains(err.Error(), "duplicate key") || strings.Contains(err.Error(), "unique constraint") {
-			return c.Status(fiber.StatusConflict).JSON(fiber.Map{
-				"error": "port already in use on this node",
-			})
-		}
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "failed to create inbound",
-		})
+		return inboundRealityError(c, err, "create")
+	}
+	if err := validateInboundReality(ctx, tx, locked, false); err != nil {
+		return inboundRealityError(c, err, "create")
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return inboundRealityError(c, err, "create")
 	}
 
 	if err := json.Unmarshal(settingsRaw, &ib.Settings); err != nil {
 		ib.Settings = make(map[string]interface{})
 	}
 
+	h.activity.Log(context.Background(), services.Record{
+		EventType:  services.EventNodeInboundCreated,
+		Severity:   services.SeveritySuccess,
+		ActorType:  "admin",
+		ActorID:    adminIDOf(c),
+		ActorLabel: adminEmail(c),
+		TargetType: "node",
+		TargetID:   ib.NodeID,
+		Detail:     map[string]any{"protocol": ib.Protocol, "port": ib.Port, "tag": ib.Tag},
+	})
 	return c.Status(fiber.StatusCreated).JSON(ib)
 }
 
@@ -253,12 +274,19 @@ func (h *AdminInboundHandler) Update(c *fiber.Ctx) error {
 		})
 	}
 
+	ctx := c.UserContext()
+	tx, locked, priorReality, err := h.lockExistingInbound(ctx, id)
+	if err != nil {
+		return inboundRealityError(c, err, "update")
+	}
+	defer tx.Rollback(ctx)
+
 	// Same one-protocol-per-node rule as Create: switching this inbound's
 	// protocol must not leave its node serving two.
 	if req.Protocol != nil {
 		var conflicting string
-		err := h.db.QueryRow(
-			context.Background(),
+		err := tx.QueryRow(
+			ctx,
 			`SELECT other.protocol
 			 FROM inbounds other
 			 JOIN inbounds self ON self.node_id = other.node_id
@@ -302,7 +330,9 @@ func (h *AdminInboundHandler) Update(c *fiber.Ctx) error {
 		if req.Protocol != nil {
 			protocol = *req.Protocol
 		} else {
-			_ = h.db.QueryRow(context.Background(), `SELECT protocol FROM inbounds WHERE id = $1`, id).Scan(&protocol)
+			if err := tx.QueryRow(ctx, `SELECT protocol FROM inbounds WHERE id = $1`, id).Scan(&protocol); err != nil {
+				return inboundRealityError(c, err, "update")
+			}
 		}
 		if protocol == "wireguard" {
 			if pk, ok := req.Settings["private_key"]; !ok || pk == "" {
@@ -310,7 +340,7 @@ func (h *AdminInboundHandler) Update(c *fiber.Ctx) error {
 				// edits (e.g. toggling the port) so already-provisioned peers
 				// don't silently lose their server identity.
 				var existingRaw json.RawMessage
-				if err := h.db.QueryRow(context.Background(), `SELECT settings FROM inbounds WHERE id = $1`, id).Scan(&existingRaw); err == nil {
+				if err := tx.QueryRow(ctx, `SELECT settings FROM inbounds WHERE id = $1`, id).Scan(&existingRaw); err == nil {
 					var existing map[string]interface{}
 					if json.Unmarshal(existingRaw, &existing) == nil {
 						if existingPK, ok := existing["private_key"]; ok {
@@ -357,24 +387,33 @@ func (h *AdminInboundHandler) Update(c *fiber.Ctx) error {
 
 	var ib inboundResponse
 	var settingsRaw json.RawMessage
-	err := h.db.QueryRow(context.Background(), query, args...).Scan(
+	err = tx.QueryRow(ctx, query, args...).Scan(
 		&ib.ID, &ib.NodeID, &ib.Protocol, &ib.Port, &ib.Tag, &settingsRaw, &ib.Enabled, &ib.CreatedAt,
 	)
 	if err != nil {
-		if strings.Contains(err.Error(), "duplicate key") || strings.Contains(err.Error(), "unique constraint") {
-			return c.Status(fiber.StatusConflict).JSON(fiber.Map{
-				"error": "port already in use on this node",
-			})
-		}
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-			"error": "inbound not found",
-		})
+		return inboundRealityError(c, err, "update")
+	}
+	if err := validateInboundReality(ctx, tx, locked, priorReality); err != nil {
+		return inboundRealityError(c, err, "update")
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return inboundRealityError(c, err, "update")
 	}
 
 	if err := json.Unmarshal(settingsRaw, &ib.Settings); err != nil {
 		ib.Settings = make(map[string]interface{})
 	}
 
+	h.activity.Log(context.Background(), services.Record{
+		EventType:  services.EventNodeInboundUpdated,
+		Severity:   services.SeverityInfo,
+		ActorType:  "admin",
+		ActorID:    adminIDOf(c),
+		ActorLabel: adminEmail(c),
+		TargetType: "node",
+		TargetID:   ib.NodeID,
+		Detail:     map[string]any{"protocol": ib.Protocol, "port": ib.Port, "tag": ib.Tag},
+	})
 	return c.JSON(ib)
 }
 
@@ -390,23 +429,41 @@ func (h *AdminInboundHandler) Update(c *fiber.Ctx) error {
 // @Router /admin/inbounds/{id} [delete]
 func (h *AdminInboundHandler) Delete(c *fiber.Ctx) error {
 	id := c.Params("id")
-
-	result, err := h.db.Exec(
-		context.Background(),
-		`DELETE FROM inbounds WHERE id = $1`,
-		id,
-	)
+	ctx := c.UserContext()
+	tx, locked, priorReality, err := h.lockExistingInbound(ctx, id)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "failed to delete inbound",
-		})
+		return inboundRealityError(c, err, "delete")
+	}
+	defer tx.Rollback(ctx)
+
+	// RETURNING captures the node while the row exists; the event targets the node.
+	var nodeID, protocol, tag string
+	var port int
+	err = tx.QueryRow(
+		ctx,
+		`DELETE FROM inbounds WHERE id = $1 RETURNING node_id::text, protocol, port, tag`,
+		id,
+	).Scan(&nodeID, &protocol, &port, &tag)
+	if err != nil {
+		return inboundRealityError(c, err, "delete")
+	}
+	if err := validateInboundReality(ctx, tx, locked, priorReality); err != nil {
+		return inboundRealityError(c, err, "delete")
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return inboundRealityError(c, err, "delete")
 	}
 
-	if result.RowsAffected() == 0 {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-			"error": "inbound not found",
-		})
-	}
+	h.activity.Log(context.Background(), services.Record{
+		EventType:  services.EventNodeInboundDeleted,
+		Severity:   services.SeverityWarning,
+		ActorType:  "admin",
+		ActorID:    adminIDOf(c),
+		ActorLabel: adminEmail(c),
+		TargetType: "node",
+		TargetID:   nodeID,
+		Detail:     map[string]any{"protocol": protocol, "port": port, "tag": tag},
+	})
 
 	return c.SendStatus(fiber.StatusNoContent)
 }
@@ -423,25 +480,45 @@ func (h *AdminInboundHandler) Delete(c *fiber.Ctx) error {
 // @Router /admin/inbounds/{id}/toggle [put]
 func (h *AdminInboundHandler) Toggle(c *fiber.Ctx) error {
 	id := c.Params("id")
+	ctx := c.UserContext()
+	tx, locked, priorReality, err := h.lockExistingInbound(ctx, id)
+	if err != nil {
+		return inboundRealityError(c, err, "toggle")
+	}
+	defer tx.Rollback(ctx)
 
 	var ib inboundResponse
 	var settingsRaw json.RawMessage
-	err := h.db.QueryRow(
-		context.Background(),
+	err = tx.QueryRow(
+		ctx,
 		`UPDATE inbounds SET enabled = NOT enabled WHERE id = $1
 		 RETURNING id, node_id, protocol, port, tag, settings, enabled, created_at`,
 		id,
 	).Scan(&ib.ID, &ib.NodeID, &ib.Protocol, &ib.Port, &ib.Tag, &settingsRaw, &ib.Enabled, &ib.CreatedAt)
 	if err != nil {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-			"error": "inbound not found",
-		})
+		return inboundRealityError(c, err, "toggle")
+	}
+	if err := validateInboundReality(ctx, tx, locked, priorReality); err != nil {
+		return inboundRealityError(c, err, "toggle")
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return inboundRealityError(c, err, "toggle")
 	}
 
 	if err := json.Unmarshal(settingsRaw, &ib.Settings); err != nil {
 		ib.Settings = make(map[string]interface{})
 	}
 
+	h.activity.Log(context.Background(), services.Record{
+		EventType:  services.EventNodeInboundToggled,
+		Severity:   services.SeverityInfo,
+		ActorType:  "admin",
+		ActorID:    adminIDOf(c),
+		ActorLabel: adminEmail(c),
+		TargetType: "node",
+		TargetID:   ib.NodeID,
+		Detail:     map[string]any{"protocol": ib.Protocol, "port": ib.Port, "tag": ib.Tag, "enabled": ib.Enabled},
+	})
 	return c.JSON(ib)
 }
 

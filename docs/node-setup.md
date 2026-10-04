@@ -67,6 +67,38 @@ Once the node is online:
 
 The node-agent picks up configuration changes automatically.
 
+### Managed Entry and two Exits
+
+In a managed chain, clients use one published Entry hostname. TCP destination
+port `24443` selects one Exit and `24444` selects the other. These are Entry
+ports, not the Exit listener ports. The Entry uses DNAT and masquerade to
+forward TCP to the selected Exit; it never terminates Reality. The Exit owns
+the VLESS Reality listener, keys, client credentials, and canonical client SNI.
+The Entry routing hostname is not the Reality SNI. UDP application traffic can
+travel inside the VLESS/TCP connection; this setup does not forward native UDP
+through the Entry.
+
+Before publishing a chain, allow inbound TCP to the Entry ports in the host and
+upstream firewalls, enable IP forwarding on the Entry, and permit forwarded
+traffic and replies between Entry and Exits. Allow the chosen listener ports
+from the Entry to each Exit in upstream firewalls. Check the Entry agent's
+forwarding policy and each Exit agent's source admission policy: nft rules
+allow the Entry source on protected Exit ports and drop other sources there.
+`publish_direct=false` suppresses direct profile publication; it does not
+replace Exit source protection or an upstream firewall. Keep the Exit
+listeners reachable from the Entry while denying direct client access.
+
+Configure every published VLESS Reality listener on each Exit, including
+eligible speed-tier listeners, to accept that Exit's exact canonical SNI.
+Legacy pool chains are not part of new managed publication. Apply the Exit
+listeners and Entry/Exit policies first, then wait for fresh agent heartbeat
+and configuration acknowledgement before distributing refreshed profiles for
+the managed hostname and ports. Rotate SNI in stages: prepare listeners that
+accept both the old and new SNI, apply and confirm them, then change the
+canonical SNI and distribute new profiles. Rotation can interrupt existing
+sessions; keep the known-good listener and SNI available until the new path is
+verified.
+
 ## Managing the Node Agent
 
 The agent runs as a systemd service:

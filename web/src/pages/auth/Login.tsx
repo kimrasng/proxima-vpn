@@ -31,7 +31,7 @@ export default function Login() {
     try {
       const res = await userLogin({ email, password });
       setToken("user", res.token);
-      navigate("/portal/devices", { replace: true });
+      navigate("/portal/dashboard", { replace: true });
     } catch (err) {
       if (err instanceof ApiError) {
         const body = err.body as { error?: string } | undefined;

@@ -3,13 +3,16 @@ package main
 import (
 	"context"
 	"log"
+	"math/rand"
 	"os"
+	"time"
 
 	_ "github.com/proximavpn/proxima-vpn/api-server/docs"
 
 	"github.com/proximavpn/proxima-vpn/api-server/internal/config"
 	"github.com/proximavpn/proxima-vpn/api-server/internal/database"
 	"github.com/proximavpn/proxima-vpn/api-server/internal/metrics"
+	"github.com/proximavpn/proxima-vpn/api-server/internal/payments"
 	"github.com/proximavpn/proxima-vpn/api-server/internal/scheduler"
 	"github.com/proximavpn/proxima-vpn/api-server/internal/server"
 	"github.com/proximavpn/proxima-vpn/api-server/internal/services"
@@ -72,6 +75,7 @@ func main() {
 
 	concurrency := scheduler.NewConcurrencyScheduler(db, rdb)
 	go concurrency.Start(ctx)
+	go scheduler.NewUUIDSlotReconciler(db, rdb).Start(ctx)
 
 	snapshot := scheduler.NewSnapshotScheduler(db, rdb)
 	go snapshot.Start(ctx)
@@ -80,6 +84,26 @@ func main() {
 
 	nodeMonitor := scheduler.NewNodeMonitorScheduler(db, telegramSvc)
 	go nodeMonitor.Start(ctx)
+
+	orderExpiry := scheduler.NewOrderExpiryScheduler(db)
+	go orderExpiry.Start(ctx)
+
+	var managedDNS *scheduler.ManagedEntryDNSScheduler
+	if err := cfg.ManagedEntryDNS.ValidationError(); err != nil {
+		log.Printf("[ManagedEntryDNS] inactive: %v", err)
+	} else if cfg.ManagedEntryDNS.Active() {
+		client := services.NewCloudflareDNSClient(cfg.ManagedEntryDNS.CloudflareToken())
+		store := services.NewManagedEntryDNSWorkerStore(db)
+		reconciler := services.NewManagedEntryDNSReconciler(services.ManagedEntryDNSReconcileDependencies{
+			Store: store, Client: client,
+			Intent: services.ManagedEntryDNSIntentConfig{
+				Enabled: true, ZoneID: cfg.ManagedEntryDNS.ZoneID, BaseDomain: cfg.ManagedEntryDNS.BaseDomain,
+			},
+			Now: time.Now, Jitter: rand.Float64,
+		})
+		managedDNS = scheduler.NewManagedEntryDNSScheduler(reconciler)
+		managedDNS.Start(ctx)
+	}
 
 	go metrics.StartGaugeUpdater(ctx, db)
 
@@ -100,7 +124,9 @@ func main() {
 	backupSvc := services.NewBackupService(db, cfg.Database.URL, cfg.Backup.S3, cfg.Backup.Schedule)
 	go backupSvc.StartScheduler(ctx)
 
-	srv := server.NewServer(cfg, db, rdb, backupSvc)
+	paymentProviders := payments.Build(cfg)
+
+	srv := server.NewServer(cfg, db, rdb, backupSvc, paymentProviders)
 	if err := srv.Start(); err != nil {
 		log.Fatalf("server error: %v", err)
 	}
@@ -108,6 +134,10 @@ func main() {
 	trafficReset.Stop()
 	expiryCheck.Stop()
 	nodeMonitor.Stop()
+	orderExpiry.Stop()
+	if managedDNS != nil {
+		managedDNS.Stop()
+	}
 	retention.Stop()
 	snapshot.Stop()
 	if backupSvc != nil {

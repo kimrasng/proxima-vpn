@@ -34,10 +34,21 @@ services:
       # Leave JWT_SECRET empty to auto-generate and persist one in app_data.
       JWT_SECRET: ${JWT_SECRET:-}
       PANEL_URL: ${PANEL_URL:-http://localhost:8080}
+      # Which peers may speak for a client through PROXY_HEADER. Unset falls
+      # back to the compose bridge ranges, where web/nginx is the only hop.
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
+      PROXY_HEADER: ${PROXY_HEADER:-}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
       # Leave ADMIN_PASSWORD empty to auto-generate one (printed in api logs).
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
       SWAGGER_ENABLED: ${SWAGGER_ENABLED:-true}
+      CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN:-}
+      CLOUDFLARE_ZONE_ID: ${CLOUDFLARE_ZONE_ID:-}
+      ENTRY_DNS_BASE_DOMAIN: ${ENTRY_DNS_BASE_DOMAIN:-}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      PAYMENTS_CURRENCY: ${PAYMENTS_CURRENCY:-}
+      PAYMENTS_PENDING_TTL: ${PAYMENTS_PENDING_TTL:-}
     volumes:
       - uploads_data:/app/uploads
       - app_data:/app/data

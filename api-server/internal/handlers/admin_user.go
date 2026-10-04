@@ -22,6 +22,7 @@ type AdminUserHandler struct {
 	db     *pgxpool.Pool
 	stats  *services.StatsService
 	logins *services.LoginHistoryService
+	plan   *services.PlanService
 }
 
 // NewAdminUserHandler creates a new AdminUserHandler.
@@ -30,6 +31,7 @@ func NewAdminUserHandler(db *pgxpool.Pool) *AdminUserHandler {
 		db:     db,
 		stats:  services.NewStatsService(db),
 		logins: services.NewLoginHistoryService(db),
+		plan:   services.NewPlanService(db),
 	}
 }
 
@@ -128,6 +130,16 @@ func (h *AdminUserHandler) Create(c *fiber.Ctx) error {
 	).Scan(&resp.ID, &resp.Email, &resp.Name, &resp.Status, &resp.CreatedAt)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "internal server error"})
+	}
+
+	// A brand-new row has no prior term to classify against, so this is always
+	// GrantFresh - but it still has to go through GrantPlan rather than
+	// leaving plan_id set with plan_started_at/plan_expires_at NULL, which
+	// made such rows invisible to both the expiry check and the reset query.
+	if req.PlanID != nil {
+		if _, err := h.plan.GrantPlan(context.Background(), resp.ID, *req.PlanID); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "user created but failed to grant plan"})
+		}
 	}
 
 	return c.Status(fiber.StatusCreated).JSON(resp)
@@ -355,6 +367,21 @@ func (h *AdminUserHandler) Update(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "invalid request body",
 		})
+	}
+
+	// A plan_id change with no explicit term dates is "grant this plan" and
+	// has to go through GrantPlan for the renew/change/fresh classification
+	// and the traffic/status side effects that come with it. Supplying either
+	// date is a deliberate manual override (e.g. correcting a term after a
+	// support ticket) and keeps using the direct SET below, bypassing
+	// GrantPlan entirely - the two paths are mutually exclusive per request.
+	if req.PlanID != nil && req.PlanStartedAt == nil && req.PlanExpiresAt == nil {
+		if _, err := h.plan.GrantPlan(context.Background(), id, *req.PlanID); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "failed to grant plan",
+			})
+		}
+		req.PlanID = nil
 	}
 
 	setClauses := []string{}

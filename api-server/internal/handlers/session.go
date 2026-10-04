@@ -16,6 +16,13 @@ func adminEmail(c *fiber.Ctx) string {
 	return email
 }
 
+// adminIDOf reads the admin id middleware.AdminJWTMiddleware puts in the request
+// locals, empty when a token carries no such claim.
+func adminIDOf(c *fiber.Ctx) string {
+	id, _ := c.Locals("admin_id").(string)
+	return id
+}
+
 // resolveSessionExpiry returns the JWT expiry duration to use for a login:
 // the admin Settings table's 'session_timeout' (seconds, see
 // web/src/pages/admin/Settings.tsx) if set and valid, otherwise fallback

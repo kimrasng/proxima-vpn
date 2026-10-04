@@ -56,6 +56,36 @@ Optional:
 | `TELEGRAM_CHAT_ID` | Your Telegram chat ID for notifications |
 | `TELEGRAM_ENABLED` | Set to `true` to activate the bot |
 
+### Optional: Cloudflare managed Entry DNS
+
+To automate Entry DNS for nodes, set all three values in the API server's
+`.env` file:
+
+| Variable | Description |
+|----------|-------------|
+| `CLOUDFLARE_API_TOKEN` | Cloudflare API token with DNS edit permission, scoped to the selected zone |
+| `CLOUDFLARE_ZONE_ID` | ID of that Cloudflare zone |
+| `ENTRY_DNS_BASE_DOMAIN` | Base domain for managed Entry hostnames in that zone, e.g. `entry.example.com` |
+
+`.env` is gitignored. Keep the token in the API process environment only, never
+in the database, API payloads, logs, `api-server/config.yaml`, or node installers.
+For a direct API deployment, `managed_entry_dns.zone_id` and
+`managed_entry_dns.base_domain` can instead be set in YAML, but the token must
+still come from `CLOUDFLARE_API_TOKEN`.
+The API creates owned Cloudflare A records with TTL 300 and DNS-only mode
+(`proxied=false`). DNS-only publishes the Entry address to clients; Cloudflare
+does not proxy this traffic or shield the Entry origin. TTL 300 is not a promise
+of immediate DNS propagation or cache expiry everywhere. If all three settings
+are absent, automation is inactive. Partial or invalid settings also leave it
+inactive, with a diagnostic, without blocking API startup or node registration.
+Correct the settings before relying on managed publication.
+
+For token rotation, create a replacement token with DNS edit permission scoped
+to the same zone. Replace `CLOUDFLARE_API_TOKEN` in the API environment and
+recreate the API service so it reads the new secret. Verify managed DNS
+reconciliation with the replacement token before revoking the old one. Do not
+assume token revocation immediately removes published DNS or client access.
+
 ## Step 4: Start Services
 
 ```bash
@@ -111,3 +141,14 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 ```
 
 The database migrations run automatically on API startup.
+
+For a managed Entry/two-Exit cutover, back up the database and current API and
+agent configuration first. Stage the schema update, then the API, then the
+Entry and Exit agents and their forwarding and listener policies. Confirm DNS
+reconciliation, agent heartbeat and configuration acknowledgement before
+distributing refreshed profiles. See [Node Setup](node-setup.md) for the
+traffic path and cutover checks. If the application rollout fails, restore the
+previous API and agent versions and known-good configuration while retaining
+the expanded schema and existing data. Do not run destructive down migrations
+or delete managed DNS records as an application rollback shortcut; verify the
+old path and client profiles before retiring the new path.

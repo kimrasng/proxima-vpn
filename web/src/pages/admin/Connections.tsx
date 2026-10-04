@@ -355,12 +355,14 @@ export default function Connections() {
               id: "device",
               header: t("admin.connections.col.device"),
               sortingField: "device",
+              minWidth: 120,
               cell: (item) => item.device || "—",
             },
             {
               id: "node",
               header: t("admin.connections.col.node"),
               sortingField: "node_name",
+              minWidth: 120,
               cell: (item) =>
                 item.node_id ? (
                   <Link onFollow={() => navigate(`/admin/nodes/${item.node_id}`)}>
@@ -399,6 +401,7 @@ export default function Connections() {
               id: "connected",
               header: t("admin.connections.col.connectedFor"),
               sortingField: "connected_since",
+              minWidth: 120,
               cell: (item) => (
                 <span title={item.connected_since ? new Date(item.connected_since).toLocaleString() : ""}>
                   {formatDuration(item.connected_since)}
@@ -409,6 +412,7 @@ export default function Connections() {
               id: "cap",
               header: t("admin.connections.col.cap"),
               sortingField: "online_ips",
+              minWidth: 120,
               cell: (item) =>
                 item.max_concurrent > 0 ? (
                   <Badge color={item.over_cap ? "severity-medium" : "grey"}>
@@ -424,6 +428,7 @@ export default function Connections() {
               id: "traffic",
               header: t("admin.connections.col.traffic"),
               sortingField: "traffic_today",
+              minWidth: 120,
               cell: (item) => formatBytes(item.traffic_today),
             },
             {

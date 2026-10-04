@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"sort"
+	"strconv"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -13,58 +14,44 @@ import (
 )
 
 const (
-	concurrencyCheckInterval = 60 * time.Second
-
-	// Xray reports a source address per connection, and one device legitimately
-	// presents several: dual-stack clients appear as both IPv4 and IPv6, and
-	// mobile carriers rotate addresses mid-session. Acting on the exact cap
-	// would disconnect an ordinary phone, so the cap is only breached once
-	// exceeded by this margin.
-	concurrencyGrace = 1
-
-	// An over-cap reading must repeat this many consecutive sweeps before it
-	// costs anyone their connection; a single sweep landing during a reconnect
-	// sees the old and new address at once.
-	overageStrikes = 3
-
-	evictionCooldown = 10 * time.Minute
+	concurrencyCheckInterval = 10 * time.Second
+	evictionCooldown         = 10 * time.Minute
 )
 
-// ConcurrencyScheduler enforces each plan's cap on how many distinct source
-// addresses may be live across a user's devices, pool-wide.
-//
-// Enforcement is opt-in via ENFORCE_CONCURRENCY=1. Off, it records what it
-// would have done: an operator needs the real distribution of their users'
-// addresses before a cap starts denying paid-for traffic, and CGNAT alone can
-// make a legitimate household look like sharing.
 type ConcurrencyScheduler struct {
-	db      *pgxpool.Pool
-	tracker *services.OnlineTracker
-	enforce bool
-	strikes map[string]int
-	cancel  context.CancelFunc
+	db        *pgxpool.Pool
+	tracker   *services.OnlineTracker
+	enforce   bool
+	grace     int
+	threshold int
+	strikes   map[string]int
+	cancel    context.CancelFunc
 }
 
 func NewConcurrencyScheduler(db *pgxpool.Pool, rdb *redis.Client) *ConcurrencyScheduler {
-	return &ConcurrencyScheduler{
-		db:      db,
-		tracker: services.NewOnlineTracker(rdb),
-		enforce: os.Getenv("ENFORCE_CONCURRENCY") == "1",
-		strikes: map[string]int{},
-	}
+	return &ConcurrencyScheduler{db: db, tracker: services.NewOnlineTracker(rdb), enforce: os.Getenv("ENFORCE_CONCURRENCY") == "1", grace: nonnegativeEnv("CONCURRENCY_GRACE", 0), threshold: positiveEnv("CONCURRENCY_STRIKES", 2), strikes: map[string]int{}}
 }
 
+func nonnegativeEnv(name string, fallback int) int {
+	if n, err := strconv.Atoi(os.Getenv(name)); err == nil && n >= 0 {
+		return n
+	}
+	return fallback
+}
+func positiveEnv(name string, fallback int) int {
+	if n, err := strconv.Atoi(os.Getenv(name)); err == nil && n > 0 {
+		return n
+	}
+	return fallback
+}
 func (s *ConcurrencyScheduler) Start(ctx context.Context) {
 	ctx, s.cancel = context.WithCancel(ctx)
 	ticker := time.NewTicker(concurrencyCheckInterval)
 	defer ticker.Stop()
-
-	mode := "observe-only"
 	if s.enforce {
-		mode = "enforcing"
+		log.Printf("concurrency enforcement requested: all Exit epochs and revocation acknowledgments required")
 	}
-	log.Printf("concurrency scheduler started (%s)", mode)
-
+	log.Printf("concurrency scheduler started (enforce=%t)", s.enforce)
 	for {
 		select {
 		case <-ctx.Done():
@@ -74,7 +61,6 @@ func (s *ConcurrencyScheduler) Start(ctx context.Context) {
 		}
 	}
 }
-
 func (s *ConcurrencyScheduler) Stop() {
 	if s.cancel != nil {
 		s.cancel()
@@ -82,113 +68,101 @@ func (s *ConcurrencyScheduler) Stop() {
 }
 
 type capRow struct {
-	userID string
-	email  string
-	cap    int
+	userID, email string
+	cap           int
 }
 
 func (s *ConcurrencyScheduler) sweep(ctx context.Context) {
-	rows, err := s.db.Query(ctx, `
-		SELECT u.id::text, u.email, COALESCE(p.max_concurrent, p.max_devices)
-		FROM users u
-		JOIN plans p ON u.plan_id = p.id
-		WHERE u.status = 'active' AND u.is_active = true
-	`)
+	rows, err := s.db.Query(ctx, `SELECT u.id::text,u.email,COALESCE(p.max_concurrent,p.max_devices) FROM users u JOIN plans p ON u.plan_id=p.id WHERE u.status='active' AND u.is_active=true`)
 	if err != nil {
 		log.Printf("concurrency sweep: %v", err)
 		return
 	}
-
 	var caps []capRow
 	for rows.Next() {
 		var r capRow
-		if err := rows.Scan(&r.userID, &r.email, &r.cap); err != nil {
-			continue
+		if err := rows.Scan(&r.userID, &r.email, &r.cap); err == nil {
+			caps = append(caps, r)
 		}
-		caps = append(caps, r)
 	}
+	err = rows.Err()
 	rows.Close()
-
-	for _, r := range caps {
-		if r.cap <= 0 {
-			continue
-		}
-		s.checkUser(ctx, r)
-	}
-}
-
-func (s *ConcurrencyScheduler) checkUser(ctx context.Context, r capRow) {
-	total, perDevice, err := s.tracker.CountDistinctIPsForUser(ctx, s.db, r.userID)
 	if err != nil {
+		log.Printf("concurrency sweep: %v", err)
 		return
 	}
-
-	if total <= r.cap+concurrencyGrace {
+	for _, r := range caps {
+		if r.cap > 0 {
+			s.checkUser(ctx, r)
+		}
+	}
+}
+func (s *ConcurrencyScheduler) checkUser(ctx context.Context, r capRow) {
+	obs, err := s.tracker.ObserveAccount(ctx, s.db, r.userID)
+	if err != nil {
+		log.Printf("concurrency epoch: %v", err)
+		return
+	}
+	if !obs.Complete {
+		log.Printf("concurrency observation incomplete: user=%s unknown_exits=%v", r.userID, obs.UnknownExitIDs)
+		return
+	}
+	pending, err := completeUUIDEvictions(ctx, s.db, r.userID)
+	if err != nil {
+		log.Printf("concurrency pending query: %v", err)
+		return
+	}
+	if pending {
+		log.Printf("concurrency eviction pending confirmation: user=%s", r.userID)
+		return
+	}
+	online := obs.OnlineUUIDs
+	if len(online) <= r.cap+s.grace {
 		delete(s.strikes, r.userID)
 		return
 	}
-
+	target := obs.NewestUUID
+	if obs.Ambiguous || target == "" {
+		log.Printf("concurrency ambiguous newest UUID: user=%s candidates=%v", r.userID, obs.AmbiguousUUIDs)
+		return
+	}
 	s.strikes[r.userID]++
-	if s.strikes[r.userID] < overageStrikes {
+	log.Printf("concurrency observation: user=%s online_uuids=%d cap=%d grace=%d strikes=%d candidate=%s enforce=%t", r.userID, len(online), r.cap, s.grace, s.strikes[r.userID], target, s.enforce)
+	if s.strikes[r.userID] < s.threshold || !s.enforce {
+		return
+	}
+	exits, err := eligibleEvictionExits(ctx, s.db, obs)
+	if err != nil {
+		log.Printf("concurrency fleet not ready: %v", err)
+		return
+	}
+	epoch, err := beginUUIDEviction(ctx, s.db, r.userID, target, exits)
+	if err != nil {
+		log.Printf("concurrency eviction request failed: %v", err)
 		return
 	}
 	delete(s.strikes, r.userID)
-
-	target := pickEvictionTarget(perDevice)
-	if target == "" {
-		return
-	}
-
-	if !s.enforce {
-		log.Printf("concurrency: user %s would be capped (%d IPs over cap %d), device %s",
-			r.email, total, r.cap, target)
-		return
-	}
-
-	_, err = s.db.Exec(ctx,
-		`UPDATE devices SET evicted_until = NOW() + $1::interval WHERE xray_uuid = $2`,
-		evictionCooldown.String(), target)
-	if err != nil {
-		log.Printf("concurrency: evicting %s: %v", target, err)
-		return
-	}
-	log.Printf("concurrency: evicted device %s of user %s for %s (%d IPs over cap %d)",
-		target, r.email, evictionCooldown, total, r.cap)
+	log.Printf("concurrency eviction pending: user=%s uuid=%s epoch=%s required_exits=%d", r.userID, target, epoch, len(exits))
 }
 
-// pickEvictionTarget chooses the device spread across the most addresses, which
-// is the shared credential rather than a victim of it. Ties go to whichever was
-// seen most recently, matching the convention that an established session
-// outranks the one that just showed up.
-func pickEvictionTarget(perDevice map[string]map[string]int64) string {
-	type candidate struct {
-		uuid     string
-		ips      int
-		lastSeen int64
+// pickEvictionTarget chooses the newest confirmed account-wide online transition.
+// Missing start times are not evidence of a recent transition.
+func pickEvictionTarget(starts map[string]int64) string {
+	uuids := make([]string, 0, len(starts))
+	for uuid := range starts {
+		uuids = append(uuids, uuid)
 	}
-
-	var candidates []candidate
-	for uuid, ips := range perDevice {
-		var newest int64
-		for _, ts := range ips {
-			if ts > newest {
-				newest = ts
-			}
+	sort.Slice(uuids, func(i, j int) bool {
+		if starts[uuids[i]] != starts[uuids[j]] {
+			return starts[uuids[i]] > starts[uuids[j]]
 		}
-		candidates = append(candidates, candidate{uuid: uuid, ips: len(ips), lastSeen: newest})
-	}
-	if len(candidates) == 0 {
+		return uuids[i] < uuids[j]
+	})
+	if len(uuids) == 0 {
 		return ""
 	}
-
-	sort.Slice(candidates, func(i, j int) bool {
-		if candidates[i].ips != candidates[j].ips {
-			return candidates[i].ips > candidates[j].ips
-		}
-		if candidates[i].lastSeen != candidates[j].lastSeen {
-			return candidates[i].lastSeen > candidates[j].lastSeen
-		}
-		return candidates[i].uuid < candidates[j].uuid
-	})
-	return candidates[0].uuid
+	if len(uuids) > 1 && starts[uuids[0]] == starts[uuids[1]] {
+		return ""
+	}
+	return uuids[0]
 }

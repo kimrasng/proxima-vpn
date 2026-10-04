@@ -1,8 +1,18 @@
 import { get, post, put, patch, del, setClientTokenType } from './client';
 import type {
   Node,
+  NodeChain,
+  CreateNodeChainRequest,
+  CreateNodeChainBatchRequest,
+  CreateNodeChainBatchResponse,
+  PlanRoutesResponse,
+  UpdateNodeChainRequest,
   NodeMetricsEntry,
   GenerateTokenResponse,
+  ProvisionNodeRequest,
+  NodeEventPage,
+  NodeEventFilterOptions,
+  NodeEventQuery,
   NodeGroup,
   NodeGroupDetail,
   CreateNodeGroupRequest,
@@ -18,9 +28,11 @@ import type {
   CreateUserResponse,
   UpdateNodeRequest,
   ListUsersParams,
-  PlanRequest,
+  AdminOrderItem,
+  AdminOrderAudit,
   DashboardStats,
   OnlineUser,
+  UUIDEvictionStatus,
   TerminateSessionResponse,
   LoginRequest,
   LoginResponse,
@@ -47,6 +59,12 @@ import type {
   UpdateXrayRequest,
   BackupListResponse,
   TriggerBackupResponse,
+  PromotionCode,
+  PromotionRequest,
+  SubscriptionDomain,
+  SubscriptionDomainHealth,
+  CreateSubscriptionDomainRequest,
+  UpdateSubscriptionDomainRequest,
 } from './types';
 
 function applyAdminClient() {
@@ -78,6 +96,16 @@ export function admin2FADisable(req: TwoFADisableRequest): Promise<void> {
   return post<void>('/api/v1/admin/auth/2fa/disable', req);
 }
 
+export function listUUIDEvictions(): Promise<UUIDEvictionStatus[]> {
+  applyAdminClient();
+  return get<UUIDEvictionStatus[]>('/api/v1/admin/uuid-evictions');
+}
+
+export function retryUUIDEviction(uuid: string): Promise<{state:string;message:string}> {
+  applyAdminClient();
+  return post<{state:string;message:string}>(`/api/v1/admin/uuid-evictions/${encodeURIComponent(uuid)}/retry`);
+}
+
 export function listNodes(): Promise<Node[]> {
   applyAdminClient();
   return get<Node[]>('/api/v1/admin/nodes');
@@ -86,6 +114,22 @@ export function listNodes(): Promise<Node[]> {
 export function getNode(id: string): Promise<Node> {
   applyAdminClient();
   return get<Node>(`/api/v1/admin/nodes/${id}`);
+}
+
+export function getNodeEvents(nodeId: string, query: NodeEventQuery = {}): Promise<NodeEventPage> {
+  applyAdminClient();
+  const params = new URLSearchParams();
+  if (query.eventTypes?.length) params.set('event_type', query.eventTypes.join(','));
+  if (query.severities?.length) params.set('severity', query.severities.join(','));
+  if (query.hours) params.set('hours', String(query.hours));
+  params.set('limit', String(query.limit ?? 25));
+  params.set('offset', String(query.offset ?? 0));
+  return get<NodeEventPage>(`/api/v1/admin/nodes/${nodeId}/events?${params.toString()}`);
+}
+
+export function getNodeEventFilters(): Promise<NodeEventFilterOptions> {
+  applyAdminClient();
+  return get<NodeEventFilterOptions>('/api/v1/admin/nodes/event-filters');
 }
 
 export function getNodeMetrics(id: string, hours = 24): Promise<NodeMetricsEntry[]> {
@@ -98,9 +142,9 @@ export function deleteNode(id: string): Promise<void> {
   return del<void>(`/api/v1/admin/nodes/${id}`);
 }
 
-export function generateNodeToken(): Promise<GenerateTokenResponse> {
+export function generateNodeToken(req?: ProvisionNodeRequest): Promise<GenerateTokenResponse> {
   applyAdminClient();
-  return post<GenerateTokenResponse>('/api/v1/admin/nodes/token');
+  return post<GenerateTokenResponse>('/api/v1/admin/nodes/token', req);
 }
 
 export function listNodeGroups(): Promise<NodeGroup[]> {
@@ -133,6 +177,46 @@ export function setNodeGroupNodes(id: string, nodeIds: string[]): Promise<void> 
   return put<void>(`/api/v1/admin/node-groups/${id}/nodes`, { node_ids: nodeIds });
 }
 
+export function listNodeChains(): Promise<NodeChain[]> {
+  applyAdminClient();
+  return get<NodeChain[]>('/api/v1/admin/node-chains');
+}
+
+export function createNodeChain(request: CreateNodeChainRequest): Promise<NodeChain> {
+  applyAdminClient();
+  return post<NodeChain>('/api/v1/admin/node-chains', request);
+}
+
+export function createNodeChainBatch(request: CreateNodeChainBatchRequest): Promise<CreateNodeChainBatchResponse> {
+  applyAdminClient();
+  return post<CreateNodeChainBatchResponse>('/api/v1/admin/node-chains/batch', request);
+}
+
+export function getPlanRoutes(id: string): Promise<PlanRoutesResponse> {
+  applyAdminClient();
+  return get<PlanRoutesResponse>(`/api/v1/admin/plans/${id}/routes`);
+}
+
+export function setPlanRoutes(id: string, chainIds: string[]): Promise<PlanRoutesResponse> {
+  applyAdminClient();
+  return put<PlanRoutesResponse>(`/api/v1/admin/plans/${id}/routes`, { chain_ids: chainIds });
+}
+
+export function updateNodeChain(id: string, request: UpdateNodeChainRequest): Promise<NodeChain> {
+  applyAdminClient();
+  return patch<NodeChain>(`/api/v1/admin/node-chains/${id}`, request);
+}
+
+export function deleteNodeChain(id: string): Promise<void> {
+  applyAdminClient();
+  return del<void>(`/api/v1/admin/node-chains/${id}`);
+}
+
+export function setNodeChainGroups(id: string, groupIds: string[]): Promise<void> {
+  applyAdminClient();
+  return put<void>(`/api/v1/admin/node-chains/${id}/groups`, { group_ids: groupIds });
+}
+
 export function listPlans(): Promise<Plan[]> {
   applyAdminClient();
   return get<Plan[]>('/api/v1/admin/plans');
@@ -156,6 +240,26 @@ export function updatePlan(id: string, req: UpdatePlanRequest): Promise<Plan> {
 export function deletePlan(id: string): Promise<void> {
   applyAdminClient();
   return del<void>(`/api/v1/admin/plans/${id}`);
+}
+
+export function listPromotions(): Promise<PromotionCode[]> {
+  applyAdminClient();
+  return get<PromotionCode[]>('/api/v1/admin/promotions');
+}
+
+export function createPromotion(req: PromotionRequest): Promise<PromotionCode> {
+  applyAdminClient();
+  return post<PromotionCode>('/api/v1/admin/promotions', req);
+}
+
+export function updatePromotion(id: string, req: PromotionRequest): Promise<PromotionCode> {
+  applyAdminClient();
+  return put<PromotionCode>(`/api/v1/admin/promotions/${id}`, req);
+}
+
+export function deletePromotion(id: string): Promise<{ message: string }> {
+  applyAdminClient();
+  return del<{ message: string }>(`/api/v1/admin/promotions/${id}`);
 }
 
 export function listUsers(params?: ListUsersParams): Promise<PaginatedUsers> {
@@ -194,15 +298,25 @@ export function getUserLoginHistory(id: string, limit = 50): Promise<LoginHistor
   return get<LoginHistoryEntry[]>(`/api/v1/admin/users/${id}/login-history?limit=${limit}`);
 }
 
-export function listPlanRequests(status?: string): Promise<PlanRequest[]> {
+export function adminListOrders(status?: string): Promise<AdminOrderItem[]> {
   applyAdminClient();
   const query = status ? `?status=${encodeURIComponent(status)}` : '';
-  return get<PlanRequest[]>(`/api/v1/admin/plan-requests${query}`);
+  return get<AdminOrderItem[]>(`/api/v1/admin/orders${query}`);
 }
 
-export function reviewPlanRequest(id: string, action: 'approve' | 'reject'): Promise<void> {
+export function adminMarkOrderPaid(id: string): Promise<AdminOrderItem> {
   applyAdminClient();
-  return put<void>(`/api/v1/admin/plan-requests/${id}`, { action });
+  return post<AdminOrderItem>(`/api/v1/admin/orders/${id}/pay`);
+}
+
+export function adminCancelOrder(id: string): Promise<void> {
+  applyAdminClient();
+  return post<void>(`/api/v1/admin/orders/${id}/cancel`);
+}
+
+export function getOrderAudit(id: string): Promise<AdminOrderAudit> {
+  applyAdminClient();
+  return get<AdminOrderAudit>(`/api/v1/admin/orders/${encodeURIComponent(id)}/audit`);
 }
 
 export function getDashboardStats(): Promise<DashboardStats> {
@@ -387,4 +501,32 @@ export function getBackupDownloadUrl(key?: string): string {
   applyAdminClient();
   const base = '/api/v1/admin/backup/download';
   return key ? `${base}?key=${encodeURIComponent(key)}` : base;
+}
+
+export function listSubscriptionDomains(): Promise<SubscriptionDomain[]> {
+  applyAdminClient();
+  return get<SubscriptionDomain[]>('/api/v1/admin/subscription-domains');
+}
+
+export function createSubscriptionDomain(req: CreateSubscriptionDomainRequest): Promise<SubscriptionDomain> {
+  applyAdminClient();
+  return post<SubscriptionDomain>('/api/v1/admin/subscription-domains', req);
+}
+
+export function updateSubscriptionDomain(
+  id: string,
+  req: UpdateSubscriptionDomainRequest,
+): Promise<SubscriptionDomain> {
+  applyAdminClient();
+  return put<SubscriptionDomain>(`/api/v1/admin/subscription-domains/${encodeURIComponent(id)}`, req);
+}
+
+export function deleteSubscriptionDomain(id: string): Promise<void> {
+  applyAdminClient();
+  return del<void>(`/api/v1/admin/subscription-domains/${encodeURIComponent(id)}`);
+}
+
+export function getSubscriptionDomainHealth(): Promise<SubscriptionDomainHealth[]> {
+  applyAdminClient();
+  return get<SubscriptionDomainHealth[]>('/api/v1/admin/subscription-domains/health');
 }

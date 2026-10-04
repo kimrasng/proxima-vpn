@@ -2,14 +2,13 @@ package handlers
 
 import (
 	"context"
-	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/proximavpn/proxima-vpn/api-server/internal/services"
 )
 
-// UserPlanHandler handles user plan request endpoints.
+// UserPlanHandler handles user-facing plan browsing and node listing endpoints.
 type UserPlanHandler struct {
 	db       *pgxpool.Pool
 	activity *services.ActivityService
@@ -20,179 +19,29 @@ func NewUserPlanHandler(db *pgxpool.Pool) *UserPlanHandler {
 	return &UserPlanHandler{db: db, activity: services.NewActivityService(db)}
 }
 
-type createPlanRequestBody struct {
-	PlanID string `json:"plan_id"`
+type userPlanPrice struct {
+	DurationDays int   `json:"duration_days"`
+	PriceCents   int64 `json:"price_cents"`
 }
 
-type planRequestResponse struct {
-	ID         string     `json:"id"`
-	PlanID     string     `json:"plan_id"`
-	PlanName   string     `json:"plan_name"`
-	Status     string     `json:"status"`
-	CreatedAt  time.Time  `json:"created_at"`
-	ReviewedAt *time.Time `json:"reviewed_at,omitempty"`
-}
-
-// CreateRequest handles POST /api/v1/user/plan-requests.
-// @Summary Create plan request
-// @Description Submit a request for a subscription plan
-// @Tags user-plans
-// @Accept json
-// @Produce json
-// @Param body body createPlanRequestBody true "Plan ID to request"
-// @Success 201 {object} planRequestResponse
-// @Failure 400 {object} map[string]string
-// @Failure 409 {object} map[string]string
-// @Failure 500 {object} map[string]string
-// @Security BearerAuth
-// @Router /user/plan-requests [post]
-func (h *UserPlanHandler) CreateRequest(c *fiber.Ctx) error {
-	userID := c.Locals("user_id").(string)
-
-	var req createPlanRequestBody
-	if err := c.BodyParser(&req); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "invalid request body",
-		})
-	}
-
-	if req.PlanID == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "plan_id is required",
-		})
-	}
-
-	var planActive bool
-	err := h.db.QueryRow(
-		context.Background(),
-		`SELECT is_active FROM plans WHERE id = $1`,
-		req.PlanID,
-	).Scan(&planActive)
-	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "plan not found",
-		})
-	}
-	if !planActive {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "plan is not active",
-		})
-	}
-
-	var hasPending bool
-	err = h.db.QueryRow(
-		context.Background(),
-		`SELECT EXISTS(SELECT 1 FROM plan_requests WHERE user_id = $1 AND status = 'pending')`,
-		userID,
-	).Scan(&hasPending)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "internal server error",
-		})
-	}
-	if hasPending {
-		return c.Status(fiber.StatusConflict).JSON(fiber.Map{
-			"error": "you already have a pending plan request",
-		})
-	}
-
-	var resp planRequestResponse
-	err = h.db.QueryRow(
-		context.Background(),
-		`INSERT INTO plan_requests (user_id, plan_id, status)
-		 VALUES ($1, $2, 'pending')
-		 RETURNING id, plan_id, status, created_at`,
-		userID, req.PlanID,
-	).Scan(&resp.ID, &resp.PlanID, &resp.Status, &resp.CreatedAt)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "internal server error",
-		})
-	}
-
-	_ = h.db.QueryRow(
-		context.Background(),
-		`SELECT name FROM plans WHERE id = $1`,
-		resp.PlanID,
-	).Scan(&resp.PlanName)
-
-	var userEmail, userName string
-	_ = h.db.QueryRow(
-		context.Background(),
-		`SELECT email, name FROM users WHERE id = $1`,
-		userID,
-	).Scan(&userEmail, &userName)
-
-	h.activity.Log(context.Background(), services.Record{
-		EventType:  services.EventPlanRequested,
-		Severity:   services.SeverityInfo,
-		ActorType:  "user",
-		ActorID:    userID,
-		ActorLabel: userName,
-		TargetType: "plan_request",
-		TargetID:   resp.ID,
-		Detail: map[string]any{
-			"email": userEmail,
-			"plan":  resp.PlanName,
-		},
-	})
-
-	return c.Status(fiber.StatusCreated).JSON(resp)
-}
-
-// ListRequests handles GET /api/v1/user/plan-requests.
-// @Summary List my plan requests
-// @Description Returns the authenticated user's plan requests
-// @Tags user-plans
-// @Produce json
-// @Success 200 {array} planRequestResponse
-// @Failure 500 {object} map[string]string
-// @Security BearerAuth
-// @Router /user/plan-requests [get]
-func (h *UserPlanHandler) ListRequests(c *fiber.Ctx) error {
-	userID := c.Locals("user_id").(string)
-
-	rows, err := h.db.Query(
-		context.Background(),
-		`SELECT pr.id, pr.plan_id, p.name, pr.status, pr.created_at, pr.reviewed_at
-		 FROM plan_requests pr
-		 JOIN plans p ON p.id = pr.plan_id
-		 WHERE pr.user_id = $1
-		 ORDER BY pr.created_at DESC`,
-		userID,
-	)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "internal server error",
-		})
-	}
-	defer rows.Close()
-
-	var results []planRequestResponse
-	for rows.Next() {
-		var r planRequestResponse
-		if err := rows.Scan(&r.ID, &r.PlanID, &r.PlanName, &r.Status, &r.CreatedAt, &r.ReviewedAt); err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"error": "internal server error",
-			})
-		}
-		results = append(results, r)
-	}
-
-	if results == nil {
-		results = []planRequestResponse{}
-	}
-
-	return c.JSON(results)
+type userPlanFeature struct {
+	Text     string `json:"text"`
+	Included bool   `json:"included"`
 }
 
 type userPlanItem struct {
-	ID           string `json:"id"`
-	Name         string `json:"name"`
-	TrafficLimit *int64 `json:"traffic_limit"`
-	DurationDays int    `json:"duration_days"`
-	MaxDevices   int    `json:"max_devices"`
-	SpeedLimit   *int   `json:"speed_limit"`
+	ID           string            `json:"id"`
+	Name         string            `json:"name"`
+	TrafficLimit *int64            `json:"traffic_limit"`
+	DurationDays int               `json:"duration_days"`
+	MaxDevices   int               `json:"max_devices"`
+	SpeedLimit   *int              `json:"speed_limit"`
+	Prices       []userPlanPrice   `json:"prices"`
+	Features     []userPlanFeature `json:"features"`
+	// Derived the same way as the admin side: a plan with no priced duration
+	// cannot be ordered; operational activity, advertisement intent and final
+	// publication approval separately gate visibility and new purchases.
+	Purchasable bool `json:"purchasable"`
 }
 
 // userNodeItem is the minimal node view an end user gets: no address, port, key
@@ -222,12 +71,13 @@ func (h *UserPlanHandler) ListNodes(c *fiber.Ctx) error {
 	// group joins to nothing and yields [].
 	rows, err := h.db.Query(
 		context.Background(),
-		`SELECT n.name, n.country, n.region, n.status
+		`SELECT COALESCE(NULLIF(nl.name, ''), n.name), n.country, n.region, n.status
 		 FROM nodes n
 		 JOIN node_group_nodes ngn ON ngn.node_id = n.id
 		 JOIN node_groups ng ON ng.id = ngn.node_group_id
 		 JOIN plans p ON p.node_group_id = ng.id
 		 JOIN users u ON u.plan_id = p.id
+		 LEFT JOIN node_labels nl ON nl.node_id = n.id AND nl.language = u.language
 		 WHERE u.id = $1 AND n.status <> 'pending'
 		 ORDER BY n.country, n.name`,
 		userID,
@@ -250,7 +100,7 @@ func (h *UserPlanHandler) ListNodes(c *fiber.Ctx) error {
 }
 
 // @Summary List available plans
-// @Description Returns all active subscription plans
+// @Description Returns active subscription plans with approved advertisement
 // @Tags user-plans
 // @Produce json
 // @Success 200 {array} userPlanItem
@@ -258,24 +108,121 @@ func (h *UserPlanHandler) ListNodes(c *fiber.Ctx) error {
 // @Security BearerAuth
 // @Router /user/plans [get]
 func (h *UserPlanHandler) ListPlans(c *fiber.Ctx) error {
-	rows, err := h.db.Query(
-		context.Background(),
+	ctx := context.Background()
+	lang := h.resolveLanguage(c)
+
+	rows, err := h.db.Query(ctx,
 		`SELECT id, name, traffic_limit, duration_days, max_devices, speed_limit
-		 FROM plans WHERE is_active = true ORDER BY name`,
+		 FROM plans WHERE is_active = true AND advertise = true AND is_advertised = true ORDER BY name`,
 	)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to list plans"})
 	}
-	defer rows.Close()
 
 	items := make([]userPlanItem, 0)
+	ids := make([]string, 0)
+	byID := make(map[string]*userPlanItem)
 	for rows.Next() {
 		var p userPlanItem
 		if err := rows.Scan(&p.ID, &p.Name, &p.TrafficLimit, &p.DurationDays, &p.MaxDevices, &p.SpeedLimit); err != nil {
-			continue
+			rows.Close()
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to list plans"})
 		}
+		p.Prices = make([]userPlanPrice, 0)
+		p.Features = make([]userPlanFeature, 0)
 		items = append(items, p)
+		ids = append(ids, p.ID)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to list plans"})
+	}
+	for i := range items {
+		byID[items[i].ID] = &items[i]
+	}
+	if len(ids) == 0 {
+		return c.JSON(items)
+	}
+
+	priceRows, err := h.db.Query(ctx,
+		`SELECT plan_id, duration_days, price_cents FROM plan_prices
+		 WHERE plan_id = ANY($1) ORDER BY duration_days`,
+		ids,
+	)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to list plans"})
+	}
+	for priceRows.Next() {
+		var planID string
+		var pr userPlanPrice
+		if err := priceRows.Scan(&planID, &pr.DurationDays, &pr.PriceCents); err != nil {
+			priceRows.Close()
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to list plans"})
+		}
+		if p, ok := byID[planID]; ok {
+			p.Prices = append(p.Prices, pr)
+			p.Purchasable = true
+		}
+	}
+	priceRows.Close()
+	if err := priceRows.Err(); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to list plans"})
+	}
+
+	// text falls back to English when the resolved language has no bullet
+	// authored for that position, and the bullet is dropped entirely if
+	// neither language has text - an admin-incomplete bullet must not render
+	// as an empty line.
+	featureRows, err := h.db.Query(ctx,
+		`SELECT pf.plan_id, pf.position, pf.included, COALESCE(t.text, en.text) AS text
+		 FROM plan_features pf
+		 LEFT JOIN plan_feature_texts t
+		        ON t.plan_id = pf.plan_id AND t.position = pf.position AND t.language = $2
+		 LEFT JOIN plan_feature_texts en
+		        ON en.plan_id = pf.plan_id AND en.position = pf.position AND en.language = 'en'
+		 WHERE pf.plan_id = ANY($1) AND COALESCE(t.text, en.text) IS NOT NULL
+		 ORDER BY pf.plan_id, pf.position`,
+		ids, lang,
+	)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to list plans"})
+	}
+	for featureRows.Next() {
+		var planID string
+		var pos int
+		var f userPlanFeature
+		if err := featureRows.Scan(&planID, &pos, &f.Included, &f.Text); err != nil {
+			featureRows.Close()
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to list plans"})
+		}
+		if p, ok := byID[planID]; ok {
+			p.Features = append(p.Features, f)
+		}
+	}
+	featureRows.Close()
+	if err := featureRows.Err(); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to list plans"})
 	}
 
 	return c.JSON(items)
+}
+
+// resolveLanguage picks the language plan feature bullets render in: an
+// explicit ?lang= query param (the web app's active i18next language) wins,
+// then the user's stored profile preference, then English.
+func (h *UserPlanHandler) resolveLanguage(c *fiber.Ctx) string {
+	if q := c.Query("lang"); q != "" {
+		return q
+	}
+	userID, ok := c.Locals("user_id").(string)
+	if !ok || userID == "" {
+		return "en"
+	}
+	var lang string
+	if err := h.db.QueryRow(context.Background(),
+		`SELECT language FROM users WHERE id = $1`, userID,
+	).Scan(&lang); err != nil || lang == "" {
+		return "en"
+	}
+	return lang
 }

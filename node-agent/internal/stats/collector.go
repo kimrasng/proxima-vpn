@@ -9,7 +9,7 @@ import (
 	"github.com/proximavpn/proxima-vpn/node-agent/internal/xray"
 )
 
-const DefaultInterval = 30 * time.Second
+const DefaultInterval = 10 * time.Second
 
 type Collector struct {
 	statsClient *xray.StatsClient
@@ -86,13 +86,17 @@ func (c *Collector) collect(ctx context.Context) {
 	// counters Xray has already zeroed.
 	c.accumulate(traffic)
 
-	onlineUsers, err := c.statsClient.GetOnlineUsers(ctx)
+	onlineIPs, err := c.collectOnlineIPs(ctx)
 	if err != nil {
-		log.Printf("collect online users: %v", err)
+		log.Printf("collect online ips: %v", err)
 		return
 	}
-
-	onlineIPs := c.collectOnlineIPs(ctx)
+	// The online map is Xray's statsUserOnline activity, not cumulative
+	// traffic counters. Never report an old positive counter as online.
+	onlineUsers := make([]string, 0, len(onlineIPs))
+	for uuid := range onlineIPs {
+		onlineUsers = append(onlineUsers, uuid)
+	}
 
 	if err := c.flush(ctx, onlineUsers, onlineIPs); err != nil {
 		log.Printf("send stats: %v (retrying %d device(s) on the next tick)", err, len(c.pending))
@@ -100,39 +104,36 @@ func (c *Collector) collect(ctx context.Context) {
 }
 
 // flush posts the undelivered set, clearing it only once the server has it.
-// collectOnlineIPs asks Xray which source addresses are live under each device
-// that showed traffic. Best-effort: the concurrency figures degrade to the
-// coarser UUID list rather than holding up the traffic report, which is what
-// the caps depend on.
-func (c *Collector) collectOnlineIPs(ctx context.Context) map[string][]client.OnlineIP {
+// collectOnlineIPs asks Xray for fresh activity under provisioned devices.
+// Failed queries cannot safely replace the previous online report.
+func (c *Collector) collectOnlineIPs(ctx context.Context) (map[string][]client.OnlineIP, error) {
 	if c.provisionedEmails == nil {
-		return nil
+		return map[string][]client.OnlineIP{}, nil
 	}
 	emails := c.provisionedEmails()
 	if len(emails) == 0 {
-		return nil
+		return map[string][]client.OnlineIP{}, nil
 	}
 
 	byUUID, err := c.statsClient.GetOnlineIPs(ctx, emails)
 	if err != nil {
-		log.Printf("collect online ips: %v", err)
-		return nil
+		return nil, err
 	}
 
 	out := make(map[string][]client.OnlineIP, len(byUUID))
+	now := time.Now().Unix()
 	for uuid, ips := range byUUID {
 		for ip, lastSeen := range ips {
-			out[uuid] = append(out[uuid], client.OnlineIP{IP: ip, LastSeen: lastSeen})
+			if lastSeen >= now-20 && lastSeen <= now {
+				out[uuid] = append(out[uuid], client.OnlineIP{IP: ip, LastSeen: lastSeen})
+			}
 		}
 	}
-	return out
+	return out, nil
 }
 
 func (c *Collector) flush(ctx context.Context, onlineUsers []string, onlineIPs map[string][]client.OnlineIP) error {
-	if len(c.pending) == 0 {
-		return nil
-	}
-
+	// Empty sets are authoritative too: they clear the preceding node report.
 	apiTraffic := make([]client.TrafficStat, 0, len(c.pending))
 	for _, t := range c.pending {
 		apiTraffic = append(apiTraffic, t)

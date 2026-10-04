@@ -7,7 +7,8 @@ import {
   TopNavigation,
 } from "@cloudscape-design/components";
 import { useTheme } from "../hooks/useTheme";
-import AnnouncementPopup from "../components/AnnouncementPopup";
+import { getUserToken, removeUserToken } from "../api/client";
+import { updateProfile } from "../api/user";
 
 export default function UserLayout() {
   const { t, i18n } = useTranslation();
@@ -27,26 +28,36 @@ export default function UserLayout() {
 
   const changeLanguage = (lng: string) => {
     void i18n.changeLanguage(lng);
+    // Subscription output is rendered server-side for VPN clients, which never
+    // see this browser's i18n state - the switch has to reach the account.
+    if (getUserToken()) {
+      void updateProfile({ language: lng });
+    }
   };
 
   return (
     <>
-      <AnnouncementPopup />
       <TopNavigation
+        id="user-top-navigation"
         identity={{
-          href: "/portal/devices",
+          href: "/portal/dashboard",
           title: "Proxima VPN",
         }}
         utilities={[
           {
             type: "button",
+            text: t("user.nav.logout"),
+            onClick: () => { removeUserToken(); navigate("/login", { replace: true }); },
+          },
+          {
+            type: "button",
             iconName: "light-dark",
-            ariaLabel: theme === "dark" ? "Switch to light mode" : "Switch to dark mode",
+            ariaLabel: t(theme === "dark" ? "user.nav.lightMode" : "user.nav.darkMode"),
             onClick: toggleTheme,
           },
           {
             type: "menu-dropdown",
-            text: i18n.language === "ko" ? "한국어" : i18n.language === "zh" ? "中文" : "English",
+            text: i18n.resolvedLanguage === "ko" ? "한국어" : i18n.resolvedLanguage === "zh" ? "中文" : "English",
             items: [
               { id: "ko", text: "한국어" },
               { id: "en", text: "English" },
@@ -57,6 +68,14 @@ export default function UserLayout() {
         ]}
       />
       <AppLayout
+        headerSelector="#user-top-navigation"
+        contentType="default"
+        maxContentWidth={1200}
+        ariaLabels={{
+          navigation: t("user.nav.navigation"),
+          navigationToggle: t("user.nav.openNavigation"),
+          navigationClose: t("user.nav.closeNavigation"),
+        }}
         navigation={
           <SideNavigation
             activeHref={location.pathname}

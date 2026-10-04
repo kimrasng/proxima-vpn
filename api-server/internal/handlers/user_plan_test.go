@@ -80,12 +80,13 @@ func TestUserNodeQueryIsScopedToThePlansGroup(t *testing.T) {
 	t.Cleanup(pool.Close)
 
 	// The statement from UserPlanHandler.ListNodes, kept in sync by hand.
-	const q = `SELECT n.name, n.country, n.region, n.status
+	const q = `SELECT COALESCE(NULLIF(nl.name, ''), n.name), n.country, n.region, n.status
 	           FROM nodes n
 	           JOIN node_group_nodes ngn ON ngn.node_id = n.id
 	           JOIN node_groups ng ON ng.id = ngn.node_group_id
 	           JOIN plans p ON p.node_group_id = ng.id
 	           JOIN users u ON u.plan_id = p.id
+	           LEFT JOIN node_labels nl ON nl.node_id = n.id AND nl.language = u.language
 	           WHERE u.id = $1 AND n.status <> 'pending'
 	           ORDER BY n.country, n.name`
 

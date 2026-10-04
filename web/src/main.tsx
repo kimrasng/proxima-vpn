@@ -1,3 +1,7 @@
+if (import.meta.env.DEV) {
+  import("react-grab");
+}
+
 import React from "react";
 import ReactDOM from "react-dom/client";
 import "@cloudscape-design/global-styles/index.css";

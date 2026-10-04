@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/requestid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/proximavpn/proxima-vpn/api-server/internal/config"
+	"github.com/proximavpn/proxima-vpn/api-server/internal/payments"
 	"github.com/proximavpn/proxima-vpn/api-server/internal/services"
 	"github.com/redis/go-redis/v9"
 )
@@ -25,12 +27,23 @@ type Server struct {
 	db            *pgxpool.Pool
 	redis         *redis.Client
 	backupService *services.BackupService
+	payments      payments.Registry
 }
 
-// NewServer creates a Fiber app with standard middleware.
-func NewServer(cfg *config.Config, db *pgxpool.Pool, rdb *redis.Client, backupSvc *services.BackupService) *Server {
-	app := fiber.New(fiber.Config{
-		BodyLimit: 10 * 1024 * 1024,
+// fiberConfig builds the Fiber config, including the trusted-proxy settings
+// that decide what c.IP() reports. EnableTrustedProxyCheck is always on: it is
+// what confines ProxyHeader to requests that really came from a configured
+// proxy, so an untrusted peer's forwarded header is ignored rather than used as
+// a fallback. EnableIPValidation makes c.IP() skip unparseable leading entries
+// in the header - a hop-by-hop list starts with whatever the client claimed -
+// instead of storing the raw value.
+func fiberConfig(cfg *config.Config) fiber.Config {
+	return fiber.Config{
+		BodyLimit:               10 * 1024 * 1024,
+		ProxyHeader:             cfg.Server.ProxyHeader,
+		EnableTrustedProxyCheck: true,
+		TrustedProxies:          cfg.Server.TrustedProxies,
+		EnableIPValidation:      true,
 		ErrorHandler: func(c *fiber.Ctx, err error) error {
 			code := fiber.StatusInternalServerError
 			if e, ok := err.(*fiber.Error); ok {
@@ -40,7 +53,12 @@ func NewServer(cfg *config.Config, db *pgxpool.Pool, rdb *redis.Client, backupSv
 				"error": err.Error(),
 			})
 		},
-	})
+	}
+}
+
+// NewServer creates a Fiber app with standard middleware.
+func NewServer(cfg *config.Config, db *pgxpool.Pool, rdb *redis.Client, backupSvc *services.BackupService, paymentProviders payments.Registry) *Server {
+	app := fiber.New(fiberConfig(cfg))
 
 	app.Use(recover.New(recover.Config{
 		EnableStackTrace: true,
@@ -60,8 +78,16 @@ func NewServer(cfg *config.Config, db *pgxpool.Pool, rdb *redis.Client, backupSv
 		return c.Next()
 	})
 
-	// Global rate limiter: 100 req/min per IP
+	// Global rate limiter: 100 req/min per IP. Payment webhooks are exempt -
+	// Stripe (and any future hosted provider) retries aggressively from a
+	// small set of source IPs, and throttling those retries only delays a
+	// legitimate confirmation rather than blocking abuse.
+	permitGuard, permitAuth := bandwidthAuthentication(db)
+	app.Use(permitGuard, permitAuth)
 	app.Use(limiter.New(limiter.Config{
+		Next: func(c *fiber.Ctx) bool {
+			return strings.HasPrefix(c.Path(), "/webhooks/payments/") || isBandwidthPermitRequest(c)
+		},
 		Max:        100,
 		Expiration: 1 * time.Minute,
 		KeyGenerator: func(c *fiber.Ctx) string {
@@ -92,6 +118,7 @@ func NewServer(cfg *config.Config, db *pgxpool.Pool, rdb *redis.Client, backupSv
 		db:            db,
 		redis:         rdb,
 		backupService: backupSvc,
+		payments:      paymentProviders,
 	}
 
 	s.registerRoutes()

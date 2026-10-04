@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"time"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/proximavpn/proxima-vpn/api-server/internal/services"
 	"github.com/proximavpn/proxima-vpn/pkg/crypto"
+	"github.com/proximavpn/proxima-vpn/pkg/lang"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -44,16 +46,19 @@ func (h *UserPortalHandler) GetProfile(c *fiber.Ctx) error {
 		trafficLimit  *int64
 		planExpiresAt *time.Time
 		planStartedAt *time.Time
+		language      string
+    subToken string
 	)
 
 	err := h.db.QueryRow(context.Background(), `
 		SELECT u.email, u.name, u.status, u.traffic_used,
-		       p.name, p.traffic_limit, u.plan_expires_at, u.plan_started_at
+		       p.name, p.traffic_limit, u.plan_expires_at, u.plan_started_at,
+		       u.language, u.sub_token
 		FROM users u
 		LEFT JOIN plans p ON u.plan_id = p.id
 		WHERE u.id = $1
 	`, userID).Scan(&email, &name, &status, &trafficUsed,
-		&planName, &trafficLimit, &planExpiresAt, &planStartedAt)
+		&planName, &trafficLimit, &planExpiresAt, &planStartedAt, &language, &subToken)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to fetch profile",
@@ -61,8 +66,10 @@ func (h *UserPortalHandler) GetProfile(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{
+		"sub_token": subToken,
 		"email":           email,
 		"name":            name,
+		"language":        language,
 		"status":          status,
 		"traffic_used":    trafficUsed,
 		"plan_name":       planName,
@@ -76,6 +83,7 @@ type updateProfileRequest struct {
 	Email    *string `json:"email"`
 	Name     *string `json:"name"`
 	Password *string `json:"password"`
+	Language *string `json:"language"`
 }
 
 // UpdateProfile updates the authenticated user's profile fields.
@@ -101,9 +109,15 @@ func (h *UserPortalHandler) UpdateProfile(c *fiber.Ctx) error {
 		})
 	}
 
-	if req.Email == nil && req.Name == nil && req.Password == nil {
+	if req.Email == nil && req.Name == nil && req.Password == nil && req.Language == nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "at least one field is required",
+		})
+	}
+
+	if req.Language != nil && !lang.Code(*req.Language).Valid() {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": fmt.Sprintf("unsupported language %q", *req.Language),
 		})
 	}
 
@@ -144,6 +158,18 @@ func (h *UserPortalHandler) UpdateProfile(c *fiber.Ctx) error {
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 				"error": "failed to update name",
+			})
+		}
+	}
+
+	if req.Language != nil {
+		_, err := h.db.Exec(ctx,
+			`UPDATE users SET language = $1, updated_at = NOW() WHERE id = $2`,
+			*req.Language, userID,
+		)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "failed to update language",
 			})
 		}
 	}

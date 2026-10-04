@@ -523,9 +523,9 @@ func (s *BotService) handleSetPlan(msg *tgbotapi.Message) {
 	planName := strings.Join(args[1:], " ")
 
 	// Delegates to services.PlanService so this goes through the exact same
-	// logic as the admin panel's plan-request approval (admin_plan_request.go)
-	// - traffic reset and reactivation included, not just the plan/expiry
-	// fields this command used to set on its own.
+	// logic as the checkout order flow's grant (services/payment.go) - traffic
+	// reset and reactivation included, not just the plan/expiry fields this
+	// command used to set on its own.
 	durationDays, err := s.plan.AssignPlanByName(context.Background(), email, planName)
 	if err != nil {
 		s.sendReply(msg.Chat.ID, fmt.Sprintf("❌ Failed to assign plan: %s", err.Error()))

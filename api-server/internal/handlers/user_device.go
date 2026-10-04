@@ -96,7 +96,7 @@ func (h *UserDeviceHandler) Create(c *fiber.Ctx) error {
 	var deviceCount, maxDevices int
 	err = h.db.QueryRow(
 		context.Background(),
-		`SELECT COUNT(*) FROM devices WHERE user_id = $1`,
+		`SELECT COUNT(*) FROM devices WHERE user_id = $1 AND retired_at IS NULL`,
 		userID,
 	).Scan(&deviceCount)
 	if err != nil {
@@ -183,7 +183,7 @@ func (h *UserDeviceHandler) List(c *fiber.Ctx) error {
 	rows, err := h.db.Query(
 		context.Background(),
 		`SELECT id, name, xray_uuid, COALESCE(wg_public_key, ''), COALESCE(wg_address, ''), created_at
-		 FROM devices WHERE user_id = $1 ORDER BY created_at`,
+		 FROM devices WHERE user_id = $1 AND retired_at IS NULL ORDER BY created_at`,
 		userID,
 	)
 	if err != nil {
@@ -226,9 +226,29 @@ func (h *UserDeviceHandler) Delete(c *fiber.Ctx) error {
 	userID := c.Locals("user_id").(string)
 	deviceID := c.Params("id")
 
+	// HWID registrations are tombstoned: retaining the account/fingerprint
+	// uniqueness key prevents the same installation from silently minting a new
+	// UUID. Block runtime admission until consumers explicitly filter retired
+	// devices. Legacy manually-created devices retain their delete semantics.
 	tag, err := h.db.Exec(
 		context.Background(),
-		`DELETE FROM devices WHERE id = $1 AND user_id = $2`,
+		`UPDATE devices SET retired_at = NOW(), evicted_until = '9999-12-31'::timestamptz
+		 WHERE id = $1 AND user_id = $2 AND hwid_fingerprint IS NOT NULL AND retired_at IS NULL`,
+		deviceID, userID,
+	)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "internal server error"})
+	}
+	if tag.RowsAffected() > 0 {
+		return c.SendStatus(fiber.StatusNoContent)
+	}
+
+	// Keep a tombstone for every UUID so old Exit sessions cannot become
+	// indistinguishable from an active credential after physical deletion.
+	tag, err = h.db.Exec(
+		context.Background(),
+		`UPDATE devices SET retired_at=NOW(), evicted_until='9999-12-31'::timestamptz
+		 WHERE id=$1 AND user_id=$2 AND hwid_fingerprint IS NULL AND retired_at IS NULL`,
 		deviceID, userID,
 	)
 	if err != nil {

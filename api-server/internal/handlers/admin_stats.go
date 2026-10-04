@@ -58,12 +58,6 @@ func (h *AdminStatsHandler) GetDashboardStats(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to query stats"})
 	}
 
-	var pendingRequests int64
-	err = h.db.QueryRow(ctx, `SELECT COUNT(*) FROM plan_requests WHERE status = 'pending'`).Scan(&pendingRequests)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to query stats"})
-	}
-
 	var uploadToday, downloadToday, totalTrafficMonth int64
 
 	// up_bytes + dn_bytes: traffic_logs has no single "bytes" column (see
@@ -114,7 +108,6 @@ func (h *AdminStatsHandler) GetDashboardStats(c *fiber.Ctx) error {
 		"upload_today":        uploadToday,
 		"download_today":      downloadToday,
 		"total_traffic_month": totalTrafficMonth,
-		"pending_requests":    pendingRequests,
 		"active_alerts":       alerts.Total,
 		"deltas":              deltas,
 		"generated_at":        time.Now().UTC().Format(time.RFC3339),
@@ -123,7 +116,7 @@ func (h *AdminStatsHandler) GetDashboardStats(c *fiber.Ctx) error {
 
 // GetAlerts returns the conditions needing operator action.
 // @Summary Get dashboard alerts
-// @Description Returns offline nodes, resource-pressured nodes, and pending approvals
+// @Description Returns offline nodes and resource-pressured nodes
 // @Tags admin-stats
 // @Produce json
 // @Success 200 {object} services.Alerts

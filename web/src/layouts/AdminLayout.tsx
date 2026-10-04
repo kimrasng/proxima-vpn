@@ -43,6 +43,7 @@ const ancestorTrails: Record<
     { dynamic: true, href: "/admin/nodes/:nodeId" },
   ],
   "/admin/users/:userId": [rootCrumb, { labelKey: "admin.nav.users", href: "/admin/users" }],
+  "/admin/orders/:orderId": [rootCrumb, { labelKey: "admin.nav.orders", href: "/admin/orders" }],
 };
 
 const nestedLeafLabels: Record<string, string> = {
@@ -55,10 +56,14 @@ const staticPageLabels: Record<string, string> = {
   "/admin/activity": "admin.nav.activity",
   "/admin/nodes": "admin.nav.nodes",
   "/admin/node-groups": "admin.nav.nodeGroups",
+  "/admin/node-chains": "admin.nav.nodeChains",
   "/admin/users": "admin.nav.users",
   "/admin/connections": "admin.nav.connections",
+  "/admin/uuid-evictions": "admin.nav.uuidEvictions",
+  "/admin/subscription-domains": "admin.nav.subscriptionDomains",
   "/admin/plans": "admin.nav.plans",
-  "/admin/plan-requests": "admin.nav.planRequests",
+  "/admin/orders": "admin.nav.orders",
+  "/admin/promotions": "admin.nav.promotions",
   "/admin/announcements": "admin.nav.announcements",
   "/admin/settings": "admin.nav.settings",
   "/admin/2fa": "admin.nav.twoFactor",
@@ -70,10 +75,14 @@ const helpTopicKeys: Record<string, string> = {
   "/admin/activity": "admin.help.activity",
   "/admin/nodes": "admin.help.nodes",
   "/admin/node-groups": "admin.help.nodeGroups",
+  "/admin/node-chains": "admin.help.nodeChains",
   "/admin/users": "admin.help.users",
   "/admin/connections": "admin.help.connections",
+  "/admin/uuid-evictions": "admin.help.uuidEvictions",
+  "/admin/subscription-domains": "admin.help.subscriptionDomains",
   "/admin/plans": "admin.help.plans",
-  "/admin/plan-requests": "admin.help.planRequests",
+  "/admin/orders": "admin.help.orders",
+  "/admin/promotions": "admin.help.promotions",
   "/admin/announcements": "admin.help.announcements",
   "/admin/settings": "admin.help.settings",
   "/admin/2fa": "admin.help.twoFactor",
@@ -129,7 +138,6 @@ function AdminLayoutShell() {
   const [alerts, setAlerts] = useState<DashboardAlerts | null>(null);
 
   const alertCount = alerts?.total ?? 0;
-  const pendingCount = alerts?.pending_requests ?? 0;
 
   useEffect(() => {
     const load = async () => {
@@ -172,6 +180,7 @@ function AdminLayoutShell() {
       items: [
         { type: "link", text: t("admin.nav.nodes"), href: "/admin/nodes" },
         { type: "link", text: t("admin.nav.nodeGroups"), href: "/admin/node-groups" },
+        { type: "link", text: t("admin.nav.nodeChains"), href: "/admin/node-chains" },
       ],
     },
     {
@@ -180,13 +189,11 @@ function AdminLayoutShell() {
       items: [
         { type: "link", text: t("admin.nav.users"), href: "/admin/users" },
         { type: "link", text: t("admin.nav.connections"), href: "/admin/connections" },
+        { type: "link", text: t("admin.nav.uuidEvictions"), href: "/admin/uuid-evictions" },
+        { type: "link", text: t("admin.nav.subscriptionDomains"), href: "/admin/subscription-domains" },
         { type: "link", text: t("admin.nav.plans"), href: "/admin/plans" },
-        {
-          type: "link",
-          text: t("admin.nav.planRequests"),
-          href: "/admin/plan-requests",
-          info: pendingCount > 0 ? <Badge color="blue">{pendingCount}</Badge> : undefined,
-        },
+        { type: "link", text: t("admin.nav.orders"), href: "/admin/orders" },
+        { type: "link", text: t("admin.nav.promotions"), href: "/admin/promotions" },
         { type: "link", text: t("admin.nav.announcements"), href: "/admin/announcements" },
       ],
     },
@@ -349,7 +356,7 @@ function AdminLayoutShell() {
         }
         drawers={drawers}
         contentType="dashboard"
-        maxContentWidth={1200}
+        maxContentWidth={location.pathname === "/admin/activity" ? 1600 : 1200}
         content={
           <Box padding={{ top: "xs" }}>
             <Outlet />

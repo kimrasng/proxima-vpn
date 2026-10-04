@@ -3,15 +3,18 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"log"
 	"math"
-	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/proximavpn/proxima-vpn/api-server/internal/metrics"
 	"github.com/proximavpn/proxima-vpn/api-server/internal/services"
 	"github.com/proximavpn/proxima-vpn/pkg/crypto"
+	"github.com/proximavpn/proxima-vpn/pkg/nodeprov"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -20,14 +23,16 @@ type NodeAgentHandler struct {
 	redis         *redis.Client
 	xrayConfigSvc *services.XrayConfigService
 	activity      *services.ActivityService
+	managedDNS    services.ManagedEntryDNSIntentConfig
 }
 
-func NewNodeAgentHandler(db *pgxpool.Pool, rdb *redis.Client) *NodeAgentHandler {
+func NewNodeAgentHandler(db *pgxpool.Pool, rdb *redis.Client, managedDNS services.ManagedEntryDNSIntentConfig) *NodeAgentHandler {
 	return &NodeAgentHandler{
 		db:            db,
 		redis:         rdb,
 		xrayConfigSvc: services.NewXrayConfigService(db),
 		activity:      services.NewActivityService(db),
+		managedDNS:    managedDNS,
 	}
 }
 
@@ -59,21 +64,8 @@ func (h *NodeAgentHandler) Register(c *fiber.Ctx) error {
 			"error": "reg_token is required",
 		})
 	}
-
-	var nodeID string
-	err := h.db.QueryRow(
-		context.Background(),
-		`SELECT id FROM nodes WHERE reg_token = $1 AND status = 'pending'`,
-		req.RegToken,
-	).Scan(&nodeID)
-	if err != nil {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"error": "invalid registration token",
-		})
-	}
-
+	ctx := context.Background()
 	apiKey := crypto.GenerateAPIKey()
-
 	realityPrivateKey, realityPublicKey, err := crypto.GenerateRealityKeypair()
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -82,8 +74,92 @@ func (h *NodeAgentHandler) Register(c *fiber.Ctx) error {
 	}
 	realityShortID := crypto.GenerateRealityShortID()
 
-	_, err = h.db.Exec(
-		context.Background(),
+	tx, err := h.db.Begin(ctx)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to start registration",
+		})
+	}
+	defer tx.Rollback(ctx)
+
+	var nodeID string
+	err = tx.QueryRow(ctx,
+		`SELECT id::text
+		 FROM nodes
+		 WHERE reg_token = $1 AND status = 'pending'`,
+		req.RegToken,
+	).Scan(&nodeID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "invalid registration token",
+		})
+	}
+	groupRows, err := tx.Query(ctx,
+		`SELECT ng.id::text
+		 FROM node_groups ng
+		 JOIN node_group_nodes ngn ON ngn.node_group_id = ng.id
+		 WHERE ngn.node_id = $1
+		 ORDER BY ng.id
+		 FOR UPDATE OF ng`,
+		nodeID,
+	)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to lock node groups",
+		})
+	}
+	for groupRows.Next() {
+		var groupID string
+		if err := groupRows.Scan(&groupID); err != nil {
+			groupRows.Close()
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "failed to lock node groups",
+			})
+		}
+	}
+	groupRows.Close()
+	if err := groupRows.Err(); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to lock node groups",
+		})
+	}
+
+	var provisionedName, provisionedCountry, provisionedRegion string
+	err = tx.QueryRow(ctx,
+		`SELECT name, country, region
+		 FROM nodes
+		 WHERE id = $1 AND reg_token = $2 AND status = 'pending'
+		 FOR UPDATE`,
+		nodeID, req.RegToken,
+	).Scan(&provisionedName, &provisionedCountry, &provisionedRegion)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "invalid registration token",
+		})
+	}
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to validate registration token",
+		})
+	}
+
+	// Operator intent beats agent autodetection; the agent value is the fallback.
+	// "pending" is GenerateToken's marker for "no name chosen", not a real name.
+	name := provisionedName
+	if name == "" || name == "pending" {
+		name = req.Name
+	}
+	country := provisionedCountry
+	if country == "" {
+		country = req.Country
+	}
+	region := provisionedRegion
+	if region == "" {
+		region = req.Region
+	}
+
+	_, err = tx.Exec(
+		ctx,
 		`UPDATE nodes
 		 SET name = $1, ip = $2::inet, port = $3, xray_version = $4,
 		     country = $5, region = $6, api_key = $7, reg_token = NULL, status = 'offline',
@@ -92,8 +168,8 @@ func (h *NodeAgentHandler) Register(c *fiber.Ctx) error {
 		     reality_public_key  = COALESCE(NULLIF(reality_public_key, ''), $9),
 		     reality_short_id    = COALESCE(NULLIF(reality_short_id, ''), $10)
 		 WHERE id = $11`,
-		req.Name, req.IP, req.Port, req.XrayVersion,
-		req.Country, req.Region, apiKey,
+		name, req.IP, req.Port, req.XrayVersion,
+		country, region, apiKey,
 		realityPrivateKey, realityPublicKey, realityShortID, nodeID,
 	)
 	if err != nil {
@@ -102,18 +178,90 @@ func (h *NodeAgentHandler) Register(c *fiber.Ctx) error {
 		})
 	}
 
-	h.activity.Log(context.Background(), services.Record{
+	var chainID string
+	err = tx.QueryRow(ctx,
+		`SELECT id::text
+		 FROM node_chains
+		 WHERE exit_node_id = $1 AND relay_pool_id IS NULL AND entry_node_id IS NULL
+		 ORDER BY created_at, id
+		 LIMIT 1
+		 FOR UPDATE`,
+		nodeID,
+	).Scan(&chainID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		err = tx.QueryRow(ctx,
+			`INSERT INTO node_chains (name, relay_pool_id, exit_node_id, exit_port, transport)
+			 VALUES ($1, NULL, $2, $3, 'tcp_udp')
+			 RETURNING id::text`,
+			name, nodeID, req.Port,
+		).Scan(&chainID)
+	} else if err == nil {
+		_, err = tx.Exec(ctx,
+			`UPDATE node_chains
+			 SET name = $1, exit_port = $2, transport = 'tcp_udp'
+			 WHERE id = $3`,
+			name, req.Port, chainID,
+		)
+	}
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to synchronize node chain",
+		})
+	}
+
+	if _, err := tx.Exec(ctx,
+		`DELETE FROM node_chains
+		 WHERE exit_node_id = $1 AND relay_pool_id IS NULL AND entry_node_id IS NULL AND id <> $2`,
+		nodeID, chainID,
+	); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to synchronize node chain",
+		})
+	}
+
+	// Groups the node already belongs to were pointed at nothing until the chain
+	// existed, so attach it to them now.
+	if _, err := tx.Exec(
+		ctx,
+		`INSERT INTO node_group_chains (node_group_id, chain_id)
+		 SELECT ngn.node_group_id, $2
+		 FROM node_group_nodes ngn
+		 WHERE ngn.node_id = $1
+		 ON CONFLICT DO NOTHING`,
+		nodeID, chainID,
+	); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to attach node chain to groups",
+		})
+	}
+	if h.managedDNS.Enabled {
+		locked, err := services.LockRealityNode(ctx, tx, nodeID)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to register node"})
+		}
+		if err := services.EnsureManagedEntryDNSIntent(ctx, tx, locked, h.managedDNS); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to register node"})
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to commit registration",
+		})
+	}
+
+	h.activity.Log(ctx, services.Record{
 		EventType:  services.EventNodeRegistered,
 		Severity:   services.SeveritySuccess,
 		ActorType:  "node",
 		ActorID:    nodeID,
-		ActorLabel: req.Name,
+		ActorLabel: name,
 		TargetType: "node",
 		TargetID:   nodeID,
 		Detail: map[string]any{
-			"node":    req.Name,
-			"country": req.Country,
-			"region":  req.Region,
+			"node":    name,
+			"country": country,
+			"region":  region,
 		},
 	})
 
@@ -135,21 +283,29 @@ func (h *NodeAgentHandler) Register(c *fiber.Ctx) error {
 func (h *NodeAgentHandler) Unregister(c *fiber.Ctx) error {
 	nodeID := c.Locals("node_id").(string)
 
-	result, err := h.db.Exec(
-		context.Background(),
-		`DELETE FROM nodes WHERE id = $1`,
-		nodeID,
-	)
+	name, err := services.DeleteNodeWithManagedDNS(c.UserContext(), h.db, nodeID)
 	if err != nil {
+		var nodeError *services.RealitySNIError
+		if (errors.As(err, &nodeError) && nodeError.Kind == services.RealitySNIMissingNode) || errors.Is(err, pgx.ErrNoRows) {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+				"error": "node not found",
+			})
+		}
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to unregister node",
 		})
 	}
-	if result.RowsAffected() == 0 {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-			"error": "node not found",
-		})
-	}
+
+	h.activity.Log(context.Background(), services.Record{
+		EventType:  services.EventNodeUnregistered,
+		Severity:   services.SeverityWarning,
+		ActorType:  "node",
+		ActorID:    nodeID,
+		ActorLabel: name,
+		TargetType: "node",
+		TargetID:   nodeID,
+		Detail:     map[string]any{"node": name},
+	})
 
 	return c.JSON(fiber.Map{"message": "node unregistered"})
 }
@@ -195,6 +351,7 @@ type heartbeatRequest struct {
 	XrayRunning bool    `json:"xray_running"`
 	// A node that cannot run tc serves speed-limited users at full rate. It
 	// stays otherwise healthy, so the panel has to carry the bad news.
+	ShapingMode  string `json:"shaping_mode"`
 	ShapingOK    bool   `json:"shaping_ok"`
 	ShapingTiers int    `json:"shaping_tiers"`
 	ShapingError string `json:"shaping_error"`
@@ -217,7 +374,7 @@ func (h *NodeAgentHandler) Heartbeat(c *fiber.Ctx) error {
 		     network_in = $5, network_out = $6, last_seen = NOW(), status = 'online',
 		     xray_version = COALESCE(NULLIF($7, ''), xray_version),
 		     config_hash = $8, xray_running = $9,
-		     shaping_ok = $10, shaping_tiers = $11, shaping_error = $12,
+		     shaping_ok = $10, shaping_tiers = $11, shaping_error = $12, shaping_mode = $14,
 		     -- Only on the offline -> online edge: stamping every heartbeat
 		     -- would make the age of the current state always read as seconds.
 		     status_changed_at = CASE
@@ -227,7 +384,7 @@ func (h *NodeAgentHandler) Heartbeat(c *fiber.Ctx) error {
 		req.CPUUsage, req.MemoryUsage, req.DiskUsage, req.LoadAvg,
 		req.NetworkIn, req.NetworkOut, req.XrayVersion,
 		req.ConfigHash, req.XrayRunning,
-		req.ShapingOK, req.ShapingTiers, req.ShapingError, nodeID,
+		req.ShapingOK, req.ShapingTiers, req.ShapingError, nodeID, req.ShapingMode,
 	)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -420,6 +577,32 @@ func (h *NodeAgentHandler) GetTLSDomain(c *fiber.Ctx) error {
 	return c.JSON(tlsDomainResponse{Domain: domain, Email: email})
 }
 
+type nodeRoleResponse struct {
+	Role string `json:"role"`
+}
+
+// GetRole tells the agent what this node is for. A relay-only node has no
+// inbounds and no clients, so starting Xray there would fail on an empty config
+// and leave the agent restarting forever; the agent therefore has to know its
+// role before it brings anything up, and role lives in the control plane so an
+// operator can change it without touching the host.
+func (h *NodeAgentHandler) GetRole(c *fiber.Ctx) error {
+	nodeID := c.Locals("node_id").(string)
+
+	var role string
+	if err := h.db.QueryRow(
+		context.Background(),
+		`SELECT role FROM nodes WHERE id = $1`,
+		nodeID,
+	).Scan(&role); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to fetch node role",
+		})
+	}
+
+	return c.JSON(nodeRoleResponse{Role: role})
+}
+
 type reportTLSCertRequest struct {
 	CertFile string `json:"cert_file"`
 	KeyFile  string `json:"key_file"`
@@ -539,48 +722,80 @@ func (h *NodeAgentHandler) Stats(c *fiber.Ctx) error {
 		metrics.TrafficBytesTotal.WithLabelValues("down").Add(float64(s.DnBytes))
 	}
 
-	if len(req.OnlineUUIDs) > 0 {
-		data, _ := json.Marshal(req.OnlineUUIDs)
-		key := fmt.Sprintf("node:%s:online", nodeID)
-		h.redis.Set(ctx, key, string(data), 60*time.Second)
+	if err := services.NewOnlineTracker(h.redis).PublishOnlineReport(ctx, nodeID, req.OnlineUUIDs, req.OnlineIPs); err != nil {
+		// Traffic has already been charged above. Returning 500 would cause the
+		// agent to resend destructive counters and bill the same bytes twice.
+		// The missing report expires and is treated as unknown by the scheduler.
+		log.Printf("node %s online report unavailable: %v", nodeID, err)
+		return c.JSON(fiber.Map{"status": "ok", "online_report": "unavailable"})
 	}
-
-	// Kept in a separate key from online_uuids: an agent too old to report IPs
-	// still populates the coarse set, and this one simply stays absent for it.
-	if len(req.OnlineIPs) > 0 {
-		data, _ := json.Marshal(req.OnlineIPs)
-		key := fmt.Sprintf("node:%s:online_ips", nodeID)
-		h.redis.Set(ctx, key, string(data), 60*time.Second)
-	}
-
-	h.recordSessionStarts(ctx, req)
 
 	return c.JSON(fiber.Map{"status": "ok"})
 }
 
-// sessionStartTTL outlives the 60s online keys so a device that keeps
-// reconnecting within the window is still reported as one continuous session
-// rather than restarting its timer on every poll.
-const sessionStartTTL = 10 * time.Minute
+// GetRelayRules returns the forwarding rules this node should have applied as a
+// relay: every enabled chain whose relay pool this node belongs to.
+//
+// A chain names a pool rather than a relay, so the same rule set is handed to
+// every relay in that pool. That is what makes a relay interchangeable - adding
+// one is a pool membership row and removing one is a DNS change, neither of which
+// touches a chain or any client config issued from it.
+//
+// Only l4_dnat chains are returned. The other modes terminate traffic in
+// userspace and are not driven by this endpoint.
+//
+// Rules carry no credentials: under l4_dnat the relay rewrites a destination and
+// never decrypts, which is precisely why one rule shape carries Reality,
+// Hysteria2 and WireGuard alike.
+func (h *NodeAgentHandler) GetRelayRules(c *fiber.Ctx) error {
+	nodeID := c.Locals("node_id").(string)
 
-// recordSessionStarts stamps the first time each device was seen online, which
-// is what the dashboard shows as connection time. SetNX rather than Set: the
-// agent re-reports the same device every poll, and overwriting would reset the
-// start to now and make every session look seconds old.
-func (h *NodeAgentHandler) recordSessionStarts(ctx context.Context, req statsRequest) {
-	now := time.Now().Unix()
-	seen := make(map[string]struct{}, len(req.OnlineIPs)+len(req.OnlineUUIDs))
+	rows, err := h.db.Query(
+		context.Background(),
+		`SELECT c.entry_port, c.transport, host(e.ip), c.exit_port
+		 FROM node_chains c
+		 JOIN nodes relay_node ON relay_node.id = $1
+		 JOIN nodes e ON e.id = c.exit_node_id
+		 WHERE relay_node.role IN ('relay', 'both')
+		   AND (c.entry_node_id = relay_node.id OR (c.entry_node_id IS NULL AND EXISTS (
+		     SELECT 1 FROM node_group_nodes ngn
+		     WHERE ngn.node_group_id = c.relay_pool_id AND ngn.node_id = relay_node.id
+		   )))
+		   AND c.enabled = true
+		   AND c.mode = 'l4_dnat'
+		 ORDER BY c.entry_port, c.transport`,
+		nodeID,
+	)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to fetch relay rules",
+		})
+	}
+	defer rows.Close()
 
-	for uuid := range req.OnlineIPs {
-		seen[uuid] = struct{}{}
+	rules := make([]nodeprov.RelayRule, 0)
+	for rows.Next() {
+		var r nodeprov.RelayRule
+		if err := rows.Scan(&r.EntryPort, &r.Transport, &r.ExitIP, &r.ExitPort); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "failed to scan relay rule",
+			})
+		}
+		// A malformed row would otherwise reach nftables as a broken rule and
+		// take the whole ruleset down with it, dropping every other chain on
+		// this relay.
+		if err := r.Validate(); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": fmt.Sprintf("invalid relay rule: %v", err),
+			})
+		}
+		rules = append(rules, r)
 	}
-	for _, uuid := range req.OnlineUUIDs {
-		seen[uuid] = struct{}{}
+	if err := rows.Err(); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to read relay rules",
+		})
 	}
 
-	for uuid := range seen {
-		key := fmt.Sprintf("device:%s:online_since", uuid)
-		h.redis.SetNX(ctx, key, now, sessionStartTTL)
-		h.redis.Expire(ctx, key, sessionStartTTL)
-	}
+	return c.JSON(rules)
 }

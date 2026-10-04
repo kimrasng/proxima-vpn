@@ -20,11 +20,15 @@ import (
 	"github.com/proximavpn/proxima-vpn/node-agent/internal/cert"
 	"github.com/proximavpn/proxima-vpn/node-agent/internal/client"
 	"github.com/proximavpn/proxima-vpn/node-agent/internal/config"
+	"github.com/proximavpn/proxima-vpn/node-agent/internal/deviceegress"
 	"github.com/proximavpn/proxima-vpn/node-agent/internal/process"
+	"github.com/proximavpn/proxima-vpn/node-agent/internal/relay"
 	"github.com/proximavpn/proxima-vpn/node-agent/internal/shaper"
 	"github.com/proximavpn/proxima-vpn/node-agent/internal/stats"
 	"github.com/proximavpn/proxima-vpn/node-agent/internal/updater"
 	"github.com/proximavpn/proxima-vpn/node-agent/internal/xray"
+	"github.com/proximavpn/proxima-vpn/pkg/devicebandwidth"
+	"github.com/proximavpn/proxima-vpn/pkg/nodeprov"
 )
 
 // version is stamped at build time via -ldflags "-X main.version=..." by the
@@ -173,24 +177,65 @@ func runCmd() *cobra.Command {
 			}
 
 			apiClient := client.NewAPIClient(cfg)
-			runner := xray.NewXrayRunner("", "")
 
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
+
+			// Role decides what this host runs at all, so it is read before anything
+			// starts. A relay forwards packets in the kernel and admits no clients,
+			// so it has no Xray config: starting Xray there fails on an empty inbound
+			// list, and superviseLoop would then restart it forever while the node
+			// reported itself healthy.
+			role, err := apiClient.GetRole(ctx)
+			if err != nil {
+				return fmt.Errorf("fetch node role: %w", err)
+			}
+			if !role.Valid() {
+				return fmt.Errorf("control plane reported unknown node role %q", role)
+			}
+			policyManager := relay.NewManager()
+			if err := waitForPolicy(ctx, role, apiClient, policyManager); err != nil {
+				return fmt.Errorf("bootstrap node policy: %w", err)
+			}
+			if !role.Exits() {
+				return runRelay(ctx, cfg, apiClient, policyManager)
+			}
+
+			runner := xray.NewXrayRunner("", "")
 
 			xrayConfig, err := apiClient.GetConfig(ctx)
 			if err != nil {
 				return fmt.Errorf("fetch initial config: %w", err)
 			}
+			state := newNodeState(xrayConfig)
+			egressServer := deviceegress.New(apiClient.RequestBandwidthPermit)
+			egressServer.SetAdmitter(apiClient.AdmitDevice)
+			// No SOCKS authentication until an authoritative revocation snapshot
+			// has been fetched; stale state cannot preserve idle associations.
+			egressServer.RevocationUnavailable()
+			if err := egressServer.Start(ctx, devicebandwidth.ListenAddress); err != nil {
+				// Legacy unlimited configs can still run, but managed configs
+				// are rejected by the materializer if the listener is unavailable.
+				log.Printf("device egress unavailable: %v", err)
+			}
+			defer func() { _ = egressServer.Close() }()
+			egress := newDeviceEgress(egressServer.SetCredentials)
+			egress.ready = func() bool { return ctx.Err() == nil && egressServer.Addr() != nil }
+			state.deviceCapability = egress.Capability
+			runner.SetConfigTransform(egress.TransformConfig)
+			runner.SetConfigRestoreGuard(egress.CanRestore)
 			if err := runner.WriteConfig(xrayConfig); err != nil {
 				return fmt.Errorf("write xray config: %w", err)
 			}
 			if err := runner.Start(); err != nil {
 				return fmt.Errorf("start xray: %w", err)
 			}
-			defer func() { _ = runner.Stop() }()
+			defer func() {
+				state.processMu.Lock()
+				defer state.processMu.Unlock()
+				_ = runner.Stop()
+			}()
 
-			state := newNodeState(xrayConfig)
 			applyShaping(xrayConfig, state)
 
 			// Learn the structure digest for the config just started, rather than
@@ -236,10 +281,13 @@ func runCmd() *cobra.Command {
 				defer cm.Stop()
 			}
 
+			go activeUUIDReportLoop(ctx, apiClient, egressServer)
+			go revokedUUIDPollLoop(ctx, apiClient.GetRevokedDevices, apiClient.AcknowledgeRevocation, egressServer)
 			go heartbeatLoop(ctx, apiClient, runner, xrayVersion, state)
 			go superviseLoop(ctx, runner, state)
 			go configPollLoop(ctx, apiClient, runner, statsClient, state)
 			go inboundsPollLoop(ctx, apiClient)
+			go policyPollLoop(ctx, role, apiClient, policyManager)
 			go updateCheckLoop(ctx, updater.NewUpdater(version, "", cfg.ServerURL, cfg.NodeID, cfg.APIKey))
 			go xrayUpdateLoop(ctx, apiClient, runner, xrayVersion, state)
 			go tlsPollLoop(ctx, apiClient, certDir, tlsDomain)
@@ -286,12 +334,18 @@ func (h *versionHolder) Get() string {
 // has published: the heartbeat reports configHash, and configPollLoop diffs
 // against users to decide restart vs. incremental update.
 type nodeState struct {
-	mu            sync.RWMutex
-	config        []byte
-	configHash    string
-	structureHash string
-	usersHash     string
-	users         map[userKey]xray.VLESSUser
+	// processMu serializes complete write/restart/rollback and gRPC sequences,
+	// not just individual runner methods. Network downloads happen outside it.
+	processMu            sync.Mutex
+	restartBlocked       bool // protected by processMu; unsafe disk config must not respawn
+	deviceCapability     func() (bool, int)
+	legacyShapingCleared bool // protected by processMu
+	mu                   sync.RWMutex
+	config               []byte
+	configHash           string
+	structureHash        string
+	usersHash            string
+	users                map[userKey]xray.VLESSUser
 
 	// xrayGen counts Xray (re)starts. syncUsers reads the user set, then makes
 	// gRPC calls without the lock held; if the supervisor respawns Xray in that
@@ -314,8 +368,45 @@ func (s *nodeState) setShaping(ok bool, tiers int, reason string) {
 
 func (s *nodeState) Shaping() (ok bool, tiers int, reason string) {
 	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.shapingOK, s.shapingTiers, s.shapingErr
+	ok, tiers, reason = s.shapingOK, s.shapingTiers, s.shapingErr
+	config := s.config
+	s.mu.RUnlock()
+	if s.deviceCapability != nil {
+		cfg, err := parseDeviceConfig(config)
+		if err != nil {
+			return false, 0, "invalid device egress metadata"
+		}
+		if len(cfg.devices) > 0 {
+			ready, count := s.deviceCapability()
+			if !ready || count != len(cfg.devices) {
+				return false, len(cfg.devices), "local device egress unavailable or generation not applied"
+			}
+		}
+	}
+	return ok, tiers, reason
+}
+
+func (s *nodeState) ShapingStatus() (hash string, ok bool, count int, reason, mode string) {
+	// Pair the canonical hash with the applied generation; never acknowledge
+	// the new limiter topology while an old Xray process is still running.
+	s.processMu.Lock()
+	defer s.processMu.Unlock()
+	hash = s.ConfigHash()
+	ok, count, reason = s.Shaping()
+	mode = s.ShapingMode()
+	return
+}
+
+func (s *nodeState) ShapingMode() string {
+	if s.deviceCapability == nil {
+		return ""
+	}
+	ok, _, _ := s.Shaping()
+	ready, count := s.deviceCapability()
+	if ok && ready && count > 0 {
+		return "device_global_v1"
+	}
+	return ""
 }
 
 // userKey keys on email because that is how Xray's RemoveUserOperation
@@ -481,12 +572,104 @@ func (s *nodeState) UsersSnapshot() map[userKey]xray.VLESSUser {
 	return out
 }
 
+// runRelay serves a node that only forwards. It installs the relay rules and
+// reports health, and starts none of the tunnel services - a relay has no
+// inbounds, no clients and no certificates, so there is nothing for Xray,
+// Hysteria2 or WireGuard to serve.
+func runRelay(ctx context.Context, cfg *config.AgentConfig, apiClient *client.APIClient, policyManager *relay.Manager) error {
+	log.Println("node role is relay: forwarding only, tunnel services not started")
+
+	go heartbeatLoop(ctx, apiClient, nil, nil, nil)
+	go policyPollLoop(ctx, nodeprov.RoleRelay, apiClient, policyManager)
+	go updateCheckLoop(ctx, updater.NewUpdater(version, "", cfg.ServerURL, cfg.NodeID, cfg.APIKey))
+
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+	<-sigCh
+
+	log.Println("shutting down")
+	return nil
+}
+
+// revokedUUIDPollLoop fetches the complete central snapshot every 500ms.
+// The independent watchdog closes idle sessions when a fetch stalls beyond the
+// maximum snapshot age, rather than waiting for the request timeout.
+func revokedUUIDPollLoop(ctx context.Context, fetch func(context.Context) (client.RevocationSnapshot, error), ack func(context.Context, client.Revocation) error, server *deviceegress.Server) {
+	const maxSnapshotAge = 5 * time.Second
+	var mu sync.Mutex
+	var lastSuccess time.Time
+	available := false
+	server.RevocationUnavailable()
+	watchdogDone := make(chan struct{})
+	go func() {
+		defer close(watchdogDone)
+		ticker := time.NewTicker(250 * time.Millisecond)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				mu.Lock()
+				if available && time.Since(lastSuccess) >= maxSnapshotAge {
+					available = false
+					server.RevocationUnavailable()
+				}
+				mu.Unlock()
+			}
+		}
+	}()
+	defer func() { <-watchdogDone }()
+	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		if ctx.Err() != nil {
+			return
+		}
+		snapshot, err := fetch(ctx)
+		mu.Lock()
+		if ctx.Err() != nil {
+			mu.Unlock()
+			return
+		}
+		if err != nil {
+			log.Printf("revoked UUID poll: %v", err)
+			available = false
+			server.RevocationUnavailable()
+		} else {
+			server.ReconcileRevokedUUIDs(snapshot.RevokedUUIDs)
+			lastSuccess = time.Now()
+			available = true
+		}
+		mu.Unlock()
+		if err == nil {
+			// Acknowledge only after local sessions have been closed.
+			for _, revocation := range snapshot.Revocations {
+				if ctx.Err() != nil {
+					return
+				}
+				if err := ack(ctx, revocation); err != nil {
+					log.Printf("revocation ack: %v", err)
+				}
+			}
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+		}
+	}
+}
+
 // heartbeatInterval also sets how fresh the panel's resource figures can be:
 // nothing shows a change sooner than the next beat. Kept well under the
 // server's offline threshold (scheduler/node_monitor.go) so a single dropped
 // beat cannot flip a healthy node to offline.
 const heartbeatInterval = 10 * time.Second
 
+// heartbeatLoop reports this node's health. runner and state are nil on a relay,
+// which runs no Xray and shapes nothing: there is no process to report on, so the
+// status it sends says so rather than inventing a reading.
 func heartbeatLoop(ctx context.Context, apiClient *client.APIClient, runner *xray.XrayRunner, xrayVersion *versionHolder, state *nodeState) {
 	ticker := time.NewTicker(heartbeatInterval)
 	defer ticker.Stop()
@@ -497,14 +680,18 @@ func heartbeatLoop(ctx context.Context, apiClient *client.APIClient, runner *xra
 			return
 		case <-ticker.C:
 			m := stats.CollectSysMetrics()
-			shapingOK, shapingTiers, shapingErr := state.Shaping()
-			status := client.NodeStatus{
-				XrayVersion:  xrayVersion.Get(),
-				ConfigHash:   state.ConfigHash(),
-				XrayRunning:  runner.IsRunning(),
-				ShapingOK:    shapingOK,
-				ShapingTiers: shapingTiers,
-				ShapingError: shapingErr,
+			status := client.NodeStatus{ShapingOK: true}
+			if state != nil {
+				configHash, shapingOK, shapingCount, shapingErr, shapingMode := state.ShapingStatus()
+				status.ConfigHash = configHash
+				status.ShapingOK = shapingOK
+				status.ShapingTiers = shapingCount
+				status.ShapingError = shapingErr
+				status.ShapingMode = shapingMode
+			}
+			if runner != nil {
+				status.XrayVersion = xrayVersion.Get()
+				status.XrayRunning = runner.IsRunning()
 			}
 			if err := apiClient.SendHeartbeat(ctx, m.CPU, m.Memory, m.Disk, m.LoadAvg, m.NetworkIn, m.NetworkOut, status); err != nil {
 				log.Printf("heartbeat: %v", err)
@@ -533,12 +720,19 @@ func superviseLoop(ctx context.Context, runner *xray.XrayRunner, state *nodeStat
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
+			state.processMu.Lock()
+			if state.restartBlocked || ctx.Err() != nil {
+				state.processMu.Unlock()
+				continue
+			}
 			if runner.IsRunning() {
 				backoff = 0
 				nextAttempt = time.Time{}
+				state.processMu.Unlock()
 				continue
 			}
 			if time.Now().Before(nextAttempt) {
+				state.processMu.Unlock()
 				continue
 			}
 
@@ -554,6 +748,7 @@ func superviseLoop(ctx context.Context, runner *xray.XrayRunner, state *nodeStat
 				}
 				nextAttempt = time.Now().Add(backoff)
 				log.Printf("supervisor: restart failed, retrying in %s: %v", backoff, err)
+				state.processMu.Unlock()
 				continue
 			}
 
@@ -565,6 +760,7 @@ func superviseLoop(ctx context.Context, runner *xray.XrayRunner, state *nodeStat
 			// reconciliation on the next poll.
 			state.noteXrayRestarted(vlessUsersOfConfig(state.Config()))
 			log.Println("supervisor: xray restarted")
+			state.processMu.Unlock()
 		}
 	}
 }
@@ -630,9 +826,16 @@ func xrayUpdateLoop(ctx context.Context, apiClient *client.APIClient, runner *xr
 				continue
 			}
 
+			state.processMu.Lock()
+			if state.restartBlocked || ctx.Err() != nil {
+				state.processMu.Unlock()
+				runner.DiscardBinary(staged)
+				continue
+			}
 			if err := runner.Stop(); err != nil {
 				log.Printf("xray update: stop failed: %v", err)
 				runner.DiscardBinary(staged)
+				state.processMu.Unlock()
 				continue
 			}
 			if err := runner.CommitBinary(staged); err != nil {
@@ -640,7 +843,10 @@ func xrayUpdateLoop(ctx context.Context, apiClient *client.APIClient, runner *xr
 				runner.DiscardBinary(staged)
 				if startErr := runner.Start(); startErr != nil {
 					log.Printf("xray update: restart after failed install also failed: %v", startErr)
+				} else {
+					state.noteXrayRestarted(vlessUsersOfConfig(state.Config()))
 				}
+				state.processMu.Unlock()
 				continue
 			}
 
@@ -648,19 +854,25 @@ func xrayUpdateLoop(ctx context.Context, apiClient *client.APIClient, runner *xr
 				log.Printf("xray update: new binary failed to start, rolling back: %v", err)
 				if rbErr := runner.RestoreBinary(); rbErr != nil {
 					log.Printf("xray update: binary rollback failed: %v", rbErr)
+					state.processMu.Unlock()
 					continue
 				}
 				if startErr := runner.Start(); startErr != nil {
 					log.Printf("xray update: restart on previous binary failed: %v", startErr)
+				} else {
+					state.noteXrayRestarted(vlessUsersOfConfig(state.Config()))
 				}
+				state.processMu.Unlock()
 				continue
 			}
 
 			applyShaping(state.Config(), state)
+			state.noteXrayRestarted(vlessUsersOfConfig(state.Config()))
 			if v, err := runner.Version(); err == nil {
 				xrayVersion.Set(v)
 				log.Printf("xray updated to %s", v)
 			}
+			state.processMu.Unlock()
 		}
 	}
 }
@@ -744,70 +956,90 @@ func configPollLoop(
 				continue
 			}
 
-			if digest.Hash == state.ConfigHash() {
-				// The running config matches the server's, so its structure
-				// digest is now known. Recording it here is what lets the
-				// *first* user-only change after startup take the incremental
-				// path: usersOnlyChange treats an empty local structure hash as
-				// "unknown" and falls back to a restart.
-				state.setStructureHash(digest.StructureHash)
-				// Reconcile anyway when a previous sync failed, so a
-				// transient gRPC error does not leave users out of step
-				// indefinitely.
-				if digest.UsersHash != state.UsersHash() {
-					if !syncUsers(ctx, statsClient, state, digest) {
-						log.Println("config poll: user reconciliation incomplete, retrying next tick")
-					}
-				}
-				continue
-			}
-
-			if usersOnlyChange(state, digest) {
-				if syncUsers(ctx, statsClient, state, digest) {
-					newConfig, err := apiClient.GetConfig(ctx)
-					if err != nil {
-						log.Printf("fetch config after user sync: %v", err)
-						continue
-					}
-					// Xray already serves this user set; the file only
-					// needs to match for the next cold start.
-					if err := runner.WriteConfig(newConfig); err != nil {
-						log.Printf("write config after user sync: %v", err)
-						continue
-					}
-					state.setConfig(newConfig, digest.StructureHash)
-					continue
-				}
-				log.Println("config poll: incremental user sync failed, falling back to restart")
-			}
-
-			newConfig, err := apiClient.GetConfig(ctx)
-			if err != nil {
-				log.Printf("config poll: %v", err)
-				continue
-			}
-
-			log.Println("config changed, restarting xray...")
-			if err := runner.WriteConfig(newConfig); err != nil {
-				log.Printf("write new config: %v", err)
-				continue
-			}
-			if err := runner.Restart(); err != nil {
-				log.Printf("restart xray on new config: %v", err)
-				rollbackConfig(runner, state)
-				continue
-			}
-
-			applyShaping(newConfig, state)
-			state.setConfig(newConfig, digest.StructureHash)
-			state.noteXrayRestartedWith(digest.UsersHash, usersFromDigest(digest))
+			applyConfigDigest(ctx, apiClient, runner, statsClient, state, digest)
 		}
 	}
 }
 
-// rollbackConfig reverts to the previous config after a new one failed to start,
-// so a bad config published fleet-wide cannot take every node down at once.
+// applyConfigDigest serializes an entire reconciliation with supervisor and
+// binary updates. Validate local topology before any gRPC user is admitted.
+func applyConfigDigest(ctx context.Context, apiClient *client.APIClient, runner *xray.XrayRunner, statsClient *xray.StatsClient, state *nodeState, digest client.ConfigDigest) {
+	state.processMu.Lock()
+	defer state.processMu.Unlock()
+	if ctx.Err() != nil {
+		return
+	}
+	if !state.restartBlocked && digest.Hash == state.ConfigHash() {
+		if !digestUsersMatchConfig(digest, state.Config()) {
+			log.Println("config poll: digest users do not match canonical config; refusing live admission")
+			return
+		}
+		state.setStructureHash(digest.StructureHash)
+		if digest.UsersHash != state.UsersHash() && !syncUsers(ctx, statsClient, state, digest) {
+			log.Println("config poll: user reconciliation incomplete, retrying next tick")
+		}
+		return
+	}
+	newConfig, err := apiClient.GetConfig(ctx)
+	if err != nil {
+		log.Printf("config poll: %v", err)
+		return
+	}
+	sum := sha256.Sum256(newConfig)
+	if hex.EncodeToString(sum[:]) != digest.Hash {
+		log.Println("config poll: configuration changed between digest and fetch, retrying next tick")
+		return
+	}
+	if !digestUsersMatchConfig(digest, newConfig) {
+		log.Println("config poll: digest users do not match fetched canonical config; retrying next tick")
+		return
+	}
+	incremental := !state.restartBlocked && usersOnlyChange(state, digest) && sameLocalStructure(state.Config(), newConfig)
+	state.setShaping(false, 0, "applying device egress generation")
+	if err := runner.WriteConfig(newConfig); err != nil {
+		log.Printf("write new config failed; stopping xray rather than serving obsolete policy: %v", err)
+		state.restartBlocked = true
+		state.setShaping(false, 0, "device egress config rejected")
+		_ = runner.Stop()
+		return
+	}
+	if incremental && syncUsers(ctx, statsClient, state, digest) {
+		state.setConfig(newConfig, digest.StructureHash)
+		applyShaping(newConfig, state)
+		return
+	}
+	log.Println("config changed, restarting xray...")
+	if err := runner.Restart(); err != nil {
+		log.Printf("restart xray on new config: %v", err)
+		rollbackConfig(runner, state)
+		return
+	}
+	state.restartBlocked = false
+	applyShaping(newConfig, state)
+	state.setConfig(newConfig, digest.StructureHash)
+	state.noteXrayRestartedWith(digest.UsersHash, vlessUsersOfConfig(newConfig))
+}
+
+func digestUsersMatchConfig(digest client.ConfigDigest, canonical []byte) bool {
+	want := vlessUsersOfConfig(canonical)
+	got := usersFromDigest(digest)
+	if len(want) != len(got) {
+		return false
+	}
+	for key, user := range want {
+		if actual, exists := got[key]; !exists || actual != user {
+			return false
+		}
+	}
+	return true
+}
+
+// rollbackConfig only re-admits a previous generation if the restore guard
+// proves it remains authorized under the latest policy. Call with processMu.
 func rollbackConfig(runner *xray.XrayRunner, state *nodeState) {
+	state.restartBlocked = true
+	state.setShaping(false, 0, "xray config failed; safe rollback unavailable")
+	_ = runner.Stop()
 	if !runner.HasBackupConfig() {
 		log.Println("rollback: no previous config available")
 		return
@@ -823,6 +1055,7 @@ func rollbackConfig(runner *xray.XrayRunner, state *nodeState) {
 		return
 	}
 
+	state.restartBlocked = false
 	applyShaping(prev, state)
 	// Clear structureHash: the agent no longer knows the server-side structure
 	// digest for the config now running, and an empty value forces the next
@@ -934,26 +1167,26 @@ func syncUsers(ctx context.Context, statsClient *xray.StatsClient, state *nodeSt
 	return true
 }
 
-// applyShaping installs tc bandwidth limits for the speed-limited inbounds
-// present in the given Xray config, recording the outcome on state so the
-// heartbeat can surface it.
-//
-// A failure here means speed-limited users are running uncapped - tc needs
-// root and a resolvable default route, neither guaranteed. Continuing is right
-// (losing the tunnel is worse than losing the cap) but staying quiet is not:
-// the panel is the only place an operator would ever notice.
+// applyShaping uses central per-device permits for managed outbounds, never a
+// shared tc speed tier. Clear inherited tier shaping once on migration.
 func applyShaping(config []byte, state *nodeState) {
-	tiers := shaper.TiersFromConfig(config)
-	if err := shaper.Apply("", tiers); err != nil {
-		log.Printf("traffic shaping FAILED - speed-limited users are NOT capped: %v", err)
-		state.setShaping(false, len(tiers), err.Error())
+	cfg, err := parseDeviceConfig(config)
+	if err != nil {
+		state.setShaping(false, 0, "invalid device egress metadata")
 		return
 	}
-	state.setShaping(true, len(tiers), "")
-	if len(tiers) > 0 {
-		log.Printf("applied speed limits to %d tier(s)", len(tiers))
+	if !state.legacyShapingCleared {
+		if err := shaper.Apply("", nil); err != nil {
+			log.Printf("warning: remove legacy tier shaping: %v", err)
+		}
+		state.legacyShapingCleared = true
 	}
+	state.setShaping(true, len(cfg.devices), "")
 }
+
+// relayRulePollInterval matches the inbound poll: relay rules change when an
+// operator edits a chain or a pool, which is the same human timescale.
+const relayRulePollInterval = 30 * time.Second
 
 func inboundsPollLoop(ctx context.Context, apiClient *client.APIClient) {
 	var hy2Manager *process.Hysteria2Manager

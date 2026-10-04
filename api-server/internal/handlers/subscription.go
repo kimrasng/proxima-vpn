@@ -4,15 +4,19 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/proximavpn/proxima-vpn/api-server/internal/services"
 	"github.com/proximavpn/proxima-vpn/api-server/internal/services/subscription"
 	"github.com/proximavpn/proxima-vpn/pkg/crypto"
 	"github.com/proximavpn/proxima-vpn/pkg/speedtier"
@@ -39,25 +43,57 @@ type subscriptionUser struct {
 	TrafficLimit  *int64
 	SpeedLimit    *int64
 	PlanExpiresAt *time.Time
+	Language      string
 }
 
 type subscriptionNode struct {
-	ID                 string
-	Name               string
-	IP                 string
-	Port               int
-	Status             string
-	RealityPublicKey   string
-	RealityShortID     string
-	TLSCertFile        *string
-	TLSKeyFile         *string
-	VmessPort          *int
-	TrojanPort         *int
-	SSPort             *int
-	SSPassword         *string
-	WGPort             *int
-	WGServerPrivateKey *string
-	HY2Port            *int
+	ID                    string
+	Name                  string
+	IP                    string
+	Port                  int
+	Status                string
+	RealityPublicKey      string
+	RealityShortID        string
+	TLSCertFile           *string
+	TLSKeyFile            *string
+	VmessPort             *int
+	TrojanPort            *int
+	SSPort                *int
+	SSPassword            *string
+	WGPort                *int
+	WGServerPrivateKey    *string
+	HY2Port               *int
+	RealityPorts          []int
+	GeneratedRealityPorts []int
+	RealitySNI            string
+	RealityStatus         string
+	ConfigHash            string
+	XrayRunning           bool
+	HeartbeatFresh        bool
+	RealityReady          bool
+	DeviceBandwidthReady  bool
+
+	// Chain fields. EntryHost/EntryPort are empty on a direct chain, which is
+	// reached at the exit's own address; on a relayed chain they are the address
+	// the client dials, and ChainExitPort says which of the exit's ports the relay
+	// forwards it to - i.e. which protocol this chain carries.
+	EntryHost     string
+	EntryPort     *int
+	ChainExitPort int
+}
+
+// relayed reports whether this row is reached through a relay pool.
+func (n subscriptionNode) relayed() bool { return n.EntryPort != nil }
+
+// dialHost is the address a client connects to: the chain's entry host when it is
+// relayed, and the exit's own address otherwise. EntryHost is preferred over the
+// relay's IP so the advertised name stays fixed while the addresses behind it are
+// replaced.
+func (n subscriptionNode) dialHost() string {
+	if n.relayed() {
+		return strings.TrimSpace(n.EntryHost)
+	}
+	return n.IP
 }
 
 // GetSubscription returns the subscription configuration for a device.
@@ -73,9 +109,12 @@ type subscriptionNode struct {
 // @Failure 404 {object} map[string]string
 // @Router /sub/{sub_token}/{device_id} [get]
 func (h *SubscriptionHandler) GetSubscription(c *fiber.Ctx) error {
-	subToken := c.Params("sub_token")
 	deviceID := c.Params("device_id")
+	return h.getSubscriptionForDevice(c, deviceID)
+}
 
+func (h *SubscriptionHandler) getSubscriptionForDevice(c *fiber.Ctx, deviceID string) error {
+	subToken := c.Params("sub_token")
 	if subToken == "" || deviceID == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "sub_token and device_id are required",
@@ -90,55 +129,57 @@ func (h *SubscriptionHandler) GetSubscription(c *fiber.Ctx) error {
 	err := h.db.QueryRow(ctx,
 		`SELECT u.id, u.plan_id, u.is_active, u.status, u.traffic_used,
 		        p.traffic_limit, p.speed_limit, u.plan_expires_at, d.xray_uuid,
-		        d.wg_private_key, d.wg_address
+		        d.wg_private_key, d.wg_address, u.language
 		 FROM users u
 		 JOIN devices d ON d.user_id = u.id
 		 LEFT JOIN plans p ON u.plan_id = p.id
-		 WHERE u.sub_token = $1 AND d.id = $2`,
+		 WHERE u.sub_token = $1 AND d.id = $2 AND d.retired_at IS NULL`,
 		subToken, deviceID,
 	).Scan(
 		&user.ID, &user.PlanID, &user.IsActive, &user.Status,
 		&user.TrafficUsed, &user.TrafficLimit, &user.SpeedLimit, &user.PlanExpiresAt, &deviceUUID,
-		&deviceWGPrivateKey, &deviceWGAddress,
+		&deviceWGPrivateKey, &deviceWGAddress, &user.Language,
 	)
-	if err != nil {
+	if errors.Is(err, pgx.ErrNoRows) {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 			"error": "subscription not found",
 		})
 	}
-
-	if !user.IsActive || user.Status != "active" {
-		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
-			"error": "subscription inactive",
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to fetch subscription",
 		})
 	}
 
-	// traffic_used and plan_expires_at were selected but never checked. Xray
-	// config generation gates on these same conditions, so an over-quota or
-	// expired user could not connect - but still got node addresses and
-	// credentials handed to them.
-	if user.PlanExpiresAt != nil && user.PlanExpiresAt.Before(time.Now()) {
-		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
-			"error": "plan expired",
-		})
-	}
-
-	if user.TrafficLimit != nil && *user.TrafficLimit > 0 && user.TrafficUsed >= *user.TrafficLimit {
-		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
-			"error": "traffic limit exceeded",
-		})
+	if status, message := subscriptionEligibility(user); status != 0 {
+		return c.Status(status).JSON(fiber.Map{"error": message})
 	}
 
 	rows, err := h.db.Query(ctx,
-		`SELECT n.id, n.name, host(n.ip), n.port, n.status, n.reality_public_key, n.reality_short_id,
+		`SELECT n.id, COALESCE(NULLIF(nl.name, ''), NULLIF(c.name, ''), n.name), host(n.ip), n.port, n.status,
+		        n.reality_public_key, n.reality_short_id,
 		        n.tls_cert_file, n.tls_key_file,
 		        vmessib.port, trojanib.port, ssib.port, ssib.settings->>'password',
 		        wgib.port, wgib.settings->>'private_key',
-		        hy2ib.port
-		 FROM nodes n
-		 JOIN node_group_nodes ngn ON n.id = ngn.node_id
-		 JOIN node_groups ng ON ngn.node_group_id = ng.id
+		        hy2ib.port,
+		        COALESCE(CASE WHEN c.entry_node_id IS NOT NULL THEN med.hostname ELSE c.entry_host END, ''),
+		        c.entry_port, c.exit_port,
+		        realityib.ports, COALESCE(n.reality_client_sni, ''), COALESCE(n.reality_sni_status, ''),
+		        COALESCE(n.config_hash, ''), COALESCE(n.xray_running, false),
+		        COALESCE(n.last_seen >= NOW() - INTERVAL '40 seconds', false),
+              COALESCE(n.shaping_ok,false) AND n.shaping_mode = 'device_global_v1'
+		 FROM node_chains c
+		 JOIN node_group_chains ngc ON ngc.chain_id = c.id
+		 JOIN node_groups ng ON ngc.node_group_id = ng.id
 		 JOIN plans p ON p.node_group_id = ng.id
+		 JOIN nodes n ON n.id = c.exit_node_id
+		 LEFT JOIN managed_entry_dns med ON med.node_id = c.entry_node_id
+		   AND med.desired_action = 'present' AND med.cleanup_requested_at IS NULL
+		 LEFT JOIN LATERAL (
+		   SELECT COALESCE(array_agg(port ORDER BY port) FILTER (WHERE protocol = 'vless_reality'),
+		     CASE WHEN count(*) = 0 THEN ARRAY[n.port]::integer[] ELSE ARRAY[]::integer[] END) AS ports
+		   FROM inbounds WHERE node_id = n.id AND enabled = true
+		 ) realityib ON true
 		 LEFT JOIN LATERAL (
 		     SELECT port FROM inbounds
 		     WHERE node_id = n.id AND protocol = 'vmess_ws' AND enabled = true
@@ -164,8 +205,21 @@ func (h *SubscriptionHandler) GetSubscription(c *fiber.Ctx) error {
 		     WHERE node_id = n.id AND protocol = 'hysteria2' AND enabled = true
 		     ORDER BY created_at LIMIT 1
 		 ) hy2ib ON true
-		 WHERE p.id = $1 AND n.status != 'pending'`,
-		user.PlanID,
+		 LEFT JOIN node_labels nl ON nl.node_id = n.id AND nl.language = $2
+		 WHERE p.id = $1 AND n.status != 'pending' AND n.role IN ('exit','both')
+		   AND c.enabled = true
+		   AND (c.entry_node_id IS NOT NULL OR c.relay_pool_id IS NOT NULL OR n.publish_direct = true)
+		   AND (c.entry_node_id IS NULL OR EXISTS (
+		     SELECT 1 FROM nodes entry WHERE entry.id = c.entry_node_id
+		       AND entry.role IN ('relay', 'both') AND family(entry.ip) = 4
+		   ))
+		   AND (c.relay_pool_id IS NULL OR EXISTS (
+		     SELECT 1 FROM node_group_nodes ngn JOIN nodes relay ON relay.id = ngn.node_id
+		     WHERE ngn.node_group_id = c.relay_pool_id AND relay.role IN ('relay','both') AND family(relay.ip) = 4
+		   ))
+		   AND ((c.entry_node_id IS NULL AND c.relay_pool_id IS NULL) OR c.health <> 'unhealthy')
+		 ORDER BY c.priority DESC, n.name ASC`,
+		user.PlanID, user.Language,
 	)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -184,15 +238,29 @@ func (h *SubscriptionHandler) GetSubscription(c *fiber.Ctx) error {
 			&node.VmessPort, &node.TrojanPort, &node.SSPort, &node.SSPassword,
 			&node.WGPort, &node.WGServerPrivateKey,
 			&node.HY2Port,
+			&node.EntryHost, &node.EntryPort, &node.ChainExitPort,
+			&node.RealityPorts, &node.RealitySNI, &node.RealityStatus,
+			&node.ConfigHash, &node.XrayRunning, &node.HeartbeatFresh, &node.DeviceBandwidthReady,
 		); err != nil {
-			continue
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "failed to read nodes",
+			})
 		}
 		nodes = append(nodes, node)
 	}
+	if err := rows.Err(); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to read nodes",
+		})
+	}
+	rows.Close()
+	realityService := services.NewXrayConfigService(h.db)
+	for i := range nodes {
+		nodes[i].RealitySNI, nodes[i].GeneratedRealityPorts, nodes[i].RealityReady = realityApplied(ctx, h.db, realityService, nodes[i])
+	}
 
-	// Plan speed limit determines which port a client connects to (a dedicated
-	// tc-shaped port) and, for limited plans, restricts them to VLESS only so
-	// the limit cannot be bypassed via other protocols.
+	// Limited devices are VLESS-only. Their authenticated identity selects a
+	// central-budget egress path on every Exit; legacy tier endpoints remain.
 	speedMbps := 0
 	if user.SpeedLimit != nil && *user.SpeedLimit > 0 {
 		speedMbps = int(*user.SpeedLimit)
@@ -270,7 +338,37 @@ func (h *SubscriptionHandler) GetSubscription(c *fiber.Ctx) error {
 				fragment += " [OFFLINE]"
 			}
 
-			links = append(links, buildVLESSLink(deviceUUID, node, speedtier.VlessPort(node.Port, speedMbps), fragment))
+			if !deviceBandwidthEligible(node, speedMbps) {
+				continue
+			}
+			// An acknowledged per-device VLESS path keeps one endpoint per relay.
+			if node.relayed() {
+				if speedMbps > 0 && !slices.Contains(node.GeneratedRealityPorts, node.ChainExitPort) {
+					continue
+				}
+				if link, ok := relayedLink(deviceUUID, node, fragment); ok {
+					links = append(links, link)
+				}
+				continue
+			}
+
+			if node.RealityReady {
+				ports := node.RealityPorts
+				if speedMbps > 0 {
+					port := speedtier.VlessPort(node.Port, speedMbps)
+					ports = nil
+					if slices.Contains(node.GeneratedRealityPorts, port) {
+						ports = []int{port}
+					}
+				}
+				for _, port := range ports {
+					name := fragment
+					if len(ports) > 1 {
+						name = fmt.Sprintf("%s :%d", fragment, port)
+					}
+					links = append(links, buildVLESSLink(deviceUUID, node, port, name))
+				}
+			}
 
 			// Speed-limited plans are VLESS-only (see buildNodeInfoList).
 			if speedMbps > 0 {
@@ -324,6 +422,19 @@ func (h *SubscriptionHandler) GetSubscription(c *fiber.Ctx) error {
 	return c.Send(body)
 }
 
+func subscriptionEligibility(user subscriptionUser) (int, string) {
+	if !user.IsActive || user.Status != "active" {
+		return fiber.StatusForbidden, "subscription inactive"
+	}
+	if user.PlanExpiresAt != nil && user.PlanExpiresAt.Before(time.Now()) {
+		return fiber.StatusForbidden, "plan expired"
+	}
+	if user.TrafficLimit != nil && *user.TrafficLimit > 0 && user.TrafficUsed >= *user.TrafficLimit {
+		return fiber.StatusForbidden, "traffic limit exceeded"
+	}
+	return 0, ""
+}
+
 func detectFormatFromUA(ua string) string {
 	uaLower := strings.ToLower(ua)
 	switch {
@@ -367,19 +478,140 @@ func buildPlanInfoLabels(user subscriptionUser) []string {
 	return labels
 }
 
+// chainProtocol names the protocol a relayed chain carries, found by matching the
+// exit port the relay forwards to against that exit's listening ports. A chain
+// forwards one port, so it is exactly one protocol - unlike a direct entry, which
+// offers every protocol the exit runs.
+func chainProtocol(node subscriptionNode) (string, bool) {
+	switch {
+	case slices.Contains(node.RealityPorts, node.ChainExitPort):
+		return "vless_reality", true
+	case node.VmessPort != nil && node.ChainExitPort == *node.VmessPort:
+		return "vmess_ws", true
+	case node.TrojanPort != nil && node.ChainExitPort == *node.TrojanPort:
+		return "trojan_tls", true
+	case node.SSPort != nil && node.ChainExitPort == *node.SSPort:
+		return "shadowsocks", true
+	case node.HY2Port != nil && node.ChainExitPort == *node.HY2Port:
+		return "hysteria2", true
+	case node.WGPort != nil && node.ChainExitPort == *node.WGPort:
+		return "wireguard", true
+	}
+	return "", false
+}
+
+// relayedNodeInfo renders the single entry a relayed chain represents. Every
+// credential comes from the exit, because the relay only rewrites a destination
+// and never terminates the tunnel - which is what lets one chain shape carry
+// Reality, Hysteria2 or WireGuard alike. Only the address is the relay's.
+//
+// ok is false when the chain names an exit port that no longer has an inbound, or
+// when the device lacks the keys a protocol needs: advertising an endpoint that
+// cannot authenticate is worse than omitting it.
+func relayedNodeInfo(node subscriptionNode, deviceWGPrivateKey, deviceWGAddress *string) (subscription.NodeInfo, bool) {
+	if node.dialHost() == "" {
+		return subscription.NodeInfo{}, false
+	}
+	protocol, ok := chainProtocol(node)
+	if !ok {
+		return subscription.NodeInfo{}, false
+	}
+
+	info := subscription.NodeInfo{
+		Name:     node.Name,
+		IP:       node.dialHost(),
+		Port:     *node.EntryPort,
+		Protocol: protocol,
+	}
+
+	switch protocol {
+	case "vless_reality":
+		if !node.RealityReady {
+			return subscription.NodeInfo{}, false
+		}
+		info.RealityPublicKey = node.RealityPublicKey
+		info.RealityShortID = node.RealityShortID
+		info.ServerName = node.RealitySNI
+	case "vmess_ws":
+		info.WSPath = "/vmess"
+		info.TLSEnabled = true
+		// The certificate has to cover the name the client dials, which is the
+		// entry host rather than the exit - see the wildcard requirement in
+		// docs; a per-exit certificate would not match.
+		info.ServerName = node.dialHost()
+	case "trojan_tls":
+		info.TLSEnabled = true
+		info.ServerName = node.dialHost()
+	case "shadowsocks":
+		if node.SSPassword == nil || *node.SSPassword == "" {
+			return subscription.NodeInfo{}, false
+		}
+		info.SSMethod = "2022-blake3-aes-128-gcm"
+		info.SSPassword = *node.SSPassword
+	case "wireguard":
+		if node.WGServerPrivateKey == nil || *node.WGServerPrivateKey == "" ||
+			deviceWGPrivateKey == nil || *deviceWGPrivateKey == "" ||
+			deviceWGAddress == nil || *deviceWGAddress == "" {
+			return subscription.NodeInfo{}, false
+		}
+		serverPubKey, err := crypto.DeriveWireGuardPublicKey(*node.WGServerPrivateKey)
+		if err != nil {
+			return subscription.NodeInfo{}, false
+		}
+		info.WGPrivateKey = *deviceWGPrivateKey
+		info.WGPeerPublicKey = serverPubKey
+		info.WGAddress = *deviceWGAddress
+	}
+
+	return info, true
+}
+
+func deviceBandwidthEligible(node subscriptionNode, speedMbps int) bool {
+	return speedMbps <= 0 || (node.DeviceBandwidthReady && node.RealityReady)
+}
+
 func buildNodeInfoList(nodes []subscriptionNode, userUUID string, speedMbps int, deviceWGPrivateKey, deviceWGAddress *string) []subscription.NodeInfo {
 	var infos []subscription.NodeInfo
 	for _, node := range nodes {
-		infos = append(infos, subscription.NodeInfo{
-			Name:             node.Name,
-			IP:               node.IP,
-			Port:             speedtier.VlessPort(node.Port, speedMbps),
-			Protocol:         "vless_reality",
-			RealityPublicKey: node.RealityPublicKey,
-			RealityShortID:   node.RealityShortID,
-		})
+		// Never advertise a hard limit from a legacy/shared-tier or unacknowledged
+		// node. Runtime identity routing and current canonical config are required.
+		if !deviceBandwidthEligible(node, speedMbps) {
+			continue
+		}
+		if node.relayed() {
+			if speedMbps > 0 && !slices.Contains(node.GeneratedRealityPorts, node.ChainExitPort) {
+				continue
+			}
+			if info, ok := relayedNodeInfo(node, deviceWGPrivateKey, deviceWGAddress); ok {
+				infos = append(infos, info)
+			}
+			continue
+		}
 
-		// Speed-limited plans are VLESS-only so the tc limit cannot be bypassed.
+		if node.RealityReady {
+			ports := node.RealityPorts
+			if speedMbps > 0 {
+				port := speedtier.VlessPort(node.Port, speedMbps)
+				ports = nil
+				if slices.Contains(node.GeneratedRealityPorts, port) {
+					ports = []int{port}
+				}
+			}
+			for _, port := range ports {
+				name := node.Name
+				if len(ports) > 1 {
+					name = fmt.Sprintf("%s :%d", node.Name, port)
+				}
+				infos = append(infos, subscription.NodeInfo{
+					Name: name, IP: node.IP, Port: port, Protocol: "vless_reality",
+					RealityPublicKey: node.RealityPublicKey, RealityShortID: node.RealityShortID,
+					ServerName: node.RealitySNI,
+				})
+			}
+		}
+
+		// Limited devices remain VLESS-only: other engines do not share this
+		// authenticated per-device egress interface.
 		if speedMbps > 0 {
 			continue
 		}
@@ -460,14 +692,26 @@ func firstWireGuardNodeInfo(nodes []subscriptionNode, deviceWGPrivateKey, device
 		if node.WGPort == nil || node.WGServerPrivateKey == nil || *node.WGServerPrivateKey == "" {
 			continue
 		}
+		// A relayed chain forwards one port, so it offers WireGuard only when that
+		// is the port it forwards; the client then dials the chain's address.
+		port := *node.WGPort
+		if node.relayed() {
+			if node.dialHost() == "" {
+				continue
+			}
+			if protocol, ok := chainProtocol(node); !ok || protocol != "wireguard" {
+				continue
+			}
+			port = *node.EntryPort
+		}
 		serverPubKey, err := crypto.DeriveWireGuardPublicKey(*node.WGServerPrivateKey)
 		if err != nil {
 			continue
 		}
 		return subscription.NodeInfo{
 			Name:            node.Name + " WireGuard",
-			IP:              node.IP,
-			Port:            *node.WGPort,
+			IP:              node.dialHost(),
+			Port:            port,
 			Protocol:        "wireguard",
 			WGPrivateKey:    *deviceWGPrivateKey,
 			WGPeerPublicKey: serverPubKey,
@@ -477,12 +721,45 @@ func firstWireGuardNodeInfo(nodes []subscriptionNode, deviceWGPrivateKey, device
 	return subscription.NodeInfo{}, false
 }
 
+// relayedLink renders the one link a relayed chain represents. Hysteria2 and
+// WireGuard are absent because this format carries neither, which is why they are
+// only offered through Clash and Sing-box.
+func relayedLink(uuid string, node subscriptionNode, fragment string) (string, bool) {
+	if node.dialHost() == "" {
+		return "", false
+	}
+	protocol, ok := chainProtocol(node)
+	if !ok {
+		return "", false
+	}
+
+	port := *node.EntryPort
+	switch protocol {
+	case "vless_reality":
+		if !node.RealityReady {
+			return "", false
+		}
+		return buildVLESSLink(uuid, node, port, fragment), true
+	case "vmess_ws":
+		return buildVMESSLink(uuid, node, port, fragment), true
+	case "trojan_tls":
+		return buildTrojanLink(uuid, node, port, fragment), true
+	case "shadowsocks":
+		if node.SSPassword == nil || *node.SSPassword == "" {
+			return "", false
+		}
+		return buildSSLink(*node.SSPassword, node, port, fragment), true
+	}
+	return "", false
+}
+
 func buildVLESSLink(uuid string, node subscriptionNode, port int, fragment string) string {
 	return fmt.Sprintf(
-		"vless://%s@%s:%d?type=tcp&security=reality&sni=www.cloudflare.com&fp=chrome&pbk=%s&sid=%s&flow=xtls-rprx-vision#%s",
+		"vless://%s@%s:%d?type=tcp&security=reality&sni=%s&fp=chrome&pbk=%s&sid=%s&flow=xtls-rprx-vision#%s",
 		uuid,
-		node.IP,
+		node.dialHost(),
 		port,
+		url.QueryEscape(node.RealitySNI),
 		url.QueryEscape(node.RealityPublicKey),
 		url.QueryEscape(node.RealityShortID),
 		url.PathEscape(fragment+" VLESS"),
@@ -493,13 +770,13 @@ func buildVMESSLink(uuid string, node subscriptionNode, port int, fragment strin
 	vmessConfig := map[string]interface{}{
 		"v":    "2",
 		"ps":   fragment + " VMess",
-		"add":  node.IP,
+		"add":  node.dialHost(),
 		"port": port,
 		"id":   uuid,
 		"aid":  0,
 		"net":  "ws",
 		"type": "none",
-		"host": node.IP,
+		"host": node.dialHost(),
 		"path": "/vmess",
 		"tls":  "tls",
 	}
@@ -511,7 +788,7 @@ func buildTrojanLink(uuid string, node subscriptionNode, port int, fragment stri
 	return fmt.Sprintf(
 		"trojan://%s@%s:%d?security=tls&type=tcp#%s",
 		uuid,
-		node.IP,
+		node.dialHost(),
 		port,
 		url.PathEscape(fragment+" Trojan"),
 	)
@@ -523,7 +800,7 @@ func buildSSLink(password string, node subscriptionNode, port int, fragment stri
 	return fmt.Sprintf(
 		"ss://%s@%s:%d#%s",
 		userinfo,
-		node.IP,
+		node.dialHost(),
 		port,
 		url.PathEscape(fragment+" SS"),
 	)

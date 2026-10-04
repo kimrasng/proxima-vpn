@@ -26,7 +26,6 @@ import {
   getNodeTraffic,
   getOnlineUsers,
   listNodes,
-  listPlanRequests,
 } from "../../api/admin";
 import type {
   ActivityEntry,
@@ -37,7 +36,6 @@ import type {
   NodeIssue,
   NodeTraffic,
   OnlineUser,
-  PlanRequest,
   TrafficWindow,
 } from "../../api/types";
 
@@ -52,10 +50,6 @@ function formatBytes(bytes: number): string {
 
 function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
-}
-
-function formatDateTime(iso: string): string {
-  return `${new Date(iso).toLocaleDateString()} ${formatTime(iso)}`;
 }
 
 // The stamp doubles as refresh feedback, so it needs seconds: two refreshes in
@@ -144,7 +138,6 @@ export default function Dashboard() {
   const [nodeTraffic, setNodeTraffic] = useState<NodeTraffic[]>([]);
   const [activity, setActivity] = useState<ActivityEntry[]>([]);
   const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
-  const [planRequests, setPlanRequests] = useState<PlanRequest[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [trafficMetric, setTrafficMetric] = useState<"download" | "upload">("download");
@@ -152,7 +145,7 @@ export default function Dashboard() {
 
   const fetchData = useCallback(async () => {
     try {
-      const [statsData, alertsData, nodesData, trafficData, activityData, onlineData, requestsData] =
+      const [statsData, alertsData, nodesData, trafficData, activityData, onlineData] =
         await Promise.all([
           getDashboardStats(),
           getDashboardAlerts(),
@@ -160,7 +153,6 @@ export default function Dashboard() {
           getNodeTraffic(trafficWindow, PREVIEW_ROWS),
           getActivity(PREVIEW_ROWS),
           getOnlineUsers(),
-          listPlanRequests("pending"),
         ]);
       setStats(statsData);
       setAlerts(alertsData);
@@ -168,7 +160,6 @@ export default function Dashboard() {
       setNodeTraffic(trafficData);
       setActivity(activityData);
       setOnlineUsers(onlineData);
-      setPlanRequests(requestsData);
     } catch {
       // intentionally ignored
     } finally {
@@ -619,128 +610,73 @@ export default function Dashboard() {
           </Container>
         </ColumnLayout>
 
-        <ColumnLayout columns={2} minColumnWidth={400}>
-          <Container
-            fitHeight
-            header={
-              <Header
-                variant="h2"
-                counter={`(${onlineUsers.length})`}
-                actions={
-                  <Link onFollow={() => navigate("/admin/connections")}>
-                    {t("admin.dashboard.viewAll")}
-                  </Link>
-                }
-              >
-                {t("admin.dashboard.onlineUsersPreview")}
-              </Header>
-            }
-          >
-            <Table
-              variant="embedded"
-              contentDensity="compact"
-              columnDefinitions={[
-                {
-                  id: "email",
-                  header: t("admin.dashboard.col.email"),
-                  cell: (item) => (
-                    <StatusIndicator type={item.over_cap ? "warning" : "success"}>
-                      {item.email}
-                    </StatusIndicator>
-                  ),
-                },
-                {
-                  id: "device",
-                  header: t("admin.dashboard.col.device"),
-                  cell: (item) => item.device || "—",
-                },
-                {
-                  id: "node",
-                  header: t("admin.dashboard.col.node"),
-                  cell: (item) => item.node_name || "—",
-                },
-                {
-                  id: "addresses",
-                  header: t("admin.connections.col.addresses"),
-                  cell: (item) =>
-                    (item.addresses ?? []).length > 0 ? (
-                      <Box fontSize="body-s">
-                        <span style={{ fontFamily: "monospace" }}>
-                          {(item.addresses ?? []).map((a) => a.ip).join(", ")}
-                        </span>
-                      </Box>
-                    ) : (
-                      <Box color="text-status-inactive">—</Box>
-                    ),
-                },
-                {
-                  id: "connections",
-                  header: t("admin.dashboard.col.connections"),
-                  cell: renderConnections,
-                },
-              ]}
-              items={onlineUsers.slice(0, PREVIEW_ROWS)}
-              empty={
-                <Box textAlign="center" padding="m">
-                  <StatusIndicator type="info">{t("admin.dashboard.noOnlineUsers")}</StatusIndicator>
-                </Box>
+        <Container
+          fitHeight
+          header={
+            <Header
+              variant="h2"
+              counter={`(${onlineUsers.length})`}
+              actions={
+                <Link onFollow={() => navigate("/admin/connections")}>
+                  {t("admin.dashboard.viewAll")}
+                </Link>
               }
-            />
-          </Container>
-
-          <Container
-            fitHeight
-            header={
-              <Header
-                variant="h2"
-                counter={`(${planRequests.length})`}
-                actions={
-                  <Link onFollow={() => navigate("/admin/plan-requests")}>
-                    {t("admin.dashboard.viewAll")}
-                  </Link>
-                }
-              >
-                {t("admin.dashboard.approvalRequests")}
-              </Header>
-            }
-          >
-            <Table
-              variant="embedded"
-              contentDensity="compact"
-              columnDefinitions={[
-                {
-                  id: "email",
-                  header: t("admin.dashboard.col.email"),
-                  cell: (item) => item.user_email,
-                },
-                {
-                  id: "plan",
-                  header: t("admin.dashboard.col.plan"),
-                  cell: (item) => item.plan_name,
-                },
-                {
-                  id: "requested",
-                  header: t("admin.dashboard.col.requestedAt"),
-                  cell: (item) => formatDateTime(item.created_at),
-                },
-                {
-                  id: "status",
-                  header: t("admin.dashboard.col.status"),
-                  minWidth: 100,
-                  cell: () => <Badge color="blue">{t("admin.dashboard.statusPending")}</Badge>,
-                },
-              ]}
-              items={planRequests.slice(0, PREVIEW_ROWS)}
-              empty={
-                <Box textAlign="center" padding="m">
-                  <StatusIndicator type="success">
-                    {t("admin.dashboard.noPendingRequests")}
+            >
+              {t("admin.dashboard.onlineUsersPreview")}
+            </Header>
+          }
+        >
+          <Table
+            variant="embedded"
+            contentDensity="compact"
+            columnDefinitions={[
+              {
+                id: "email",
+                header: t("admin.dashboard.col.email"),
+                cell: (item) => (
+                  <StatusIndicator type={item.over_cap ? "warning" : "success"}>
+                    {item.email}
                   </StatusIndicator>
-                </Box>
-              }
-            />
-          </Container>
-        </ColumnLayout>
+                ),
+              },
+              {
+                id: "device",
+                header: t("admin.dashboard.col.device"),
+                cell: (item) => item.device || "—",
+              },
+              {
+                id: "node",
+                header: t("admin.dashboard.col.node"),
+                cell: (item) => item.node_name || "—",
+              },
+              {
+                id: "addresses",
+                header: t("admin.connections.col.addresses"),
+                cell: (item) =>
+                  (item.addresses ?? []).length > 0 ? (
+                    <Box fontSize="body-s">
+                      <span style={{ fontFamily: "monospace" }}>
+                        {(item.addresses ?? []).map((a) => a.ip).join(", ")}
+                      </span>
+                    </Box>
+                  ) : (
+                    <Box color="text-status-inactive">—</Box>
+                  ),
+              },
+              {
+                id: "connections",
+                header: t("admin.dashboard.col.connections"),
+                cell: renderConnections,
+              },
+            ]}
+            items={onlineUsers.slice(0, PREVIEW_ROWS)}
+            empty={
+              <Box textAlign="center" padding="m">
+                <StatusIndicator type="info">{t("admin.dashboard.noOnlineUsers")}</StatusIndicator>
+              </Box>
+            }
+          />
+        </Container>
       </SpaceBetween>
     </ContentLayout>
   );

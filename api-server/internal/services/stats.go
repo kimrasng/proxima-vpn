@@ -228,11 +228,9 @@ type Alerts struct {
 	NodeIssues []NodeIssue `json:"node_issues"`
 	// Total counts only what an operator still has to look at: firing conditions
 	// that are neither acknowledged nor silenced. Stale rows are excluded because
-	// their readings are frozen, and pending approvals are excluded because they
-	// are a work queue rather than a system condition.
-	Total           int    `json:"total"`
-	PendingRequests int    `json:"pending_requests"`
-	EvaluatedAt     string `json:"evaluated_at"`
+	// their readings are frozen.
+	Total       int    `json:"total"`
+	EvaluatedAt string `json:"evaluated_at"`
 }
 
 // GetAlerts reads the persisted alert lifecycle rather than recomputing conditions
@@ -295,12 +293,6 @@ func (s *StatsService) GetAlerts(ctx context.Context) (Alerts, error) {
 		if item, ok := byKind[kind]; ok {
 			a.Items = append(a.Items, *item)
 		}
-	}
-
-	if err := s.db.QueryRow(ctx,
-		`SELECT COUNT(*) FROM plan_requests WHERE status = 'pending'`,
-	).Scan(&a.PendingRequests); err != nil {
-		return a, fmt.Errorf("count pending requests: %w", err)
 	}
 
 	if !latest.IsZero() {

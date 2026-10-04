@@ -7,6 +7,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -27,19 +28,58 @@ const (
 // its feed rows into untranslated text, so they are enumerated here rather than
 // written as literals at each call site.
 const (
-	EventUserLogin      = "user.login"
-	EventUserRegistered = "user.registered"
-	EventUserCreated    = "user.created"
-	EventUserDeleted    = "user.deleted"
-	EventAdminLogin     = "admin.login"
-	EventNodeOffline    = "node.offline"
-	EventNodeRegistered = "node.registered"
-	EventPlanRequested  = "plan.requested"
-	EventPlanApproved   = "plan.approved"
-	EventPlanRejected   = "plan.rejected"
+	EventUserLogin        = "user.login"
+	EventUserRegistered   = "user.registered"
+	EventUserCreated      = "user.created"
+	EventUserDeleted      = "user.deleted"
+	EventAdminLogin       = "admin.login"
+	EventNodeOffline      = "node.offline"
+	EventNodeRegistered   = "node.registered"
+	EventOrderCreated     = "plan.order_created"
+	EventOrderPaid        = "plan.order_paid"
+	EventOrderCancelled   = "plan.order_cancelled"
+	EventOrderExpired     = "plan.order_expired"
+	EventPaymentIgnored   = "plan.payment_ignored"
+	EventPromotionApplied = "plan.promotion_applied"
+	EventPromotionCreated = "plan.promotion_created"
+
+	EventNodeUpdated             = "node.updated"
+	EventNodeDeleted             = "node.deleted"
+	EventNodeUnregistered        = "node.unregistered"
+	EventNodeXrayUpdateRequested = "node.xray_update_requested"
+	EventNodeTLSRequested        = "node.tls_requested"
+	EventNodeInboundCreated      = "node.inbound_created"
+	EventNodeInboundUpdated      = "node.inbound_updated"
+	EventNodeInboundDeleted      = "node.inbound_deleted"
+	EventNodeInboundToggled      = "node.inbound_toggled"
 
 	EventSessionTerminated = "session.terminated"
 )
+
+// NodeEventTypes enumerates the events recorded against a node target and backs
+// the viewer's filter options; an event missing here is stored but unfilterable.
+func NodeEventTypes() []string {
+	return []string{
+		EventNodeRegistered,
+		EventNodeUnregistered,
+		EventNodeUpdated,
+		EventNodeDeleted,
+		EventNodeOnline,
+		EventNodeOffline,
+		EventNodeAlertFired,
+		EventNodeAlertEscalated,
+		EventNodeAlertResolved,
+		EventNodeAlertAcked,
+		EventNodeAlertSilenced,
+		EventNodeAlertClosed,
+		EventNodeXrayUpdateRequested,
+		EventNodeTLSRequested,
+		EventNodeInboundCreated,
+		EventNodeInboundUpdated,
+		EventNodeInboundDeleted,
+		EventNodeInboundToggled,
+	}
+}
 
 // Entry is one row of the activity feed.
 type Entry struct {
@@ -163,7 +203,11 @@ func (s *ActivityService) list(ctx context.Context, limit int, targetType, targe
 	}
 	defer rows.Close()
 
-	entries := make([]Entry, 0, limit)
+	return scanEntries(rows, limit)
+}
+
+func scanEntries(rows pgx.Rows, capacity int) ([]Entry, error) {
+	entries := make([]Entry, 0, capacity)
 	for rows.Next() {
 		var e Entry
 		var detail []byte
@@ -183,4 +227,96 @@ func (s *ActivityService) list(ctx context.Context, limit int, targetType, targe
 	}
 
 	return entries, rows.Err()
+}
+
+// NodeEventQuery selects a window of one node's history; an empty EventTypes or
+// Severities means no restriction, not no matches.
+type NodeEventQuery struct {
+	NodeID     string
+	EventTypes []string
+	Severities []string
+	Since      *time.Time
+	Until      *time.Time
+	Limit      int
+	Offset     int
+}
+
+// NodeEventPage carries a page plus the unpaged total, so the viewer can page
+// beyond the rows it holds.
+type NodeEventPage struct {
+	Items  []Entry `json:"items"`
+	Total  int     `json:"total"`
+	Limit  int     `json:"limit"`
+	Offset int     `json:"offset"`
+}
+
+const (
+	nodeEventsDefaultLimit = 25
+	nodeEventsMaxLimit     = 200
+)
+
+// ListNodeEvents returns one node's events, newest first, with the total.
+func (s *ActivityService) ListNodeEvents(ctx context.Context, q NodeEventQuery) (NodeEventPage, error) {
+	page := NodeEventPage{Items: []Entry{}}
+	if s == nil || s.db == nil || q.NodeID == "" {
+		return page, nil
+	}
+
+	limit := q.Limit
+	if limit <= 0 || limit > nodeEventsMaxLimit {
+		limit = nodeEventsDefaultLimit
+	}
+	offset := q.Offset
+	if offset < 0 {
+		offset = 0
+	}
+	page.Limit = limit
+	page.Offset = offset
+
+	// cardinality, not IS NULL: pgx sends an empty slice as '{}', never NULL.
+	const where = `
+		WHERE target_type = 'node' AND target_id = $1
+		  AND (cardinality($2::text[]) = 0 OR event_type = ANY($2::text[]))
+		  AND (cardinality($3::text[]) = 0 OR severity   = ANY($3::text[]))
+		  AND ($4::timestamptz IS NULL OR created_at >= $4)
+		  AND ($5::timestamptz IS NULL OR created_at <= $5)`
+
+	types := q.EventTypes
+	if types == nil {
+		types = []string{}
+	}
+	severities := q.Severities
+	if severities == nil {
+		severities = []string{}
+	}
+	args := []any{q.NodeID, types, severities, q.Since, q.Until}
+
+	if err := s.db.QueryRow(ctx,
+		`SELECT COUNT(*) FROM activity_logs`+where, args...,
+	).Scan(&page.Total); err != nil {
+		return page, fmt.Errorf("count node events: %w", err)
+	}
+	if page.Total == 0 {
+		return page, nil
+	}
+
+	rows, err := s.db.Query(ctx, `
+		SELECT id::text, event_type, severity, actor_type, actor_id, actor_label,
+		       target_type, target_id, detail, created_at
+		FROM activity_logs`+where+`
+		ORDER BY created_at DESC, activity_logs.id DESC
+		LIMIT $6 OFFSET $7`,
+		append(args, limit, offset)...,
+	)
+	if err != nil {
+		return page, fmt.Errorf("query node events: %w", err)
+	}
+	defer rows.Close()
+
+	items, err := scanEntries(rows, limit)
+	if err != nil {
+		return page, err
+	}
+	page.Items = items
+	return page, nil
 }

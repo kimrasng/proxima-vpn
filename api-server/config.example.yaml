@@ -8,6 +8,25 @@ server:
   host: "0.0.0.0"
   port: 2053
 
+  # Only a peer listed here has its proxy_header believed; every other peer is
+  # recorded by its own address, so a client reaching port 2053 directly cannot
+  # forge the client IP used for login audit rows and rate limits. The defaults
+  # below cover the compose bridge network, where nginx is the only hop in front
+  # of the API. Narrow the list to your load balancer once its address is known,
+  # and leave it empty when no proxy sits in front of the API.
+  # Overridable with TRUSTED_PROXIES (comma-separated; "none" clears the list).
+  trusted_proxies:
+    - "10.0.0.0/8"
+    - "172.16.0.0/12"
+    - "192.168.0.0/16"
+    - "127.0.0.1"
+    - "::1"
+
+  # Header a trusted proxy publishes the real client address in. Must match the
+  # proxy's own configuration - web/nginx.prod.conf sends X-Forwarded-For.
+  # Overridable with PROXY_HEADER.
+  proxy_header: "X-Forwarded-For"
+
 database:
   url: "postgres://vpnuser:vpnpass@localhost:5432/vpnpanel"
   max_connections: 20
@@ -15,6 +34,12 @@ database:
 
 redis:
   url: "redis://localhost:6379"
+
+# Optional Cloudflare managed Entry DNS settings. The API token is environment-only.
+# Leave both blank unless also setting CLOUDFLARE_API_TOKEN in the environment.
+managed_entry_dns:
+  zone_id: ""
+  base_domain: ""
 
 jwt:
   secret: "change-me-to-random-secret"

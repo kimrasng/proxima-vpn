@@ -422,6 +422,17 @@ func parseOnlineIPEntry(data []byte) (ip string, lastSeen int64, err error) {
 	return ip, lastSeen, nil
 }
 
+func mergeOnlineIPs(out map[string]map[string]int64, uuid string, ips map[string]int64) {
+	if out[uuid] == nil {
+		out[uuid] = map[string]int64{}
+	}
+	for ip, ts := range ips {
+		if ts > out[uuid][ip] {
+			out[uuid][ip] = ts
+		}
+	}
+}
+
 // GetOnlineIPs returns the source IPs currently connected under each device
 // UUID, mapped to the last time Xray saw them. Requires statsUserOnline on the
 // client's policy level; without it Xray keeps no such map and this is empty.
@@ -447,12 +458,7 @@ func (c *StatsClient) GetOnlineIPs(ctx context.Context, emails []string) (map[st
 		if at := strings.IndexByte(uuid, '@'); at >= 0 {
 			uuid = uuid[:at]
 		}
-		if out[uuid] == nil {
-			out[uuid] = map[string]int64{}
-		}
-		for ip, ts := range resp.IPs {
-			out[uuid][ip] = ts
-		}
+		mergeOnlineIPs(out, uuid, resp.IPs)
 	}
 	return out, nil
 }

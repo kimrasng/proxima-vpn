@@ -48,6 +48,13 @@ type XrayRunner struct {
 	configPath string
 	grpcAddr   string
 	binaryPath string
+
+	// Config writes and restores share the same canonical-to-runtime transform.
+	// canonicalConfig never contains node-local SOCKS passwords.
+	configMu        sync.Mutex
+	canonicalConfig []byte
+	configTransform func([]byte) ([]byte, error)
+	restoreGuard    func([]byte) error
 }
 
 // NewXrayRunner creates a new Xray process runner.
@@ -203,32 +210,85 @@ func isProcessGone(err error) bool {
 	return err == os.ErrProcessDone || strings.Contains(err.Error(), "process already finished")
 }
 
-// WriteConfig writes the Xray configuration JSON to the config path, keeping
-// the previous contents in a sibling .prev file so a config that Xray refuses
-// can be rolled back (see RestoreConfig).
+// SetConfigTransform installs a node-local materializer. WriteConfig accepts
+// canonical bytes, backups remain canonical, and RestoreConfig re-materializes
+// rather than resurrecting an old runtime credential generation.
+func (r *XrayRunner) SetConfigTransform(transform func([]byte) ([]byte, error)) {
+	r.configMu.Lock()
+	defer r.configMu.Unlock()
+	r.configTransform = transform
+}
+
+// SetConfigRestoreGuard prevents rollback from re-admitting revoked users or
+// bypassing a newly required limiter. The guard runs before materialization.
+func (r *XrayRunner) SetConfigRestoreGuard(guard func([]byte) error) {
+	r.configMu.Lock()
+	defer r.configMu.Unlock()
+	r.restoreGuard = guard
+}
+
+// WriteConfig writes a secure runtime config, retaining the previous canonical
+// bytes as .prev. Configs inherited from an earlier agent are not trusted as
+// canonical when a transform is installed.
 func (r *XrayRunner) WriteConfig(data []byte) error {
-	dir := filepath.Dir(r.configPath)
+	r.configMu.Lock()
+	defer r.configMu.Unlock()
+	if err := r.secureConfigFiles(); err != nil {
+		return err
+	}
+	runtime := data
+	if r.configTransform != nil {
+		var err error
+		runtime, err = r.configTransform(data)
+		if err != nil {
+			return fmt.Errorf("materialize xray config: %w", err)
+		}
+	}
+	prev := r.canonicalConfig
+	if prev == nil && r.configTransform == nil {
+		var err error
+		prev, err = os.ReadFile(r.configPath)
+		if err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("read previous xray config: %w", err)
+		}
+	}
+	if prev != nil {
+		if err := writePrivateConfig(r.backupPath(), prev); err != nil {
+			return fmt.Errorf("back up canonical xray config: %w", err)
+		}
+	} else if r.configTransform != nil {
+		// A leftover .prev can contain runtime secrets or obsolete policy.
+		if err := os.Remove(r.backupPath()); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("remove untrusted config backup: %w", err)
+		}
+	}
+	if err := writePrivateConfig(r.configPath, runtime); err != nil {
+		return err
+	}
+	r.canonicalConfig = append([]byte(nil), data...)
+	return nil
+}
+
+func (r *XrayRunner) secureConfigFiles() error {
+	for _, path := range []string{r.configPath, r.backupPath()} {
+		if err := os.Chmod(path, 0o600); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("secure xray config: %w", err)
+		}
+	}
+	return nil
+}
+
+// Atomic replacement never opens an existing world-readable file for writing.
+func writePrivateConfig(path string, data []byte) error {
+	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return fmt.Errorf("create config dir: %w", err)
 	}
-
-	if prev, err := os.ReadFile(r.configPath); err == nil {
-		if err := os.WriteFile(r.backupPath(), prev, 0o644); err != nil {
-			return fmt.Errorf("back up previous xray config: %w", err)
-		}
-	} else if !os.IsNotExist(err) {
-		return fmt.Errorf("read previous xray config: %w", err)
-	}
-
-	// Write to a temp file and rename so a crash mid-write cannot leave a
-	// truncated config that Xray would then fail to parse on next start.
-	tmp, err := os.CreateTemp(dir, "xray-config-*.json")
+	tmp, err := os.CreateTemp(dir, "xray-config-*.json") // mode 0600
 	if err != nil {
 		return fmt.Errorf("create temp xray config: %w", err)
 	}
-	tmpPath := tmp.Name()
-	defer func() { _ = os.Remove(tmpPath) }()
-
+	defer func() { _ = os.Remove(tmp.Name()) }()
 	if _, err := tmp.Write(data); err != nil {
 		_ = tmp.Close()
 		return fmt.Errorf("write xray config: %w", err)
@@ -236,13 +296,9 @@ func (r *XrayRunner) WriteConfig(data []byte) error {
 	if err := tmp.Close(); err != nil {
 		return fmt.Errorf("close temp xray config: %w", err)
 	}
-	if err := os.Chmod(tmpPath, 0o644); err != nil {
-		return fmt.Errorf("chmod xray config: %w", err)
-	}
-	if err := os.Rename(tmpPath, r.configPath); err != nil {
+	if err := os.Rename(tmp.Name(), path); err != nil {
 		return fmt.Errorf("replace xray config: %w", err)
 	}
-
 	return nil
 }
 
@@ -257,13 +313,31 @@ func (r *XrayRunner) HasBackupConfig() bool {
 // contents, so a caller that failed to start Xray on a new config can revert
 // and resync its change-detection hash. It does not restart Xray.
 func (r *XrayRunner) RestoreConfig() ([]byte, error) {
+	r.configMu.Lock()
+	defer r.configMu.Unlock()
+	if err := r.secureConfigFiles(); err != nil {
+		return nil, err
+	}
 	prev, err := os.ReadFile(r.backupPath())
 	if err != nil {
 		return nil, fmt.Errorf("read xray config backup: %w", err)
 	}
-	if err := os.WriteFile(r.configPath, prev, 0o644); err != nil {
+	if r.restoreGuard != nil {
+		if err := r.restoreGuard(prev); err != nil {
+			return nil, fmt.Errorf("unsafe xray config rollback: %w", err)
+		}
+	}
+	runtime := prev
+	if r.configTransform != nil {
+		runtime, err = r.configTransform(prev)
+		if err != nil {
+			return nil, fmt.Errorf("materialize previous xray config: %w", err)
+		}
+	}
+	if err := writePrivateConfig(r.configPath, runtime); err != nil {
 		return nil, fmt.Errorf("restore xray config: %w", err)
 	}
+	r.canonicalConfig = append([]byte(nil), prev...)
 	return prev, nil
 }
 

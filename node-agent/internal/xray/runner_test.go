@@ -233,3 +233,58 @@ func TestCommitBinaryKeepsPreviousForRollback(t *testing.T) {
 		t.Errorf("RestoreBinary left %q, want the original binary", rolled)
 	}
 }
+
+func TestConfigTransformFailureSecuresExistingConfigAndBackup(t *testing.T) {
+	r := NewXrayRunner(filepath.Join(t.TempDir(), "config.json"), "")
+	for _, path := range []string{r.ConfigPath(), r.ConfigPath() + ".prev"} {
+		if err := os.WriteFile(path, []byte("old runtime secret"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	r.SetConfigTransform(func([]byte) ([]byte, error) { return nil, os.ErrPermission })
+	if err := r.WriteConfig([]byte("bad")); err == nil {
+		t.Fatal("transform failure accepted")
+	}
+	for _, path := range []string{r.ConfigPath(), r.ConfigPath() + ".prev"} {
+		info, err := os.Stat(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if info.Mode().Perm() != 0o600 {
+			t.Fatalf("existing secret file %s mode = %o", path, info.Mode().Perm())
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if string(data) != "old runtime secret" {
+			t.Fatal("rejected transform changed disk contents")
+		}
+	}
+}
+
+func TestRestoreGuardRunsBeforeMaterializerAndLeavesRuntimeIntact(t *testing.T) {
+	r := NewXrayRunner(filepath.Join(t.TempDir(), "config.json"), "")
+	transforms := 0
+	r.SetConfigTransform(func(data []byte) ([]byte, error) { transforms++; return append([]byte("runtime:"), data...), nil })
+	if err := r.WriteConfig([]byte("old")); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.WriteConfig([]byte("new")); err != nil {
+		t.Fatal(err)
+	}
+	r.SetConfigRestoreGuard(func([]byte) error { return os.ErrPermission })
+	if _, err := r.RestoreConfig(); err == nil {
+		t.Fatal("unauthorized rollback accepted")
+	}
+	if transforms != 2 {
+		t.Fatal("unauthorized backup reached the credential materializer")
+	}
+	data, err := os.ReadFile(r.ConfigPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != "runtime:new" {
+		t.Fatalf("runtime config = %q", data)
+	}
+}

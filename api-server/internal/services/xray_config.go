@@ -126,12 +126,15 @@ type xrayAPI struct {
 }
 
 type xrayOutbound struct {
-	Protocol string `json:"protocol"`
-	Tag      string `json:"tag"`
+	Protocol string          `json:"protocol"`
+	Tag      string          `json:"tag"`
+	Settings json.RawMessage `json:"settings,omitempty"`
 }
 
 type xrayRoutingRule struct {
-	InboundTag  []string `json:"inboundTag"`
+	Type        string   `json:"type"`
+	InboundTag  []string `json:"inboundTag,omitempty"`
+	User        []string `json:"user,omitempty"`
 	OutboundTag string   `json:"outboundTag"`
 }
 
@@ -173,9 +176,9 @@ type ConfigUser struct {
 }
 
 // ConfigDigest fingerprints a node's config without transferring it.
-// StructureHash covers the config with client lists emptied, so it moves only on
-// structural edits (ports, inbounds, keys, routing) - which is what lets an
-// agent apply a users-only change without a restart.
+// StructureHash covers the config with client lists emptied. Device egress
+// declarations remain structural, forcing a full reload when admitted VLESS
+// identities change; legacy non-VLESS client-only edits can still avoid one.
 type ConfigDigest struct {
 	Hash          string       `json:"hash"`
 	StructureHash string       `json:"structure_hash"`
@@ -319,7 +322,9 @@ func (s *XrayConfigService) generate(ctx context.Context, nodeID string) ([]byte
 		   AND u.status = 'active'
 		   AND (u.plan_expires_at IS NULL OR u.plan_expires_at > NOW())
 		   AND (p.traffic_limit IS NULL OR u.traffic_used < p.traffic_limit)
-		   AND (d.evicted_until IS NULL OR d.evicted_until <= NOW())`,
+		   AND d.retired_at IS NULL
+		   AND (d.evicted_until IS NULL OR d.evicted_until <= NOW())
+		 ORDER BY d.xray_uuid`,
 		nodeID,
 	)
 	if err != nil {
@@ -327,11 +332,12 @@ func (s *XrayConfigService) generate(ctx context.Context, nodeID string) ([]byte
 	}
 	defer rows.Close()
 
-	// Unlimited clients are provisioned on the shared inbounds for every
-	// protocol. Speed-limited clients are grouped by their Mbps value and only
-	// provisioned on a dedicated VLESS Reality inbound that the node agent
-	// rate-limits with tc; provisioning them on the shared vmess/trojan/ss
-	// inbounds would let them bypass the limit, so those are excluded.
+	// All devices are admitted on the main VLESS Reality inbounds, including
+	// fixed-chain relays that use the main port. Limited devices also keep their
+	// tier-specific endpoints for saved subscription compatibility. Every VLESS
+	// identity routes through local device egress, even while unlimited, so live
+	// sessions cannot bypass a later plan downgrade. Limited devices never
+	// receive shared vmess/trojan/ss credentials.
 	var vlessClients []xrayClient
 	var vmessClients []xrayClient
 	var trojanClients []xrayTrojanClient
@@ -345,26 +351,20 @@ func (s *XrayConfigService) generate(ctx context.Context, nodeID string) ([]byte
 		var speedLimit *int64
 
 		if err := rows.Scan(&uuid, &speedLimit); err != nil {
-			continue
+			return nil, nil, fmt.Errorf("scan client: %w", err)
 		}
 
-		if speedLimit != nil && *speedLimit > 0 {
-			mbps := int(*speedLimit)
-			tierVless[mbps] = append(tierVless[mbps], xrayClient{
-				ID:    uuid,
-				Flow:  "xtls-rprx-vision",
-				Email: uuid + "@proxima",
-				Level: 0,
-			})
-			continue
-		}
-
-		vlessClients = append(vlessClients, xrayClient{
+		client := xrayClient{
 			ID:    uuid,
 			Flow:  "xtls-rprx-vision",
 			Email: uuid + "@proxima",
 			Level: 0,
-		})
+		}
+		vlessClients = append(vlessClients, client)
+		if speedLimit != nil && *speedLimit > 0 {
+			addCompatibilityTierClient(tierVless, *speedLimit, client)
+			continue
+		}
 
 		vmessClients = append(vmessClients, xrayClient{
 			ID:    uuid,
@@ -379,6 +379,10 @@ func (s *XrayConfigService) generate(ctx context.Context, nodeID string) ([]byte
 		})
 	}
 
+	if err := rows.Err(); err != nil {
+		return nil, nil, fmt.Errorf("read clients: %w", err)
+	}
+
 	if vlessClients == nil {
 		vlessClients = []xrayClient{}
 	}
@@ -391,26 +395,7 @@ func (s *XrayConfigService) generate(ctx context.Context, nodeID string) ([]byte
 
 	// Reality parameters for the speed-tier inbounds mirror the main VLESS
 	// Reality inbound (falling back to sane defaults).
-	tierDest := "www.cloudflare.com:443"
-	tierServerNames := []string{"www.cloudflare.com"}
-	for _, ib := range dbInbounds {
-		if ib.Protocol != "vless_reality" {
-			continue
-		}
-		var st struct {
-			Dest        string   `json:"dest"`
-			ServerNames []string `json:"server_names"`
-		}
-		if json.Unmarshal(ib.Settings, &st) == nil {
-			if st.Dest != "" {
-				tierDest = st.Dest
-			}
-			if len(st.ServerNames) > 0 {
-				tierServerNames = st.ServerNames
-			}
-		}
-		break
-	}
+	tierDest, tierServerNames := tierRealityParameters(dbInbounds)
 
 	apiSettings, _ := json.Marshal(xrayDokodemoSettings{
 		Address: "127.0.0.1",
@@ -453,12 +438,16 @@ func (s *XrayConfigService) generate(ctx context.Context, nodeID string) ([]byte
 	}
 	sort.Ints(tierMbps)
 	for _, mbps := range tierMbps {
-		inbounds = append(inbounds, s.buildTierVlessInbound(
+		tier := s.buildTierVlessInbound(
 			speedtier.VlessPort(nodePort, mbps),
 			speedtier.Tag(mbps),
 			tierVless[mbps],
 			realityPrivateKey, realityShortID, tierDest, tierServerNames,
-		))
+		)
+		inbounds, err = appendCompatibilityTierInbound(inbounds, tier)
+		if err != nil {
+			return nil, nil, fmt.Errorf("compatibility tier %d: %w", mbps, err)
+		}
 	}
 
 	cfg := xrayConfig{
@@ -476,20 +465,15 @@ func (s *XrayConfigService) generate(ctx context.Context, nodeID string) ([]byte
 			},
 		},
 		Inbounds: inbounds,
-		Outbounds: []xrayOutbound{
-			{Protocol: "freedom", Tag: "direct"},
-			{Protocol: "blackhole", Tag: "block"},
-		},
-		Routing: xrayRouting{
-			Rules: []xrayRoutingRule{
-				{InboundTag: []string{"api"}, OutboundTag: "api"},
-			},
-		},
 	}
 
-	out, err := json.MarshalIndent(cfg, "", "  ")
+	out, err := json.Marshal(cfg)
 	if err != nil {
 		return nil, nil, fmt.Errorf("marshal xray config: %w", err)
+	}
+	out, err = WithDeviceEgressRouting(out)
+	if err != nil {
+		return nil, nil, fmt.Errorf("declare device egress: %w", err)
 	}
 	return out, vlessUsersOf(inbounds), nil
 }
@@ -546,21 +530,7 @@ func (s *XrayConfigService) buildInbound(
 }
 
 func (s *XrayConfigService) buildVlessReality(ib inboundRow, clients []xrayClient, privateKey, shortID string) (*xrayInbound, error) {
-	// Parse settings for dest and server_names.
-	var settings struct {
-		Dest        string   `json:"dest"`
-		ServerNames []string `json:"server_names"`
-	}
-	if err := json.Unmarshal(ib.Settings, &settings); err != nil {
-		settings.Dest = "www.cloudflare.com:443"
-		settings.ServerNames = []string{"www.cloudflare.com"}
-	}
-	if settings.Dest == "" {
-		settings.Dest = "www.cloudflare.com:443"
-	}
-	if len(settings.ServerNames) == 0 {
-		settings.ServerNames = []string{"www.cloudflare.com"}
-	}
+	dest, serverNames := realityParameters(ib.Settings)
 
 	inboundSettings, _ := json.Marshal(xrayInboundSettings{
 		Clients:    clients,
@@ -573,14 +543,9 @@ func (s *XrayConfigService) buildVlessReality(ib inboundRow, clients []xrayClien
 		Tag:      ib.Tag,
 		Settings: inboundSettings,
 		StreamSettings: &xrayStreamSettings{
-			Network:  "tcp",
-			Security: "reality",
-			RealitySettings: &xrayRealitySettings{
-				Dest:        settings.Dest,
-				ServerNames: settings.ServerNames,
-				PrivateKey:  privateKey,
-				ShortIds:    []string{shortID},
-			},
+			Network:         "tcp",
+			Security:        "reality",
+			RealitySettings: newXrayRealitySettings(dest, serverNames, realityKeys{privateKey, shortID}),
 		},
 		Sniffing: &xraySniffing{
 			Enabled:      true,
@@ -589,9 +554,9 @@ func (s *XrayConfigService) buildVlessReality(ib inboundRow, clients []xrayClien
 	}, nil
 }
 
-// buildTierVlessInbound builds a dedicated VLESS Reality inbound for a single
-// speed tier. The node agent recognizes the tag (see pkg/speedtier) and applies
-// a tc bandwidth limit to the inbound's port.
+// buildTierVlessInbound preserves the dedicated VLESS Reality endpoint for a
+// speed tier. Routing uses each client's authenticated email to select its own
+// device egress limiter; the tier's port is no longer the enforcement boundary.
 func (s *XrayConfigService) buildTierVlessInbound(
 	port int,
 	tag string,
@@ -613,14 +578,9 @@ func (s *XrayConfigService) buildTierVlessInbound(
 		Tag:      tag,
 		Settings: settings,
 		StreamSettings: &xrayStreamSettings{
-			Network:  "tcp",
-			Security: "reality",
-			RealitySettings: &xrayRealitySettings{
-				Dest:        dest,
-				ServerNames: serverNames,
-				PrivateKey:  privateKey,
-				ShortIds:    []string{shortID},
-			},
+			Network:         "tcp",
+			Security:        "reality",
+			RealitySettings: newXrayRealitySettings(dest, serverNames, realityKeys{privateKey, shortID}),
 		},
 		Sniffing: &xraySniffing{
 			Enabled:      true,
@@ -756,14 +716,9 @@ func (s *XrayConfigService) buildLegacyInbounds(
 			Tag:      "vless-reality",
 			Settings: vlessSettings,
 			StreamSettings: &xrayStreamSettings{
-				Network:  "tcp",
-				Security: "reality",
-				RealitySettings: &xrayRealitySettings{
-					Dest:        "www.cloudflare.com:443",
-					ServerNames: []string{"www.cloudflare.com"},
-					PrivateKey:  realityPrivateKey,
-					ShortIds:    []string{realityShortID},
-				},
+				Network:         "tcp",
+				Security:        "reality",
+				RealitySettings: newXrayRealitySettings(defaultRealityDest, []string{"www.cloudflare.com"}, realityKeys{realityPrivateKey, realityShortID}),
 			},
 			Sniffing: &xraySniffing{
 				Enabled:      true,

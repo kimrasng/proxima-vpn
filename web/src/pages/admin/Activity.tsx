@@ -1,374 +1,227 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  Badge,
-  Box,
-  Button,
-  ColumnLayout,
-  Container,
-  ContentLayout,
-  Flashbar,
-  Header,
-  Pagination,
-  Select,
-  type SelectProps,
-  SpaceBetween,
-  Spinner,
-  StatusIndicator,
-  Table,
-  TextFilter,
+  Alert, Box, Button, Cards, Container, ContentLayout, Header, Modal, Pagination,
+  PropertyFilter, Select, SpaceBetween, StatusIndicator, Table, Toggle,
 } from "@cloudscape-design/components";
 import { useCollection } from "@cloudscape-design/collection-hooks";
 import { getActivity } from "../../api/admin";
-import type { ActivityEntry, AlertSeverity } from "../../api/types";
-import { useManualRefresh } from "../../hooks/useManualRefresh";
+import type { ActivityEntry } from "../../api/types";
+import { ActivityDetails } from "./ActivityDetails";
+import "./activity.css";
 
-// Matches the node agents' 10s heartbeat, so a change on a node reaches
-// the screen within roughly one beat plus one poll.
-const REFRESH_INTERVAL = 10000;
-const PAGE_SIZE = 25;
-// The activity endpoint caps at 200 rows, so asking for more silently returns 20.
-const FETCH_LIMIT = 200;
-
-const badgeColor: Record<AlertSeverity, "red" | "severity-medium" | "blue" | "green"> = {
-  error: "red",
-  warning: "severity-medium",
-  info: "blue",
-  success: "green",
-};
-
-function indicatorType(severity: AlertSeverity) {
-  return severity === "info" ? "info" : severity;
-}
-
-function formatDateTime(iso: string): string {
-  const date = new Date(iso);
-  return `${date.toLocaleDateString()} ${date.toLocaleTimeString(undefined, {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  })}`;
-}
+const SEVERITIES = ["error", "warning", "info", "success"] as const;
+const SUMMARY_TYPES = ["all", "error", "warning", "info"] as const;
+const RANGE_HOURS: Readonly<Record<string, number>> = { all: 0, "24h": 24, "7d": 168, "30d": 720 };
+const DETAIL_STACK_WIDTH = 1550;
 
 export default function Activity() {
   const { t } = useTranslation();
-
   const [entries, setEntries] = useState<ActivityEntry[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [severityFilter, setSeverityFilter] = useState("all");
-  const [eventFilter, setEventFilter] = useState("all");
-
-  const fetchEntries = useCallback(async () => {
-    try {
-      setEntries(await getActivity(FETCH_LIMIT));
-      setError(null);
-    } catch {
-      setError(t("admin.activity.fetchError"));
-    } finally {
-      setLoading(false);
-    }
-  }, [t]);
-
-  const { refreshing, lastUpdated, refresh } = useManualRefresh(fetchEntries, REFRESH_INTERVAL);
-
-  const describeEvent = useCallback(
-    (entry: ActivityEntry) => {
-      const key = `admin.dashboard.event.${entry.event_type}`;
-      const translated = t(key);
-      return translated === key ? t("admin.dashboard.event.unknown") : translated;
-    },
-    [t],
-  );
-
-  const summary = useMemo(() => {
-    const counts = { error: 0, warning: 0, today: 0 };
-    const startOfDay = new Date();
-    startOfDay.setHours(0, 0, 0, 0);
-    for (const entry of entries) {
-      if (entry.severity === "error") counts.error++;
-      else if (entry.severity === "warning") counts.warning++;
-      if (new Date(entry.created_at) >= startOfDay) counts.today++;
-    }
-    return counts;
-  }, [entries]);
-
-  const severityOptions = useMemo<SelectProps.Options>(
-    () => [
-      { value: "all", label: t("admin.activity.filterSeverityAll") },
-      { value: "error", label: t("admin.activity.severityError") },
-      { value: "warning", label: t("admin.activity.severityWarning") },
-      { value: "success", label: t("admin.activity.severitySuccess") },
-      { value: "info", label: t("admin.activity.severityInfo") },
-    ],
-    [t],
-  );
-
-  const eventOptions = useMemo<SelectProps.Options>(() => {
-    const types = Array.from(new Set(entries.map((e) => e.event_type))).sort();
-    return [
-      { value: "all", label: t("admin.activity.filterEventAll") },
-      ...types.map((type) => {
-        const key = `admin.dashboard.event.${type}`;
-        const translated = t(key);
-        return { value: type, label: translated === key ? type : translated };
-      }),
-    ];
-  }, [entries, t]);
-
-  const { items, collectionProps, filterProps, filteredItemsCount, paginationProps, actions } =
-    useCollection(entries, {
-      filtering: {
-        empty: (
-          <Box textAlign="center" padding={{ vertical: "l" }} color="inherit">
-            <SpaceBetween size="xxs">
-              <Box variant="strong" color="inherit">
-                {t("admin.activity.empty")}
-              </Box>
-              <Box variant="small" color="inherit">
-                {t("admin.activity.emptyHint")}
-              </Box>
-            </SpaceBetween>
-          </Box>
-        ),
-        noMatch: (
-          <Box textAlign="center" padding={{ vertical: "l" }} color="inherit">
-            <Box variant="strong" color="inherit">
-              {t("admin.activity.noMatch")}
-            </Box>
-          </Box>
-        ),
-        filteringFunction: (item, filteringText) => {
-          if (severityFilter !== "all" && item.severity !== severityFilter) return false;
-          if (eventFilter !== "all" && item.event_type !== eventFilter) return false;
-          const text = filteringText.trim().toLowerCase();
-          if (!text) return true;
-          return [item.actor_label, item.actor_type, item.event_type, describeEvent(item)].some(
-            (field) => (field ?? "").toLowerCase().includes(text),
-          );
-        },
-      },
-      sorting: {},
-      pagination: { pageSize: PAGE_SIZE },
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState(false);
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [range, setRange] = useState("all");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const fetching = useRef(false);
+  const initialSelection = useRef(false);
+  const workspaceRef = useRef<HTMLDivElement>(null);
+  const selectionTrigger = useRef<HTMLElement | null>(null);
+  const [compactDetails, setCompactDetails] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  useEffect(() => {
+    const workspace = workspaceRef.current;
+    if (!workspace) return;
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry) setCompactDetails(entry.contentRect.width <= DETAIL_STACK_WIDTH);
     });
+    observer.observe(workspace);
+    return () => observer.disconnect();
+  }, []);
+  const fetchEntries = useCallback(async () => {
+    if (fetching.current) return;
+    fetching.current = true;
+    setRefreshing(true);
+    try {
+      const fetched = await getActivity(200);
+      setEntries(fetched);
+      const firstEntry = fetched[0];
+      if (!initialSelection.current && firstEntry) {
+        setSelectedId(firstEntry.id);
+        initialSelection.current = true;
+      }
+      setLastUpdated(new Date());
+      setError(false);
+    } catch {
+      setError(true);
+    } finally {
+      fetching.current = false;
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+  useEffect(() => { void fetchEntries(); }, [fetchEntries]);
+  useEffect(() => {
+    if (!autoRefresh) return;
+    const timer = setInterval(() => void fetchEntries(), 10000);
+    return () => clearInterval(timer);
+  }, [autoRefresh, fetchEntries]);
 
-  const filtersActive =
-    Boolean(filterProps.filteringText) || severityFilter !== "all" || eventFilter !== "all";
-
-  const clearFilters = () => {
-    actions.setFiltering("");
-    setSeverityFilter("all");
-    setEventFilter("all");
+  const eventLabel = (entry: ActivityEntry) => {
+    const key = `admin.dashboard.event.${entry.event_type}`;
+    return t(key, { defaultValue: entry.event_type });
   };
-
-  if (loading) {
-    return (
-      <ContentLayout header={<Header variant="h1">{t("admin.activity.title")}</Header>}>
-        <Box textAlign="center" padding="xxl">
-          <Spinner size="large" />
-        </Box>
-      </ContentLayout>
-    );
-  }
+  const severityLabel = (severity: string) => t(`admin.nodeEvents.severity.${severity}`);
+  const timeEntries = useMemo(() => {
+    const hours = RANGE_HOURS[range] ?? 0;
+    const cutoff = (lastUpdated?.getTime() ?? Date.now()) - hours * 3600000;
+    return entries.filter((entry) => hours === 0 || Date.parse(entry.created_at) >= cutoff);
+  }, [entries, range, lastUpdated]);
+  const searchableEntries = timeEntries.map((entry) => ({ ...entry, eventLabel: eventLabel(entry) }));
+  const { items, allPageItems, collectionProps, propertyFilterProps, paginationProps, filteredItemsCount, actions } =
+    useCollection<ActivityEntry>(searchableEntries, {
+      propertyFiltering: {
+        filteringProperties: [
+          { key: "severity", propertyLabel: t("admin.activity.col.severity"), groupValuesLabel: t("admin.activity.col.severity"),
+            operators: ["=", "!="].map((operator) => ({ operator, format: (value: unknown) => typeof value === "string" ? severityLabel(value) : "" })) },
+          { key: "target_type", propertyLabel: t("admin.activity.col.target"), groupValuesLabel: t("admin.activity.col.target"), operators: ["=", "!="] },
+          { key: "event_type", propertyLabel: t("admin.dashboard.col.event"), groupValuesLabel: t("admin.dashboard.col.event"), operators: ["=", "!="] },
+        ],
+        filteringOptions: [
+          ...SEVERITIES.map((severity) => ({ propertyKey: "severity", value: severity, label: severityLabel(severity) })),
+          ...Array.from(new Set(entries.flatMap((entry) => entry.target_type ? [entry.target_type] : [])))
+            .map((value) => ({ propertyKey: "target_type", value })),
+          ...Array.from(new Set(entries.map((entry) => entry.event_type))).map((value) => ({ propertyKey: "event_type", value })),
+        ],
+        empty: <Box padding="l" textAlign="center">{t("admin.activity.empty")}</Box>,
+        noMatch: <Box padding="l" textAlign="center">{t("admin.activity.noMatch")}</Box>,
+      },
+      sorting: { defaultState: { sortingColumn: { sortingField: "created_at" }, isDescending: true } },
+      pagination: { pageSize: 25 },
+    });
+  const selected = allPageItems.find((entry) => entry.id === selectedId);
+  useEffect(() => {
+    if (selectedId && !loading && !selected) setSelectedId(null);
+  }, [selectedId, selected, loading]);
+  const selectedItems = selected ? [selected] : [];
+  const severityTokens = propertyFilterProps.query.tokens.filter((token) => token.propertyKey === "severity");
+  const activeSummary = severityTokens.length === 0 ? "all"
+    : severityTokens.length === 1 && severityTokens[0]?.operator === "=" ? severityTokens[0].value
+    : severityTokens.length === 2 && severityTokens.every((token) => token.operator === "!=")
+      && severityTokens.some((token) => token.value === "error")
+      && severityTokens.some((token) => token.value === "warning") ? "info" : null;
+  const summary = SUMMARY_TYPES.map((severity) => ({
+    severity,
+    label: severity === "all" ? t("admin.activity.kpi.total") : severityLabel(severity),
+    count: timeEntries.filter((entry) => severity === "all" || (severity === "info"
+      ? entry.severity === "info" || entry.severity === "success"
+      : entry.severity === severity)).length,
+  }));
+  const severityOptions = [
+    { value: "all", label: t("admin.activity.filterSeverityAll") },
+    ...SEVERITIES.map((severity) => ({ value: severity, label: severityLabel(severity) })),
+  ];
+  const header = <Header counter={`(${filteredItemsCount ?? 0})`} description={t("admin.activity.tableHint")}
+    actions={<Pagination {...paginationProps} />}>{t("admin.activity.tableTitle")}</Header>;
+  const selectEntry = (id: string | null) => {
+    if (id) {
+      selectionTrigger.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    }
+    setSelectedId(id);
+    setDetailsOpen(id !== null);
+  };
+  const closeDetails = () => {
+    setDetailsOpen(false);
+    setSelectedId(null);
+    requestAnimationFrame(() => selectionTrigger.current?.focus());
+  };
+  const selection = {
+    selectedItems,
+    onSelectionChange: ({ detail }: { readonly detail: { readonly selectedItems: readonly ActivityEntry[] } }) => selectEntry(detail.selectedItems[0]?.id ?? null),
+    ariaLabels: { selectionGroupLabel: t("admin.activity.tableTitle"), itemSelectionLabel: (_data: unknown, item: ActivityEntry) => `${t("admin.activity.details")}: ${eventLabel(item)}` },
+  };
+  const columns = [
+    { id: "time", header: t("admin.dashboard.col.time"), sortingField: "created_at", minWidth: 200, cell: (item: ActivityEntry) => <span className="activity-log__nowrap">{new Date(item.created_at).toLocaleString()}</span> },
+    { id: "severity", header: t("admin.activity.col.severity"), sortingField: "severity", minWidth: 110, cell: (item: ActivityEntry) => <span className="activity-log__nowrap"><StatusIndicator type={item.severity}>{severityLabel(item.severity)}</StatusIndicator></span> },
+    { id: "event", header: t("admin.dashboard.col.event"), sortingField: "event_type", minWidth: 280, cell: (item: ActivityEntry) => <Button variant="inline-link" onClick={() => selectEntry(item.id)}>{eventLabel(item)}</Button> },
+    { id: "actor", header: t("admin.activity.col.actor"), sortingField: "actor_label", minWidth: 185, cell: (item: ActivityEntry) => item.actor_label || item.actor_type },
+    { id: "target", header: t("admin.activity.col.target"), minWidth: 105, cell: (item: ActivityEntry) => item.target_type || "—" },
+  ];
 
   return (
-    <ContentLayout
-      header={
-        <Header
-          variant="h1"
-          description={
-            <SpaceBetween size="xxs" direction="horizontal" alignItems="center">
-              <span>{t("admin.activity.subtitle")}</span>
-              {lastUpdated && (
-                <Box variant="small" color="text-status-inactive">
-                  {`· ${t("admin.activity.lastUpdated", { time: lastUpdated.toLocaleTimeString() })}`}
-                </Box>
-              )}
-            </SpaceBetween>
-          }
-          actions={
-            <Button
-              iconName="refresh"
-              ariaLabel={t("admin.activity.refresh")}
-              loading={refreshing}
-              onClick={refresh}
-            />
-          }
-        >
-          {t("admin.activity.title")}
-        </Header>
-      }
-    >
-      <SpaceBetween size="m">
-        {error && (
-          <Flashbar
-            items={[
-              { type: "error", content: error, dismissible: true, onDismiss: () => setError(null) },
-            ]}
-          />
-        )}
-
-        <Container>
-          <ColumnLayout columns={4} variant="text-grid" minColumnWidth={160}>
-            <div>
-              <Box variant="awsui-key-label">{t("admin.activity.kpi.total")}</Box>
-              <Box fontSize="heading-xl" fontWeight="bold">
-                {entries.length}
-              </Box>
-            </div>
-            <div>
-              <Box variant="awsui-key-label">{t("admin.activity.kpi.today")}</Box>
-              <Box fontSize="heading-xl" fontWeight="bold">
-                {summary.today}
-              </Box>
-            </div>
-            <div>
-              <Box variant="awsui-key-label">{t("admin.activity.kpi.error")}</Box>
-              <Box
-                fontSize="heading-xl"
-                fontWeight="bold"
-                color={summary.error > 0 ? "text-status-error" : "inherit"}
-              >
-                {summary.error}
-              </Box>
-            </div>
-            <div>
-              <Box variant="awsui-key-label">{t("admin.activity.kpi.warning")}</Box>
-              <Box
-                fontSize="heading-xl"
-                fontWeight="bold"
-                color={summary.warning > 0 ? "text-status-warning" : "inherit"}
-              >
-                {summary.warning}
-              </Box>
-            </div>
-          </ColumnLayout>
-        </Container>
-
-        <Table
-          {...collectionProps}
-          variant="container"
-          contentDensity="compact"
-          wrapLines
-          items={items}
-          trackBy="id"
-          header={
-            <Header
-              counter={
-                filteredItemsCount !== undefined && filteredItemsCount !== entries.length
-                  ? `(${filteredItemsCount}/${entries.length})`
-                  : `(${entries.length})`
-              }
-              description={t("admin.activity.tableHint")}
-            >
-              {t("admin.activity.tableTitle")}
-            </Header>
-          }
-          filter={
-            <SpaceBetween direction="horizontal" size="xs" alignItems="center">
-              <TextFilter
-                {...filterProps}
-                filteringPlaceholder={t("admin.activity.searchPlaceholder")}
-                filteringAriaLabel={t("admin.activity.searchPlaceholder")}
-                countText={
-                  filtersActive
-                    ? t("admin.activity.matchCount", { count: filteredItemsCount ?? 0 })
-                    : ""
-                }
-              />
-              <Select
-                selectedOption={
-                  severityOptions.find((o) => "value" in o && o.value === severityFilter) ?? null
-                }
-                options={severityOptions}
-                onChange={({ detail }) => {
-                  setSeverityFilter(detail.selectedOption.value ?? "all");
-                  actions.setCurrentPage(1);
-                }}
-                ariaLabel={t("admin.activity.filterSeverityAll")}
-              />
-              <Select
-                selectedOption={
-                  eventOptions.find((o) => "value" in o && o.value === eventFilter) ?? null
-                }
-                options={eventOptions}
-                onChange={({ detail }) => {
-                  setEventFilter(detail.selectedOption.value ?? "all");
-                  actions.setCurrentPage(1);
-                }}
-                ariaLabel={t("admin.activity.filterEventAll")}
-              />
-              {filtersActive && (
-                <Button variant="link" onClick={clearFilters}>
-                  {t("admin.activity.clearFilters")}
-                </Button>
-              )}
-            </SpaceBetween>
-          }
-          pagination={<Pagination {...paginationProps} />}
-          columnDefinitions={[
-            {
-              id: "severity",
-              header: t("admin.activity.col.severity"),
-              sortingField: "severity",
-              minWidth: 110,
-              cell: (item) => (
-                <Badge color={badgeColor[item.severity]}>
-                  {t(`admin.activity.severity${item.severity.charAt(0).toUpperCase()}${item.severity.slice(1)}`)}
-                </Badge>
-              ),
-            },
-            {
-              id: "actor",
-              header: t("admin.activity.col.actor"),
-              sortingField: "actor_label",
-              minWidth: 160,
-              cell: (item) => (
-                <SpaceBetween size="xxxs">
-                  <Box variant="strong" fontSize="body-s">
-                    {item.actor_label || item.actor_type}
-                  </Box>
-                  <Box variant="small" color="text-body-secondary">
-                    {item.actor_type}
-                  </Box>
-                </SpaceBetween>
-              ),
-            },
-            {
-              id: "event",
-              header: t("admin.dashboard.col.event"),
-              sortingField: "event_type",
-              minWidth: 240,
-              cell: (item) => (
-                <StatusIndicator type={indicatorType(item.severity)}>
-                  <Box variant="span" fontSize="body-s">
-                    {describeEvent(item)}
-                  </Box>
-                </StatusIndicator>
-              ),
-            },
-            {
-              id: "target",
-              header: t("admin.activity.col.target"),
-              cell: (item) =>
-                item.target_type ? (
-                  <Box variant="small" color="text-body-secondary">
-                    {item.target_type}
-                  </Box>
-                ) : (
-                  <Box color="text-status-inactive">—</Box>
-                ),
-            },
-            {
-              id: "time",
-              header: t("admin.dashboard.col.time"),
-              sortingField: "created_at",
-              minWidth: 170,
-              cell: (item) => formatDateTime(item.created_at),
-            },
-          ]}
-        />
+    <ContentLayout header={<Header variant="h1" description={t("admin.activity.subtitle")} actions={
+      <SpaceBetween size="s" direction="horizontal" alignItems="center">
+        <Button iconName="refresh" loading={refreshing} onClick={() => void fetchEntries()}>{t("admin.activity.refresh")}</Button>
+        <Toggle checked={autoRefresh} onChange={({ detail }) => setAutoRefresh(detail.checked)}>{t("admin.activity.autoRefresh")}</Toggle>
       </SpaceBetween>
+    }>{t("admin.activity.title")}</Header>}>
+      <div className="activity-screen">
+        <SpaceBetween size="m">
+          {error && <Alert type="error">{t("admin.activity.fetchError")}</Alert>}
+          <Cards items={summary} trackBy="severity"
+            cardsPerRow={[{ cards: 1 }, { minWidth: 360, cards: 2 }, { minWidth: 700, cards: 4 }]}
+            cardDefinition={{ header: (item) => item.label, sections: [{ id: "count", content: (item) => <Box fontSize="display-l" fontWeight="bold">{item.count}</Box> }] }} />
+          <Container>
+            <div className="activity-toolbar">
+              <PropertyFilter {...propertyFilterProps} filteringPlaceholder={t("admin.activity.searchPlaceholder")}
+                filteringAriaLabel={t("admin.activity.searchPlaceholder")}
+                countText={t("admin.activity.matchCount", { count: filteredItemsCount ?? 0 })}
+                onChange={propertyFilterProps.onChange}
+                i18nStrings={{ filteringAriaLabel: t("admin.activity.searchPlaceholder"), dismissAriaLabel: t("common.close"),
+                  clearFiltersText: t("admin.activity.clearFilters"), applyActionText: t("admin.activity.apply"),
+                  cancelActionText: t("common.cancel"), operationAndText: t("admin.activity.and"), operationOrText: t("admin.activity.or"),
+                  groupPropertiesText: t("admin.activity.addFilter"), groupValuesText: t("admin.activity.values") }} />
+              <Select selectedOption={severityOptions.find((option) => option.value === activeSummary) ?? null}
+                options={severityOptions} placeholder={t("admin.activity.filterSeverityAll")}
+                ariaLabel={t("admin.activity.filterSeverityAll")}
+                onChange={({ detail }) => {
+                  const severity = detail.selectedOption.value ?? "all";
+                  actions.setPropertyFiltering({ operation: "and", tokens: [
+                    ...propertyFilterProps.query.tokens.filter((token) => token.propertyKey !== "severity"),
+                    ...(severity === "all" ? [] : severity === "info" ? [
+                      { propertyKey: "severity", operator: "!=" as const, value: "error" },
+                      { propertyKey: "severity", operator: "!=" as const, value: "warning" },
+                    ] : [{ propertyKey: "severity", operator: "=" as const, value: severity }]),
+                  ] });
+                  actions.setCurrentPage(1);
+                }} />
+              <Select selectedOption={{ value: range, label: t(`admin.nodeEvents.range${range === "all" ? "All" : range}`) }}
+                options={Object.keys(RANGE_HOURS).map((value) => ({ value, label: t(`admin.nodeEvents.range${value === "all" ? "All" : value}`) }))}
+                ariaLabel={t("admin.nodeEvents.filterRange")} onChange={({ detail }) => {
+                  setRange(detail.selectedOption.value ?? "all"); actions.setCurrentPage(1);
+                }} />
+            </div>
+          </Container>
+          <div ref={workspaceRef} className={selected && !compactDetails ? "activity-workspace activity-workspace--selected" : "activity-workspace"}>
+            <div className="activity-log">
+              <div className="activity-log__table">
+                <Table {...collectionProps} {...selection} items={items} trackBy="id" selectionType="single"
+                  onRowClick={({ detail }) => selectEntry(detail.item.id)} loading={loading}
+                  loadingText={t("admin.activity.tableTitle")} header={header} contentDensity="compact" wrapLines
+                  columnDefinitions={columns} />
+              </div>
+              <div className="activity-log__cards">
+                <Cards {...selection} items={items} trackBy="id" selectionType="single" loading={loading}
+                  header={header} empty={collectionProps.empty}
+                  cardsPerRow={[{ cards: 1 }]} cardDefinition={{
+                    header: (item) => <Button variant="inline-link" onClick={() => selectEntry(item.id)}>{eventLabel(item)}</Button>,
+                    sections: columns.filter((column) => column.id !== "event").map((column) => ({ id: column.id, header: column.header, content: column.cell })),
+                  }} />
+              </div>
+            </div>
+            {selected && !compactDetails && <ActivityDetails entry={entries.find((entry) => entry.id === selected.id) ?? selected}
+              eventLabel={eventLabel(selected)} onClose={closeDetails} />}
+          </div>
+          <Modal visible={compactDetails && detailsOpen && !!selected} onDismiss={closeDetails}
+            header={t("admin.activity.details")} size="large">
+            {selected && <ActivityDetails entry={entries.find((entry) => entry.id === selected.id) ?? selected}
+              eventLabel={eventLabel(selected)} onClose={closeDetails} />}
+          </Modal>
+          {lastUpdated && <Box variant="small" color="text-body-secondary">{t("admin.activity.lastUpdated", { time: lastUpdated.toLocaleTimeString() })}</Box>}
+        </SpaceBetween>
+      </div>
     </ContentLayout>
   );
 }

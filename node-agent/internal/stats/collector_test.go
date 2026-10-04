@@ -110,9 +110,33 @@ func TestPendingClearedAfterSuccessfulSend(t *testing.T) {
 		t.Errorf("pending = %v, want empty", c.pending)
 	}
 
-	// A tick with no traffic must not re-post the already-delivered sample.
+	// Even with no traffic, flush now sends an empty online report.
 	if err := c.flush(context.Background(), nil, nil); err != nil {
-		t.Fatalf("empty flush should be a no-op, got %v", err)
+		t.Fatalf("empty flush should succeed, got %v", err)
+	}
+}
+
+// The empty report must be posted too, or an old positive report persists.
+func TestEmptyOnlineReportIsSent(t *testing.T) {
+	requests := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload client.StatsPayload
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Errorf("decode: %v", err)
+		}
+		if len(payload.OnlineUUIDs) != 0 {
+			t.Errorf("online=%v", payload.OnlineUUIDs)
+		}
+		requests++
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+	c := NewCollector(nil, client.NewAPIClient(&config.AgentConfig{NodeID: "node-1", APIKey: "key", ServerURL: srv.URL}), DefaultInterval, nil)
+	if err := c.flush(context.Background(), nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	if requests != 1 {
+		t.Fatalf("requests=%d", requests)
 	}
 }
 

@@ -6,6 +6,7 @@ import {
   Box,
   ButtonDropdown,
   Button,
+  Cards,
   ColumnLayout,
   Container,
   ContentLayout,
@@ -32,6 +33,7 @@ import {
 import type { AlertSeverity, DashboardAlerts, NodeIssue } from "../../api/types";
 import { useManualRefresh } from "../../hooks/useManualRefresh";
 import { formatDuration } from "../../utils/relativeTime";
+import "./responsiveMonitoring.css";
 
 // Matches the node agents' 10s heartbeat, so a change on a node reaches
 // the screen within roughly one beat plus one poll.
@@ -222,6 +224,96 @@ export default function Alerts() {
     setKindFilter("all");
   };
 
+  const filter = (
+    <ColumnLayout columns={3} minColumnWidth={200}>
+      <TextFilter
+        {...filterProps}
+        filteringPlaceholder={t("admin.alerts.searchPlaceholder")}
+        filteringAriaLabel={t("admin.alerts.searchPlaceholder")}
+        countText={filtersActive ? t("admin.alerts.matchCount", { count: filteredItemsCount ?? 0 }) : ""}
+      />
+      <Select
+        selectedOption={severityOptions.find((o) => "value" in o && o.value === severityFilter) ?? null}
+        options={severityOptions}
+        onChange={({ detail }) => {
+          setSeverityFilter(detail.selectedOption.value ?? "all");
+          actions.setCurrentPage(1);
+        }}
+        ariaLabel={t("admin.alerts.filterSeverityAll")}
+      />
+      <Select
+        selectedOption={kindOptions.find((o) => "value" in o && o.value === kindFilter) ?? null}
+        options={kindOptions}
+        onChange={({ detail }) => {
+          setKindFilter(detail.selectedOption.value ?? "all");
+          actions.setCurrentPage(1);
+        }}
+        ariaLabel={t("admin.alerts.filterKindAll")}
+      />
+    </ColumnLayout>
+  );
+
+  const renderLifecycle = (item: NodeIssue) => {
+    if (item.state === "stale") {
+      return <StatusIndicator type="pending">{t("admin.alerts.stateStale")}</StatusIndicator>;
+    }
+    if (isSilenced(item)) return <Badge color="grey">{t("admin.alerts.stateSilenced")}</Badge>;
+    if (item.acked) return <Badge color="blue">{t("admin.alerts.stateAcked")}</Badge>;
+    return <Badge color="red">{t("admin.alerts.stateFiring")}</Badge>;
+  };
+
+  const renderActions = (item: NodeIssue) => (
+    <ButtonDropdown
+      variant="inline-icon"
+      ariaLabel={t("admin.alerts.col.actions")}
+      expandToViewport
+      loading={actionBusy === item.alert_id}
+      items={[
+        {
+          id: item.acked ? "unack" : "ack",
+          text: item.acked ? t("admin.alerts.unack") : t("admin.alerts.ack"),
+          description: item.acked ? undefined : t("admin.alerts.ackHint"),
+        },
+        {
+          id: "ack-silence-60",
+          text: t("admin.alerts.ackSilence", { minutes: 60 }),
+          disabled: item.acked && isSilenced(item),
+        },
+        { id: "silence-15", text: t("admin.alerts.silenceFor", { minutes: 15 }) },
+        { id: "silence-60", text: t("admin.alerts.silenceFor", { minutes: 60 }) },
+        { id: "silence-240", text: t("admin.alerts.silenceFor", { minutes: 240 }) },
+        { id: "silence-1440", text: t("admin.alerts.silenceForDay") },
+        { id: "unsilence", text: t("admin.alerts.unsilence"), disabled: !isSilenced(item) },
+        {
+          id: "close",
+          text: t("admin.alerts.close"),
+          description: t("admin.alerts.closeHint"),
+          disabled: !isClosable(item),
+        },
+      ]}
+      onItemClick={({ detail }) => {
+        if (detail.id === "ack" || detail.id === "unack") {
+          void runAction(item.alert_id, () => acknowledgeAlert(item.alert_id, detail.id === "ack"));
+          return;
+        }
+        if (detail.id === "ack-silence-60") {
+          void runAction(item.alert_id, () => acknowledgeAndSilenceAlert(item.alert_id, 60));
+          return;
+        }
+        if (detail.id === "close") {
+          void runAction(item.alert_id, () => closeAlert(item.alert_id));
+          return;
+        }
+        if (detail.id === "unsilence") {
+          void runAction(item.alert_id, () => silenceAlert(item.alert_id, 0));
+          return;
+        }
+        const minutes = Number(detail.id.replace("silence-", ""));
+        void runAction(item.alert_id, () => silenceAlert(item.alert_id, minutes));
+      }}
+    />
+  );
+
   if (loading) {
     return (
       <ContentLayout header={<Header variant="h1">{t("admin.alerts.title")}</Header>}>
@@ -317,47 +409,35 @@ export default function Alerts() {
             </Header>
           }
         >
-          <Table
-            variant="embedded"
-            contentDensity="compact"
+          <Cards
             items={alerts?.items ?? []}
             trackBy="kind"
-            columnDefinitions={[
-              {
-                id: "alert",
-                header: t("admin.dashboard.col.alert"),
-                cell: (item) => (
-                  <StatusIndicator type={indicatorType(item.severity)}>
-                    {t(`admin.dashboard.alert.${item.kind}`, { count: item.count })}
-                  </StatusIndicator>
-                ),
-              },
-              {
-                id: "detail",
-                header: t("admin.dashboard.col.detail"),
-                cell: (item) => (
-                  <Box variant="small" color="text-body-secondary">
-                    {t(`admin.dashboard.alert.${item.kind}_desc`)}
-                  </Box>
-                ),
-              },
-              {
-                id: "count",
-                header: t("admin.alerts.col.count"),
-                minWidth: 90,
-                cell: (item) => item.count,
-              },
-              {
-                id: "action",
-                header: t("admin.dashboard.col.action"),
-                minWidth: 120,
-                cell: () => (
-                  <Link onFollow={() => navigate("/admin/nodes")}>
-                    {t("admin.alerts.goToNodes")}
-                  </Link>
-                ),
-              },
-            ]}
+            cardsPerRow={[{ cards: 1 }, { minWidth: 550, cards: 2 }]}
+            cardDefinition={{
+              header: (item) => (
+                <StatusIndicator type={indicatorType(item.severity)}>
+                  {t(`admin.dashboard.alert.${item.kind}`, { count: item.count })}
+                </StatusIndicator>
+              ),
+              sections: [
+                {
+                  id: "detail",
+                  content: (item) => (
+                    <Box variant="small" color="text-body-secondary">
+                      {t(`admin.dashboard.alert.${item.kind}_desc`)}
+                    </Box>
+                  ),
+                },
+                {
+                  id: "action",
+                  content: () => (
+                    <Link onFollow={() => navigate("/admin/nodes")}>
+                      {t("admin.alerts.goToNodes")}
+                    </Link>
+                  ),
+                },
+              ],
+            }}
             empty={
               <Box textAlign="center" padding="m">
                 <StatusIndicator type="success">{t("admin.dashboard.noAlerts")}</StatusIndicator>
@@ -366,29 +446,8 @@ export default function Alerts() {
           />
         </Container>
 
-        <Container
-          header={
-            <Header variant="h2" description={t("admin.alerts.approvalsHint")}>
-              {t("admin.alerts.approvalsTitle")}
-            </Header>
-          }
-        >
-          <SpaceBetween direction="horizontal" size="s" alignItems="center">
-            {(alerts?.pending_requests ?? 0) > 0 ? (
-              <>
-                <Badge color="blue">
-                  {t("admin.alerts.approvalsCount", { count: alerts?.pending_requests ?? 0 })}
-                </Badge>
-                <Link onFollow={() => navigate("/admin/plan-requests")}>
-                  {t("admin.alerts.goToRequests")}
-                </Link>
-              </>
-            ) : (
-              <StatusIndicator type="success">{t("admin.alerts.approvalsNone")}</StatusIndicator>
-            )}
-          </SpaceBetween>
-        </Container>
-
+        <div className="monitoring-collection">
+          <div className="monitoring-collection__table">
         <Table
           {...collectionProps}
           variant="container"
@@ -408,47 +467,7 @@ export default function Alerts() {
               {t("admin.alerts.tableTitle")}
             </Header>
           }
-          filter={
-            <SpaceBetween direction="horizontal" size="xs" alignItems="center">
-              <TextFilter
-                {...filterProps}
-                filteringPlaceholder={t("admin.alerts.searchPlaceholder")}
-                filteringAriaLabel={t("admin.alerts.searchPlaceholder")}
-                countText={
-                  filtersActive
-                    ? t("admin.alerts.matchCount", { count: filteredItemsCount ?? 0 })
-                    : ""
-                }
-              />
-              <Select
-                selectedOption={
-                  severityOptions.find((o) => "value" in o && o.value === severityFilter) ?? null
-                }
-                options={severityOptions}
-                onChange={({ detail }) => {
-                  setSeverityFilter(detail.selectedOption.value ?? "all");
-                  actions.setCurrentPage(1);
-                }}
-                ariaLabel={t("admin.alerts.filterSeverityAll")}
-              />
-              <Select
-                selectedOption={
-                  kindOptions.find((o) => "value" in o && o.value === kindFilter) ?? null
-                }
-                options={kindOptions}
-                onChange={({ detail }) => {
-                  setKindFilter(detail.selectedOption.value ?? "all");
-                  actions.setCurrentPage(1);
-                }}
-                ariaLabel={t("admin.alerts.filterKindAll")}
-              />
-              {filtersActive && (
-                <Button variant="link" onClick={clearFilters}>
-                  {t("admin.alerts.clearFilters")}
-                </Button>
-              )}
-            </SpaceBetween>
-          }
+          filter={<SpaceBetween size="xs">{filter}{filtersActive && <Button variant="link" onClick={clearFilters}>{t("admin.alerts.clearFilters")}</Button>}</SpaceBetween>}
           pagination={<Pagination {...paginationProps} />}
           columnDefinitions={[
             {
@@ -457,20 +476,21 @@ export default function Alerts() {
               sortingField: "node_name",
               minWidth: 130,
               cell: (item) => (
-                <StatusIndicator type={indicatorType(item.severity)}>
-                  {item.node_deleted ? (
-                    // The detail page would 404, so the name is shown as the
-                    // snapshot it now is rather than as a link.
-                    <SpaceBetween size="xxs" direction="horizontal" alignItems="center">
-                      <span>{item.node_name || "—"}</span>
-                      <Badge color="grey">{t("admin.alerts.nodeDeleted")}</Badge>
-                    </SpaceBetween>
-                  ) : (
-                    <Link onFollow={() => navigate(`/admin/nodes/${item.node_id}`)}>
-                      {item.node_name}
-                    </Link>
-                  )}
-                </StatusIndicator>
+                <span className="monitoring-collection__node-name">
+                  <StatusIndicator type={indicatorType(item.severity)}>
+                    {item.node_deleted ? (
+                      <>
+                        <span>{item.node_name || "—"}</span>
+                        {" "}
+                        <Badge color="grey">{t("admin.alerts.nodeDeleted")}</Badge>
+                      </>
+                    ) : (
+                      <Link onFollow={() => navigate(`/admin/nodes/${item.node_id}`)}>
+                        {item.node_name}
+                      </Link>
+                    )}
+                  </StatusIndicator>
+                </span>
               ),
             },
             {
@@ -514,92 +534,53 @@ export default function Alerts() {
               id: "lifecycle",
               header: t("admin.alerts.col.lifecycle"),
               minWidth: 150,
-              cell: (item) => {
-                const silenced = isSilenced(item);
-                if (item.state === "stale") {
-                  return (
-                    <StatusIndicator type="pending">{t("admin.alerts.stateStale")}</StatusIndicator>
-                  );
-                }
-                if (silenced) {
-                  return <Badge color="grey">{t("admin.alerts.stateSilenced")}</Badge>;
-                }
-                if (item.acked) {
-                  return <Badge color="blue">{t("admin.alerts.stateAcked")}</Badge>;
-                }
-                // One colour per lifecycle state. Keying this off severity gave two
-                // different colours to the identical word "Firing", which reads as
-                // an undocumented sub-state; severity is already the Issue badge's
-                // job one column over.
-                return <Badge color="red">{t("admin.alerts.stateFiring")}</Badge>;
-              },
+              cell: renderLifecycle,
             },
             {
               id: "actions",
               header: "",
               minWidth: 60,
-              cell: (item) => (
-                <ButtonDropdown
-                  variant="inline-icon"
-                  ariaLabel={t("admin.alerts.col.actions")}
-                  expandToViewport
-                  loading={actionBusy === item.alert_id}
-                  items={[
-                    {
-                      id: item.acked ? "unack" : "ack",
-                      text: item.acked ? t("admin.alerts.unack") : t("admin.alerts.ack"),
-                      description: item.acked ? undefined : t("admin.alerts.ackHint"),
-                    },
-                    {
-                      id: "ack-silence-60",
-                      text: t("admin.alerts.ackSilence", { minutes: 60 }),
-                      disabled: item.acked && isSilenced(item),
-                    },
-                    { id: "silence-15", text: t("admin.alerts.silenceFor", { minutes: 15 }) },
-                    { id: "silence-60", text: t("admin.alerts.silenceFor", { minutes: 60 }) },
-                    { id: "silence-240", text: t("admin.alerts.silenceFor", { minutes: 240 }) },
-                    { id: "silence-1440", text: t("admin.alerts.silenceForDay") },
-                    {
-                      id: "unsilence",
-                      text: t("admin.alerts.unsilence"),
-                      disabled: !isSilenced(item),
-                    },
-                    {
-                      id: "close",
-                      text: t("admin.alerts.close"),
-                      description: t("admin.alerts.closeHint"),
-                      disabled: !isClosable(item),
-                    },
-                  ]}
-                  onItemClick={({ detail }) => {
-                    if (detail.id === "ack" || detail.id === "unack") {
-                      void runAction(item.alert_id, () =>
-                        acknowledgeAlert(item.alert_id, detail.id === "ack"),
-                      );
-                      return;
-                    }
-                    if (detail.id === "ack-silence-60") {
-                      void runAction(item.alert_id, () =>
-                        acknowledgeAndSilenceAlert(item.alert_id, 60),
-                      );
-                      return;
-                    }
-                    if (detail.id === "close") {
-                      void runAction(item.alert_id, () => closeAlert(item.alert_id));
-                      return;
-                    }
-                    if (detail.id === "unsilence") {
-                      void runAction(item.alert_id, () => silenceAlert(item.alert_id, 0));
-                      return;
-                    }
-                    const minutes = Number(detail.id.replace("silence-", ""));
-                    void runAction(item.alert_id, () => silenceAlert(item.alert_id, minutes));
-                  }}
-                />
-              ),
+              cell: renderActions,
             },
           ]}
         />
+          </div>
+          <div className="monitoring-collection__cards">
+            <Cards
+              items={items}
+              trackBy={(item) => `${item.node_id}:${item.kind}`}
+              cardsPerRow={[{ cards: 1 }, { minWidth: 600, cards: 2 }]}
+              header={<Header counter={`(${filteredItemsCount ?? issues.length}/${issues.length})`} description={t("admin.alerts.tableHint")}>{t("admin.alerts.tableTitle")}</Header>}
+              filter={<SpaceBetween size="xs">{filter}{filtersActive && <Button variant="link" onClick={clearFilters}>{t("admin.alerts.clearFilters")}</Button>}</SpaceBetween>}
+              pagination={<Pagination {...paginationProps} />}
+              empty={issues.length === 0 ? <Box padding="l" textAlign="center">{t("admin.alerts.empty")}</Box> : <Box padding="l" textAlign="center">{t("admin.alerts.noMatch")}</Box>}
+              cardDefinition={{
+                header: (item) => (
+                  <StatusIndicator type={indicatorType(item.severity)}>
+                    {item.node_deleted ? (
+                      <SpaceBetween direction="horizontal" size="xxs" alignItems="center">
+                        <span>{item.node_name || "—"}</span>
+                        <Badge color="grey">{t("admin.alerts.nodeDeleted")}</Badge>
+                      </SpaceBetween>
+                    ) : (
+                      <Link onFollow={() => navigate(`/admin/nodes/${item.node_id}`)}>
+                        {item.node_name}
+                      </Link>
+                    )}
+                  </StatusIndicator>
+                ),
+                sections: [
+                  { id: "issue", header: t("admin.dashboard.col.issue"), content: (item) => <Badge color={badgeColor[item.severity]}>{t(`admin.dashboard.issue.${item.kind}`)}</Badge> },
+                  { id: "location", header: t("admin.nodes.col.countryRegion"), content: (item) => [item.country, item.region].filter(Boolean).join(" · ") || "—" },
+                  { id: "reading", header: t("admin.dashboard.col.reading"), content: renderReading },
+                  { id: "duration", header: t("admin.alerts.col.duration"), content: (item) => item.duration_seconds > 0 ? formatDuration(t, item.duration_seconds) : "—" },
+                  { id: "lifecycle", header: t("admin.alerts.col.lifecycle"), content: renderLifecycle },
+                  { id: "actions", header: t("admin.alerts.col.actions"), content: renderActions },
+                ],
+              }}
+            />
+          </div>
+        </div>
       </SpaceBetween>
     </ContentLayout>
   );

@@ -517,7 +517,10 @@ function UserDetailPage() {
             fitHeight
             header={<Header variant="h2" counter={`(${user.devices.length})`}>{t("admin.userDetail.devices")}</Header>}
           >
-            <Table
+            <SpaceBetween size="s">
+              <Box variant="small" color="text-body-secondary">{t("admin.userDetail.deviceCountHint", { count: user.devices.length })}</Box>
+              <Box variant="small" color="text-body-secondary">{t("admin.userDetail.onlineUnknown")}</Box>
+              <Table
               variant="embedded"
               items={user.devices}
               columnDefinitions={[
@@ -538,7 +541,8 @@ function UserDetailPage() {
                 },
               ]}
               empty={<Box textAlign="center">{t("admin.userDetail.devicesEmpty")}</Box>}
-            />
+              />
+            </SpaceBetween>
           </Container>
 
           <Container

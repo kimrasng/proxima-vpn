@@ -73,7 +73,10 @@ jobs:
       # map corrupts quota or eviction state silently instead of crashing. Adds
       # no measurable time here - the slow package is slow from sleeps, not CPU.
       - name: Test api-server
-        run: cd api-server && go test -race ./...
+        # DB-backed packages share the PostgreSQL service above. Serial package
+        # execution prevents a test cleanup transaction from racing Migrate's
+        # global backfill across package binaries.
+        run: cd api-server && go test -p 1 -race ./...
       - name: Test node-agent
         run: cd node-agent && go test -race ./...
       - name: Test pkg
@@ -128,6 +131,10 @@ jobs:
         run: cd web && npm ci
       - name: Lint
         run: cd web && npm run lint
+      # A key in en.json but missing from ko.json or zh.json renders as the raw
+      # dotted path in that language. Lint and build both pass regardless.
+      - name: Check locale key parity
+        run: cd web && npm run check:locales
       # Every server route lives under /api/v1. A call written as /api/... still
       # compiles, passes lint and looks right in review, then 404s only for
       # whoever exercises that one path - device deletion shipped that way.

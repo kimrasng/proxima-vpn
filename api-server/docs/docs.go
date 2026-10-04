@@ -56,7 +56,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/github_com_proximavpn_proxima-vpn_api-server_internal_services.Entry"
+                                "$ref": "#/definitions/services.Entry"
                             }
                         }
                     },
@@ -79,7 +79,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Acknowledging removes an alert from the notifiable count while leaving it visible. Silencing suppresses notifications for a bounded window without stopping evaluation.",
+                "description": "Acknowledging removes an alert from the notifiable count while leaving it visible. Silencing suppresses notifications for a bounded window without stopping evaluation. Closing resolves an alert the evaluator cannot resolve itself, and is accepted only for a stale alert or one whose node no longer exists.",
                 "consumes": [
                     "application/json"
                 ],
@@ -89,7 +89,7 @@ const docTemplate = `{
                 "tags": [
                     "admin"
                 ],
-                "summary": "Acknowledge or silence an alert",
+                "summary": "Acknowledge, silence or close an alert",
                 "parameters": [
                     {
                         "type": "string",
@@ -99,12 +99,12 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "description": "Acknowledge flag or silence duration in minutes",
+                        "description": "Acknowledge flag, silence duration in minutes, or close flag",
                         "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.patchAlertRequest"
+                            "$ref": "#/definitions/handlers.patchAlertRequest"
                         }
                     }
                 ],
@@ -129,6 +129,15 @@ const docTemplate = `{
                     },
                     "404": {
                         "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -160,7 +169,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/internal_handlers.announcementItem"
+                                "$ref": "#/definitions/handlers.announcementItem"
                             }
                         }
                     },
@@ -199,7 +208,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.createAnnouncementRequest"
+                            "$ref": "#/definitions/handlers.createAnnouncementRequest"
                         }
                     }
                 ],
@@ -207,7 +216,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.announcementItem"
+                            "$ref": "#/definitions/handlers.announcementItem"
                         }
                     },
                     "400": {
@@ -263,7 +272,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.updateAnnouncementRequest"
+                            "$ref": "#/definitions/handlers.updateAnnouncementRequest"
                         }
                     }
                 ],
@@ -271,7 +280,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.announcementItem"
+                            "$ref": "#/definitions/handlers.announcementItem"
                         }
                     },
                     "400": {
@@ -364,7 +373,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.disable2FARequest"
+                            "$ref": "#/definitions/handlers.disable2FARequest"
                         }
                     }
                 ],
@@ -424,7 +433,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.enable2FARequest"
+                            "$ref": "#/definitions/handlers.enable2FARequest"
                         }
                     }
                 ],
@@ -553,7 +562,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.loginRequest"
+                            "$ref": "#/definitions/handlers.loginRequest"
                         }
                     }
                 ],
@@ -561,7 +570,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.loginResponse"
+                            "$ref": "#/definitions/handlers.loginResponse"
                         }
                     },
                     "400": {
@@ -739,7 +748,7 @@ const docTemplate = `{
                         "name": "body",
                         "in": "body",
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.terminateSessionRequest"
+                            "$ref": "#/definitions/handlers.terminateSessionRequest"
                         }
                     }
                 ],
@@ -813,7 +822,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.updateInboundRequest"
+                            "$ref": "#/definitions/handlers.updateInboundRequest"
                         }
                     }
                 ],
@@ -821,7 +830,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.inboundResponse"
+                            "$ref": "#/definitions/handlers.inboundResponse"
                         }
                     },
                     "400": {
@@ -926,7 +935,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.inboundResponse"
+                            "$ref": "#/definitions/handlers.inboundResponse"
                         }
                     },
                     "404": {
@@ -962,7 +971,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/internal_handlers.nodeGroupListItem"
+                                "$ref": "#/definitions/handlers.nodeGroupListItem"
                             }
                         }
                     },
@@ -1001,7 +1010,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.createNodeGroupRequest"
+                            "$ref": "#/definitions/handlers.createNodeGroupRequest"
                         }
                     }
                 ],
@@ -1009,7 +1018,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.nodeGroupListItem"
+                            "$ref": "#/definitions/handlers.nodeGroupListItem"
                         }
                     },
                     "400": {
@@ -1061,7 +1070,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.nodeGroupDetail"
+                            "$ref": "#/definitions/handlers.nodeGroupDetail"
                         }
                     },
                     "404": {
@@ -1115,7 +1124,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.createNodeGroupRequest"
+                            "$ref": "#/definitions/handlers.createNodeGroupRequest"
                         }
                     }
                 ],
@@ -1235,7 +1244,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.setNodesRequest"
+                            "$ref": "#/definitions/handlers.setNodesRequest"
                         }
                     }
                 ],
@@ -1298,7 +1307,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/internal_handlers.nodeListItem"
+                                "$ref": "#/definitions/handlers.nodeListItem"
                             }
                         }
                     },
@@ -1314,6 +1323,31 @@ const docTemplate = `{
                 }
             }
         },
+        "/admin/nodes/event-filters": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns the event types and severities available for filtering node events",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-nodes"
+                ],
+                "summary": "List node event filter options",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.nodeEventFiltersResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/admin/nodes/token": {
             "post": {
                 "security": [
@@ -1321,7 +1355,10 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Creates a one-time registration token and install command for a new node",
+                "description": "Records the supplied provisioning configuration against a pending node and returns a one-time registration token plus a tailored install command",
+                "consumes": [
+                    "application/json"
+                ],
                 "produces": [
                     "application/json"
                 ],
@@ -1329,11 +1366,30 @@ const docTemplate = `{
                     "admin-nodes"
                 ],
                 "summary": "Generate node registration token",
+                "parameters": [
+                    {
+                        "description": "Provisioning configuration",
+                        "name": "body",
+                        "in": "body",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.provisionNodeRequest"
+                        }
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.generateTokenResponse"
+                            "$ref": "#/definitions/handlers.generateTokenResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
                         }
                     },
                     "500": {
@@ -1376,7 +1432,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.nodeListItem"
+                            "$ref": "#/definitions/handlers.nodeListItem"
                         }
                     },
                     "404": {
@@ -1421,7 +1477,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.updateNodeRequest"
+                            "$ref": "#/definitions/handlers.updateNodeRequest"
                         }
                     }
                 ],
@@ -1507,6 +1563,79 @@ const docTemplate = `{
                 }
             }
         },
+        "/admin/nodes/{id}/events": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns one node's events newest first, filtered by type, severity and time range",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-nodes"
+                ],
+                "summary": "Get node events",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Node ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Comma-separated event types",
+                        "name": "event_type",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Comma-separated severities",
+                        "name": "severity",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Only events within this many hours",
+                        "name": "hours",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page size (default 25, max 200)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Rows to skip",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/services.NodeEventPage"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/admin/nodes/{id}/tls": {
             "get": {
                 "security": [
@@ -1535,7 +1664,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.tlsStatusResponse"
+                            "$ref": "#/definitions/handlers.tlsStatusResponse"
                         }
                     },
                     "404": {
@@ -1582,7 +1711,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.issueCertificateRequest"
+                            "$ref": "#/definitions/handlers.issueCertificateRequest"
                         }
                     }
                 ],
@@ -1654,7 +1783,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.xrayVersionResponse"
+                            "$ref": "#/definitions/handlers.xrayVersionResponse"
                         }
                     },
                     "404": {
@@ -1701,7 +1830,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.updateXrayRequest"
+                            "$ref": "#/definitions/handlers.updateXrayRequest"
                         }
                     }
                 ],
@@ -1709,7 +1838,7 @@ const docTemplate = `{
                     "202": {
                         "description": "Accepted",
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.updateXrayResponse"
+                            "$ref": "#/definitions/handlers.updateXrayResponse"
                         }
                     },
                     "400": {
@@ -1772,7 +1901,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/internal_handlers.inboundResponse"
+                                "$ref": "#/definitions/handlers.inboundResponse"
                             }
                         }
                     },
@@ -1818,7 +1947,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.createInboundRequest"
+                            "$ref": "#/definitions/handlers.createInboundRequest"
                         }
                     }
                 ],
@@ -1826,7 +1955,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.inboundResponse"
+                            "$ref": "#/definitions/handlers.inboundResponse"
                         }
                     },
                     "400": {
@@ -1899,25 +2028,25 @@ const docTemplate = `{
                 }
             }
         },
-        "/admin/plan-requests": {
+        "/admin/orders": {
             "get": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns all plan requests with optional status filter",
+                "description": "Returns all plan orders, optionally filtered by status",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "admin-plan-requests"
+                    "admin-orders"
                 ],
-                "summary": "List plan requests",
+                "summary": "List plan orders",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Filter by status (pending, approved, rejected)",
+                        "description": "Filter by status (pending, paid, cancelled)",
                         "name": "status",
                         "in": "query"
                     }
@@ -1928,7 +2057,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/internal_handlers.adminPlanRequestItem"
+                                "$ref": "#/definitions/handlers.adminOrderItem"
                             }
                         }
                     },
@@ -1944,47 +2073,35 @@ const docTemplate = `{
                 }
             }
         },
-        "/admin/plan-requests/{id}": {
-            "put": {
+        "/admin/orders/{id}/audit": {
+            "get": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "description": "Approve or reject a pending plan request",
-                "consumes": [
-                    "application/json"
-                ],
+                "description": "Returns one order with its user and plan, the checkout request context captured with it, the plan expiry on either side of the grant, and every payment confirmation attempt newest-first. Raw provider payloads are never included.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "admin-plan-requests"
+                    "admin-orders"
                 ],
-                "summary": "Review plan request",
+                "summary": "Get plan order audit record",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Plan Request ID",
+                        "description": "Order ID",
                         "name": "id",
                         "in": "path",
                         "required": true
-                    },
-                    {
-                        "description": "Action (approve or reject)",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/internal_handlers.reviewRequestBody"
-                        }
                     }
                 ],
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.adminPlanRequestItem"
+                            "$ref": "#/definitions/handlers.adminOrderAuditResponse"
                         }
                     },
                     "400": {
@@ -1998,6 +2115,113 @@ const docTemplate = `{
                     },
                     "404": {
                         "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/orders/{id}/cancel": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Admin cancels a pending order",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-orders"
+                ],
+                "summary": "Cancel a plan order",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Order ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/orders/{id}/pay": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Admin confirms payment was received for a pending order, granting the plan",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-orders"
+                ],
+                "summary": "Mark a plan order paid",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Order ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.adminOrderItem"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -2038,7 +2262,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/internal_handlers.planResponse"
+                                "$ref": "#/definitions/handlers.planResponse"
                             }
                         }
                     },
@@ -2077,7 +2301,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.createPlanRequest"
+                            "$ref": "#/definitions/handlers.createPlanRequest"
                         }
                     }
                 ],
@@ -2085,7 +2309,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.planResponse"
+                            "$ref": "#/definitions/handlers.planResponse"
                         }
                     },
                     "400": {
@@ -2116,7 +2340,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns a single plan by ID with node group info",
+                "description": "Returns a single plan by ID with node group info, pricing and feature bullets",
                 "produces": [
                     "application/json"
                 ],
@@ -2137,7 +2361,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.planResponse"
+                            "$ref": "#/definitions/handlers.planResponse"
                         }
                     },
                     "404": {
@@ -2182,7 +2406,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.updatePlanRequest"
+                            "$ref": "#/definitions/handlers.updatePlanRequest"
                         }
                     }
                 ],
@@ -2190,7 +2414,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.planResponse"
+                            "$ref": "#/definitions/handlers.planResponse"
                         }
                     },
                     "400": {
@@ -2276,6 +2500,224 @@ const docTemplate = `{
                 }
             }
         },
+        "/admin/promotions": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns every promotion code, newest first",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-promotions"
+                ],
+                "summary": "List promotion codes",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/handlers.promotionResponse"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Creates a promotion code with a discount, validity window, and eligibility rules",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-promotions"
+                ],
+                "summary": "Create a promotion code",
+                "parameters": [
+                    {
+                        "description": "Promotion code fields",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.promotionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.promotionResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/promotions/{id}": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Replaces a promotion code's fields",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-promotions"
+                ],
+                "summary": "Update a promotion code",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Promotion ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Promotion code fields",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.promotionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.promotionResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Deletes a promotion code. Orders that already reserved it keep their discount snapshot.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-promotions"
+                ],
+                "summary": "Delete a promotion code",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Promotion ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/admin/settings": {
             "get": {
                 "security": [
@@ -2297,7 +2739,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/internal_handlers.settingItem"
+                                "$ref": "#/definitions/handlers.settingItem"
                             }
                         }
                     },
@@ -2414,7 +2856,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns offline nodes, resource-pressured nodes, and pending approvals",
+                "description": "Returns offline nodes and resource-pressured nodes",
                 "produces": [
                     "application/json"
                 ],
@@ -2426,7 +2868,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_proximavpn_proxima-vpn_api-server_internal_services.Alerts"
+                            "$ref": "#/definitions/services.Alerts"
                         }
                     },
                     "500": {
@@ -2476,7 +2918,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/github_com_proximavpn_proxima-vpn_api-server_internal_services.NodeTraffic"
+                                "$ref": "#/definitions/services.NodeTraffic"
                             }
                         }
                     },
@@ -2577,7 +3019,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.userListResponse"
+                            "$ref": "#/definitions/handlers.userListResponse"
                         }
                     },
                     "500": {
@@ -2615,7 +3057,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.createUserRequest"
+                            "$ref": "#/definitions/handlers.createUserRequest"
                         }
                     }
                 ],
@@ -2623,7 +3065,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.createUserResponse"
+                            "$ref": "#/definitions/handlers.createUserResponse"
                         }
                     },
                     "400": {
@@ -2684,7 +3126,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.userDetailResponse"
+                            "$ref": "#/definitions/handlers.userDetailResponse"
                         }
                     },
                     "404": {
@@ -2738,7 +3180,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.updateUserRequest"
+                            "$ref": "#/definitions/handlers.updateUserRequest"
                         }
                     }
                 ],
@@ -2860,7 +3302,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/github_com_proximavpn_proxima-vpn_api-server_internal_services.LoginEntry"
+                                "$ref": "#/definitions/services.LoginEntry"
                             }
                         }
                     },
@@ -2965,7 +3407,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.userTrafficResponse"
+                            "$ref": "#/definitions/handlers.userTrafficResponse"
                         }
                     },
                     "404": {
@@ -3009,7 +3451,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.userLoginRequest"
+                            "$ref": "#/definitions/handlers.userLoginRequest"
                         }
                     }
                 ],
@@ -3017,7 +3459,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.loginResponse"
+                            "$ref": "#/definitions/handlers.loginResponse"
                         }
                     },
                     "400": {
@@ -3070,7 +3512,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.registerRequest"
+                            "$ref": "#/definitions/handlers.registerRequest"
                         }
                     }
                 ],
@@ -3078,7 +3520,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.registerResponse"
+                            "$ref": "#/definitions/handlers.registerResponse"
                         }
                     },
                     "400": {
@@ -3125,7 +3567,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.updateInfoResponse"
+                            "$ref": "#/definitions/handlers.updateInfoResponse"
                         }
                     },
                     "204": {
@@ -3227,7 +3669,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.xrayUpdateInfoResponse"
+                            "$ref": "#/definitions/handlers.xrayUpdateInfoResponse"
                         }
                     },
                     "204": {
@@ -3367,7 +3809,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/internal_handlers.deviceResponse"
+                                "$ref": "#/definitions/handlers.deviceResponse"
                             }
                         }
                     },
@@ -3406,7 +3848,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.createDeviceRequest"
+                            "$ref": "#/definitions/handlers.createDeviceRequest"
                         }
                     }
                 ],
@@ -3414,7 +3856,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.deviceResponse"
+                            "$ref": "#/definitions/handlers.deviceResponse"
                         }
                     },
                     "400": {
@@ -3514,7 +3956,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/internal_handlers.userNodeItem"
+                                "$ref": "#/definitions/handlers.userNodeItem"
                             }
                         }
                     },
@@ -3530,28 +3972,28 @@ const docTemplate = `{
                 }
             }
         },
-        "/user/plan-requests": {
+        "/user/orders": {
             "get": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns the authenticated user's plan requests",
+                "description": "Returns the authenticated user's plan orders",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "user-plans"
+                    "user-orders"
                 ],
-                "summary": "List my plan requests",
+                "summary": "List my orders",
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/internal_handlers.planRequestResponse"
+                                "$ref": "#/definitions/handlers.orderResponse"
                             }
                         }
                     },
@@ -3572,7 +4014,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Submit a request for a subscription plan",
+                "description": "Places a pending order for a plan at one of its priced durations",
                 "consumes": [
                     "application/json"
                 ],
@@ -3580,17 +4022,17 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "user-plans"
+                    "user-orders"
                 ],
-                "summary": "Create plan request",
+                "summary": "Create a plan order",
                 "parameters": [
                     {
-                        "description": "Plan ID to request",
+                        "description": "Plan and duration to order",
                         "name": "body",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.createPlanRequestBody"
+                            "$ref": "#/definitions/handlers.createOrderRequest"
                         }
                     }
                 ],
@@ -3598,7 +4040,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.planRequestResponse"
+                            "$ref": "#/definitions/handlers.orderResponse"
                         }
                     },
                     "400": {
@@ -3631,6 +4073,232 @@ const docTemplate = `{
                 }
             }
         },
+        "/user/orders/{id}/cancel": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Cancels one of the authenticated user's own pending orders",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "user-orders"
+                ],
+                "summary": "Cancel my order",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Order ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.orderResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/user/orders/{id}/checkout": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Hands an existing pending order to the named payment provider and returns where to send the browser",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "user-orders"
+                ],
+                "summary": "Start a checkout for a pending order",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Order ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Which provider to check out with",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.startCheckoutRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.startCheckoutResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/user/orders/{id}/promotion": {
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Attaches or replaces a promotion code on one of the authenticated user's own pending orders",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "user-orders"
+                ],
+                "summary": "Apply a promotion code to my pending order",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Order ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Promotion code to apply",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.applyPromotionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.orderResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/user/payment-providers": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns every registered payment provider and how checking out with it behaves",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "user-orders"
+                ],
+                "summary": "List available payment providers",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/handlers.paymentProviderItem"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/user/plans": {
             "get": {
                 "security": [
@@ -3652,7 +4320,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/internal_handlers.userPlanItem"
+                                "$ref": "#/definitions/handlers.userPlanItem"
                             }
                         }
                     },
@@ -3726,7 +4394,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.updateProfileRequest"
+                            "$ref": "#/definitions/handlers.updateProfileRequest"
                         }
                     }
                 ],
@@ -3826,7 +4494,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.userSummary"
+                            "$ref": "#/definitions/handlers.userSummary"
                         }
                     },
                     "500": {
@@ -3878,220 +4546,210 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "github_com_proximavpn_proxima-vpn_api-server_internal_services.Alert": {
+        "handlers.adminOrderAuditContext": {
             "type": "object",
             "properties": {
-                "count": {
-                    "type": "integer"
-                },
-                "kind": {
+                "browser_family": {
                     "type": "string"
                 },
-                "severity": {
+                "client_ip": {
+                    "type": "string"
+                },
+                "device_fingerprint": {
+                    "type": "string"
+                },
+                "locale": {
+                    "type": "string"
+                },
+                "origin": {
+                    "type": "string"
+                },
+                "os_family": {
+                    "type": "string"
+                },
+                "user_agent": {
                     "type": "string"
                 }
             }
         },
-        "github_com_proximavpn_proxima-vpn_api-server_internal_services.Alerts": {
-            "type": "object",
-            "properties": {
-                "evaluated_at": {
-                    "type": "string"
-                },
-                "items": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/github_com_proximavpn_proxima-vpn_api-server_internal_services.Alert"
-                    }
-                },
-                "node_issues": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/github_com_proximavpn_proxima-vpn_api-server_internal_services.NodeIssue"
-                    }
-                },
-                "pending_requests": {
-                    "type": "integer"
-                },
-                "total": {
-                    "description": "Total counts only what an operator still has to look at: firing conditions\nthat are neither acknowledged nor silenced. Stale rows are excluded because\ntheir readings are frozen, and pending approvals are excluded because they\nare a work queue rather than a system condition.",
-                    "type": "integer"
-                }
-            }
-        },
-        "github_com_proximavpn_proxima-vpn_api-server_internal_services.Entry": {
+        "handlers.adminOrderAuditEvent": {
             "type": "object",
             "properties": {
                 "actor_id": {
                     "type": "string"
                 },
-                "actor_label": {
-                    "type": "string"
-                },
                 "actor_type": {
                     "type": "string"
                 },
-                "created_at": {
+                "amount_cents": {
+                    "type": "integer"
+                },
+                "currency": {
                     "type": "string"
                 },
-                "detail": {
-                    "type": "object",
-                    "additionalProperties": {}
-                },
-                "event_type": {
+                "external_id": {
                     "type": "string"
                 },
                 "id": {
                     "type": "string"
                 },
-                "severity": {
+                "outcome": {
                     "type": "string"
                 },
-                "target_id": {
+                "processed_at": {
                     "type": "string"
                 },
-                "target_type": {
-                    "type": "string"
-                }
-            }
-        },
-        "github_com_proximavpn_proxima-vpn_api-server_internal_services.LoginEntry": {
-            "type": "object",
-            "properties": {
-                "actor_type": {
+                "provider": {
                     "type": "string"
                 },
-                "attempted_email": {
+                "reason": {
                     "type": "string"
                 },
-                "created_at": {
+                "received_at": {
                     "type": "string"
                 },
-                "failure_reason": {
+                "request_id": {
                     "type": "string"
                 },
-                "id": {
+                "request_ip": {
                     "type": "string"
                 },
-                "ip": {
+                "session_id": {
                     "type": "string"
-                },
-                "success": {
-                    "type": "boolean"
                 },
                 "user_agent": {
                     "type": "string"
+                }
+            }
+        },
+        "handlers.adminOrderAuditGrant": {
+            "type": "object",
+            "properties": {
+                "plan_expires_after": {
+                    "type": "string"
                 },
-                "user_id": {
+                "plan_expires_before": {
                     "type": "string"
                 }
             }
         },
-        "github_com_proximavpn_proxima-vpn_api-server_internal_services.NodeIssue": {
+        "handlers.adminOrderAuditOrder": {
             "type": "object",
             "properties": {
-                "acked": {
-                    "type": "boolean"
-                },
-                "acked_by": {
+                "cancelled_at": {
                     "type": "string"
                 },
-                "alert_id": {
-                    "description": "Lifecycle fields, added when alerts became stateful. Additive on purpose:\nan older client that ignores unknown keys still reads the same response.",
-                    "type": "string"
-                },
-                "country": {
-                    "type": "string"
-                },
-                "duration_seconds": {
-                    "type": "integer"
-                },
-                "fired_at": {
-                    "type": "string"
-                },
-                "kind": {
-                    "type": "string"
-                },
-                "node_id": {
-                    "type": "string"
-                },
-                "node_name": {
-                    "type": "string"
-                },
-                "region": {
-                    "type": "string"
-                },
-                "severity": {
-                    "type": "string"
-                },
-                "silenced_until": {
-                    "type": "string"
-                },
-                "state": {
-                    "type": "string"
-                },
-                "status": {
-                    "type": "string"
-                },
-                "value": {
-                    "type": "number"
-                }
-            }
-        },
-        "github_com_proximavpn_proxima-vpn_api-server_internal_services.NodeTraffic": {
-            "type": "object",
-            "properties": {
-                "download": {
-                    "type": "integer"
-                },
-                "node_id": {
-                    "type": "string"
-                },
-                "node_name": {
-                    "type": "string"
-                },
-                "status": {
-                    "type": "string"
-                },
-                "upload": {
-                    "type": "integer"
-                }
-            }
-        },
-        "github_com_proximavpn_proxima-vpn_api-server_internal_services.UserNodeTraffic": {
-            "type": "object",
-            "properties": {
-                "download": {
-                    "type": "integer"
-                },
-                "node_id": {
-                    "type": "string"
-                },
-                "node_name": {
-                    "type": "string"
-                },
-                "total": {
-                    "type": "integer"
-                },
-                "upload": {
-                    "type": "integer"
-                }
-            }
-        },
-        "internal_handlers.adminPlanRequestItem": {
-            "type": "object",
-            "properties": {
                 "created_at": {
                     "type": "string"
                 },
+                "discount_cents": {
+                    "type": "integer"
+                },
+                "duration_days": {
+                    "type": "integer"
+                },
+                "expired_at": {
+                    "type": "string"
+                },
+                "expires_at": {
+                    "type": "string"
+                },
                 "id": {
+                    "type": "string"
+                },
+                "paid_at": {
+                    "type": "string"
+                },
+                "paid_by": {
+                    "type": "string"
+                },
+                "plan_id": {
                     "type": "string"
                 },
                 "plan_name": {
                     "type": "string"
                 },
-                "reviewed_at": {
+                "price_cents": {
+                    "type": "integer"
+                },
+                "provider": {
                     "type": "string"
+                },
+                "provider_session_id": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "user_email": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "string"
+                },
+                "user_name": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.adminOrderAuditResponse": {
+            "type": "object",
+            "properties": {
+                "grant": {
+                    "$ref": "#/definitions/handlers.adminOrderAuditGrant"
+                },
+                "order": {
+                    "$ref": "#/definitions/handlers.adminOrderAuditOrder"
+                },
+                "payment_events": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handlers.adminOrderAuditEvent"
+                    }
+                },
+                "request_context": {
+                    "$ref": "#/definitions/handlers.adminOrderAuditContext"
+                }
+            }
+        },
+        "handlers.adminOrderItem": {
+            "type": "object",
+            "properties": {
+                "browser_family": {
+                    "type": "string"
+                },
+                "cancelled_at": {
+                    "type": "string"
+                },
+                "client_ip": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "duration_days": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "os_family": {
+                    "type": "string"
+                },
+                "paid_at": {
+                    "type": "string"
+                },
+                "paid_by": {
+                    "type": "string"
+                },
+                "plan_id": {
+                    "type": "string"
+                },
+                "plan_name": {
+                    "type": "string"
+                },
+                "price_cents": {
+                    "type": "integer"
                 },
                 "status": {
                     "type": "string"
@@ -4104,7 +4762,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.announcementItem": {
+        "handlers.announcementItem": {
             "type": "object",
             "properties": {
                 "content": {
@@ -4130,7 +4788,15 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.createAnnouncementRequest": {
+        "handlers.applyPromotionRequest": {
+            "type": "object",
+            "properties": {
+                "promotion_code": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.createAnnouncementRequest": {
             "type": "object",
             "properties": {
                 "content": {
@@ -4147,7 +4813,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.createDeviceRequest": {
+        "handlers.createDeviceRequest": {
             "type": "object",
             "properties": {
                 "name": {
@@ -4155,7 +4821,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.createInboundRequest": {
+        "handlers.createInboundRequest": {
             "type": "object",
             "properties": {
                 "enabled": {
@@ -4176,7 +4842,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.createNodeGroupRequest": {
+        "handlers.createNodeGroupRequest": {
             "type": "object",
             "properties": {
                 "name": {
@@ -4184,11 +4850,35 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.createPlanRequest": {
+        "handlers.createOrderRequest": {
+            "type": "object",
+            "properties": {
+                "device_fingerprint": {
+                    "description": "DeviceFingerprint is opaque audit data supplied by the panel in the JSON\nbody (the CORS allow-list admits no custom header for it). It is stored\nand never consulted: no eligibility rule, rate limit, uniqueness check or\nWHERE predicate reads this column.",
+                    "type": "string"
+                },
+                "duration_days": {
+                    "type": "integer"
+                },
+                "plan_id": {
+                    "type": "string"
+                },
+                "promotion_code": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.createPlanRequest": {
             "type": "object",
             "properties": {
                 "duration_days": {
                     "type": "integer"
+                },
+                "features": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handlers.planFeatureInput"
+                    }
                 },
                 "max_concurrent": {
                     "type": "integer"
@@ -4202,6 +4892,12 @@ const docTemplate = `{
                 "node_group_id": {
                     "type": "string"
                 },
+                "prices": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handlers.planPriceInput"
+                    }
+                },
                 "speed_limit": {
                     "type": "integer"
                 },
@@ -4210,15 +4906,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.createPlanRequestBody": {
-            "type": "object",
-            "properties": {
-                "plan_id": {
-                    "type": "string"
-                }
-            }
-        },
-        "internal_handlers.createUserRequest": {
+        "handlers.createUserRequest": {
             "type": "object",
             "properties": {
                 "email": {
@@ -4238,7 +4926,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.createUserResponse": {
+        "handlers.createUserResponse": {
             "type": "object",
             "properties": {
                 "created_at": {
@@ -4258,7 +4946,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.deviceItem": {
+        "handlers.deviceItem": {
             "type": "object",
             "properties": {
                 "created_at": {
@@ -4275,7 +4963,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.deviceResponse": {
+        "handlers.deviceResponse": {
             "type": "object",
             "properties": {
                 "created_at": {
@@ -4301,7 +4989,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.disable2FARequest": {
+        "handlers.disable2FARequest": {
             "type": "object",
             "properties": {
                 "code": {
@@ -4309,7 +4997,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.enable2FARequest": {
+        "handlers.enable2FARequest": {
             "type": "object",
             "properties": {
                 "code": {
@@ -4320,10 +5008,16 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.generateTokenResponse": {
+        "handlers.generateTokenResponse": {
             "type": "object",
             "properties": {
+                "firewall_ports": {
+                    "type": "string"
+                },
                 "install_command": {
+                    "type": "string"
+                },
+                "node_id": {
                     "type": "string"
                 },
                 "token": {
@@ -4331,7 +5025,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.inboundResponse": {
+        "handlers.inboundResponse": {
             "type": "object",
             "properties": {
                 "created_at": {
@@ -4361,7 +5055,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.issueCertificateRequest": {
+        "handlers.issueCertificateRequest": {
             "type": "object",
             "required": [
                 "domain",
@@ -4376,7 +5070,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.loginRequest": {
+        "handlers.loginRequest": {
             "type": "object",
             "properties": {
                 "email": {
@@ -4390,7 +5084,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.loginResponse": {
+        "handlers.loginResponse": {
             "type": "object",
             "properties": {
                 "token": {
@@ -4398,7 +5092,24 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.nodeGroupDetail": {
+        "handlers.nodeEventFiltersResponse": {
+            "type": "object",
+            "properties": {
+                "event_types": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "severities": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "handlers.nodeGroupDetail": {
             "type": "object",
             "properties": {
                 "created_at": {
@@ -4413,12 +5124,12 @@ const docTemplate = `{
                 "nodes": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/internal_handlers.nodeGroupNode"
+                        "$ref": "#/definitions/handlers.nodeGroupNode"
                     }
                 }
             }
         },
-        "internal_handlers.nodeGroupListItem": {
+        "handlers.nodeGroupListItem": {
             "type": "object",
             "properties": {
                 "created_at": {
@@ -4435,7 +5146,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.nodeGroupNode": {
+        "handlers.nodeGroupNode": {
             "type": "object",
             "properties": {
                 "id": {
@@ -4449,7 +5160,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.nodeListItem": {
+        "handlers.nodeListItem": {
             "type": "object",
             "properties": {
                 "capacity": {
@@ -4470,11 +5181,24 @@ const docTemplate = `{
                 "disk_usage": {
                     "type": "number"
                 },
+                "firewall_ports": {
+                    "type": "string"
+                },
+                "firewall_preset": {
+                    "type": "string"
+                },
                 "id": {
                     "type": "string"
                 },
                 "ip": {
                     "type": "string"
+                },
+                "labels": {
+                    "description": "Per-language names keyed by language code, populated by GetNode only;\nthe list endpoint omits them rather than joining for every row.",
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
                 },
                 "last_ping_at": {
                     "type": "string"
@@ -4484,6 +5208,9 @@ const docTemplate = `{
                 },
                 "load_avg": {
                     "type": "number"
+                },
+                "max_concurrent_conns": {
+                    "type": "integer"
                 },
                 "memory_usage": {
                     "type": "number"
@@ -4500,6 +5227,9 @@ const docTemplate = `{
                 "online_devices": {
                     "description": "Device credentials live on this node now, against how many the plans\npointing at it are entitled to place. Capacity is an entitlement ceiling,\nnot a limit - nothing refuses a connection for exceeding it.",
                     "type": "integer"
+                },
+                "os_family": {
+                    "type": "string"
                 },
                 "port": {
                     "type": "integer"
@@ -4550,24 +5280,28 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.patchAlertRequest": {
+        "handlers.orderResponse": {
             "type": "object",
             "properties": {
-                "ack": {
-                    "type": "boolean"
+                "cancelled_at": {
+                    "type": "string"
                 },
-                "silence_minutes": {
-                    "type": "integer"
-                }
-            }
-        },
-        "internal_handlers.planRequestResponse": {
-            "type": "object",
-            "properties": {
                 "created_at": {
                     "type": "string"
                 },
+                "discount_cents": {
+                    "type": "integer"
+                },
+                "duration_days": {
+                    "type": "integer"
+                },
+                "expires_at": {
+                    "type": "string"
+                },
                 "id": {
+                    "type": "string"
+                },
+                "paid_at": {
                     "type": "string"
                 },
                 "plan_id": {
@@ -4576,7 +5310,10 @@ const docTemplate = `{
                 "plan_name": {
                     "type": "string"
                 },
-                "reviewed_at": {
+                "price_cents": {
+                    "type": "integer"
+                },
+                "provider": {
                     "type": "string"
                 },
                 "status": {
@@ -4584,7 +5321,57 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.planResponse": {
+        "handlers.patchAlertRequest": {
+            "type": "object",
+            "properties": {
+                "ack": {
+                    "type": "boolean"
+                },
+                "close": {
+                    "type": "boolean"
+                },
+                "silence_minutes": {
+                    "type": "integer"
+                }
+            }
+        },
+        "handlers.paymentProviderItem": {
+            "type": "object",
+            "properties": {
+                "mode": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.planFeatureInput": {
+            "type": "object",
+            "properties": {
+                "included": {
+                    "type": "boolean"
+                },
+                "text": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "handlers.planPriceInput": {
+            "type": "object",
+            "properties": {
+                "duration_days": {
+                    "type": "integer"
+                },
+                "price_cents": {
+                    "type": "integer"
+                }
+            }
+        },
+        "handlers.planResponse": {
             "type": "object",
             "properties": {
                 "created_at": {
@@ -4592,6 +5379,12 @@ const docTemplate = `{
                 },
                 "duration_days": {
                     "type": "integer"
+                },
+                "features": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handlers.planFeatureInput"
+                    }
                 },
                 "id": {
                     "type": "string"
@@ -4614,6 +5407,16 @@ const docTemplate = `{
                 "node_group_name": {
                     "type": "string"
                 },
+                "prices": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handlers.planPriceInput"
+                    }
+                },
+                "purchasable": {
+                    "description": "Derived from Prices, never a stored column: a plan with zero priced\ndurations cannot enter the order flow, but stays admin-assignable via\nTelegram/admin_user.go regardless of this value.",
+                    "type": "boolean"
+                },
                 "speed_limit": {
                     "type": "integer"
                 },
@@ -4622,7 +5425,125 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.registerRequest": {
+        "handlers.promotionRequest": {
+            "type": "object",
+            "properties": {
+                "allowed_user_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "code": {
+                    "type": "string"
+                },
+                "discount_type": {
+                    "type": "string"
+                },
+                "discount_value": {
+                    "type": "integer"
+                },
+                "duration_days": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "first_purchase_only": {
+                    "type": "boolean"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "max_redemptions": {
+                    "type": "integer"
+                },
+                "max_redemptions_per_user": {
+                    "type": "integer"
+                },
+                "min_order_cents": {
+                    "type": "integer"
+                },
+                "plan_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "valid_from": {
+                    "type": "string"
+                },
+                "valid_until": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.promotionResponse": {
+            "type": "object",
+            "properties": {
+                "allowed_user_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "code": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "discount_type": {
+                    "type": "string"
+                },
+                "discount_value": {
+                    "type": "integer"
+                },
+                "duration_days": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "first_purchase_only": {
+                    "type": "boolean"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "max_redemptions": {
+                    "type": "integer"
+                },
+                "max_redemptions_per_user": {
+                    "type": "integer"
+                },
+                "min_order_cents": {
+                    "type": "integer"
+                },
+                "plan_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "redeemed_count": {
+                    "type": "integer"
+                },
+                "valid_from": {
+                    "type": "string"
+                },
+                "valid_until": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.provisionNodeRequest": {
+            "type": "object"
+        },
+        "handlers.registerRequest": {
             "type": "object",
             "properties": {
                 "email": {
@@ -4636,7 +5557,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.registerResponse": {
+        "handlers.registerResponse": {
             "type": "object",
             "properties": {
                 "email": {
@@ -4653,15 +5574,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.reviewRequestBody": {
-            "type": "object",
-            "properties": {
-                "action": {
-                    "type": "string"
-                }
-            }
-        },
-        "internal_handlers.setNodesRequest": {
+        "handlers.setNodesRequest": {
             "type": "object",
             "properties": {
                 "node_ids": {
@@ -4672,7 +5585,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.settingItem": {
+        "handlers.settingItem": {
             "type": "object",
             "properties": {
                 "key": {
@@ -4683,7 +5596,29 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.terminateSessionRequest": {
+        "handlers.startCheckoutRequest": {
+            "type": "object",
+            "properties": {
+                "provider": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.startCheckoutResponse": {
+            "type": "object",
+            "properties": {
+                "mode": {
+                    "type": "string"
+                },
+                "provider": {
+                    "type": "string"
+                },
+                "redirect_url": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.terminateSessionRequest": {
             "type": "object",
             "properties": {
                 "cooldown_minutes": {
@@ -4691,7 +5626,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.tlsStatusResponse": {
+        "handlers.tlsStatusResponse": {
             "type": "object",
             "properties": {
                 "cert_file": {
@@ -4708,7 +5643,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.updateAnnouncementRequest": {
+        "handlers.updateAnnouncementRequest": {
             "type": "object",
             "properties": {
                 "content": {
@@ -4728,7 +5663,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.updateInboundRequest": {
+        "handlers.updateInboundRequest": {
             "type": "object",
             "properties": {
                 "enabled": {
@@ -4749,7 +5684,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.updateInfoResponse": {
+        "handlers.updateInfoResponse": {
             "type": "object",
             "properties": {
                 "download_url": {
@@ -4760,28 +5695,20 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.updateNodeRequest": {
-            "type": "object",
-            "properties": {
-                "country": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "region": {
-                    "type": "string"
-                },
-                "traffic_multiplier": {
-                    "type": "number"
-                }
-            }
+        "handlers.updateNodeRequest": {
+            "type": "object"
         },
-        "internal_handlers.updatePlanRequest": {
+        "handlers.updatePlanRequest": {
             "type": "object",
             "properties": {
                 "duration_days": {
                     "type": "integer"
+                },
+                "features": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handlers.planFeatureInput"
+                    }
                 },
                 "is_active": {
                     "type": "boolean"
@@ -4798,6 +5725,13 @@ const docTemplate = `{
                 "node_group_id": {
                     "type": "string"
                 },
+                "prices": {
+                    "description": "Nil leaves prices/features untouched; a present (possibly empty) slice\nfully replaces the set, matching the node_labels convention except that\nhere there is no per-item \"empty clears it\" - the whole list is the unit.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handlers.planPriceInput"
+                    }
+                },
                 "speed_limit": {
                     "type": "integer"
                 },
@@ -4806,10 +5740,13 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.updateProfileRequest": {
+        "handlers.updateProfileRequest": {
             "type": "object",
             "properties": {
                 "email": {
+                    "type": "string"
+                },
+                "language": {
                     "type": "string"
                 },
                 "name": {
@@ -4820,7 +5757,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.updateUserRequest": {
+        "handlers.updateUserRequest": {
             "type": "object",
             "properties": {
                 "is_active": {
@@ -4843,7 +5780,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.updateXrayRequest": {
+        "handlers.updateXrayRequest": {
             "type": "object",
             "properties": {
                 "version": {
@@ -4851,7 +5788,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.updateXrayResponse": {
+        "handlers.updateXrayResponse": {
             "type": "object",
             "properties": {
                 "status": {
@@ -4862,7 +5799,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.userDetailResponse": {
+        "handlers.userDetailResponse": {
             "type": "object",
             "properties": {
                 "created_at": {
@@ -4871,7 +5808,7 @@ const docTemplate = `{
                 "devices": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/internal_handlers.deviceItem"
+                        "$ref": "#/definitions/handlers.deviceItem"
                     }
                 },
                 "email": {
@@ -4915,7 +5852,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.userListItem": {
+        "handlers.userListItem": {
             "type": "object",
             "properties": {
                 "created_at": {
@@ -4953,7 +5890,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.userListResponse": {
+        "handlers.userListResponse": {
             "type": "object",
             "properties": {
                 "limit": {
@@ -4968,12 +5905,12 @@ const docTemplate = `{
                 "users": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/internal_handlers.userListItem"
+                        "$ref": "#/definitions/handlers.userListItem"
                     }
                 }
             }
         },
-        "internal_handlers.userLoginRequest": {
+        "handlers.userLoginRequest": {
             "type": "object",
             "properties": {
                 "email": {
@@ -4984,7 +5921,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.userNodeItem": {
+        "handlers.userNodeItem": {
             "type": "object",
             "properties": {
                 "country": {
@@ -5001,11 +5938,28 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.userPlanItem": {
+        "handlers.userPlanFeature": {
+            "type": "object",
+            "properties": {
+                "included": {
+                    "type": "boolean"
+                },
+                "text": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.userPlanItem": {
             "type": "object",
             "properties": {
                 "duration_days": {
                     "type": "integer"
+                },
+                "features": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handlers.userPlanFeature"
+                    }
                 },
                 "id": {
                     "type": "string"
@@ -5016,6 +5970,16 @@ const docTemplate = `{
                 "name": {
                     "type": "string"
                 },
+                "prices": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handlers.userPlanPrice"
+                    }
+                },
+                "purchasable": {
+                    "description": "Derived the same way as the admin side: a plan with no priced duration\ncannot be ordered, independent of is_active (which only gates whether\nit is shown or requestable at all).",
+                    "type": "boolean"
+                },
                 "speed_limit": {
                     "type": "integer"
                 },
@@ -5024,7 +5988,18 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.userSummary": {
+        "handlers.userPlanPrice": {
+            "type": "object",
+            "properties": {
+                "duration_days": {
+                    "type": "integer"
+                },
+                "price_cents": {
+                    "type": "integer"
+                }
+            }
+        },
+        "handlers.userSummary": {
             "type": "object",
             "properties": {
                 "devices": {
@@ -5059,13 +6034,13 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.userTrafficResponse": {
+        "handlers.userTrafficResponse": {
             "type": "object",
             "properties": {
                 "by_node": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/github_com_proximavpn_proxima-vpn_api-server_internal_services.UserNodeTraffic"
+                        "$ref": "#/definitions/services.UserNodeTraffic"
                     }
                 },
                 "percentage": {
@@ -5088,7 +6063,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.xrayUpdateInfoResponse": {
+        "handlers.xrayUpdateInfoResponse": {
             "type": "object",
             "properties": {
                 "target_version": {
@@ -5096,7 +6071,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.xrayVersionResponse": {
+        "handlers.xrayVersionResponse": {
             "type": "object",
             "properties": {
                 "current_version": {
@@ -5104,6 +6079,227 @@ const docTemplate = `{
                 },
                 "latest_version": {
                     "type": "string"
+                }
+            }
+        },
+        "services.Alert": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "severity": {
+                    "type": "string"
+                }
+            }
+        },
+        "services.Alerts": {
+            "type": "object",
+            "properties": {
+                "evaluated_at": {
+                    "type": "string"
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/services.Alert"
+                    }
+                },
+                "node_issues": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/services.NodeIssue"
+                    }
+                },
+                "total": {
+                    "description": "Total counts only what an operator still has to look at: firing conditions\nthat are neither acknowledged nor silenced. Stale rows are excluded because\ntheir readings are frozen.",
+                    "type": "integer"
+                }
+            }
+        },
+        "services.Entry": {
+            "type": "object",
+            "properties": {
+                "actor_id": {
+                    "type": "string"
+                },
+                "actor_label": {
+                    "type": "string"
+                },
+                "actor_type": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "detail": {
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "event_type": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "severity": {
+                    "type": "string"
+                },
+                "target_id": {
+                    "type": "string"
+                },
+                "target_type": {
+                    "type": "string"
+                }
+            }
+        },
+        "services.LoginEntry": {
+            "type": "object",
+            "properties": {
+                "actor_type": {
+                    "type": "string"
+                },
+                "attempted_email": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "failure_reason": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "ip": {
+                    "type": "string"
+                },
+                "success": {
+                    "type": "boolean"
+                },
+                "user_agent": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "services.NodeEventPage": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/services.Entry"
+                    }
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "offset": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "services.NodeIssue": {
+            "type": "object",
+            "properties": {
+                "acked": {
+                    "type": "boolean"
+                },
+                "acked_by": {
+                    "type": "string"
+                },
+                "alert_id": {
+                    "description": "Lifecycle fields, added when alerts became stateful. Additive on purpose:\nan older client that ignores unknown keys still reads the same response.",
+                    "type": "string"
+                },
+                "country": {
+                    "type": "string"
+                },
+                "duration_seconds": {
+                    "type": "integer"
+                },
+                "fired_at": {
+                    "type": "string"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "node_deleted": {
+                    "description": "NodeDeleted marks an alert whose node has been removed. Such an alert can\nnever be resolved by evaluation - nothing reports for it - so the UI offers\nclosing it by hand.",
+                    "type": "boolean"
+                },
+                "node_id": {
+                    "type": "string"
+                },
+                "node_name": {
+                    "type": "string"
+                },
+                "region": {
+                    "type": "string"
+                },
+                "severity": {
+                    "type": "string"
+                },
+                "silenced_until": {
+                    "type": "string"
+                },
+                "state": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "value": {
+                    "type": "number"
+                }
+            }
+        },
+        "services.NodeTraffic": {
+            "type": "object",
+            "properties": {
+                "download": {
+                    "type": "integer"
+                },
+                "node_id": {
+                    "type": "string"
+                },
+                "node_name": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "upload": {
+                    "type": "integer"
+                }
+            }
+        },
+        "services.UserNodeTraffic": {
+            "type": "object",
+            "properties": {
+                "download": {
+                    "type": "integer"
+                },
+                "node_id": {
+                    "type": "string"
+                },
+                "node_name": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                },
+                "upload": {
+                    "type": "integer"
                 }
             }
         }

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
   Box,
@@ -139,6 +140,9 @@ export default function NodeGroups() {
   return (
     <ContentLayout header={<Header variant="h1">{t("admin.nodeGroups.title")}</Header>}>
       <SpaceBetween size="l">
+        <Box variant="p" color="text-body-secondary">
+          {t("admin.nodeChains.poolHint")} <Link to="/admin/node-chains">{t("admin.nav.nodeChains")}</Link>
+        </Box>
         {error && (
           <Flashbar items={[{ type: "error", content: error, dismissible: true, onDismiss: () => setError(null) }]} />
         )}
@@ -277,6 +281,7 @@ export default function NodeGroups() {
                 width: 50,
               },
               { id: "name", header: t("admin.nodes.col.name"), cell: (item) => item.name },
+              { id: "role", header: t("admin.nodes.role.label"), cell: (item) => t(`admin.nodes.role.${allNodes.find((node) => node.id === item.id)?.role ?? "exit"}`) },
               { id: "country", header: t("admin.nodes.col.country"), cell: (item) => item.country },
               {
                 id: "status",

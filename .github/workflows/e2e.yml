@@ -19,6 +19,7 @@ on:
       - 'node-agent/**'
       - 'pkg/**'
       - 'scripts/e2e_full_test.sh'
+      - 'tests/relay-e2e/**'
       - '.github/workflows/e2e.yml'
   push:
     branches: [main]
@@ -27,9 +28,18 @@ on:
       - 'node-agent/**'
       - 'pkg/**'
       - 'scripts/e2e_full_test.sh'
+      - 'tests/relay-e2e/**'
       - '.github/workflows/e2e.yml'
 
 jobs:
+  relay-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - name: Verify relay-only VLESS Reality dataplane
+        run: bash tests/relay-e2e/run.sh
+
   e2e:
     runs-on: ubuntu-latest
     timeout-minutes: 15

@@ -58,6 +58,48 @@ docker compose logs web
 
 - Check API logs for connection attempts: `docker compose logs api | grep "node"`
 
+## Managed Entry/Exit Profile Fails
+
+If a managed profile is missing or connects to the wrong Exit, check in this
+order before replacing any working listener or DNS record:
+
+1. Check the profile's managed Entry hostname and Cloudflare DNS state. The A
+   record must point to the Entry address in DNS-only mode, not to an Exit.
+   `pending` means reconciliation is still due or retrying; `ready` means the
+   owned record was observed, not that every resolver has updated. `conflict`
+   calls for an ownership or record check, not overwriting an unrelated record.
+   For `error`, inspect the error code and API reconciliation logs and correct
+   configuration or provider permission. `deleting` means cleanup is in
+   progress; `deleted` means the owned record has been removed. DNS caches and
+   previously issued profiles may persist after deletion.
+2. Check that the client's TCP destination is the Entry hostname on `24443`
+   or `24444`, as intended. Verify Entry port reachability, upstream firewall,
+   IP forwarding, DNAT/masquerade policy, and connectivity from Entry to the
+   selected Exit. Do not test this as native UDP forwarding.
+3. Check the selected Exit's upstream firewall and nft source admission. The
+   protected listener port should accept the Entry's source address and drop
+   other sources. `publish_direct=false` hides direct profiles but doesn't
+   enforce that network restriction.
+4. Verify the selected Exit listener is running with the profile's VLESS
+   credentials, Reality public key and short ID, and that its accepted server
+   names include the Exit's exact canonical client SNI. The Entry routing
+   hostname is not the SNI; check all published listeners, including speed
+   tiers, if only some clients fail.
+5. Check fresh Entry and Exit agent heartbeats, policy fetch/apply logs, and
+   configuration acknowledgement. An unsafe or incompatible SNI/listener
+   combination withholds managed rollout or profile publication. It does not
+   forcibly terminate all existing Xray sessions. Do not distribute a profile
+   until the listeners and policies are applied and acknowledged.
+
+If policy fetch or apply fails, inspect the agent logs and restore API access
+or correct the invalid policy. The agent retains the last successfully applied
+policy on failure; that is not instant revocation of an old allowlist or
+profile. For a failed SNI cutover, restore the known-good canonical SNI and
+listener settings, apply them, wait for fresh agent acknowledgement, then
+republish profiles. Keep the expanded schema and stored data intact during an
+application rollback; verify both the old traffic path and DNS state before
+retiring the new path.
+
 ## Subscription Not Working
 
 **Symptoms:** VPN client can't import subscription link, or shows no servers.

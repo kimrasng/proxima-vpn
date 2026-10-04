@@ -17,6 +17,8 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 8080,
+    strictPort: true,
+    watch: process.env.DEV_DOCKER_POLL === "1" ? { usePolling: true, interval: 500 } : undefined,
     proxy: apiProxy,
   },
   preview: {

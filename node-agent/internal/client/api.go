@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/proximavpn/proxima-vpn/node-agent/internal/config"
+	"github.com/proximavpn/proxima-vpn/pkg/nodeprov"
 )
 
 // APIClient communicates with the main server API.
@@ -87,12 +88,14 @@ type HeartbeatPayload struct {
 	XrayRunning bool    `json:"xray_running"`
 	// Reports whether tc shaping is in force. Without this a node that cannot
 	// run tc serves speed-limited users at full rate and nothing says so.
+	ShapingMode  string `json:"shaping_mode,omitempty"`
 	ShapingOK    bool   `json:"shaping_ok"`
 	ShapingTiers int    `json:"shaping_tiers"`
 	ShapingError string `json:"shaping_error,omitempty"`
 }
 
 type NodeStatus struct {
+	ShapingMode  string
 	XrayVersion  string
 	ConfigHash   string
 	XrayRunning  bool
@@ -249,6 +252,7 @@ func (c *APIClient) SendHeartbeat(ctx context.Context, cpu, memory, disk, loadAv
 		XrayVersion:  status.XrayVersion,
 		ConfigHash:   status.ConfigHash,
 		XrayRunning:  status.XrayRunning,
+		ShapingMode:  status.ShapingMode,
 		ShapingOK:    status.ShapingOK,
 		ShapingTiers: status.ShapingTiers,
 		ShapingError: status.ShapingError,
@@ -389,6 +393,89 @@ func (c *APIClient) GetWireGuardPeers(ctx context.Context) ([]WireGuardPeer, err
 		return nil, fmt.Errorf("decode wireguard peers: %w", err)
 	}
 	return peers, nil
+}
+
+// GetRole fetches this node's role, which decides whether the agent brings up
+// the tunnel services at all: a relay forwards packets in the kernel and runs
+// none of them.
+func (c *APIClient) GetRole(ctx context.Context) (nodeprov.Role, error) {
+	url := fmt.Sprintf("%s/api/v1/nodes/%s/role", c.serverURL, c.nodeID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return "", fmt.Errorf("create role request: %w", err)
+	}
+	req.Header.Set("X-Node-Key", c.apiKey)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("get role request: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("get role failed (status %d): %s", resp.StatusCode, string(body))
+	}
+
+	var payload struct {
+		Role nodeprov.Role `json:"role"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		return "", fmt.Errorf("decode role: %w", err)
+	}
+	return payload.Role, nil
+}
+
+// GetRelayRules fetches the forwarding rules this node should have applied as a
+// relay. The rules come from the pools this node belongs to, so a relay that has
+// just joined a pool picks up its whole rule set on the next poll.
+func (c *APIClient) GetRelayRules(ctx context.Context) ([]nodeprov.RelayRule, error) {
+	url := fmt.Sprintf("%s/api/v1/nodes/%s/relay-rules", c.serverURL, c.nodeID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("create relay rules request: %w", err)
+	}
+	req.Header.Set("X-Node-Key", c.apiKey)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("get relay rules request: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("get relay rules failed (status %d): %s", resp.StatusCode, string(body))
+	}
+
+	var rules []nodeprov.RelayRule
+	if err := json.NewDecoder(resp.Body).Decode(&rules); err != nil {
+		return nil, fmt.Errorf("decode relay rules: %w", err)
+	}
+	return rules, nil
+}
+
+func (c *APIClient) GetExitRules(ctx context.Context) ([]nodeprov.ExitRule, error) {
+	url := fmt.Sprintf("%s/api/v1/nodes/%s/exit-rules", c.serverURL, c.nodeID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("create exit rules request: %w", err)
+	}
+	req.Header.Set("X-Node-Key", c.apiKey)
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("get exit rules request: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("get exit rules failed (status %d): %s", resp.StatusCode, string(body))
+	}
+	var rules []nodeprov.ExitRule
+	if err := json.NewDecoder(resp.Body).Decode(&rules); err != nil {
+		return nil, fmt.Errorf("decode exit rules: %w", err)
+	}
+	return rules, nil
 }
 
 // GetHysteria2Users fetches the current set of xray_uuids eligible to

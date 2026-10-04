@@ -15,18 +15,28 @@ import (
 // every config poll and subscription fetch depend on. traffic_logs is kept
 // longer because it backs the admin traffic charts; users.traffic_used holds the
 // authoritative total, so pruning the log does not lose quota accounting.
+//
+// plan_orders tracking fields (origin, client_ip, user_agent, browser_family,
+// os_family, locale, device_fingerprint) are purged under DEC-027 after 180 days
+// by NULLing them rather than deleting rows, preserving all financial evidence:
+// order status/pricing, payment provider events, and plan grant timestamps.
 const (
-	trafficLogRetention    = 90 * 24 * time.Hour
-	nodeMetricsRetention   = 14 * 24 * time.Hour
-	activityLogRetention   = 90 * 24 * time.Hour
-	snapshotRetention      = 30 * 24 * time.Hour
-	loginHistoryRetention  = 180 * 24 * time.Hour
-	retentionSweepInterval = 6 * time.Hour
+	trafficLogRetention       = 90 * 24 * time.Hour
+	nodeMetricsRetention      = 14 * 24 * time.Hour
+	activityLogRetention      = 90 * 24 * time.Hour
+	snapshotRetention         = 30 * 24 * time.Hour
+	loginHistoryRetention     = 180 * 24 * time.Hour
+	planOrdersPurgeRetention  = 180 * 24 * time.Hour
+	retentionSweepInterval    = 6 * time.Hour
 
 	// deleteBatchSize bounds each DELETE so a first sweep over a large backlog
 	// cannot hold locks or bloat WAL for long; the sweep repeats until a batch
 	// comes back short.
 	deleteBatchSize = 20000
+
+	// updateBatchSize bounds each UPDATE so NULLing tracking fields does not hold
+	// locks long; the sweep repeats until a batch comes back short.
+	updateBatchSize = 20000
 )
 
 // RetentionScheduler trims append-only telemetry tables to a bounded window.
@@ -77,6 +87,9 @@ func (s *RetentionScheduler) run(ctx context.Context) {
 	// grows without a sweep. Kept longer than the activity feed because it is the
 	// audit trail an operator reaches for after the fact.
 	s.prune(ctx, "login_history", "created_at", loginHistoryRetention)
+	// plan_orders tracking fields (checkout audit) are NULLed rather than deleted
+	// to preserve all financial evidence (order status, payment events, grant timestamps).
+	s.purgeColumns(ctx)
 }
 
 // prune deletes rows older than the retention window in bounded batches. table
@@ -108,5 +121,50 @@ func (s *RetentionScheduler) prune(ctx context.Context, table, column string, wi
 
 	if total > 0 {
 		log.Printf("[Retention] pruned %d row(s) from %s older than %s", total, table, window)
+	}
+}
+
+// purgeColumns NULLs checkout audit tracking fields in plan_orders older than
+// the retention window, preserving all financial evidence: order/payment status,
+// provider events, and plan grant timestamps. The partial index idx_plan_orders_purge_sweep
+// (WHERE user_agent IS NOT NULL) keeps scans off full table when user_agent becomes NULL.
+func (s *RetentionScheduler) purgeColumns(ctx context.Context) {
+	// Tracking columns to NULL: origin, client_ip, user_agent, browser_family,
+	// os_family, locale, device_fingerprint. Financial columns preserved:
+	// status, price_cents, paid_at, paid_by, cancelled_at, provider, provider_session_id,
+	// promotion_id, discount_cents, granted_plan_expires_before, granted_plan_expires_after.
+	query := `UPDATE plan_orders
+		SET origin = NULL,
+		    client_ip = NULL,
+		    user_agent = NULL,
+		    browser_family = NULL,
+		    os_family = NULL,
+		    locale = NULL,
+		    device_fingerprint = NULL
+		WHERE ctid IN (
+			SELECT ctid FROM plan_orders
+			WHERE created_at < $1 AND user_agent IS NOT NULL
+			LIMIT ` + strconv.Itoa(updateBatchSize) + `
+		)`
+
+	cutoff := time.Now().Add(-planOrdersPurgeRetention)
+	var total int64
+
+	for ctx.Err() == nil {
+		result, err := s.db.Exec(ctx, query, cutoff)
+		if err != nil {
+			log.Printf("[Retention] error purging plan_orders tracking: %v", err)
+			return
+		}
+
+		affected := result.RowsAffected()
+		total += affected
+		if affected < updateBatchSize {
+			break
+		}
+	}
+
+	if total > 0 {
+		log.Printf("[Retention] purged tracking from %d plan_orders row(s) older than %s", total, planOrdersPurgeRetention)
 	}
 }

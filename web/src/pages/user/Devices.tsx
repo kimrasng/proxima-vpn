@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   ContentLayout,
@@ -18,30 +18,13 @@ import {
   Tabs,
 } from "@cloudscape-design/components";
 import { QRCodeSVG } from "qrcode.react";
-import type { Device } from "../../api/types";
+import type { Device, PublicSubscriptionDomain, UserProfile, UserSummary } from "../../api/types";
 import * as userApi from "../../api/user";
 
-const SUBSCRIPTION_FORMATS = [
-  { id: "v2ray", label: "V2Ray" },
-  { id: "clash", label: "Clash" },
-  { id: "singbox", label: "Sing-box" },
-  { id: "surfboard", label: "Surfboard" },
-  { id: "quantumult", label: "Quantumult" },
-  { id: "wireguard", label: "WireGuard" },
-];
-
-function getSubscriptionUrl(device: Device, format?: string): string {
-  const raw = device.subscription_url || `/sub/${device.xray_uuid}`;
-  // subscription_url is a relative path (/sub/<token>/<id>); make it absolute so
-  // copied links and QR codes work when imported into a client.
-  const base = /^https?:\/\//i.test(raw)
-    ? raw
-    : `${window.location.origin}${raw.startsWith("/") ? "" : "/"}${raw}`;
-  if (format && format !== "v2ray") return `${base}?format=${format}`;
-  return base;
-}
+import { getAccountSubscriptionUrl, getSubscriptionUrl, SUBSCRIPTION_FORMATS } from "../../utils/subscriptionUrl";
 
 function CopyableUrl({ url }: { url: string }) {
+  const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
@@ -86,10 +69,134 @@ function CopyableUrl({ url }: { url: string }) {
       <Button
         variant="inline-icon"
         iconName={copied ? "status-positive" : "copy"}
-        ariaLabel="Copy"
+        ariaLabel={t("common.copy")}
         onClick={() => void handleCopy()}
       />
     </div>
+  );
+}
+
+function SubscriptionDomainPicker({ urlForDomain }: { urlForDomain: (domain?: string) => string }) {
+  const { t } = useTranslation();
+  const [domains, setDomains] = useState<PublicSubscriptionDomain[]>([]);
+  const [results, setResults] = useState<Record<string, boolean | undefined>>({});
+  const [loading, setLoading] = useState(true);
+  const [testing, setTesting] = useState(false);
+  const [activeDomain, setActiveDomain] = useState<string | undefined>();
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const publicDomains = await userApi.listPublicSubscriptionDomains();
+        const ordered = [...publicDomains].sort((a, b) => {
+          if (a.is_default !== b.is_default) return a.is_default ? -1 : 1;
+          return a.display_order - b.display_order;
+        });
+        setDomains(ordered);
+        setActiveDomain(ordered[0]?.domain);
+      } catch {
+        // The existing subscription URL is a usable fallback while a deployment
+        // is upgraded ahead of its subscription-domain endpoint.
+        setDomains([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    void load();
+  }, []);
+
+  const runReachabilityTest = async () => {
+    setTesting(true);
+    const outcomes = await Promise.all(
+      domains.map(async (domain) => {
+        const url = urlForDomain(domain.domain);
+        const controller = new AbortController();
+        const timeout = window.setTimeout(() => controller.abort(), 8000);
+        try {
+          // A no-cors request is intentional: the test needs browser network
+          // reachability, not readable subscription content or a CORS contract.
+          await fetch(url, { method: "HEAD", mode: "no-cors", cache: "no-store", signal: controller.signal });
+          return [domain.id, true] as const;
+        } catch {
+          return [domain.id, false] as const;
+        } finally {
+          window.clearTimeout(timeout);
+        }
+      }),
+    );
+    const nextResults = Object.fromEntries(outcomes);
+    setResults(nextResults);
+    const firstWorking = domains.find((domain) => nextResults[domain.id]);
+    if (firstWorking) setActiveDomain(firstWorking.domain);
+    setTesting(false);
+  };
+
+  const orderedDomains = useMemo(
+    () => [...domains].sort((a, b) => {
+      const aResult = results[a.id];
+      const bResult = results[b.id];
+      if (aResult === true && bResult !== true) return -1;
+      if (bResult === true && aResult !== true) return 1;
+      if (aResult === false && bResult !== false) return 1;
+      if (bResult === false && aResult !== false) return -1;
+      if (a.is_default !== b.is_default) return a.is_default ? -1 : 1;
+      return a.display_order - b.display_order;
+    }),
+    [domains, results],
+  );
+
+  if (loading) {
+    return <Spinner />;
+  }
+
+  if (domains.length === 0) {
+    return <CopyableUrl url={urlForDomain()} />;
+  }
+
+  const selectedDomain = activeDomain ?? orderedDomains[0]?.domain;
+
+  return (
+    <SpaceBetween size="s">
+      <Flashbar
+        items={[{
+          type: "warning",
+          content: t("user.devices.subscriptionDomainWarning"),
+        }]}
+      />
+      <Box variant="p">{t("user.devices.subscriptionDomainDescription")}</Box>
+      <SpaceBetween direction="horizontal" size="xs">
+        <Button loading={testing} onClick={() => void runReachabilityTest()}>
+          {t("user.devices.testDomains")}
+        </Button>
+        {testing && <StatusIndicator type="loading">{t("user.devices.testingDomains")}</StatusIndicator>}
+      </SpaceBetween>
+      <Tabs
+        activeTabId={selectedDomain}
+        onChange={({ detail }) => setActiveDomain(detail.activeTabId)}
+        tabs={orderedDomains.map((domain) => {
+          const result = results[domain.id];
+          const label = result === true
+            ? `${domain.domain} ✓`
+            : result === false
+              ? `${domain.domain} ✕`
+              : domain.domain;
+          return {
+            id: domain.domain,
+            label,
+            content: (
+              <SpaceBetween size="xs">
+                {result !== undefined && (
+                  <StatusIndicator type={result ? "success" : "error"}>
+                    {t(result ? "user.devices.domainReachable" : "user.devices.domainUnreachable")}
+                  </StatusIndicator>
+                )}
+                <CopyableUrl url={urlForDomain(domain.domain)} />
+              </SpaceBetween>
+            ),
+          };
+        })}
+      />
+    </SpaceBetween>
   );
 }
 
@@ -103,7 +210,6 @@ function DeviceCard({
   onQr: (d: Device) => void;
 }) {
   const { t } = useTranslation();
-  const [activeFormat, setActiveFormat] = useState("v2ray");
   const [copied, setCopied] = useState(false);
 
   const handleCopyUuid = async () => {
@@ -175,7 +281,7 @@ function DeviceCard({
             <Button
               variant="inline-icon"
               iconName={copied ? "status-positive" : "copy"}
-              ariaLabel="Copy UUID"
+              ariaLabel={t("common.copy")}
               onClick={() => void handleCopyUuid()}
             />
           </div>
@@ -191,19 +297,7 @@ function DeviceCard({
         <div>
           <Box variant="awsui-key-label">{t("user.devices.subscriptionUrl")}</Box>
           <Box margin={{ top: "xs" }}>
-            <Tabs
-              activeTabId={activeFormat}
-              onChange={({ detail }) => setActiveFormat(detail.activeTabId)}
-              tabs={SUBSCRIPTION_FORMATS.map((fmt) => ({
-                id: fmt.id,
-                label: fmt.label,
-                content: (
-                  <Box margin={{ top: "xs" }}>
-                    <CopyableUrl url={getSubscriptionUrl(device, fmt.id)} />
-                  </Box>
-                ),
-              }))}
-            />
+            <SubscriptionDomainPicker urlForDomain={domain => getSubscriptionUrl(device, undefined, domain)} />
           </Box>
         </div>
       </SpaceBetween>
@@ -219,11 +313,13 @@ export default function Devices() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showQrModal, setShowQrModal] = useState(false);
+  const [accountQr, setAccountQr] = useState(false);
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
   const [qrFormat, setQrFormat] = useState("v2ray");
   const [newDeviceName, setNewDeviceName] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [profile, setProfile] = useState<{ plan_name?: string; max_devices?: number } | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [summary, setSummary] = useState<UserSummary | null>(null);
 
   const loadDevices = async () => {
     try {
@@ -234,6 +330,7 @@ export default function Devices() {
       ]);
       setDevices(deviceList);
       setProfile(userProfile);
+      setSummary(await userApi.getSummary().catch(() => null));
     } catch {
       setFlash([{ type: "error", content: t("user.devices.loadError"), dismissible: true, onDismiss: () => setFlash([]) }]);
     } finally {
@@ -295,7 +392,7 @@ export default function Devices() {
     );
   }
 
-  const maxDevices = profile?.max_devices ?? 0;
+  const maxDevices = summary?.max_devices ?? 0;
   const atLimit = maxDevices > 0 && devices.length >= maxDevices;
 
   return (
@@ -326,6 +423,17 @@ export default function Devices() {
       <SpaceBetween size="l">
         <Flashbar items={flash} />
 
+        {profile?.sub_token && (
+          <Container header={<Header variant="h2">{t("user.devices.accountUrl")}</Header>}>
+            <SpaceBetween size="s">
+              <Box variant="p">{t("user.devices.accountUrlHint")}</Box>
+              <SubscriptionDomainPicker urlForDomain={domain => getAccountSubscriptionUrl(profile.sub_token!, undefined, domain)} />
+              <Button onClick={() => { setAccountQr(true); setQrFormat("v2ray"); setShowQrModal(true); }}>{t("user.devices.showQr")}</Button>
+              <Box variant="small" color="text-body-secondary">{t("user.devices.hwidHint")}</Box>
+            </SpaceBetween>
+          </Container>
+        )}
+        {devices.length > 0 && profile?.sub_token && <Box variant="h3">{t("user.devices.legacyLinks")}</Box>}
         {devices.length === 0 ? (
           <Box textAlign="center" padding="xl">
             <SpaceBetween size="m">
@@ -342,7 +450,7 @@ export default function Devices() {
                 key={device.id}
                 device={device}
                 onDelete={(d) => { setSelectedDevice(d); setShowDeleteModal(true); }}
-                onQr={(d) => { setSelectedDevice(d); setQrFormat("v2ray"); setShowQrModal(true); }}
+                onQr={(d) => { setAccountQr(false); setSelectedDevice(d); setQrFormat("v2ray"); setShowQrModal(true); }}
               />
             ))}
           </ColumnLayout>
@@ -397,10 +505,10 @@ export default function Devices() {
         header={t("user.devices.qrTitle")}
         size="medium"
       >
-        {selectedDevice && (
+        {(accountQr ? !!profile?.sub_token : !!selectedDevice) && (
           <SpaceBetween size="l">
             <Box textAlign="center">
-              <QRCodeSVG value={getSubscriptionUrl(selectedDevice, qrFormat)} size={220} />
+              <QRCodeSVG value={accountQr ? getAccountSubscriptionUrl(profile!.sub_token!, qrFormat) : getSubscriptionUrl(selectedDevice!, qrFormat)} size={220} />
             </Box>
             <Tabs
               activeTabId={qrFormat}
@@ -410,7 +518,7 @@ export default function Devices() {
                 label: fmt.label,
                 content: (
                   <Box margin={{ top: "xs" }}>
-                    <CopyableUrl url={getSubscriptionUrl(selectedDevice, fmt.id)} />
+                    <CopyableUrl url={accountQr ? getAccountSubscriptionUrl(profile!.sub_token!, fmt.id) : getSubscriptionUrl(selectedDevice!, fmt.id)} />
                   </Box>
                 ),
               }))}

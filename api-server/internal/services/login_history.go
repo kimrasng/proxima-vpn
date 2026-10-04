@@ -88,20 +88,25 @@ func (s *LoginHistoryService) Record(ctx context.Context, a LoginAttempt) {
 		INSERT INTO login_history
 			(user_id, actor_type, attempted_email, success, failure_reason, ip, user_agent)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
-	`, userID, actorType, truncateUTF8(a.Email, maxEmailBytes), a.Success, a.Reason,
-		a.IP, truncateUTF8(a.UserAgent, maxUserAgentBytes),
+	`, userID, actorType, TruncateUTF8(a.Email, maxEmailBytes), a.Success, a.Reason,
+		a.IP, TruncateUTF8(a.UserAgent, MaxUserAgentBytes),
 	); err != nil {
 		log.Printf("[LoginHistory] dropping attempt for %q: %v", a.Email, err)
 	}
 }
 
 const (
-	maxEmailBytes     = 320
-	maxUserAgentBytes = 512
+	maxEmailBytes = 320
+	// MaxUserAgentBytes bounds every stored User-Agent, wherever it is
+	// captured, so one caller-supplied header cannot grow a row without limit.
+	MaxUserAgentBytes = 512
 )
 
-// truncateUTF8 cuts s to at most limit bytes without splitting a rune.
-func truncateUTF8(s string, limit int) string {
+// TruncateUTF8 cuts s to at most limit bytes without splitting a rune. It is
+// exported because every audit writer that stores caller-supplied text needs
+// exactly this bound: Postgres rejects invalid UTF-8 for the whole statement,
+// so a byte-sliced multi-byte string lets a client suppress its own audit row.
+func TruncateUTF8(s string, limit int) string {
 	if len(s) <= limit {
 		return s
 	}

@@ -11,16 +11,21 @@ import Alerts from "./pages/admin/Alerts";
 import Activity from "./pages/admin/Activity";
 import Nodes from "./pages/admin/Nodes";
 import NodeGroups from "./pages/admin/NodeGroups";
+import NodeChains from "./pages/admin/NodeChains";
 import Plans from "./pages/admin/Plans";
+import Promotions from "./pages/admin/Promotions";
 import Users from "./pages/admin/Users";
 import UserDetail from "./pages/admin/UserDetail";
-import PlanRequests from "./pages/admin/PlanRequests";
+import Orders from "./pages/admin/Orders";
+import OrderDetail from "./pages/admin/OrderDetail";
 import AdminAnnouncements from "./pages/admin/Announcements";
 import Settings from "./pages/admin/Settings";
 import TwoFactor from "./pages/admin/TwoFactor";
 import NodeInbounds from "./pages/admin/NodeInbounds";
 import NodeDetail from "./pages/admin/NodeDetail";
+import UUIDEvictions from "./pages/admin/UUIDEvictions";
 import Connections from "./pages/admin/Connections";
+import SubscriptionDomains from "./pages/admin/SubscriptionDomains";
 
 import Login from "./pages/auth/Login";
 import AdminLogin from "./pages/auth/AdminLogin";
@@ -61,11 +66,16 @@ export const router = createBrowserRouter([
       { path: "/admin/nodes/:nodeId", element: <NodeDetail /> },
       { path: "/admin/nodes/:nodeId/inbounds", element: <NodeInbounds /> },
       { path: "/admin/node-groups", element: <NodeGroups /> },
+      { path: "/admin/node-chains", element: <NodeChains /> },
       { path: "/admin/plans", element: <Plans /> },
       { path: "/admin/users", element: <Users /> },
       { path: "/admin/users/:userId", element: <UserDetail /> },
+      { path: "/admin/uuid-evictions", element: <UUIDEvictions /> },
       { path: "/admin/connections", element: <Connections /> },
-      { path: "/admin/plan-requests", element: <PlanRequests /> },
+      { path: "/admin/subscription-domains", element: <SubscriptionDomains /> },
+      { path: "/admin/orders", element: <Orders /> },
+      { path: "/admin/orders/:orderId", element: <OrderDetail /> },
+      { path: "/admin/promotions", element: <Promotions /> },
       { path: "/admin/announcements", element: <AdminAnnouncements /> },
       { path: "/admin/settings", element: <Settings /> },
       { path: "/admin/2fa", element: <TwoFactor /> },

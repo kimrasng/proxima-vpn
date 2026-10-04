@@ -21,6 +21,16 @@ docker compose up -d --build
 Panel: http://localhost:8080
 API: http://localhost:2053
 
+To work on the frontend with hot reload at the same panel URL after starting the stack:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build --no-deps web
+```
+
+Changes under `web/` then update in the browser without rebuilding. The development
+container proxies API requests to the existing `api` service. To return to the
+production nginx container, run `docker compose up -d --build --no-deps --force-recreate web`.
+
 ## Production Deployment
 
 See [docs/installation.md](docs/installation.md)
@@ -50,6 +60,35 @@ See [docs/troubleshooting.md](docs/troubleshooting.md)
               │Node Agents│
               └───────────┘
 ```
+
+## Utilities
+
+### ChatGPT Checkout Script
+
+One-click script for testing ChatGPT checkout API calls from Chrome Console.
+
+**File:** `scripts/chatgpt-checkout.js`
+
+**Usage:**
+```bash
+# Generate the console script
+node scripts/chatgpt-checkout.js
+
+# Copy the output and paste into Chrome Console on chatgpt.com
+# Script auto-fetches auth token - no manual steps needed!
+```
+
+**What it does:**
+- Auto-fetches auth token from `https://chatgpt.com/api/auth/session`
+- Uses token to make checkout request with `plan_name=chatgptpromax`
+- Only includes essential headers (`authorization`, `content-type`)
+- Browser automatically injects other headers
+
+**Features:**
+- No manual token replacement needed
+- One-click execution
+- Error handling included
+- Logs all steps for debugging
 
 ## License
 

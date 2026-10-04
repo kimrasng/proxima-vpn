@@ -11,10 +11,7 @@ import {
   Flashbar,
   Grid,
   Header,
-  Icon,
   KeyValuePairs,
-  List,
-  Pagination,
   Popover,
   SegmentedControl,
   Select,
@@ -22,7 +19,6 @@ import {
   Spinner,
   StatusIndicator,
 } from "@cloudscape-design/components";
-import type { IconProps } from "@cloudscape-design/components";
 import {
   LineChart,
   Line,
@@ -33,8 +29,9 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
-import { getActivity, getNode, getNodeMetrics } from "../../api/admin";
-import type { ActivityEntry, Node, NodeMetricsEntry } from "../../api/types";
+import { getNode, getNodeMetrics } from "../../api/admin";
+import { NodeEventViewer } from "../../components/NodeEventViewer";
+import type { Node, NodeMetricsEntry } from "../../api/types";
 import { usePublishBreadcrumbLeaf } from "../../hooks/useBreadcrumbLeaf";
 import { formatAbsoluteTime, formatRelativeTime } from "../../utils/relativeTime";
 import { formatBytes } from "../../utils/format";
@@ -44,8 +41,6 @@ import { useManualRefresh } from "../../hooks/useManualRefresh";
 // the screen within roughly one beat plus one poll.
 const REFRESH_INTERVAL = 10000;
 
-const EVENT_FETCH_LIMIT = 50;
-const EVENTS_PER_PAGE = 6;
 
 type ResourceMetric = "cpu" | "memory" | "disk";
 
@@ -71,12 +66,6 @@ function formatChartTime(dateStr: string, hours: number): string {
   return d.toLocaleDateString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
-function formatEventTime(iso: string): string {
-  const date = new Date(iso);
-  const time = date.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
-  const isToday = date.toDateString() === new Date().toDateString();
-  return isToday ? time : `${date.toLocaleDateString(undefined, { month: "short", day: "numeric" })} ${time}`;
-}
 
 function getUsageStatus(value: number): "success" | "warning" | "error" {
   if (value < 50) return "success";
@@ -95,12 +84,6 @@ function titleCase(value: string): string {
   return value.replace(/\b\p{Ll}/gu, (char) => char.toUpperCase());
 }
 
-const SEVERITY_ICON: Record<ActivityEntry["severity"], { name: IconProps.Name; variant: IconProps.Variant }> = {
-  error: { name: "status-negative", variant: "error" },
-  warning: { name: "status-warning", variant: "warning" },
-  success: { name: "status-positive", variant: "success" },
-  info: { name: "status-info", variant: "subtle" },
-};
 
 interface ChartPoint {
   time: string;
@@ -152,9 +135,6 @@ export default function NodeDetail() {
   const { t } = useTranslation();
   const [node, setNode] = useState<Node | null>(null);
   const [metrics, setMetrics] = useState<NodeMetricsEntry[]>([]);
-  const [events, setEvents] = useState<ActivityEntry[]>([]);
-  const [eventPage, setEventPage] = useState(1);
-  const [eventsError, setEventsError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedHours, setSelectedHours] = useState(24);
@@ -176,29 +156,12 @@ export default function NodeDetail() {
   const fetchAll = useCallback(async () => {
     if (!nodeId) return;
     try {
-      // A failing event feed must not blank the page, so it resolves to its own
-      // error marker instead of rejecting the whole batch.
-      const [nodeData, metricsData, activityResult] = await Promise.all([
+      const [nodeData, metricsData] = await Promise.all([
         getNode(nodeId),
         getNodeMetrics(nodeId, selectedHours),
-        getActivity(EVENT_FETCH_LIMIT, { type: "node", id: nodeId }).then(
-          (entries) => ({ ok: true as const, entries }),
-          () => ({ ok: false as const, entries: [] as ActivityEntry[] }),
-        ),
       ]);
       setNode(nodeData);
       setMetrics(metricsData);
-      if (activityResult.ok) {
-        setEvents(activityResult.entries);
-        // A refresh can drop entries (retention) and leave the viewer on a page
-        // that no longer exists, which would render an empty card.
-        setEventPage((page) =>
-          Math.min(page, Math.max(1, Math.ceil(activityResult.entries.length / EVENTS_PER_PAGE))),
-        );
-        setEventsError(null);
-      } else {
-        setEventsError(t("admin.nodeDetail.eventsError"));
-      }
       setError(null);
     } catch {
       setError(t("admin.nodeDetail.fetchError"));
@@ -237,14 +200,7 @@ export default function NodeDetail() {
     </Box>
   );
 
-  const renderActivitySentence = (entry: ActivityEntry) => {
-    const key = `admin.dashboard.event.${entry.event_type}`;
-    const translated = t(key);
-    return translated === key ? t("admin.dashboard.event.unknown") : translated;
-  };
 
-  const eventPageCount = Math.max(1, Math.ceil(events.length / EVENTS_PER_PAGE));
-  const pagedEvents = events.slice((eventPage - 1) * EVENTS_PER_PAGE, eventPage * EVENTS_PER_PAGE);
 
   const statusLabel = (status: string): string => {
     if (status === "online") return t("admin.nodes.statusOnline");
@@ -316,9 +272,12 @@ export default function NodeDetail() {
                 loading={refreshing}
                 onClick={refresh}
               />
-              <Button variant="primary" onClick={() => navigate(`/admin/nodes/${nodeId}/inbounds`)}>
-                {t("admin.nodeDetail.manageInbounds")}
+              <Button onClick={() => navigate(`/admin/node-chains?${node.role === "both" ? "node" : node.role === "exit" ? "exit" : "entry"}=${encodeURIComponent(node.id)}`)}>
+                {t("admin.routeManagement.portMap")}
               </Button>
+              {node.role !== "relay" && <Button variant="primary" onClick={() => navigate(`/admin/nodes/${nodeId}/inbounds`)}>
+                {t("admin.nodeDetail.manageInbounds")}
+              </Button>}
             </SpaceBetween>
           }
           description={
@@ -341,6 +300,7 @@ export default function NodeDetail() {
             <KeyValuePairs
               columns={2}
               items={[
+                { label: t("admin.nodes.role.label"), value: t(`admin.nodes.role.${node.role}`) },
                 {
                   label: t("admin.nodes.col.status"),
                   value: (
@@ -360,7 +320,7 @@ export default function NodeDetail() {
                     </span>
                   ),
                 },
-                { label: t("admin.nodeDetail.xrayVersion"), value: node.xray_version ?? "—" },
+                ...(node.role !== "relay" ? [{ label: t("admin.nodeDetail.xrayVersion"), value: node.xray_version ?? "—" }] : []),
                 {
                   label: t("admin.nodeDetail.createdAt"),
                   value: new Date(node.created_at).toLocaleString(),
@@ -432,7 +392,7 @@ export default function NodeDetail() {
                   {t("admin.nodeDetail.healthAllClearDetail")}
                 </Alert>
               )}
-              <KeyValuePairs
+              {node.role === "relay" ? <Box color="text-body-secondary">{t("admin.routeManagement.entryMetricsHint")}</Box> : <KeyValuePairs
                 columns={1}
                 items={[
                   {
@@ -483,7 +443,7 @@ export default function NodeDetail() {
                         </SpaceBetween>
                       ) : node.shaping_ok === true ? (
                         <StatusIndicator type="success">
-                          {t("admin.nodeDetail.shapingActive", { tiers: node.shaping_tiers ?? 0 })}
+                          {t(node.shaping_mode === "device_global_v1" ? "admin.routeManagement.deviceLimiterActive" : "admin.nodeDetail.shapingActive", { tiers: node.shaping_tiers ?? 0 })}
                         </StatusIndicator>
                       ) : (
                         <StatusIndicator type="info">
@@ -511,75 +471,13 @@ export default function NodeDetail() {
                     ),
                   },
                 ]}
-              />
+              />}
             </SpaceBetween>
           </Container>
 
-          <Container
-            fitHeight
-            header={
-              <Header
-                variant="h2"
-                counter={events.length > 0 ? `(${events.length})` : undefined}
-                actions={
-                  eventPageCount > 1 ? (
-                    <Pagination
-                      currentPageIndex={eventPage}
-                      pagesCount={eventPageCount}
-                      onChange={({ detail }) => setEventPage(detail.currentPageIndex)}
-                      ariaLabels={{
-                        paginationLabel: t("admin.nodeDetail.eventsPagination"),
-                        previousPageLabel: t("admin.nodeDetail.eventsPrevPage"),
-                        nextPageLabel: t("admin.nodeDetail.eventsNextPage"),
-                        pageLabel: (page) => t("admin.nodeDetail.eventsPageLabel", { page }),
-                      }}
-                    />
-                  ) : undefined
-                }
-              >
-                {t("admin.nodeDetail.recentEvents")}
-              </Header>
-            }
-          >
-            {eventsError ? (
-              <Box textAlign="center" padding="l">
-                <StatusIndicator type="error">{eventsError}</StatusIndicator>
-              </Box>
-            ) : events.length > 0 ? (
-              <List
-                items={pagedEvents}
-                ariaLabel={t("admin.nodeDetail.recentEvents")}
-                renderItem={(entry) => ({
-                  id: entry.id,
-                  icon: (
-                    <Icon
-                      name={SEVERITY_ICON[entry.severity].name}
-                      variant={SEVERITY_ICON[entry.severity].variant}
-                    />
-                  ),
-                  content: (
-                    <Box variant="span" fontSize="body-s">
-                      <Box variant="strong" fontSize="body-s" display="inline">
-                        {entry.actor_label || entry.actor_type}
-                      </Box>
-                      {` ${renderActivitySentence(entry)}`}
-                    </Box>
-                  ),
-                  secondaryContent: (
-                    <Box variant="small" color="text-body-secondary">
-                      {formatEventTime(entry.created_at)}
-                    </Box>
-                  ),
-                  announcementLabel: renderActivitySentence(entry),
-                })}
-              />
-            ) : (
-              <Box textAlign="center" padding="l">
-                <StatusIndicator type="info">{t("admin.nodeDetail.noEvents")}</StatusIndicator>
-              </Box>
-            )}
-          </Container>
         </ColumnLayout>
+
+        <NodeEventViewer nodeId={node.id} />
 
         <Container
           header={

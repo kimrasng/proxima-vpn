@@ -3,6 +3,8 @@ package services
 import (
 	"testing"
 	"time"
+
+	"github.com/proximavpn/proxima-vpn/pkg/nodeprov"
 )
 
 func ruleFor(t *testing.T, kind AlertKind) alertRule {
@@ -332,13 +334,36 @@ func TestResolveReportsEpisodeDuration(t *testing.T) {
 // must not, because offline already says it.
 func TestXrayDownOnlyWhileReporting(t *testing.T) {
 	r := ruleFor(t, AlertXrayDown)
-	n := nodeReading{xrayOK: false}
+	n := nodeReading{xrayOK: false, role: string(nodeprov.RoleExit)}
 
 	if _, flag := ruleInput(r, n, true); !flag {
 		t.Fatal("an online node with xray down must breach")
 	}
 	if _, flag := ruleInput(r, n, false); flag {
 		t.Fatal("an offline node must not raise xray_down on top of offline")
+	}
+}
+
+// A relay forwards packets in the kernel and deliberately runs no Xray and no tc,
+// so xray_running=false and shaping_ok=false are its configured state. Firing on
+// them would mean a permanent alert on every relay, which buries the real ones.
+func TestRelayDoesNotRaiseXrayOrShapingAlerts(t *testing.T) {
+	relay := nodeReading{xrayOK: false, shapingOK: false, role: string(nodeprov.RoleRelay)}
+
+	if _, flag := ruleInput(ruleFor(t, AlertXrayDown), relay, true); flag {
+		t.Error("a relay raised xray_down, which it can never satisfy")
+	}
+	if _, flag := ruleInput(ruleFor(t, AlertShapingFailed), relay, true); flag {
+		t.Error("a relay raised shaping_failed, which it installs no rules for")
+	}
+
+	// A node doing both jobs still runs Xray, so it must still be watched.
+	both := nodeReading{xrayOK: false, shapingOK: false, role: string(nodeprov.RoleBoth)}
+	if _, flag := ruleInput(ruleFor(t, AlertXrayDown), both, true); !flag {
+		t.Error("a node with role=both did not raise xray_down while its Xray was dead")
+	}
+	if _, flag := ruleInput(ruleFor(t, AlertShapingFailed), both, true); !flag {
+		t.Error("a node with role=both did not raise shaping_failed")
 	}
 }
 

@@ -2,9 +2,11 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -43,7 +45,7 @@ type nodeGroupNode struct {
 }
 
 type setNodesRequest struct {
-	NodeIDs []string `json:"node_ids"`
+	NodeIDs *[]string `json:"node_ids"`
 }
 
 // Create creates a new node group.
@@ -293,30 +295,99 @@ func (h *AdminNodeGroupHandler) SetNodes(c *fiber.Ctx) error {
 			"error": "invalid request body",
 		})
 	}
-
-	// Verify group exists
-	var exists bool
-	err := h.db.QueryRow(
-		context.Background(),
-		`SELECT EXISTS(SELECT 1 FROM node_groups WHERE id = $1)`,
-		id,
-	).Scan(&exists)
-	if err != nil || !exists {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-			"error": "node group not found",
+	if req.NodeIDs == nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "node_ids is required",
 		})
 	}
+	nodeIDs := *req.NodeIDs
+	ctx := context.Background()
 
-	tx, err := h.db.Begin(context.Background())
+	tx, err := h.db.Begin(ctx)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to start transaction",
 		})
 	}
-	defer func() { _ = tx.Rollback(context.Background()) }()
+	defer tx.Rollback(ctx)
+
+	var lockedGroupID string
+	err = tx.QueryRow(ctx,
+		`SELECT id::text FROM node_groups WHERE id = $1 FOR UPDATE`, id,
+	).Scan(&lockedGroupID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "node group not found",
+		})
+	}
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to lock node group",
+		})
+	}
+
+	rows, err := tx.Query(ctx,
+		`SELECT n.id::text, n.role, n.id::text = ANY($1::text[])
+		 FROM nodes n
+		 WHERE n.id::text = ANY($1::text[])
+		    OR EXISTS (
+		      SELECT 1 FROM node_group_nodes ngn
+		      WHERE ngn.node_group_id = $2 AND ngn.node_id = n.id
+		    )
+		 ORDER BY n.id
+		 FOR UPDATE`,
+		nodeIDs, id,
+	)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to validate nodes",
+		})
+	}
+	selectedNodes := 0
+	forwardingNodes := 0
+	for rows.Next() {
+		var nodeID, role string
+		var selected bool
+		if err := rows.Scan(&nodeID, &role, &selected); err != nil {
+			rows.Close()
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "failed to validate nodes",
+			})
+		}
+		if selected {
+			selectedNodes++
+			if role == "relay" || role == "both" {
+				forwardingNodes++
+			}
+		}
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to validate nodes",
+		})
+	}
+	if selectedNodes != len(nodeIDs) {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "node_ids contains an unknown or duplicate node",
+		})
+	}
+	var referenced bool
+	if err := tx.QueryRow(ctx,
+		`SELECT EXISTS(SELECT 1 FROM node_chains WHERE relay_pool_id = $1)`, id,
+	).Scan(&referenced); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to validate relay pool",
+		})
+	}
+	if referenced && (selectedNodes == 0 || forwardingNodes != selectedNodes) {
+		return c.Status(fiber.StatusConflict).JSON(fiber.Map{
+			"error": "referenced relay pool must remain nonempty and forwarding-only",
+		})
+	}
 
 	_, err = tx.Exec(
-		context.Background(),
+		ctx,
 		`DELETE FROM node_group_nodes WHERE node_group_id = $1`,
 		id,
 	)
@@ -326,21 +397,71 @@ func (h *AdminNodeGroupHandler) SetNodes(c *fiber.Ctx) error {
 		})
 	}
 
-	// Insert new associations
-	for _, nodeID := range req.NodeIDs {
-		_, err = tx.Exec(
-			context.Background(),
-			`INSERT INTO node_group_nodes (node_group_id, node_id) VALUES ($1, $2)`,
-			id, nodeID,
-		)
-		if err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-				"error": "failed to add node: " + nodeID,
-			})
-		}
+	if _, err := tx.Exec(ctx,
+		`INSERT INTO node_group_nodes (node_group_id, node_id)
+		 SELECT $1, node_id::uuid FROM unnest($2::text[]) AS node_id`,
+		id, nodeIDs,
+	); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to add nodes",
+		})
 	}
 
-	if err := tx.Commit(context.Background()); err != nil {
+	// Subscriptions are served from node_group_chains, so a membership edit that
+	// touched only node_group_nodes would not reach a single client until the next
+	// API restart re-ran the migration backfill. Every node gets a direct chain
+	// created here if it does not have one, for the same reason the backfill
+	// exists: a node with no chain is invisible.
+	//
+	// Relayed chains are left alone. They are placed deliberately, by pool, and
+	// re-deriving them from node membership would delete an operator's work.
+	if _, err := tx.Exec(
+		ctx,
+		`INSERT INTO node_chains (name, relay_pool_id, exit_node_id, exit_port, transport)
+		 SELECT n.name, NULL, n.id, n.port, 'tcp_udp'
+		 FROM nodes n
+		 WHERE n.id = ANY($1::uuid[])
+		   AND NOT EXISTS (
+		     SELECT 1 FROM node_chains c
+		     WHERE c.exit_node_id = n.id AND c.relay_pool_id IS NULL AND c.entry_node_id IS NULL
+		   )`,
+		nodeIDs,
+	); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to create node chains",
+		})
+	}
+
+	if _, err := tx.Exec(
+		ctx,
+		`DELETE FROM node_group_chains ngc
+		 USING node_chains c
+		 WHERE ngc.chain_id = c.id
+		   AND ngc.node_group_id = $1
+		   AND c.relay_pool_id IS NULL AND c.entry_node_id IS NULL
+		   AND NOT (c.exit_node_id = ANY($2::uuid[]))`,
+		id, nodeIDs,
+	); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to clear group chains",
+		})
+	}
+
+	if _, err := tx.Exec(
+		ctx,
+		`INSERT INTO node_group_chains (node_group_id, chain_id)
+		 SELECT $1, c.id
+		 FROM node_chains c
+		 WHERE c.relay_pool_id IS NULL AND c.entry_node_id IS NULL AND c.exit_node_id = ANY($2::uuid[])
+		 ON CONFLICT DO NOTHING`,
+		id, nodeIDs,
+	); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to attach group chains",
+		})
+	}
+
+	if err := tx.Commit(ctx); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to commit transaction",
 		})
@@ -348,6 +469,6 @@ func (h *AdminNodeGroupHandler) SetNodes(c *fiber.Ctx) error {
 
 	return c.JSON(fiber.Map{
 		"node_group_id": id,
-		"node_ids":      req.NodeIDs,
+		"node_ids":      nodeIDs,
 	})
 }

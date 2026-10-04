@@ -8,19 +8,46 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
 
 type Config struct {
-	Server       ServerConfig       `yaml:"server"`
-	Database     DatabaseConfig     `yaml:"database"`
-	Redis        RedisConfig        `yaml:"redis"`
-	JWT          JWTConfig          `yaml:"jwt"`
-	Backup       BackupConfig       `yaml:"backup"`
-	Telegram     TelegramConfig     `yaml:"telegram"`
-	Subscription SubscriptionConfig `yaml:"subscription"`
-	Storage      StorageConfig      `yaml:"storage"`
+	Server          ServerConfig          `yaml:"server"`
+	Database        DatabaseConfig        `yaml:"database"`
+	Redis           RedisConfig           `yaml:"redis"`
+	JWT             JWTConfig             `yaml:"jwt"`
+	Backup          BackupConfig          `yaml:"backup"`
+	Telegram        TelegramConfig        `yaml:"telegram"`
+	Subscription    SubscriptionConfig    `yaml:"subscription"`
+	Storage         StorageConfig         `yaml:"storage"`
+	Payments        PaymentsConfig        `yaml:"payments"`
+	ManagedEntryDNS ManagedEntryDNSConfig `yaml:"managed_entry_dns" json:"managed_entry_dns"`
+}
+
+// PaymentsConfig governs every payment provider, not just Stripe: the
+// currency and pending-order lifetime are panel-wide because plan_prices
+// holds bare integer cents with no per-plan currency column.
+type PaymentsConfig struct {
+	Currency      string       `yaml:"currency"`
+	PendingTTLRaw string       `yaml:"pending_ttl"`
+	Stripe        StripeConfig `yaml:"stripe"`
+}
+
+type StripeConfig struct {
+	SecretKey     string `yaml:"secret_key"`
+	WebhookSecret string `yaml:"webhook_secret"`
+}
+
+// PendingTTL parses PaymentsConfig.PendingTTLRaw, falling back to 24h on an
+// unparseable value the same way JWT's AdminExpiry/UserExpiry fall back.
+func (p PaymentsConfig) PendingTTL() time.Duration {
+	d, err := time.ParseDuration(p.PendingTTLRaw)
+	if err != nil {
+		return 24 * time.Hour
+	}
+	return d
 }
 
 type StorageConfig struct {
@@ -33,7 +60,25 @@ type ServerConfig struct {
 	Host     string `yaml:"host"`
 	Port     int    `yaml:"port"`
 	PanelURL string `yaml:"panel_url"`
+
+	// TrustedProxies lists the addresses and CIDR ranges whose ProxyHeader is
+	// believed; any other peer is recorded by its own address. Port 2053 is
+	// published alongside nginx, so a client reaching the API directly can
+	// send any X-Forwarded-For it likes - without this list every IP-keyed
+	// decision (rate limits, login audit rows, payment request addresses) is
+	// spoofable. Empty trusts no proxy at all.
+	TrustedProxies []string `yaml:"trusted_proxies"`
+
+	// ProxyHeader is where a trusted proxy publishes the real client address.
+	// Empty disables forwarded-header handling entirely.
+	ProxyHeader string `yaml:"proxy_header"`
 }
+
+// TrustNoProxy is the TRUSTED_PROXIES value that clears the list, for a
+// deployment with no reverse proxy in front of the API. An empty variable
+// cannot mean this: compose passes unset variables through as empty strings,
+// which would silently disable forwarding for the standard topology.
+const TrustNoProxy = "none"
 
 type DatabaseConfig struct {
 	URL            string `yaml:"url"`
@@ -80,6 +125,12 @@ func Load(path string) (*Config, error) {
 		Server: ServerConfig{
 			Host: "0.0.0.0",
 			Port: 2053,
+			// The compose topology puts nginx on the bridge network in front
+			// of the API, so the private ranges Docker allocates from are the
+			// proxies worth believing. Loopback covers running the binary
+			// directly behind a host-local proxy.
+			TrustedProxies: []string{"10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "127.0.0.1", "::1"},
+			ProxyHeader:    "X-Forwarded-For",
 		},
 		Database: DatabaseConfig{
 			MaxConnections: 20,
@@ -96,6 +147,10 @@ func Load(path string) (*Config, error) {
 			Type:      "local",
 			LocalPath: "/app/uploads",
 		},
+		Payments: PaymentsConfig{
+			Currency:      "usd",
+			PendingTTLRaw: "24h",
+		},
 	}
 
 	data, err := os.ReadFile(path)
@@ -111,6 +166,7 @@ func Load(path string) (*Config, error) {
 	}
 
 	applyEnvOverrides(cfg)
+	cfg.ManagedEntryDNS.resolve()
 
 	if cfg.JWT.Secret == "" {
 		// No secret provided: load a persisted one or generate and persist a new
@@ -156,6 +212,15 @@ func loadOrCreateJWTSecret() string {
 }
 
 func applyEnvOverrides(cfg *Config) {
+	if v := os.Getenv("CLOUDFLARE_API_TOKEN"); v != "" {
+		cfg.ManagedEntryDNS.Token = Secret{value: v}
+	}
+	if v := os.Getenv("CLOUDFLARE_ZONE_ID"); v != "" {
+		cfg.ManagedEntryDNS.ZoneID = v
+	}
+	if v := os.Getenv("ENTRY_DNS_BASE_DOMAIN"); v != "" {
+		cfg.ManagedEntryDNS.BaseDomain = v
+	}
 	if v := os.Getenv("DATABASE_URL"); v != "" {
 		cfg.Database.URL = v
 	}
@@ -168,4 +233,38 @@ func applyEnvOverrides(cfg *Config) {
 	if v := os.Getenv("PANEL_URL"); v != "" {
 		cfg.Server.PanelURL = v
 	}
+	if v := os.Getenv("TRUSTED_PROXIES"); v != "" {
+		cfg.Server.TrustedProxies = parseTrustedProxies(v)
+	}
+	if v := os.Getenv("PROXY_HEADER"); v != "" {
+		cfg.Server.ProxyHeader = v
+	}
+	if v := os.Getenv("STRIPE_SECRET_KEY"); v != "" {
+		cfg.Payments.Stripe.SecretKey = v
+	}
+	if v := os.Getenv("STRIPE_WEBHOOK_SECRET"); v != "" {
+		cfg.Payments.Stripe.WebhookSecret = v
+	}
+	if v := os.Getenv("PAYMENTS_CURRENCY"); v != "" {
+		cfg.Payments.Currency = v
+	}
+	if v := os.Getenv("PAYMENTS_PENDING_TTL"); v != "" {
+		cfg.Payments.PendingTTLRaw = v
+	}
+}
+
+// parseTrustedProxies splits a comma-separated TRUSTED_PROXIES value. Entries
+// stay verbatim so Fiber parses each CIDR with the same code that matches it.
+func parseTrustedProxies(raw string) []string {
+	if strings.TrimSpace(raw) == TrustNoProxy {
+		return nil
+	}
+
+	proxies := make([]string, 0, strings.Count(raw, ",")+1)
+	for _, entry := range strings.Split(raw, ",") {
+		if trimmed := strings.TrimSpace(entry); trimmed != "" {
+			proxies = append(proxies, trimmed)
+		}
+	}
+	return proxies
 }

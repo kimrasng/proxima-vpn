@@ -8,6 +8,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/proximavpn/proxima-vpn/pkg/nodeprov"
 )
 
 // Alert event types. EventNodeOffline already exists for the offline edge; the
@@ -69,6 +70,7 @@ type nodeReading struct {
 	disk      float64
 	xrayOK    bool
 	shapingOK bool
+	role      string
 }
 
 // Evaluate runs one pass over every non-pending node and every rule, persists the
@@ -80,7 +82,7 @@ func (s *AlertService) Evaluate(ctx context.Context) ([]AlertTransition, error) 
 	rows, err := s.db.Query(ctx, `
 		SELECT n.id::text, n.name, n.country, n.region, n.status,
 		       n.cpu_usage, n.memory_usage, n.disk_usage,
-		       n.xray_running, COALESCE(n.shaping_ok, true)
+		       n.xray_running, COALESCE(n.shaping_ok, true), n.role
 		FROM nodes n
 		WHERE n.status <> 'pending'
 		ORDER BY n.name ASC
@@ -93,7 +95,7 @@ func (s *AlertService) Evaluate(ctx context.Context) ([]AlertTransition, error) 
 		var r nodeReading
 		if err := rows.Scan(&r.id, &r.name, &r.country, &r.region, &r.status,
 			&r.cpu, &r.memory, &r.disk,
-			&r.xrayOK, &r.shapingOK); err != nil {
+			&r.xrayOK, &r.shapingOK, &r.role); err != nil {
 			rows.Close()
 			return nil, fmt.Errorf("scan node for alert evaluation: %w", err)
 		}
@@ -164,11 +166,14 @@ func ruleInput(r alertRule, n nodeReading, online bool) (float64, bool) {
 	case AlertOffline:
 		return 0, !online
 	case AlertXrayDown:
-		// Only meaningful while the node is reporting: an offline node's Xray is
-		// down by definition, and saying so twice is noise.
-		return 0, online && !n.xrayOK
+		// Only meaningful while the node is reporting, and only on a node that is
+		// meant to run Xray at all: an offline node's Xray is down by definition,
+		// and a relay deliberately runs none, so firing there would be a permanent
+		// false alarm that buries the real ones.
+		return 0, online && nodeprov.Role(n.role).Exits() && !n.xrayOK
 	case AlertShapingFailed:
-		return 0, !n.shapingOK
+		// A relay installs no tc rules, so it has none to fail.
+		return 0, nodeprov.Role(n.role).Exits() && !n.shapingOK
 	case AlertCPU:
 		return n.cpu, false
 	case AlertMemory:

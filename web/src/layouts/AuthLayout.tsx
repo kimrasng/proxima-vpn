@@ -1,6 +1,7 @@
 import { Outlet } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { Box, SpaceBetween, Button } from "@cloudscape-design/components";
+import { SpaceBetween, Button } from "@cloudscape-design/components";
+import "./authLayout.css";
 
 export default function AuthLayout() {
   const { i18n } = useTranslation();
@@ -10,17 +11,8 @@ export default function AuthLayout() {
   };
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "2rem",
-      }}
-    >
-      <div style={{ position: "absolute", top: "1rem", right: "1rem" }}>
+    <div className="auth-layout">
+      <div className="auth-layout__languages">
         <SpaceBetween direction="horizontal" size="xs">
           <Button
             variant={i18n.language === "ko" ? "primary" : "normal"}
@@ -42,11 +34,9 @@ export default function AuthLayout() {
           </Button>
         </SpaceBetween>
       </div>
-      <Box padding={{ top: "xxxl" }}>
-        <div style={{ width: "100%", maxWidth: "480px" }}>
-          <Outlet />
-        </div>
-      </Box>
+      <div className="auth-layout__form">
+        <Outlet />
+      </div>
     </div>
   );
 }

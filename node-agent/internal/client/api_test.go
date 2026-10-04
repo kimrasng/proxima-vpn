@@ -1,8 +1,14 @@
 package client
 
 import (
+	"context"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"testing"
+
+	"github.com/proximavpn/proxima-vpn/node-agent/internal/config"
+	"github.com/proximavpn/proxima-vpn/pkg/nodeprov"
 )
 
 // Regression: the agent posted {"traffic":[{"uuid","upload","download"}]} while
@@ -93,5 +99,32 @@ func TestHeartbeatWireNamesMatchTheServerContract(t *testing.T) {
 	}
 	if !decoded.XrayRunning {
 		t.Errorf("xray_running did not survive the round trip: %s", body)
+	}
+}
+
+func TestGetExitRulesUsesAuthenticatedNodeEndpointAndDecodesRules(t *testing.T) {
+	var requestPath, nodeKey string
+	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+		requestPath = request.URL.Path
+		nodeKey = request.Header.Get("X-Node-Key")
+		response.Header().Set("Content-Type", "application/json")
+		_, _ = response.Write([]byte(`[{"exit_port":443,"transport":"tcp","relay_ips":["203.0.113.2"]}]`))
+	}))
+	t.Cleanup(server.Close)
+	apiClient := NewAPIClient(&config.AgentConfig{ServerURL: server.URL, NodeID: "node-1", APIKey: "secret"})
+
+	rules, err := apiClient.GetExitRules(context.Background())
+	if err != nil {
+		t.Fatalf("get exit rules: %v", err)
+	}
+	if requestPath != "/api/v1/nodes/node-1/exit-rules" {
+		t.Errorf("request path = %q", requestPath)
+	}
+	if nodeKey != "secret" {
+		t.Errorf("X-Node-Key = %q", nodeKey)
+	}
+	want := []nodeprov.ExitRule{{ExitPort: 443, Transport: nodeprov.TransportTCP, RelayIPs: []string{"203.0.113.2"}}}
+	if len(rules) != 1 || rules[0].ExitPort != want[0].ExitPort || rules[0].Transport != want[0].Transport || len(rules[0].RelayIPs) != 1 || rules[0].RelayIPs[0] != want[0].RelayIPs[0] {
+		t.Errorf("rules = %+v, want %+v", rules, want)
 	}
 }
