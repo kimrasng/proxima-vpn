@@ -1,0 +1,19 @@
+table inet proxima_relay {
+	chain prerouting {
+		type nat hook prerouting priority dstnat; policy accept;
+		dnat ip to tcp dport map { 24443 : 10.141.120.30 . 8443, 24444 : 10.141.120.40 . 8443, 24445 : 10.141.120.30 . 8443 }
+	}
+
+	chain postrouting {
+		type nat hook postrouting priority srcnat; policy accept;
+		ip daddr 10.141.120.30 masquerade
+		ip daddr 10.141.120.40 masquerade
+	}
+
+	chain forward {
+		type filter hook forward priority filter; policy accept;
+		ct state established,related accept
+		ip daddr 10.141.120.30 accept
+		ip daddr 10.141.120.40 accept
+	}
+}

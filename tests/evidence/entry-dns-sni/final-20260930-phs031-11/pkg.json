@@ -1,0 +1,10 @@
+{
+  "passed": true,
+  "requiredCount": 68,
+  "testPassCount": 97,
+  "skipCount": 0,
+  "noTestPackageCount": 1,
+  "packagePassCount": 6,
+  "expectedPackages": 7,
+  "problems": []
+}

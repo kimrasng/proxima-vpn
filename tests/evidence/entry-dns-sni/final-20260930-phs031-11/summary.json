@@ -1,0 +1,221 @@
+{
+  "passed": true,
+  "commands": [
+    {
+      "command": "relay",
+      "exitCode": 0
+    },
+    {
+      "command": "relay-check",
+      "exitCode": 0
+    },
+    {
+      "command": "migration",
+      "exitCode": 0
+    },
+    {
+      "command": "api-list",
+      "exitCode": 0
+    },
+    {
+      "command": "api-race-tests",
+      "exitCode": 0
+    },
+    {
+      "command": "api-check",
+      "exitCode": 0
+    },
+    {
+      "command": "api-vet",
+      "exitCode": 0
+    },
+    {
+      "command": "api-build",
+      "exitCode": 0
+    },
+    {
+      "command": "pkg-list",
+      "exitCode": 0
+    },
+    {
+      "command": "pkg-race-tests",
+      "exitCode": 0
+    },
+    {
+      "command": "pkg-check",
+      "exitCode": 0
+    },
+    {
+      "command": "pkg-vet",
+      "exitCode": 0
+    },
+    {
+      "command": "pkg-build",
+      "exitCode": 0
+    },
+    {
+      "command": "node-list",
+      "exitCode": 0
+    },
+    {
+      "command": "node-race-tests",
+      "exitCode": 0
+    },
+    {
+      "command": "node-nft",
+      "exitCode": 0
+    },
+    {
+      "command": "node-check",
+      "exitCode": 0
+    },
+    {
+      "command": "node-vet",
+      "exitCode": 0
+    },
+    {
+      "command": "node-build",
+      "exitCode": 0
+    },
+    {
+      "command": "api-binary",
+      "exitCode": 0
+    },
+    {
+      "command": "real-admin-api-ready",
+      "exitCode": 0
+    },
+    {
+      "command": "order-fixture",
+      "exitCode": 0
+    },
+    {
+      "command": "locales",
+      "exitCode": 0
+    },
+    {
+      "command": "lint",
+      "exitCode": 0
+    },
+    {
+      "command": "web-build",
+      "exitCode": 0
+    },
+    {
+      "command": "preview-ready",
+      "exitCode": 0
+    },
+    {
+      "command": "browser-real-admin",
+      "exitCode": 0
+    },
+    {
+      "command": "real-node-chains-api-ready",
+      "exitCode": 0
+    },
+    {
+      "command": "browser-real-node-chains",
+      "exitCode": 0
+    },
+    {
+      "command": "real-admin-subscription-domains-api-ready",
+      "exitCode": 0
+    },
+    {
+      "command": "browser-real-admin-subscription-domains",
+      "exitCode": 0
+    },
+    {
+      "command": "real-user-portal-api-ready",
+      "exitCode": 0
+    },
+    {
+      "command": "browser-real-user-portal",
+      "exitCode": 0
+    },
+    {
+      "command": "real-user-subscription-domains-api-ready",
+      "exitCode": 0
+    },
+    {
+      "command": "browser-real-user-subscription-domains",
+      "exitCode": 0
+    },
+    {
+      "command": "browser-mock",
+      "exitCode": 0
+    },
+    {
+      "command": "browser-check",
+      "exitCode": 0
+    },
+    {
+      "command": "diff-check",
+      "exitCode": 0
+    },
+    {
+      "command": "graph-validate",
+      "exitCode": 0
+    },
+    {
+      "command": "credential-scan",
+      "exitCode": 0
+    }
+  ],
+  "relay": {
+    "assertions": 24,
+    "exitCode": 0
+  },
+  "modules": {
+    "api": {
+      "passed": true,
+      "requiredCount": 433,
+      "testPassCount": 732,
+      "skipCount": 0,
+      "noTestPackageCount": 6,
+      "packagePassCount": 9,
+      "expectedPackages": 15,
+      "problems": []
+    },
+    "pkg": {
+      "passed": true,
+      "requiredCount": 68,
+      "testPassCount": 97,
+      "skipCount": 0,
+      "noTestPackageCount": 1,
+      "packagePassCount": 6,
+      "expectedPackages": 7,
+      "problems": []
+    },
+    "node": {
+      "passed": true,
+      "requiredCount": 88,
+      "testPassCount": 96,
+      "skipCount": 1,
+      "noTestPackageCount": 2,
+      "packagePassCount": 8,
+      "expectedPackages": 10,
+      "problems": [],
+      "nft": {
+        "passed": true,
+        "requiredCount": 1,
+        "testPassCount": 1,
+        "skipCount": 0,
+        "noTestPackageCount": 0,
+        "packagePassCount": 1,
+        "expectedPackages": 1,
+        "problems": []
+      }
+    }
+  },
+  "browser": {
+    "passed": true,
+    "total": 115,
+    "passedTests": 115,
+    "skipped": 0,
+    "failed": 0,
+    "files": 8,
+    "requiredFiles": 8,
+    "problems": []
+  }
+}
