@@ -1,0 +1,170 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: relay_e2e
+      POSTGRES_USER: relay_e2e
+      POSTGRES_PASSWORD: relay_e2e
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U relay_e2e -d relay_e2e"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+    networks: [control]
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+    networks: [control]
+
+  api:
+    image: ${E2E_IMAGE}
+    command: ["proxima-api"]
+    environment:
+      DATABASE_URL: postgres://relay_e2e:relay_e2e@postgres:5432/relay_e2e
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: relay-e2e-not-for-production
+      ADMIN_EMAIL: admin@relay-e2e.test
+      ADMIN_PASSWORD: RelayE2EAdminPassword123!
+      SWAGGER_ENABLED: "false"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:2053/health"]
+      interval: 2s
+      timeout: 2s
+      retries: 60
+    networks: [control]
+
+  control:
+    image: ${E2E_IMAGE}
+    command: ["bash", "/src/tests/relay-e2e/provision.sh"]
+    environment:
+      E2E_ACTION: ${E2E_ACTION:-provision}
+      E2E_API_URL: http://api:2053
+      ADMIN_EMAIL: admin@relay-e2e.test
+      ADMIN_PASSWORD: RelayE2EAdminPassword123!
+      RELAY_FRONT_IP: ${RELAY_FRONT_IP}
+      RELAY_BACK_IP: ${RELAY_BACK_IP}
+      EXIT_A_BACK_IP: ${EXIT_A_BACK_IP}
+      EXIT_B_BACK_IP: ${EXIT_B_BACK_IP}
+      PGPASSWORD: relay_e2e
+    volumes:
+      - e2e-state:/state
+      - e2e-relay:/relay-state
+      - e2e-exit-a:/exit-a-state
+      - e2e-exit-b:/exit-b-state
+      - e2e-client:/client-state
+    networks: [control]
+
+  relay:
+    image: ${E2E_IMAGE}
+    privileged: true
+    command: ["bash", "/src/tests/relay-e2e/node.sh"]
+    environment:
+      E2E_ROLE: relay
+    volumes:
+      - e2e-relay:/state:ro
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "kill -0 1 && nft list table inet proxima_relay | grep -q '24443'"]
+      interval: 2s
+      timeout: 2s
+      retries: 60
+    networks:
+      front:
+        ipv4_address: ${RELAY_FRONT_IP}
+        aliases: [entry.relay-e2e.test]
+      back:
+        ipv4_address: ${RELAY_BACK_IP}
+      control: {}
+
+  exit-a:
+    image: ${E2E_IMAGE}
+    privileged: true
+    command: ["bash", "/src/tests/relay-e2e/node.sh"]
+    environment:
+      E2E_ROLE: exit-a
+      E2E_MARKER: PROXIMA_EXIT_A
+      RELAY_BACK_IP: ${RELAY_BACK_IP}
+    volumes:
+      - e2e-exit-a:/state:ro
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "kill -0 1 && ss -tln | grep -q ':8443 ' && nft list table inet proxima_relay | grep -q '${RELAY_BACK_IP}'"]
+      interval: 2s
+      timeout: 2s
+      retries: 60
+    networks:
+      back:
+        ipv4_address: ${EXIT_A_BACK_IP}
+      control: {}
+
+  exit-b:
+    image: ${E2E_IMAGE}
+    privileged: true
+    command: ["bash", "/src/tests/relay-e2e/node.sh"]
+    environment:
+      E2E_ROLE: exit-b
+      E2E_MARKER: PROXIMA_EXIT_B
+      RELAY_BACK_IP: ${RELAY_BACK_IP}
+    volumes:
+      - e2e-exit-b:/state:ro
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "kill -0 1 && ss -tln | grep -q ':8443 ' && nft list table inet proxima_relay | grep -q '${RELAY_BACK_IP}'"]
+      interval: 2s
+      timeout: 2s
+      retries: 60
+    networks:
+      back:
+        ipv4_address: ${EXIT_B_BACK_IP}
+      control: {}
+
+  client:
+    image: ${E2E_IMAGE}
+    privileged: true
+    command: ["bash", "/src/tests/relay-e2e/client.sh"]
+    environment:
+      E2E_MODE: ${E2E_MODE:-relayed}
+      RELAY_FRONT_IP: ${RELAY_FRONT_IP}
+      EXIT_A_BACK_IP: ${EXIT_A_BACK_IP}
+      EXIT_B_BACK_IP: ${EXIT_B_BACK_IP}
+    volumes:
+      - e2e-client:/state:ro
+    networks:
+      front:
+        ipv4_address: ${CLIENT_FRONT_IP}
+      back:
+        ipv4_address: ${CLIENT_BACK_IP}
+
+volumes:
+  e2e-state:
+  e2e-relay:
+  e2e-exit-a:
+  e2e-exit-b:
+  e2e-client:
+
+networks:
+  control: {}
+  front:
+    ipam:
+      config:
+        - subnet: ${FRONT_SUBNET}
+  back:
+    ipam:
+      config:
+        - subnet: ${BACK_SUBNET}

@@ -1,0 +1,96 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: direct_e2e
+      POSTGRES_USER: direct_e2e
+      POSTGRES_PASSWORD: direct_e2e
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U direct_e2e -d direct_e2e"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+    networks: [control]
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+    networks: [control]
+
+  api:
+    image: ${E2E_IMAGE}
+    command: ["proxima-api"]
+    environment:
+      DATABASE_URL: postgres://direct_e2e:direct_e2e@postgres:5432/direct_e2e
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: direct-e2e-not-for-production
+      ADMIN_EMAIL: admin@direct-e2e.test
+      ADMIN_PASSWORD: DirectE2EAdminPassword123!
+      SWAGGER_ENABLED: "false"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:2053/health"]
+      interval: 2s
+      timeout: 2s
+      retries: 60
+    networks: [control]
+
+  control:
+    image: ${E2E_IMAGE}
+    command: ["bash", "/src/tests/direct-e2e/provision.sh"]
+    environment:
+      E2E_API_URL: http://api:2053
+      ADMIN_EMAIL: admin@direct-e2e.test
+      ADMIN_PASSWORD: DirectE2EAdminPassword123!
+      EXIT_IP: ${EXIT_IP}
+    volumes:
+      - e2e-exit:/exit-state
+      - e2e-client:/client-state
+    networks: [control]
+
+  exit:
+    image: ${E2E_IMAGE}
+    privileged: true
+    command: ["bash", "/src/tests/direct-e2e/node.sh"]
+    volumes:
+      - e2e-exit:/state:ro
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "kill -0 1 && ss -tln | grep -q ':8443 '"]
+      interval: 2s
+      timeout: 2s
+      retries: 60
+    networks:
+      direct:
+        ipv4_address: ${EXIT_IP}
+      control: {}
+
+  client:
+    image: ${E2E_IMAGE}
+    command: ["bash", "/src/tests/direct-e2e/client.sh"]
+    environment:
+      EXIT_IP: ${EXIT_IP}
+    volumes:
+      - e2e-client:/state:ro
+    networks: [direct]
+
+volumes:
+  e2e-exit:
+  e2e-client:
+
+networks:
+  control: {}
+  direct:
+    ipam:
+      config:
+        - subnet: ${DIRECT_SUBNET}
