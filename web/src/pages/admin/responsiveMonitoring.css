@@ -1,0 +1,23 @@
+.monitoring-collection {
+  container-type: inline-size;
+  min-inline-size: 0;
+}
+
+.monitoring-collection__cards {
+  display: none;
+}
+
+.monitoring-collection__node-name {
+  display: inline-block;
+  white-space: nowrap;
+}
+
+@container (max-width: 900px) {
+  .monitoring-collection__table {
+    display: none;
+  }
+
+  .monitoring-collection__cards {
+    display: block;
+  }
+}

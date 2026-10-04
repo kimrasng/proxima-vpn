@@ -1,0 +1,28 @@
+.auth-layout {
+  box-sizing: border-box;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  padding: 24px;
+}
+
+.auth-layout__languages {
+  align-self: flex-end;
+}
+
+.auth-layout__form {
+  width: 100%;
+  max-width: 360px;
+  min-width: 0;
+  margin-block: auto;
+}
+
+@media (max-width: 600px) {
+  .auth-layout {
+    padding: 16px;
+  }
+}
