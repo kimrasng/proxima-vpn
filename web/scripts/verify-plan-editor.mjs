@@ -1,0 +1,55 @@
+import { chromium } from '@playwright/test';
+import { spawn } from 'node:child_process';
+import assert from 'node:assert/strict';
+const server = spawn('npm', ['run', 'preview', '--', '--port', '4188'], { stdio: 'ignore' });
+const browser = await chromium.launch();
+try {
+  await new Promise(resolve => setTimeout(resolve, 2000));
+  const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+  await page.addInitScript(() => { localStorage.setItem('proxima_admin_token', 'fixture'); localStorage.setItem('i18nextLng', 'en'); });
+  const plan = { id: 'c1f835fa-d701-49af-9b53-cd21793528dc', advertise: true, is_advertised: false, name: 'Starter', duration_days: 30, max_devices: 3, max_concurrent: null, traffic_limit: 107374182400, speed_limit: 100, node_group_id: 'group-fixture', is_active: true, purchasable: true, prices: [{ duration_days: 30, price_cents: 1000 }], features: [{ included: true, text: { en: 'Fast connection', ko: '빠른 연결' } }] };
+  let saved;
+  await page.route('**/api/**', async route => {
+    const path = new URL(route.request().url()).pathname;
+    if (route.request().method() === 'PUT' && path.endsWith('/plans/c1f835fa-d701-49af-9b53-cd21793528dc')) { saved = route.request().postDataJSON(); Object.assign(plan, saved); return route.fulfill({ json: plan }); }
+    const data = path.endsWith('/plans/c1f835fa-d701-49af-9b53-cd21793528dc') ? plan : path.endsWith('/plans') ? [plan] : path.endsWith('/node-groups') ? [{ id: 'group-fixture', name: 'Global' }] : path.includes('/routes') ? { chain_ids: [], warnings: [], node_group_id: 'group-fixture', speed_enforcement: 'shared_tier' } : path.endsWith('/node-chains') ? [] : { items: [], total: 0 };
+    await route.fulfill({ json: data });
+  });
+  page.on('pageerror', error => console.log('PAGE ERROR', error.message));
+  await page.goto('http://localhost:4188/admin/plans');
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
+  await page.getByRole('heading', { name: 'Live preview' }).waitFor();
+  assert.equal(await page.getByLabel('Plan ID', { exact: true }).isDisabled(), true);
+  await page.getByRole('textbox', { name: 'Plan Name', exact: true }).fill('Preview plan');
+  await page.getByRole('heading', { name: 'Preview plan', exact: true }).waitFor();
+  assert.equal(await page.getByText('Fast connection', { exact: true }).count(), 1);
+  await page.screenshot({ path: '/tmp/plan-editor-desktop.png', fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: '/tmp/plan-editor-mobile.png', fullPage: true });
+  await page.getByLabel('Traffic Limit (GB)', { exact: true }).fill('');
+  await page.getByLabel('Speed Limit (Mbps)', { exact: true }).fill('');
+  await page.getByLabel('Duration amount', { exact: true }).first().fill('2');
+  await page.getByLabel('Duration unit', { exact: true }).first().click();
+  await page.getByRole('option', { name: 'Week', exact: true }).click();
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await page.getByRole('button', { name: 'Create Plan', exact: true }).waitFor();
+  assert.equal(saved.traffic_limit, null);
+  assert.equal(saved.speed_limit, null);
+  assert.equal(saved.max_concurrent, null);
+  assert.equal(saved.prices[0].price_cents, 1000);
+  assert.equal(saved.duration_days, 14);
+  assert.equal(saved.advertise, true);
+  assert.equal(saved.is_advertised, undefined);
+  assert.equal(saved.features[0].text.en, 'Fast connection');
+  await page.getByRole('button', { name: 'Final advertise', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Final advertise', exact: true }).click();
+  await page.getByRole('button', { name: 'Stop advertising', exact: true }).waitFor();
+  assert.deepEqual(saved, { is_advertised: true });
+  await page.getByRole('button', { name: 'Create Plan', exact: true }).click();
+  await page.getByLabel('Plan ID', { exact: true }).fill('83b9233a-82b3-4523-8e76-07e1aadcd781');
+  assert.equal(await page.getByLabel('Plan ID', { exact: true }).inputValue(), '83b9233a-82b3-4523-8e76-07e1aadcd781');
+  assert.equal(await page.getByLabel('Prepare for customer advertising', { exact: false }).isChecked(), false);
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Discard changes', exact: true }).click();
+  console.log('PASS: day/week/month duration controls, create/immutable ID, live preview, limit clearing, separate final advertise payload and discard');
+} finally { await browser.close(); server.kill(); }
