@@ -1,0 +1,21 @@
+schema = 1
+id = "REQ-1790874093-7wf"
+type = "requirement"
+title = "Single account subscription URL issues stable UUIDs from HWID"
+description = "A valid x-hwid on GET /sub/{sub_token} identifies one logical client installation. The first valid unseen HWID atomically creates one device UUID and later matching requests reuse it. Missing or invalid headers create nothing. The legacy device-specific endpoint remains compatible during migration."
+status = "deprecated"
+created_at = 2026-10-02T02:01:33+09:00
+updated_at = 2026-10-02T02:08:30+09:00
+
+[metadata]
+kind = "functional"
+owner = "api-server"
+priority = "must"
+
+[[relations]]
+to = "DEC-1790874094-knw"
+type = "constrained_by"
+
+[[relations]]
+to = "ACT-1790874094-agw"
+type = "has_criterion"

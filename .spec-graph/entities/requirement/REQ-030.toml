@@ -1,0 +1,33 @@
+schema = 1
+id = "REQ-030"
+type = "requirement"
+title = "Users obtain a plan by completing a checkout rather than by requesting approval"
+description = "A user selects a plan and duration, optionally applies a promotion code, chooses a payment route and completes payment. A successful payment grants the plan automatically. The previous request and administrator approval flow is removed once checkout is in place."
+status = "resolved"
+created_at = 2026-09-20T14:55:02+09:00
+updated_at = 2026-09-30T02:53:55+09:00
+
+[metadata]
+kind = "functional"
+owner = "billing"
+priority = "must"
+
+[[relations]]
+to = "DEC-022"
+type = "constrained_by"
+
+[[relations]]
+to = "DEC-024"
+type = "constrained_by"
+
+[[relations]]
+to = "DEC-025"
+type = "constrained_by"
+
+[[relations]]
+to = "ACT-030"
+type = "has_criterion"
+
+[[relations]]
+to = "ACT-031"
+type = "has_criterion"

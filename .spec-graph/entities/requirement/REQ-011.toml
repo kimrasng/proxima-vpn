@@ -3,9 +3,9 @@ id = "REQ-011"
 type = "requirement"
 title = "An operator can acknowledge a firing alert to stop it counting against them"
 description = "Acknowledging removes the alert from the notifiable count while leaving it visible. The acknowledgement binds to the current firing episode and clears when the alert resolves."
-status = "active"
+status = "resolved"
 created_at = 2026-09-19T21:28:40+09:00
-updated_at = 2026-09-19T22:02:44+09:00
+updated_at = 2026-09-22T10:06:24+09:00
 
 [metadata]
 kind = "functional"

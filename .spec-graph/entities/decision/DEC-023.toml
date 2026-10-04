@@ -1,0 +1,20 @@
+schema = 1
+id = "DEC-023"
+type = "decision"
+title = "Traffic quota resets monthly inside a prepaid term, anchored to the purchase day"
+description = "traffic_limit is a per-month allowance independent of the purchased term length. A scheduler zeroes traffic_used every month on the anniversary day of plan_started_at while the term is unexpired. Because there is no auto-renewal there is no recurring payment event to drive the reset, so it is driven by the prepaid term: a twelve month prepayment receives twelve monthly resets and resets stop once plan_expires_at has passed. Expired users are never refilled."
+status = "active"
+created_at = 2026-09-20T14:54:20+09:00
+updated_at = 2026-09-20T14:54:20+09:00
+
+[metadata]
+date = "2026-09-20"
+rationale = "User confirmed monthly reset and confirmed auto-renewal is impossible, so the reset must anchor on plan_started_at day-of-month and gate on plan_expires_at instead of hanging off a billing event. Per-term quota was rejected because annual tiers would have to carry twelve times the traffic."
+
+[[relations]]
+to = "DEC-022"
+type = "depends_on"
+
+[[relations]]
+to = "DEC-024"
+type = "depends_on"

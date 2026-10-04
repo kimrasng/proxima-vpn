@@ -1,0 +1,13 @@
+schema = 1
+id = "STT-002"
+type = "state"
+title = "Managed Entry DNS lifecycle"
+description = "Desired states progress from unconfigured to pending to ready or error, and explicit node deletion creates durable deleting intent until provider absence is observed. Offline nodes and chain deletion do not transition to deleting. New relayed publication requires ready; existing ready records remain usable during provider outages when the desired address is unchanged."
+status = "draft"
+created_at = 2026-09-29T20:09:11+09:00
+updated_at = 2026-09-29T20:09:11+09:00
+
+[metadata]
+entity = "entry_dns"
+from = "unconfigured|pending|ready|error|deleting"
+to = "pending|ready|error|deleting|deleted"

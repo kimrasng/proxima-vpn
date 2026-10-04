@@ -1,0 +1,85 @@
+schema = 1
+id = "PHS-029"
+type = "phase"
+title = "Reconcile managed Entry DNS"
+description = "Implement the Cloudflare-only client and durable asynchronous managed-record lifecycle using deterministic provider tests."
+status = "resolved"
+created_at = 2026-09-25T21:32:30+09:00
+updated_at = 2026-09-30T13:55:52+09:00
+
+[metadata]
+exit_criteria = "[Fake-provider lifecycle suite passes under race detection Managed DNS state converges without blocking registration or touching foreign records Only explicit node deletion schedules cleanup and tombstones survive row removal]"
+goal = "Converge owned DNS-only Entry A records safely across retries, restarts, concurrency, and deletion"
+instructions = "[Write deterministic fake Cloudflare tests before implementation for create, lost response, restart, duplicate workers, address change, foreign conflict, 401, 403, 429 Retry-After, 5xx, and deletion races. Use zone-scoped deployment secrets, proxied=false, TTL 300, owned-record-only mutation, and base-domain/zone validation. Generate one stable hostname with at least 128 bits of cryptographic randomness and persist desired address, provider ID, ownership, generation, observed state, retry state, and deletion intent. Reconcile asynchronously with per-node serialization, stale-generation rejection, bounded exponential backoff, jitter, and redacted errors.]"
+must_not = "[Do not add provider-neutral DNS abstractions. Do not persist or log the token. Do not block node registration on Cloudflare. Do not delete DNS on offline state or chain deletion.]"
+order = 2.0
+qa = "[map[command:cd api-server && go test -race ./internal/services/... ./internal/handlers evidence: expected:exit 0; provider failure matrix and lifecycle concurrency scenarios execute without skips]]"
+references = "[api-server/internal/services api-server/internal/handlers/node_agent.go api-server/internal/handlers/admin_node.go scripts/install.sh .env.example]"
+
+[[relations]]
+to = "PLN-005"
+type = "belongs_to"
+
+[[relations]]
+to = "ACT-039"
+type = "covers"
+
+[[relations]]
+to = "ACT-040"
+type = "covers"
+
+[[relations]]
+to = "API-031"
+type = "covers"
+
+[[relations]]
+to = "DEC-032"
+type = "covers"
+
+[[relations]]
+to = "REQ-038"
+type = "covers"
+
+[[relations]]
+to = "REQ-039"
+type = "covers"
+
+[[relations]]
+to = "RSK-014"
+type = "covers"
+
+[[relations]]
+to = "TST-028"
+type = "covers"
+
+[[relations]]
+to = "ACT-039"
+type = "delivers"
+
+[[relations]]
+to = "ACT-040"
+type = "delivers"
+
+[[relations]]
+to = "API-031"
+type = "delivers"
+
+[[relations]]
+to = "DEC-032"
+type = "delivers"
+
+[[relations]]
+to = "REQ-038"
+type = "delivers"
+
+[[relations]]
+to = "REQ-039"
+type = "delivers"
+
+[[relations]]
+to = "TST-028"
+type = "delivers"
+
+[[relations]]
+to = "PHS-030"
+type = "precedes"

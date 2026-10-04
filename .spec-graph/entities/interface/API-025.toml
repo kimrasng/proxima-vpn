@@ -1,0 +1,15 @@
+schema = 1
+id = "API-025"
+type = "interface"
+title = "Legacy plan-request/approval feature fully removed"
+description = "plan_requests table dropped via migration; UserPlanHandler.CreateRequest/ListRequests, AdminPlanRequestHandler, their 4 routes, EventPlanRequested/Approved/Rejected activity events, and the DashboardStats/Alerts pending_requests fields all removed. Checkout (plan_orders/payment_events, PaymentService.Settle) is the only remaining path to obtaining a plan; the admin-confirmed and Stripe providers still drive it, and AssignPlanToUser is retained solely for the Telegram bot's /setplan."
+status = "active"
+created_at = 2026-09-21T14:02:14+09:00
+updated_at = 2026-09-21T14:02:14+09:00
+
+[metadata]
+kind = "removal"
+
+[[relations]]
+to = "REQ-030"
+type = "implements"

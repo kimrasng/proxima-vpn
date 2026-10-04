@@ -1,0 +1,13 @@
+schema = 1
+id = "REQ-026"
+type = "requirement"
+title = "Node events are collected as structured records and presented in a dedicated viewer"
+description = "Node lifecycle, health and configuration events are recorded as structured entries with a type, severity, actor and payload. Administrators read them through a dedicated viewer supporting filtering by type and severity, filtering by time range, and paging deep enough to investigate an incident, rather than through a short unfiltered list on the node detail page."
+status = "resolved"
+created_at = 2026-09-20T14:55:02+09:00
+updated_at = 2026-09-22T10:06:25+09:00
+
+[metadata]
+kind = "functional"
+owner = "api-server"
+priority = "must"

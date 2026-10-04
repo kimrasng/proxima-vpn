@@ -1,0 +1,13 @@
+schema = 1
+id = "ACT-1790874094-5gw"
+type = "criterion"
+title = "Over-cap enforcement evicts newest online UUID after observation"
+description = "Given online UUID count is above an enforced plan cap for the configured confirmation sweeps, when enforcement runs, then the newest account-wide online UUID is temporarily evicted and its controlled payload permits fail."
+status = "deprecated"
+created_at = 2026-10-02T02:01:34+09:00
+updated_at = 2026-10-02T02:08:30+09:00
+
+[metadata]
+given = "Online UUID count exceeds an enforced plan cap for configured confirmation sweeps"
+then = "The newest account-wide online UUID is temporarily evicted and controlled payload permits fail."
+when = "The concurrency policy runs"

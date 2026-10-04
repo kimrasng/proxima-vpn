@@ -1,0 +1,18 @@
+schema = 1
+id = "API-029"
+type = "interface"
+title = "Authenticated exit policy projection for node agents"
+description = "GET /api/v1/nodes/:id/exit-rules returns enabled l4_dnat exit port and transport rules with the deduplicated IPv4 addresses of forwarding relay-pool members. It includes a rule with an empty relay IP list so the agent preserves fail-closed protection."
+status = "active"
+created_at = 2026-09-24T01:02:04+09:00
+updated_at = 2026-09-24T02:08:14+09:00
+
+[metadata]
+kind = "http"
+method = "GET"
+path = "/api/v1/nodes/:id/exit-rules"
+stability = "experimental"
+
+[[relations]]
+to = "REQ-035"
+type = "implements"

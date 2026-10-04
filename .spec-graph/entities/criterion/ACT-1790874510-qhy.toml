@@ -1,0 +1,18 @@
+schema = 1
+id = "ACT-1790874510-qhy"
+type = "criterion"
+title = "Over-cap enforcement evicts newest online UUID after observation"
+description = "Given over-cap UUIDs across Exits under explicitly enabled enforcement, after confirmation evict the newest account-wide UUID. Its central permits fail immediately and its established Vision TCP/XUDP sessions terminate across all Exits without disconnecting other UUIDs. If immediate termination cannot be proven, enforcement stays disabled."
+status = "draft"
+created_at = 2026-10-02T02:08:30+09:00
+updated_at = 2026-10-02T02:08:30+09:00
+
+[metadata]
+given = "Online UUID count exceeds an explicitly enforced cap for confirmed sweeps"
+then = "New permits are denied and existing Vision TCP/XUDP sessions stop across all Exits without interrupting other UUIDs."
+when = "Newest account-wide UUID is evicted"
+
+[[relations]]
+to = "ACT-1790874094-5gw"
+type = "supersedes"
+metadata = {reason = "Ensure eviction actually terminates established Vision and XUDP traffic"}

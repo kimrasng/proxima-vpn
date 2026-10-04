@@ -1,0 +1,13 @@
+schema = 1
+id = "ACT-1790874510-rq2"
+type = "criterion"
+title = "Registration cap holds under distinct concurrent HWIDs"
+description = "Different unseen valid HWIDs racing under the same account cannot create more than the configured registration cap; rejected requests create no device UUID."
+status = "draft"
+created_at = 2026-10-02T02:08:30+09:00
+updated_at = 2026-10-02T02:08:30+09:00
+
+[metadata]
+given = "An account has one registration slot remaining"
+then = "At most one new device UUID is committed and the other receives an actionable cap response."
+when = "Two distinct new HWIDs refresh concurrently"

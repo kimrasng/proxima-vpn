@@ -1,0 +1,13 @@
+schema = 1
+id = "REQ-023"
+type = "requirement"
+title = "Node provisioning collects configuration before emitting an install command"
+description = "An administrator adding a node first chooses the target operating system and fills in a form covering node name, country, region, traffic multiplier, maximum concurrent connections and the firewall ports to open. Only after that form is submitted does the panel produce the install command. The values entered are persisted with the pending node and must survive node registration rather than being overwritten by what the agent self-reports."
+status = "resolved"
+created_at = 2026-09-20T14:55:02+09:00
+updated_at = 2026-09-22T10:06:25+09:00
+
+[metadata]
+kind = "functional"
+owner = "admin-panel"
+priority = "must"

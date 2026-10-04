@@ -3,9 +3,9 @@ id = "REQ-007"
 type = "requirement"
 title = "An alert that appears and clears between polls must still be recorded"
 description = "Alert state is persisted and transitions are logged, so a condition that starts and ends inside one poll interval remains visible after the fact."
-status = "active"
+status = "resolved"
 created_at = 2026-09-19T21:28:40+09:00
-updated_at = 2026-09-19T22:02:33+09:00
+updated_at = 2026-09-22T10:06:24+09:00
 
 [metadata]
 kind = "functional"

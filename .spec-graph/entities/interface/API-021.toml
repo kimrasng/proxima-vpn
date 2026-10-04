@@ -1,0 +1,15 @@
+schema = 1
+id = "API-021"
+type = "interface"
+title = "PaymentService.Settle order state machine"
+description = "PaymentService.Settle(ctx, Confirmation) claims payment_events via idempotent INSERT ON CONFLICT keyed on (provider, external_id), claims plan_orders from pending or expired to paid, cross-checks AmountCents against the order's snapshotted price_cents, and grants the plan via PlanService.GrantPlanWithDuration. Reverts the order claim on amount mismatch or grant failure."
+status = "active"
+created_at = 2026-09-21T13:36:30+09:00
+updated_at = 2026-09-21T13:36:30+09:00
+
+[metadata]
+kind = "service"
+
+[[relations]]
+to = "REQ-030"
+type = "implements"

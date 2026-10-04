@@ -1,0 +1,13 @@
+schema = 1
+id = "ACT-036"
+type = "criterion"
+title = "A protected exit port admits only its relay pool"
+description = "An enabled l4_dnat chain permits traffic to its exit port only from the current forwarding members of its relay pool and rejects direct client traffic. Removing all relay members retains the protected port and rejects all traffic."
+status = "active"
+created_at = 2026-09-24T01:02:05+09:00
+updated_at = 2026-09-24T01:02:05+09:00
+
+[metadata]
+given = "An enabled l4_dnat chain with an exit port and relay-pool membership"
+then = "Only the matching relay source IPv4 addresses may reach the protected transport and exit port; an empty relay set remains blocked"
+when = "The exit agent applies the authenticated exit policy"

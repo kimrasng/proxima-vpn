@@ -1,0 +1,16 @@
+schema = 1
+id = "DEC-028"
+type = "decision"
+title = "Subscription reachability solved by a shared admin managed domain pool"
+description = "An admin managed pool of subscription domains is offered to every user as a list, which works because the existing subscription route is host agnostic so one token is valid on any pool domain. Per user domain assignment is rejected. Server side probing reports only name resolution, transport security and certificate breakage to administrators, because whether a domain is actually reachable can only be measured from the user network, so the user facing picker races candidates from the browser. Domains are hidden only by explicit administrator deactivation and never automatically."
+status = "active"
+created_at = 2026-09-20T14:54:20+09:00
+updated_at = 2026-09-20T14:54:20+09:00
+
+[metadata]
+date = "2026-09-20"
+rationale = "A URL already pasted into a client cannot be rotated afterwards because no protocol lets the server redirect a stored subscription to another host, so the only working mitigation is handing over several URLs up front. Server side probes cannot detect regional censorship since a blocked domain still answers from the hosting region."
+
+[[relations]]
+to = "RSK-013"
+type = "mitigates"

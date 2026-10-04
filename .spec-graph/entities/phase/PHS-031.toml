@@ -1,0 +1,77 @@
+schema = 1
+id = "PHS-031"
+type = "phase"
+title = "Verify and document the production topology"
+description = "Prove two-Exit routing, origin protection, non-default SNI, tunneled UDP, rollback, and deployment operations with preserved last-known-good relay policy."
+status = "resolved"
+created_at = 2026-09-29T20:11:21+09:00
+updated_at = 2026-09-30T20:01:51+09:00
+
+[metadata]
+exit_criteria = "[Privileged multi-Exit relay E2E passes all positive and negative assertions API, node-agent, and web regression gates pass without required skips Deployment, migration, secret rotation, failure handling, and rollback documentation match verified behavior]"
+goal = "Produce executable evidence that the complete managed topology is safe and operable"
+instructions = "[Extend the isolated E2E to one Entry hostname with ports 24443 and 24444 routing to two Exits with distinct markers. Verify correct credentials, non-default SNI, and UDP carried inside VLESS TCP succeed; wrong port, cross-Exit credentials, and direct-origin access fail. Preserve global transport-port overlap rules, fail-closed Exit source allowlists, and last-known-good nft policy behavior. Document DNS-only IP exposure, zone-scoped secrets, status states, incompatible SNI stop behavior, staged cutover, legacy pool exclusion, and rollback. Store sanitized logs and screenshots under tests/evidence/entry-dns-sni/.]"
+must_not = "[Do not require live Cloudflare credentials for automated E2E. Do not add native UDP DNAT, SNI routing, TLS termination, HAProxy, Nginx, or PROXY protocol. Do not claim immediate DNS propagation, immediate revocation, or zero-downtime SNI rotation. Do not activate PLN-005 while PLN-004 remains active.]"
+order = 4.0
+qa = "[map[command:bash tests/relay-e2e/run.sh evidence: expected:exit 0; two-Exit, wrong-credential, direct-origin, non-default-SNI, and tunneled-UDP assertions execute] map[command:cd api-server && go test -race ./... && cd ../node-agent && go test -race ./... && cd ../web && npm run build && npm run test:e2e && cd .. && spec-graph validate evidence: expected:all commands exit 0; mandatory suites execute without skips and evidence files contain no secrets]]"
+references = "[tests/relay-e2e pkg/nodeprov/relay.go node-agent/internal/relay/relay.go node-agent/cmd/policy.go docs/installation.md docs/node-setup.md docs/troubleshooting.md]"
+
+[[relations]]
+to = "PLN-005"
+type = "belongs_to"
+
+[[relations]]
+to = "ACT-036"
+type = "covers"
+
+[[relations]]
+to = "API-029"
+type = "covers"
+
+[[relations]]
+to = "DEC-030"
+type = "covers"
+
+[[relations]]
+to = "DEC-031"
+type = "covers"
+
+[[relations]]
+to = "REQ-035"
+type = "covers"
+
+[[relations]]
+to = "TST-026"
+type = "covers"
+
+[[relations]]
+to = "TST-030"
+type = "covers"
+
+[[relations]]
+to = "ACT-036"
+type = "delivers"
+
+[[relations]]
+to = "API-029"
+type = "delivers"
+
+[[relations]]
+to = "DEC-030"
+type = "delivers"
+
+[[relations]]
+to = "DEC-031"
+type = "delivers"
+
+[[relations]]
+to = "REQ-035"
+type = "delivers"
+
+[[relations]]
+to = "TST-026"
+type = "delivers"
+
+[[relations]]
+to = "TST-030"
+type = "delivers"

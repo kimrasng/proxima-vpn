@@ -1,0 +1,12 @@
+schema = 1
+id = "ACT-031"
+type = "criterion"
+title = "A replayed payment webhook cannot grant a plan twice"
+status = "active"
+created_at = 2026-09-21T13:38:17+09:00
+updated_at = 2026-09-21T13:38:17+09:00
+
+[metadata]
+given = "An order that has already been settled to paid by a payment_events row with outcome granted for a given provider and external_id"
+then = "The event is recorded as a duplicate, the handler returns 200, and the order status, paid_at, and the user's plan expiry are unchanged"
+when = "The same webhook event is redelivered"

@@ -1,0 +1,21 @@
+schema = 1
+id = "REQ-034"
+type = "requirement"
+title = "Users receive several subscription domains so a blocked domain can be replaced"
+description = "A user is offered their subscription URL on every publicly enabled domain in the pool, with an indication of which the panel believes healthy and a means of testing reachability from their own network. Guidance makes clear that several profiles should be configured up front because a URL already stored in a client cannot be redirected later."
+status = "resolved"
+created_at = 2026-09-20T14:55:02+09:00
+updated_at = 2026-09-30T02:53:55+09:00
+
+[metadata]
+kind = "functional"
+owner = "api-server"
+priority = "must"
+
+[[relations]]
+to = "DEC-028"
+type = "constrained_by"
+
+[[relations]]
+to = "ACT-035"
+type = "has_criterion"

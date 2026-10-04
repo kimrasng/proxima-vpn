@@ -1,0 +1,16 @@
+schema = 1
+id = "DEC-027"
+type = "decision"
+title = "Client supplied device fingerprints are correlation signals and never access controls"
+description = "Fingerprint data collected during checkout is attacker controlled input and must never gate access, discounts, trials or login. It is stored so that a human investigating suspected abuse can correlate orders. Commercial fingerprinting services are rejected; server derived signals such as address prefix, user agent family, account age and order velocity are the primary source and an open source visitor identifier is at most a weak hint. Tracking fields are purged from orders after a retention window while financial columns are retained."
+status = "active"
+created_at = 2026-09-20T14:54:20+09:00
+updated_at = 2026-09-20T14:54:20+09:00
+
+[metadata]
+date = "2026-09-20"
+rationale = "A value computed and sent by the client can be forged trivially so it cannot be a security control. The false positive direction is worse because visitor identifiers collide across virtual machines and hardened browsers, so automated denial would block paying customers. Shipping a commercial device tracking library to privacy seeking users is also a reputational risk."
+
+[[relations]]
+to = "RSK-011"
+type = "mitigates"

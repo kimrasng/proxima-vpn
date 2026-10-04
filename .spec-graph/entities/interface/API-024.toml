@@ -1,0 +1,15 @@
+schema = 1
+id = "API-024"
+type = "interface"
+title = "POST /user/orders/:id/checkout starts a provider checkout"
+description = "UserCheckoutHandler.Start looks up the named provider in the registry, loads the caller's own pending order, calls provider.StartCheckout, persists provider and provider_session_id on the order, and returns the provider mode and an optional redirect_url."
+status = "active"
+created_at = 2026-09-21T13:36:31+09:00
+updated_at = 2026-09-21T13:36:31+09:00
+
+[metadata]
+kind = "endpoint"
+
+[[relations]]
+to = "REQ-030"
+type = "implements"

@@ -1,0 +1,15 @@
+schema = 1
+id = "API-023"
+type = "interface"
+title = "POST /webhooks/payments/:provider receives provider callbacks"
+description = "PaymentWebhookHandler.Receive looks up the provider in the registry, type-asserts WebhookVerifier, verifies the signed payload, and calls PaymentService.Settle on a non-nil confirmation. Always returns 200 except on signature failure or grant failure, matching Stripe's retry-until-2xx semantics. Exempted from the global rate limiter."
+status = "active"
+created_at = 2026-09-21T13:36:31+09:00
+updated_at = 2026-09-21T13:36:31+09:00
+
+[metadata]
+kind = "endpoint"
+
+[[relations]]
+to = "REQ-030"
+type = "implements"

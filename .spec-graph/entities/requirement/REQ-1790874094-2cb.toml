@@ -1,0 +1,17 @@
+schema = 1
+id = "REQ-1790874094-2cb"
+type = "requirement"
+title = "Each issued UUID has independent directional speed ceilings"
+description = "Each HWID-issued Xray UUID has independent upload and download maximum rates. All VLESS connections and Exit nodes for that UUID share the same central directional budgets. The plan speed is not account-wide shared bandwidth and is not multiplied by a UUID opening more connections."
+status = "draft"
+created_at = 2026-10-02T02:01:34+09:00
+updated_at = 2026-10-02T02:01:34+09:00
+
+[metadata]
+kind = "functional"
+owner = "node-agent"
+priority = "must"
+
+[[relations]]
+to = "ACT-1790874094-ea2"
+type = "has_criterion"

@@ -1,0 +1,11 @@
+schema = 1
+id = "PLN-005"
+type = "plan"
+title = "Managed Entry DNS, port-routed Exit, and Reality SNI delivery"
+description = "Deliver Cloudflare-managed Entry hostnames, opaque port-based multi-Exit routing, Exit-owned Reality client SNI, staged compatibility, administration, and end-to-end verification without activating this plan while PLN-004 remains active."
+status = "resolved"
+created_at = 2026-09-25T21:32:30+09:00
+updated_at = 2026-09-30T20:02:27+09:00
+
+[metadata]
+status = "draft"

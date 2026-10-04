@@ -1,0 +1,24 @@
+schema = 1
+id = "API-031"
+type = "interface"
+title = "Cloudflare DNS client and managed-record reconciler contract"
+description = "A server-side module creates, finds, updates, and deletes only owned A records; exposes deterministic fake transport coverage for success, lost responses, restart recovery, duplicate workers, address changes, foreign records, 401, 403, 429, 5xx, and deletion races; and honors Retry-After without exposing credentials."
+status = "active"
+created_at = 2026-09-29T20:09:10+09:00
+updated_at = 2026-09-30T13:55:24+09:00
+
+[metadata]
+kind = "module"
+path = "api-server/internal/services"
+
+[[relations]]
+to = "REQ-038"
+type = "implements"
+
+[[relations]]
+to = "REQ-039"
+type = "implements"
+
+[[relations]]
+to = "STT-002"
+type = "triggers"

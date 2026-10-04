@@ -1,0 +1,13 @@
+schema = 1
+id = "ACT-034"
+type = "criterion"
+title = "An administrator can inspect bounded checkout context and outcome evidence"
+description = "The order audit surface exposes checkout origin, trusted client context, browser and OS labels, locale, device fingerprint, payment outcomes, and grant expiry before and after settlement without exposing payment provider payloads."
+status = "active"
+created_at = 2026-09-21T22:36:27+09:00
+updated_at = 2026-09-21T22:36:27+09:00
+
+[metadata]
+given = "An authenticated administrator opens an existing order detail page after checkout activity and settlement"
+then = "The administrator sees bounded checkout context, payment event metadata, and grant expiry before and after values, while raw payment provider payloads are absent"
+when = "The audit sections load through the documented order audit endpoint"

@@ -1,0 +1,57 @@
+schema = 1
+id = "PHS-028"
+type = "phase"
+title = "Persist managed endpoint contracts"
+description = "Add migration-safe Entry DNS and Exit SNI persistence plus backend administration contracts using TDD."
+status = "resolved"
+created_at = 2026-09-25T21:32:30+09:00
+updated_at = 2026-09-30T11:16:29+09:00
+
+[metadata]
+exit_criteria = "[Repeatable migrations preserve legacy chain identity, ports, groups, explicit hosts, and pool chains Backend APIs expose managed DNS state and validate Exit SNI without exposing secrets Rollback restores legacy publication while retaining managed DNS ownership and cleanup intent]"
+goal = "Establish additive persisted contracts and validation before provider or publication behavior changes"
+instructions = "[Write failing migration and handler tests first. Add nullable Entry DNS intent and observation fields plus Exit client SNI fields without deleting entry_host. Backfill SNI only from the normalized intersection of published Reality listener server_names and report empty intersections. Expose read-only Entry hostname and DNS state; derive new chain hosts and reject mismatched obsolete entry_host values.]"
+must_not = "[Do not auto-convert legacy relay-pool chains. Do not rewrite externally managed DNS or listener settings. Do not expose Cloudflare credentials or change global port claims.]"
+order = 1.0
+qa = "[map[command:cd api-server && go test -race ./internal/database ./internal/handlers evidence: expected:exit 0; migration-twice, conflict, API, and rollback assertions execute without skips]]"
+references = "[api-server/internal/database/schema.go api-server/internal/handlers/admin_node.go api-server/internal/handlers/admin_node_chain_create.go api-server/internal/handlers/node_agent.go api-server/internal/services/xray_config.go]"
+
+[[relations]]
+to = "PLN-005"
+type = "belongs_to"
+
+[[relations]]
+to = "ACT-042"
+type = "covers"
+
+[[relations]]
+to = "API-032"
+type = "covers"
+
+[[relations]]
+to = "REQ-041"
+type = "covers"
+
+[[relations]]
+to = "TST-031"
+type = "covers"
+
+[[relations]]
+to = "ACT-042"
+type = "delivers"
+
+[[relations]]
+to = "API-032"
+type = "delivers"
+
+[[relations]]
+to = "REQ-041"
+type = "delivers"
+
+[[relations]]
+to = "TST-031"
+type = "delivers"
+
+[[relations]]
+to = "PHS-029"
+type = "precedes"

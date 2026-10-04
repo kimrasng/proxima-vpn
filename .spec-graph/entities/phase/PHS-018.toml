@@ -1,0 +1,45 @@
+schema = 1
+id = "PHS-018"
+type = "phase"
+title = "Phase 1 - Node provisioning flow and port presets"
+description = "Captures operating system, name, country, region, traffic multiplier, concurrent connection cap and firewall port selection before the install command is produced, persists those values on the pending node so agent self-reporting cannot overwrite them, and parameterises the install script port handling."
+status = "resolved"
+created_at = 2026-09-20T14:56:06+09:00
+updated_at = 2026-09-20T15:35:55+09:00
+
+[metadata]
+exit_criteria = "[Provisioning form collects OS, identity, location, traffic multiplier, concurrency cap and ports before any command is shown Values entered survive node registration and are not overwritten by agent-reported values Port selection offers presets and a custom entry path, and the install script opens exactly the chosen ports Node edit dialog exposes the same administrator adjustable attributes and separates them from read only facts Driven in a real browser across the supported languages]"
+goal = "Provision a node from a guided form that yields a tailored install command"
+order = 1.0
+
+[[relations]]
+to = "PLN-004"
+type = "belongs_to"
+
+[[relations]]
+to = "REQ-023"
+type = "covers"
+
+[[relations]]
+to = "REQ-024"
+type = "covers"
+
+[[relations]]
+to = "REQ-025"
+type = "covers"
+
+[[relations]]
+to = "REQ-023"
+type = "delivers"
+
+[[relations]]
+to = "REQ-024"
+type = "delivers"
+
+[[relations]]
+to = "REQ-025"
+type = "delivers"
+
+[[relations]]
+to = "PHS-019"
+type = "precedes"

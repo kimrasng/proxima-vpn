@@ -1,0 +1,12 @@
+schema = 1
+id = "RSK-010"
+type = "risk"
+title = "Existing plan grant path corrupts paid subscription terms"
+description = "AssignPlanToUser overwrites plan_expires_at from the current time and unconditionally zeroes traffic_used, so a renewal discards remaining paid time and refills the traffic allowance. Under the approval based flow this is tolerable, but once purchases are involved it destroys entitlements customers paid for and permits repeated free quota refills."
+status = "active"
+created_at = 2026-09-20T14:55:02+09:00
+updated_at = 2026-09-20T14:55:02+09:00
+
+[metadata]
+impact = "high"
+likelihood = "high"

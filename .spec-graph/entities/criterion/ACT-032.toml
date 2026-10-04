@@ -1,0 +1,12 @@
+schema = 1
+id = "ACT-032"
+type = "criterion"
+title = "Adding a payment provider requires no change to order handling"
+status = "active"
+created_at = 2026-09-21T13:38:17+09:00
+updated_at = 2026-09-21T13:38:17+09:00
+
+[metadata]
+given = "The Provider and WebhookVerifier interfaces and the Registry already used by the admin-confirmed provider"
+then = "PaymentService.Settle, the checkout start handler, and the webhook receive handler drive the new provider through the same state machine without any provider-specific branching"
+when = "A new provider implementation is registered in the Registry"

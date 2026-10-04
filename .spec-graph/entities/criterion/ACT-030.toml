@@ -1,0 +1,12 @@
+schema = 1
+id = "ACT-030"
+type = "criterion"
+title = "A user completes a Stripe checkout and the plan is granted automatically"
+status = "active"
+created_at = 2026-09-21T13:38:25+09:00
+updated_at = 2026-09-21T13:38:25+09:00
+
+[metadata]
+given = "A user with a pending order for a plan and duration starts checkout with the stripe provider and completes payment on the hosted Checkout page with a valid test card"
+then = "The order transitions to paid, the user's plan is extended by exactly the order's duration, and no administrator action is required"
+when = "Stripe delivers the checkout.session.completed webhook"

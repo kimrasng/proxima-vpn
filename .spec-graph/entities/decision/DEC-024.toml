@@ -1,0 +1,16 @@
+schema = 1
+id = "DEC-024"
+type = "decision"
+title = "Plan grant extends rather than replaces and preserves traffic_used on renewal"
+description = "PlanService.Grant becomes the single entry point for granting plan time. Renewing the same unexpired plan extends plan_expires_at and preserves both traffic_used and the monthly reset anchor. A plan change or a purchase after expiry starts a fresh term, zeroes traffic_used and re-anchors the reset to the purchase date; a plan change carries over remaining time from the old term rather than computing a monetary proration. AssignPlanToUser is reduced to a thin wrapper operating in replace mode."
+status = "active"
+created_at = 2026-09-20T14:54:20+09:00
+updated_at = 2026-09-20T14:54:20+09:00
+
+[metadata]
+date = "2026-09-20"
+rationale = "AssignPlanToUser currently zeroes traffic_used and overwrites the term on every call, which silently destroys paid-for remaining time and grants a free quota refill on every renewal. This must be corrected before any checkout code exists."
+
+[[relations]]
+to = "RSK-010"
+type = "mitigates"

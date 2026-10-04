@@ -1,0 +1,17 @@
+schema = 1
+id = "REQ-1790885140-3wx"
+type = "requirement"
+title = "UUID concurrency enforcement requires verified fleet acknowledgment"
+description = "An over-cap UUID may be selected only from a complete unambiguous account-wide observation. The selected UUID remains banned until every required serving Exit has acknowledged closing established Vision TCP and XUDP sessions. Missing reports, stale capabilities, or missing acknowledgments must not be treated as successful enforcement."
+status = "draft"
+created_at = 2026-10-02T05:05:40+09:00
+updated_at = 2026-10-02T05:05:40+09:00
+
+[metadata]
+kind = "functional"
+owner = "api-server"
+priority = "must"
+
+[[relations]]
+to = "ACT-1790885140-2be"
+type = "has_criterion"

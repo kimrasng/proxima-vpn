@@ -1,0 +1,13 @@
+schema = 1
+id = "REQ-027"
+type = "requirement"
+title = "Node display names are translated per user language in subscription output"
+description = "A node carries an administrator supplied display name for each supported panel language. Subscription content served to a user renders node names in that user account language, falling back to the default name when no translation exists. Translations are entered by an administrator in the panel and no machine translation service is involved."
+status = "resolved"
+created_at = 2026-09-20T14:55:02+09:00
+updated_at = 2026-09-22T10:06:25+09:00
+
+[metadata]
+kind = "functional"
+owner = "api-server"
+priority = "must"

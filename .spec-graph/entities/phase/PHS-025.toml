@@ -1,0 +1,29 @@
+schema = 1
+id = "PHS-025"
+type = "phase"
+title = "Phase 8 - Promotion codes"
+description = "Adds promotion codes with discount kinds, validity windows, plan and duration applicability, minimum totals, overall and per user redemption caps, first purchase and named user restrictions, with atomic redemption reservation and a fully discounted order path that bypasses the provider."
+status = "resolved"
+created_at = 2026-09-20T14:56:06+09:00
+updated_at = 2026-09-21T15:48:42+09:00
+
+[metadata]
+exit_criteria = "[A code applies only within its validity window, applicability and minimum total Overall and per user redemption caps hold under concurrent checkout Restriction to first purchases and to named users is enforced An order discounted to nothing is fulfilled without contacting a provider Cancelled or expired orders release their reservation exactly once Covered by automated tests including a concurrent redemption case]"
+goal = "Apply a conditional discount to a purchase without exceeding its limits"
+order = 8.0
+
+[[relations]]
+to = "PLN-004"
+type = "belongs_to"
+
+[[relations]]
+to = "REQ-032"
+type = "covers"
+
+[[relations]]
+to = "REQ-032"
+type = "delivers"
+
+[[relations]]
+to = "PHS-026"
+type = "precedes"

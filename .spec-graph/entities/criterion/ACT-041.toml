@@ -1,0 +1,13 @@
+schema = 1
+id = "ACT-041"
+type = "criterion"
+title = "Every VLESS Reality profile uses an SNI accepted by its Exit listener"
+description = "The single Exit-node value is normalized, accepted by all published Reality listeners including generated speed tiers, and propagated without serializer-specific defaults."
+status = "active"
+created_at = 2026-09-29T20:09:11+09:00
+updated_at = 2026-09-30T16:15:51+09:00
+
+[metadata]
+given = "A relayed Exit with enabled VLESS Reality listeners and a configured client SNI"
+then = "Each profile dials the Entry host and chain port and carries the exact Exit SNI accepted by every published listener"
+when = "The listener configuration is applied and raw, Clash, and Sing-box profiles are generated"

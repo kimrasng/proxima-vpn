@@ -1,0 +1,12 @@
+schema = 1
+id = "RSK-1790874094-624"
+type = "risk"
+title = "HWID-controlled UUID issuance can exclude unsupported clients or be reset"
+description = "Applications without x-hwid cannot use strict intake, while a client-controlled HWID can be changed to request registrations. Compatibility, registration caps, retention, observation, and staged strict rollout mitigate rather than eliminate these risks."
+status = "draft"
+created_at = 2026-10-02T02:01:34+09:00
+updated_at = 2026-10-02T02:01:34+09:00
+
+[metadata]
+impact = "medium"
+likelihood = "medium"

@@ -1,0 +1,13 @@
+schema = 1
+id = "ACT-040"
+type = "criterion"
+title = "DNS retries and deletion recover without foreign-record mutation"
+description = "Ambiguous provider outcomes, concurrent workers, process restarts, and explicit deletion converge from persisted intent without regenerating names, leaking credentials, or overwriting records not owned by this installation."
+status = "active"
+created_at = 2026-09-29T20:09:11+09:00
+updated_at = 2026-09-30T13:55:24+09:00
+
+[metadata]
+given = "Persisted managed DNS intent and provider success, transient failure, ambiguity, or a foreign conflict"
+then = "The newest owned intent converges exactly once, transient failures back off, permanent failures remain visible, and foreign records are untouched"
+when = "One or more reconciliation workers process current and stale generations"

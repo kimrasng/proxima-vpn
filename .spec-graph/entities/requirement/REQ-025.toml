@@ -1,0 +1,13 @@
+schema = 1
+id = "REQ-025"
+type = "requirement"
+title = "Node edit supports the full set of administrator adjustable node attributes"
+description = "The node edit dialog exposes every attribute an administrator may change after registration, including the provisioning values captured at add time, and clearly separates them from read only facts such as address and port. Fields carry enough explanation that an administrator can tell what each value affects."
+status = "resolved"
+created_at = 2026-09-20T14:55:02+09:00
+updated_at = 2026-09-22T10:06:25+09:00
+
+[metadata]
+kind = "functional"
+owner = "admin-panel"
+priority = "should"

@@ -1,0 +1,11 @@
+schema = 1
+id = "PLN-1790874094-3qa"
+type = "plan"
+title = "HWID-issued UUID subscription slots and concurrency"
+description = "Deliver one account subscription URL with optional HWID-issued UUID identity, UUID-slot concurrency observation/enforcement, retained legacy compatibility, and per-UUID speed policy presentation."
+status = "draft"
+created_at = 2026-10-02T02:01:34+09:00
+updated_at = 2026-10-02T02:03:55+09:00
+
+[metadata]
+status = "draft"

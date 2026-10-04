@@ -1,0 +1,12 @@
+schema = 1
+id = "RSK-012"
+type = "risk"
+title = "Plan attribute edits retroactively change entitlements of paying customers"
+description = "Traffic allowance and other entitlements are read live from the plan row through the user plan reference, so editing a plan immediately changes the allowance of every subscriber mid term. Once terms are purchased this shifts what customers paid for. Snapshotting entitlements onto the grant is the eventual fix and is deliberately out of scope for now."
+status = "active"
+created_at = 2026-09-20T14:55:02+09:00
+updated_at = 2026-09-20T14:55:02+09:00
+
+[metadata]
+impact = "medium"
+likelihood = "medium"

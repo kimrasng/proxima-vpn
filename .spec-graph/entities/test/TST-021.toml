@@ -1,0 +1,15 @@
+schema = 1
+id = "TST-021"
+type = "test"
+title = "Order expiry scheduler sweeps only pending orders past their deadline"
+description = "TestOrderExpiry_SweepsPendingPastDeadline, TestOrderExpiry_DoesNotTouchOrderNotYetDue, TestOrderExpiry_DoesNotTouchPaidOrder in api-server/internal/scheduler/order_expiry_test.go, run against a real Postgres instance."
+status = "active"
+created_at = 2026-09-21T13:36:45+09:00
+updated_at = 2026-09-21T13:36:45+09:00
+
+[metadata]
+kind = "unit"
+
+[[relations]]
+to = "REQ-030"
+type = "verifies"

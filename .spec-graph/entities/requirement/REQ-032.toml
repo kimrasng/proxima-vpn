@@ -1,0 +1,21 @@
+schema = 1
+id = "REQ-032"
+type = "requirement"
+title = "Promotion codes apply conditionally with redemption limits and user targeting"
+description = "A promotion code defines a percentage or fixed discount, a validity window, the plans and durations it applies to, a minimum order total, an overall redemption cap, a per user redemption cap, an optional restriction to first purchases and an optional restriction to named users. Redemption is reserved atomically so concurrent checkouts cannot exceed a cap."
+status = "resolved"
+created_at = 2026-09-20T14:55:02+09:00
+updated_at = 2026-09-30T02:53:55+09:00
+
+[metadata]
+kind = "functional"
+owner = "billing"
+priority = "must"
+
+[[relations]]
+to = "DEC-025"
+type = "constrained_by"
+
+[[relations]]
+to = "ACT-033"
+type = "has_criterion"

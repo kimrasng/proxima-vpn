@@ -1,0 +1,30 @@
+schema = 1
+id = "REQ-1790874510-a2p"
+type = "requirement"
+title = "Online concurrency counts UUID slots across all Exit nodes"
+description = "One Xray UUID consumes one account concurrency slot irrespective of VLESS connection count, source IP, Entry relay, or Exit count. Union across fresh Exit reports uses the Xray 20-second activity window; agent polling, empty-report clearing, and Redis expiry must prevent stale 30/60-second observations. Preserve one account-wide online_since transition across node switches before newest-UUID selection."
+status = "draft"
+created_at = 2026-10-02T02:08:30+09:00
+updated_at = 2026-10-02T02:08:30+09:00
+
+[metadata]
+kind = "functional"
+owner = "api-server"
+priority = "must"
+
+[[relations]]
+to = "ACT-1790874094-t7c"
+type = "has_criterion"
+
+[[relations]]
+to = "ACT-1790874510-9hm"
+type = "has_criterion"
+
+[[relations]]
+to = "ACT-1790874510-qhy"
+type = "has_criterion"
+
+[[relations]]
+to = "REQ-1790874093-tq8"
+type = "supersedes"
+metadata = {reason = "Define measurable online freshness and account-wide transition continuity"}

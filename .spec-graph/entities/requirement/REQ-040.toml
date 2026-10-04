@@ -1,0 +1,21 @@
+schema = 1
+id = "REQ-040"
+type = "requirement"
+title = "Each Exit node owns the Reality client SNI published to subscribers"
+description = "Persist one normalized lowercase ASCII or Punycode DNS hostname on each publishable VLESS Reality Exit. Reject empty values, IP literals, wildcards, URLs, ports, or whitespace. Require exact membership in every published Reality listener effective server_names set and emit the same value in raw VLESS, Clash, and Sing-box profiles only after the listener configuration is applied."
+status = "active"
+created_at = 2026-09-29T20:09:10+09:00
+updated_at = 2026-09-30T16:15:51+09:00
+
+[metadata]
+kind = "functional"
+owner = "api-server"
+priority = "must"
+
+[[relations]]
+to = "DEC-033"
+type = "constrained_by"
+
+[[relations]]
+to = "ACT-041"
+type = "has_criterion"

@@ -1,0 +1,101 @@
+schema = 1
+id = "PHS-030"
+type = "phase"
+title = "Apply Exit SNI and publish relayed profiles"
+description = "Validate and deploy Exit-owned Reality SNI, derive chain endpoints from Entry state, update all subscription formats, and expose focused UI controls."
+status = "resolved"
+created_at = 2026-09-29T20:11:21+09:00
+updated_at = 2026-09-30T16:16:18+09:00
+
+[metadata]
+exit_criteria = "[Raw VLESS, Clash, and Sing-box emit identical canonical SNI and managed Entry endpoint Incompatible listeners or unapplied SNI block publication Admin UI exposes DNS state and safe Exit SNI editing with no credential surface]"
+goal = "Publish usable VLESS Reality profiles from one managed Entry hostname, per-chain port, and canonical Exit SNI"
+instructions = "[Write failing SNI validation, listener-intersection, rollout-order, listener-port, and serializer tests first. Normalize lowercase ASCII or Punycode hostnames and reject IP literals, wildcards, URLs, ports, whitespace, and empty values. Require exact membership in every published Reality listener including speed tiers; apply listener configuration before advertising a changed SNI. Resolve the actual enabled listener and serialize one propagated SNI in raw VLESS, Clash, and Sing-box without www.cloudflare.com fallbacks. Add focused dashboard controls for read-only Entry DNS status, Exit SNI editing, and managed chain creation while preserving legacy display.]"
+must_not = "[Do not derive SNI from Entry DNS or use server_names[0] implicitly. Do not rewrite dest or server_names. Do not emit Exit IP fallback or redesign unrelated UI.]"
+order = 3.0
+qa = "[map[command:cd api-server && go test -race ./internal/handlers ./internal/services/... evidence: expected:exit 0; SNI and all serializer scenarios execute without skips] map[command:cd web && npm run build && npm run test:e2e evidence: expected:both commands exit 0; DNS state, valid SNI, rejection, and no-secret browser scenarios execute]]"
+references = "[api-server/internal/services/xray_config.go api-server/internal/handlers/subscription.go api-server/internal/services/subscription/types.go api-server/internal/services/subscription/clash.go api-server/internal/services/subscription/singbox.go web/src/pages/admin/NodeChains.tsx web/src/pages/admin/NodeInbounds.tsx]"
+
+[[relations]]
+to = "PLN-005"
+type = "belongs_to"
+
+[[relations]]
+to = "ACT-041"
+type = "covers"
+
+[[relations]]
+to = "API-030"
+type = "covers"
+
+[[relations]]
+to = "API-033"
+type = "covers"
+
+[[relations]]
+to = "DEC-033"
+type = "covers"
+
+[[relations]]
+to = "REQ-036"
+type = "covers"
+
+[[relations]]
+to = "REQ-037"
+type = "covers"
+
+[[relations]]
+to = "REQ-040"
+type = "covers"
+
+[[relations]]
+to = "RSK-015"
+type = "covers"
+
+[[relations]]
+to = "TST-027"
+type = "covers"
+
+[[relations]]
+to = "TST-029"
+type = "covers"
+
+[[relations]]
+to = "ACT-041"
+type = "delivers"
+
+[[relations]]
+to = "API-030"
+type = "delivers"
+
+[[relations]]
+to = "API-033"
+type = "delivers"
+
+[[relations]]
+to = "DEC-033"
+type = "delivers"
+
+[[relations]]
+to = "REQ-036"
+type = "delivers"
+
+[[relations]]
+to = "REQ-037"
+type = "delivers"
+
+[[relations]]
+to = "REQ-040"
+type = "delivers"
+
+[[relations]]
+to = "TST-027"
+type = "delivers"
+
+[[relations]]
+to = "TST-029"
+type = "delivers"
+
+[[relations]]
+to = "PHS-031"
+type = "precedes"

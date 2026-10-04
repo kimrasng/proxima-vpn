@@ -1,0 +1,21 @@
+schema = 1
+id = "REQ-028"
+type = "requirement"
+title = "Plan pricing is expressed as duration presets with derived savings"
+description = "A plan carries a price for each offered duration preset. The user facing plan card lists the available durations with their prices and shows a saving relative to paying monthly for the same span. The saving is computed from the monthly price rather than stored, so it cannot go stale when a price is edited."
+status = "resolved"
+created_at = 2026-09-20T14:55:02+09:00
+updated_at = 2026-09-22T10:06:25+09:00
+
+[metadata]
+kind = "functional"
+owner = "billing"
+priority = "must"
+
+[[relations]]
+to = "DEC-022"
+type = "constrained_by"
+
+[[relations]]
+to = "DEC-023"
+type = "constrained_by"

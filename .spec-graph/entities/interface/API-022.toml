@@ -1,0 +1,19 @@
+schema = 1
+id = "API-022"
+type = "interface"
+title = "Stripe hosted Checkout Session provider"
+description = "StripeProvider.StartCheckout builds a dynamic price_data Checkout Session carrying order_id in metadata on both the session and PaymentIntent. StripeProvider.VerifyWebhook authenticates via webhook.ConstructEvent and handles checkout.session.completed and checkout.session.async_payment_succeeded, returning a Confirmation only for a paid PaymentStatus."
+status = "active"
+created_at = 2026-09-21T13:36:30+09:00
+updated_at = 2026-09-21T13:36:30+09:00
+
+[metadata]
+kind = "service"
+
+[[relations]]
+to = "REQ-030"
+type = "implements"
+
+[[relations]]
+to = "REQ-031"
+type = "implements"

@@ -1,0 +1,15 @@
+schema = 1
+id = "API-026"
+type = "interface"
+title = "Promotion code management and discounted-order endpoints"
+description = "Admin promotion CRUD endpoints and user order promotion endpoints create, replace, reserve, confirm, and release conditional percentage or fixed discounts. A fully discounted order is settled by the panel without a payment provider."
+status = "active"
+created_at = 2026-09-21T15:33:35+09:00
+updated_at = 2026-09-21T15:33:35+09:00
+
+[metadata]
+kind = "api"
+
+[[relations]]
+to = "REQ-032"
+type = "implements"

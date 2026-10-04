@@ -1,0 +1,13 @@
+schema = 1
+id = "ACT-039"
+type = "criterion"
+title = "All chains on one Entry publish one DNS-only managed hostname"
+description = "The same stable generated hostname is visible on every relayed chain for an Entry, resolves to that Entry IPv4, and is never used to choose the Exit."
+status = "active"
+created_at = 2026-09-29T20:09:11+09:00
+updated_at = 2026-09-30T13:55:24+09:00
+
+[metadata]
+given = "A registered forwarding Entry with two chains to different Exits"
+then = "One DNS-only A hostname resolves to the Entry and the two unique chain ports select their respective Exits"
+when = "Managed DNS is reconciled and subscriptions are generated"

@@ -1,0 +1,16 @@
+schema = 1
+id = "DEC-033"
+type = "decision"
+title = "Exit node state is the canonical source of client Reality SNI"
+description = "The Exit node owns the client-facing SNI independently from its Entry hostname. Node-SNI writes and Reality inbound create, update, and enable operations share node-level serialization. Existing nodes backfill only from the deterministic intersection of effective server_names across published listeners; an empty intersection blocks migration without rewriting listener settings."
+status = "active"
+created_at = 2026-09-29T20:09:10+09:00
+updated_at = 2026-09-30T16:15:51+09:00
+
+[metadata]
+date = "2026-09-29"
+rationale = "A node-owned value gives every subscription serializer one source while explicit listener-membership validation prevents valid-looking but unusable profiles."
+
+[[relations]]
+to = "RSK-015"
+type = "mitigates"

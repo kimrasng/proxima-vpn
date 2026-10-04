@@ -1,0 +1,24 @@
+schema = 1
+id = "API-032"
+type = "interface"
+title = "Admin node endpoints expose managed Entry DNS and Exit Reality SNI state"
+description = "Admin node read models expose generated Entry hostname and DNS status/error without secrets. Exit updates accept the canonical client SNI and enforce shared Reality listener validation. Chain create and update derive the dial host from the selected Entry and reject a mismatched legacy entry_host."
+status = "resolved"
+created_at = 2026-09-29T20:09:11+09:00
+updated_at = 2026-09-30T11:16:19+09:00
+
+[metadata]
+kind = "http"
+path = "/api/v1/admin/nodes and /api/v1/admin/node-chains"
+
+[[relations]]
+to = "REQ-038"
+type = "implements"
+
+[[relations]]
+to = "REQ-040"
+type = "implements"
+
+[[relations]]
+to = "REQ-041"
+type = "implements"

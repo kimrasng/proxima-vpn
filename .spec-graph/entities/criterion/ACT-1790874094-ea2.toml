@@ -1,0 +1,13 @@
+schema = 1
+id = "ACT-1790874094-ea2"
+type = "criterion"
+title = "One UUID shares its speed budget over all connections and Exits"
+description = "Given a positive plan speed and one UUID using many VLESS connections over two Exits, when payload transfers run, then each direction remains inside one bounded UUID budget while a second UUID has its own budget."
+status = "draft"
+created_at = 2026-10-02T02:01:34+09:00
+updated_at = 2026-10-02T02:01:34+09:00
+
+[metadata]
+given = "A positive plan speed and one UUID using many VLESS connections over two Exits"
+then = "Each direction remains inside one bounded UUID budget while a second UUID has its own budget."
+when = "Payload transfers run"

@@ -1,0 +1,29 @@
+schema = 1
+id = "PHS-019"
+type = "phase"
+title = "Phase 2 - Node event collection and viewer"
+description = "Establishes structured node event records covering lifecycle, health and configuration change, and a dedicated viewer with type, severity and time range filtering plus paging deep enough for incident investigation."
+status = "resolved"
+created_at = 2026-09-20T14:56:06+09:00
+updated_at = 2026-09-20T18:13:14+09:00
+
+[metadata]
+exit_criteria = "[Node lifecycle, health and configuration events are recorded with type, severity, actor and payload Viewer filters by event type, by severity and by time range, and pages beyond the previous fixed window Event history is reachable from the node detail page Driven in a real browser against seeded event data]"
+goal = "Investigate node incidents from a filterable structured event history"
+order = 2.0
+
+[[relations]]
+to = "PLN-004"
+type = "belongs_to"
+
+[[relations]]
+to = "REQ-026"
+type = "covers"
+
+[[relations]]
+to = "REQ-026"
+type = "delivers"
+
+[[relations]]
+to = "PHS-020"
+type = "precedes"

@@ -1,0 +1,33 @@
+schema = 1
+id = "PHS-1790874094-y78"
+type = "phase"
+title = "HWID UUID concurrency verification and staged activation"
+description = "Prove subscription identity, online slot accounting, eviction semantics, device budget behavior and strict-HWID rollout readiness in isolated environments."
+status = "draft"
+created_at = 2026-10-02T02:01:34+09:00
+updated_at = 2026-10-02T02:01:34+09:00
+
+[metadata]
+exit_criteria = ["DB/Redis concurrency and stale-report tests pass.", "Vision/XUDP and multi-Exit UUID budget tests pass.", "Browser coverage spans primary URL and policy states.", "Strict HWID remains disabled unless explicitly approved after observation evidence."]
+goal = "Establish evidence for observation and a separately approved enforcement rollout."
+order = 4.0
+
+[[relations]]
+to = "PLN-1790874094-3qa"
+type = "belongs_to"
+
+[[relations]]
+to = "REQ-1790874094-2cb"
+type = "covers"
+
+[[relations]]
+to = "REQ-1790874510-a2p"
+type = "covers"
+
+[[relations]]
+to = "REQ-1790874510-ky7"
+type = "covers"
+
+[[relations]]
+to = "PHS-1790885140-7r1"
+type = "precedes"

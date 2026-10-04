@@ -1,0 +1,13 @@
+schema = 1
+id = "ACT-1790874094-t7c"
+type = "criterion"
+title = "Online slot count ignores connections, addresses, and Exit fan-out"
+description = "Given one UUID with many active VLESS connections on more than one Exit and a second UUID, when online reports are merged, then the account count is two."
+status = "draft"
+created_at = 2026-10-02T02:01:34+09:00
+updated_at = 2026-10-02T02:01:34+09:00
+
+[metadata]
+given = "One UUID has many active connections on more than one Exit and another UUID is active"
+then = "The account concurrency count is two."
+when = "Fresh online reports are merged"

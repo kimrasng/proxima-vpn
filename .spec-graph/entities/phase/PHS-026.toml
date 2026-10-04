@@ -1,0 +1,25 @@
+schema = 1
+id = "PHS-026"
+type = "phase"
+title = "Phase 9 - Checkout audit and request context"
+description = "Completes the administrator audit view over checkout attempts, payments and resulting grants, records the optional device fingerprint as a correlation signal only, verifies that the recorded client address is the real client, and purges tracking fields after a retention window."
+status = "resolved"
+created_at = 2026-09-20T14:56:06+09:00
+updated_at = 2026-09-21T22:36:53+09:00
+
+[metadata]
+exit_criteria = "[Administrators see checkout attempts with origin, address, user agent, derived browser and operating system and locale A paid order shows its payment record and the resulting grant including the term before and after The recorded client address is confirmed to be the real client rather than the proxy A device fingerprint is stored but gates nothing Tracking fields are purged after the retention window while financial fields are retained]"
+goal = "Explain from the panel how any subscription came to be granted"
+order = 9.0
+
+[[relations]]
+to = "PLN-004"
+type = "belongs_to"
+
+[[relations]]
+to = "REQ-033"
+type = "covers"
+
+[[relations]]
+to = "REQ-033"
+type = "delivers"

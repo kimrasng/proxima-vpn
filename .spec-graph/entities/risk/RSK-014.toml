@@ -1,0 +1,12 @@
+schema = 1
+id = "RSK-014"
+type = "risk"
+title = "Cloudflare partial success or stale work can orphan or overwrite DNS"
+description = "A provider mutation can succeed while the response or database update fails, and concurrent or delayed work can target obsolete intent or unrelated records."
+status = "draft"
+created_at = 2026-09-29T20:09:11+09:00
+updated_at = 2026-09-29T20:09:11+09:00
+
+[metadata]
+impact = "high"
+likelihood = "medium"

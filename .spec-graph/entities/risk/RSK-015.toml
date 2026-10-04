@@ -1,0 +1,12 @@
+schema = 1
+id = "RSK-015"
+type = "risk"
+title = "Exit SNI drift can publish profiles rejected by Reality listeners"
+description = "Node state, inbound settings, generated speed tiers, deployed Xray state, and subscriptions can diverge during migration or updates."
+status = "draft"
+created_at = 2026-09-29T20:09:11+09:00
+updated_at = 2026-09-29T20:09:11+09:00
+
+[metadata]
+impact = "high"
+likelihood = "medium"

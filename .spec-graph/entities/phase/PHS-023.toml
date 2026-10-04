@@ -1,0 +1,37 @@
+schema = 1
+id = "PHS-023"
+type = "phase"
+title = "Phase 6 - Checkout and payment provider abstraction"
+description = "Builds order records, payment event recording, administrator managed checkout routes and the provider interface, proving the state machine with an administrator confirmed provider before integrating a hosted provider. Includes order expiry sweeping and the cheaply available request context fields."
+status = "resolved"
+created_at = 2026-09-20T14:56:06+09:00
+updated_at = 2026-09-21T13:33:07+09:00
+
+[metadata]
+exit_criteria = "[An order is persisted for every checkout attempt whether or not it is paid A payment event is recorded before business logic runs and a replay cannot grant twice An administrator confirmed route completes a purchase end to end and grants the plan A hosted provider completes a purchase end to end through the same state machine Unpaid orders expire on a schedule and a late confirmation is still honoured Adding a provider touches only its own implementation and its registration Verified by driving a real purchase and by replaying a payment callback]"
+goal = "Complete a purchase that grants a plan exactly once"
+order = 6.0
+
+[[relations]]
+to = "PLN-004"
+type = "belongs_to"
+
+[[relations]]
+to = "REQ-030"
+type = "covers"
+
+[[relations]]
+to = "REQ-031"
+type = "covers"
+
+[[relations]]
+to = "REQ-030"
+type = "delivers"
+
+[[relations]]
+to = "REQ-031"
+type = "delivers"
+
+[[relations]]
+to = "PHS-024"
+type = "precedes"

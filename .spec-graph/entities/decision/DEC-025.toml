@@ -1,0 +1,12 @@
+schema = 1
+id = "DEC-025"
+type = "decision"
+title = "Payment idempotency enforced by database unique constraints rather than application locks"
+description = "Three layers ensure a replayed or concurrent payment callback cannot double-extend a subscription. A unique constraint on payment_events over route and provider event id rejects duplicate callbacks before business logic runs. A unique constraint on plan_grants over order id permits at most one grant per order. A conditional status transition guarded by a predicate on the current status selects a single winner. The grant transaction also locks the user row for update. No Redis locking is used."
+status = "active"
+created_at = 2026-09-20T14:54:20+09:00
+updated_at = 2026-09-20T14:54:20+09:00
+
+[metadata]
+date = "2026-09-20"
+rationale = "Database constraints are the only mechanism that holds under concurrent webhook delivery, process restarts and multiple application replicas. A Redis lock adds an availability dependency and still requires the database constraint as a backstop."

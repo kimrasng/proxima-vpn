@@ -1,0 +1,37 @@
+schema = 1
+id = "PHS-022"
+type = "phase"
+title = "Phase 5 - Plan pricing presets and plan presentation"
+description = "Adds per duration pricing with savings derived from the monthly price, an administrator pricing editor, and plan cards that render entitlements from plan attributes alongside administrator authored per-language feature bullets."
+status = "resolved"
+created_at = 2026-09-20T14:56:06+09:00
+updated_at = 2026-09-21T00:01:40+09:00
+
+[metadata]
+exit_criteria = "[A plan carries a price per offered duration and an administrator can edit the matrix Savings are computed from the monthly price and never stored Plan cards render traffic, device and speed figures from plan attributes Administrator authored feature bullets are per language, ordered and marked included or excluded A plan without pricing is not purchasable yet remains administrator assignable Driven in a real browser across the supported languages]"
+goal = "Offer plans at several durations with trustworthy pricing and feature presentation"
+order = 5.0
+
+[[relations]]
+to = "PLN-004"
+type = "belongs_to"
+
+[[relations]]
+to = "REQ-028"
+type = "covers"
+
+[[relations]]
+to = "REQ-029"
+type = "covers"
+
+[[relations]]
+to = "REQ-028"
+type = "delivers"
+
+[[relations]]
+to = "REQ-029"
+type = "delivers"
+
+[[relations]]
+to = "PHS-023"
+type = "precedes"

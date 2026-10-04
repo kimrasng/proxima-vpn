@@ -1,0 +1,29 @@
+schema = 1
+id = "PHS-024"
+type = "phase"
+title = "Phase 7 - Retirement of the plan request flow"
+description = "Removes the request and approval feature across storage, handlers, routes and panel screens once checkout is proven, after resolving any outstanding requests."
+status = "resolved"
+created_at = 2026-09-20T14:56:06+09:00
+updated_at = 2026-09-21T14:02:34+09:00
+
+[metadata]
+exit_criteria = "[Outstanding requests are resolved or migrated before removal Request handlers, routes and panel screens are gone No remaining reference to the removed feature in server or panel code The panel builds and the server starts cleanly after removal]"
+goal = "Leave checkout as the only route to obtaining a plan"
+order = 7.0
+
+[[relations]]
+to = "PLN-004"
+type = "belongs_to"
+
+[[relations]]
+to = "REQ-030"
+type = "covers"
+
+[[relations]]
+to = "REQ-030"
+type = "delivers"
+
+[[relations]]
+to = "PHS-025"
+type = "precedes"

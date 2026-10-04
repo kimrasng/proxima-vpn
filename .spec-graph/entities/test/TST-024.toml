@@ -1,0 +1,19 @@
+schema = 1
+id = "TST-024"
+type = "test"
+title = "Promotion reservations, expiry release, and free-order settlement are verified"
+description = "Database-backed automated tests cover conditional eligibility, overall and per-user caps under concurrent redemption, idempotent release, confirmation after settlement, release on expiry and administrator cancellation, and a 100% promotion that grants a plan through POST /user/orders without an external provider."
+status = "active"
+created_at = 2026-09-21T15:33:35+09:00
+updated_at = 2026-09-21T15:33:35+09:00
+
+[metadata]
+kind = "integration"
+
+[[relations]]
+to = "ACT-033"
+type = "verifies"
+
+[[relations]]
+to = "REQ-032"
+type = "verifies"

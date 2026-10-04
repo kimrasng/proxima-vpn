@@ -1,0 +1,25 @@
+schema = 1
+id = "PHS-027"
+type = "phase"
+title = "Phase 10 - Subscription domain pool"
+description = "Adds an administrator managed pool of subscription domains, exposes every publicly enabled domain to the user with reachability testing from the browser, and reports name resolution, transport security and certificate breakage to administrators."
+status = "resolved"
+created_at = 2026-09-20T14:56:07+09:00
+updated_at = 2026-09-30T02:51:55+09:00
+
+[metadata]
+exit_criteria = "[Administrators manage the pool including enablement, public visibility, ordering and the default A user sees their subscription URL on every publicly enabled domain Reachability is testable from the user browser and ordered by what works there Administrator facing health reporting covers resolution, transport security and certificate expiry Guidance states that a stored subscription URL cannot be redirected later Driven in a real browser]"
+goal = "Give a user a working subscription URL when a domain is blocked"
+order = 10.0
+
+[[relations]]
+to = "PLN-004"
+type = "belongs_to"
+
+[[relations]]
+to = "REQ-034"
+type = "covers"
+
+[[relations]]
+to = "REQ-034"
+type = "delivers"

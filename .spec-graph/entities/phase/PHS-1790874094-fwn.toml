@@ -1,0 +1,33 @@
+schema = 1
+id = "PHS-1790874094-fwn"
+type = "phase"
+title = "Portal and admin logical-device policy surfaces"
+description = "Expose the account URL, HWID compatibility/retirement, UUID-slot concurrency and per-UUID speed policy without overstating readiness."
+status = "draft"
+created_at = 2026-10-02T02:01:34+09:00
+updated_at = 2026-10-02T02:01:34+09:00
+
+[metadata]
+exit_criteria = ["User sees one primary account URL and compatibility guidance.", "Admin sees registered/online UUID counts and observation state.", "Plan labels distinguish HWID registrations, UUID slots, and per-UUID speed.", "Supported languages render without fallback."]
+goal = "Make logical UUID devices and their policies understandable to users and operators."
+order = 3.0
+
+[[relations]]
+to = "PLN-1790874094-3qa"
+type = "belongs_to"
+
+[[relations]]
+to = "REQ-1790874094-2cb"
+type = "covers"
+
+[[relations]]
+to = "REQ-1790874510-a2p"
+type = "covers"
+
+[[relations]]
+to = "REQ-1790874510-ky7"
+type = "covers"
+
+[[relations]]
+to = "PHS-1790874094-y78"
+type = "precedes"

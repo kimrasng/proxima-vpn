@@ -1,0 +1,21 @@
+schema = 1
+id = "REQ-1790874093-tq8"
+type = "requirement"
+title = "Online concurrency counts UUID slots across all Exit nodes"
+description = "One active Xray UUID consumes one account slot regardless of its VLESS connection count, source IPs, Entry relay, or number of Exit nodes. The scheduler unions fresh online UUID reports across Exit nodes and applies the plan max_concurrent setting in observation mode before enforcement."
+status = "deprecated"
+created_at = 2026-10-02T02:01:33+09:00
+updated_at = 2026-10-02T02:08:30+09:00
+
+[metadata]
+kind = "functional"
+owner = "api-server"
+priority = "must"
+
+[[relations]]
+to = "ACT-1790874094-t7c"
+type = "has_criterion"
+
+[[relations]]
+to = "ACT-1790874510-qhy"
+type = "has_criterion"

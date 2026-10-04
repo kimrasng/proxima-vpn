@@ -1,0 +1,13 @@
+schema = 1
+id = "REQ-024"
+type = "requirement"
+title = "Firewall ports are chosen from presets or entered manually during provisioning"
+description = "The provisioning form offers a list of predefined port presets to choose from. Selecting an other or custom option reveals an additional input allowing explicit port and range entry. The resulting port set is passed to the install script instead of the currently hardcoded port list."
+status = "resolved"
+created_at = 2026-09-20T14:55:02+09:00
+updated_at = 2026-09-22T10:06:25+09:00
+
+[metadata]
+kind = "functional"
+owner = "admin-panel"
+priority = "must"

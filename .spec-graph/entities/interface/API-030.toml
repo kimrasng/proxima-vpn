@@ -1,0 +1,21 @@
+schema = 1
+id = "API-030"
+type = "interface"
+title = "Dashboard consumes admin node-chain and node-role contracts"
+description = "The web administrator client uses authenticated node role and node-chain list/create/patch/delete/group APIs with an explicit entry_node_id; node groups remain only for subscription visibility."
+status = "active"
+created_at = 2026-09-25T21:32:30+09:00
+updated_at = 2026-09-30T16:15:51+09:00
+
+[metadata]
+kind = "module"
+path = "web/src/api/admin.ts"
+stability = "experimental"
+
+[[relations]]
+to = "REQ-036"
+type = "implements"
+
+[[relations]]
+to = "REQ-037"
+type = "implements"

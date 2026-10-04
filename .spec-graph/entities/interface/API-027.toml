@@ -1,0 +1,15 @@
+schema = 1
+id = "API-027"
+type = "interface"
+title = "Administrator order audit endpoint"
+description = "The authenticated GET /api/v1/admin/orders/{id}/audit endpoint returns bounded checkout context, grant expiry evidence, and payment event metadata without raw provider payloads."
+status = "active"
+created_at = 2026-09-21T22:36:27+09:00
+updated_at = 2026-09-21T22:36:27+09:00
+
+[metadata]
+kind = "api"
+
+[[relations]]
+to = "REQ-033"
+type = "implements"

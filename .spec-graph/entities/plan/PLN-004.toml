@@ -1,0 +1,11 @@
+schema = 1
+id = "PLN-004"
+type = "plan"
+title = "Node provisioning rework and purchase-driven subscriptions"
+description = "Reworks node provisioning into a guided flow that captures configuration before emitting an install command, builds structured node event collection with a dedicated viewer, adds per-language node display names surfaced in subscription output, replaces the plan request and approval flow with a real checkout supporting multiple payment providers and promotion codes, and offers subscription URLs across a pool of domains so a blocked domain can be replaced."
+status = "resolved"
+created_at = 2026-09-20T14:56:06+09:00
+updated_at = 2026-09-30T02:51:58+09:00
+
+[metadata]
+status = "active"

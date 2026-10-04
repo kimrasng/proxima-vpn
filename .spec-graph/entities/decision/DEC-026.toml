@@ -1,0 +1,12 @@
+schema = 1
+id = "DEC-026"
+type = "decision"
+title = "Payment providers sit behind a four method interface with secrets held in the environment"
+description = "A Provider interface exposes Kind, ValidateConfig, CreatePayment and ParseWebhook, with refund and status polling as optional add-on interfaces. CreatePayment returns either a redirect action or a display-instructions action, which together cover hosted checkout and crypto or bank transfer. Admin managed checkout route rows select a provider and hold non-secret configuration, while secrets live in environment variables referenced by name. Manual admin confirmation emits the same payment event as a webhook so a single state machine serves both."
+status = "active"
+created_at = 2026-09-20T14:54:20+09:00
+updated_at = 2026-09-20T14:54:20+09:00
+
+[metadata]
+date = "2026-09-20"
+rationale = "Encrypting provider secrets in Postgres requires a key encryption key that itself lives in the environment, so the trust root is identical while complexity grows and secrets leak into database dumps and the existing S3 backup path. Treating manual confirmation as an event source rather than a special case avoids a second state machine."

@@ -1,0 +1,13 @@
+schema = 1
+id = "REQ-029"
+type = "requirement"
+title = "Plan cards present derived entitlements and administrator authored feature bullets separately"
+description = "Quantities that exist as plan attributes, such as traffic allowance, device count and speed limit, are rendered from those attributes so they cannot contradict the plan. Additional marketing bullets are authored by an administrator per language, each marked as included or excluded, and are ordered for display."
+status = "resolved"
+created_at = 2026-09-20T14:55:02+09:00
+updated_at = 2026-09-22T10:06:25+09:00
+
+[metadata]
+kind = "functional"
+owner = "billing"
+priority = "should"

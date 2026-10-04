@@ -1,0 +1,21 @@
+schema = 1
+id = "TST-026"
+type = "test"
+title = "VLESS Reality relay-only admission is verified in isolated Docker"
+description = "An isolated Docker topology provisions nodes, pools, chains, the VLESS Reality inbound, a plan, user, and device via real admin and user HTTP APIs. Running relay and exit node-agent processes apply the projected nftables policies and generated Xray config. The subscribed client reaches a local HTTP marker only via the relay. An API-rejected empty-pool mutation is injected directly into the isolated database to verify both agents reconcile and a fresh connection fails closed."
+status = "resolved"
+created_at = 2026-09-24T01:02:05+09:00
+updated_at = 2026-09-30T20:00:29+09:00
+
+[metadata]
+automated = true
+kind = "e2e"
+path = "tests/relay-e2e"
+
+[[relations]]
+to = "ACT-036"
+type = "verifies"
+
+[[relations]]
+to = "API-029"
+type = "verifies"

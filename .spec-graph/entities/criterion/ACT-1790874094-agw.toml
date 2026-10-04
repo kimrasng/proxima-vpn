@@ -1,0 +1,13 @@
+schema = 1
+id = "ACT-1790874094-agw"
+type = "criterion"
+title = "Subscription refresh atomically creates or reuses exactly one UUID"
+description = "Given an active account and valid HWID, when concurrent refreshes arrive, then one matching device UUID exists and every successful response uses it."
+status = "draft"
+created_at = 2026-10-02T02:01:34+09:00
+updated_at = 2026-10-02T02:01:34+09:00
+
+[metadata]
+given = "An active account and a valid HWID"
+then = "Exactly one matching device UUID exists and every successful response uses it."
+when = "Concurrent subscription refreshes arrive"

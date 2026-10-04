@@ -1,0 +1,12 @@
+schema = 1
+id = "DEC-031"
+type = "decision"
+title = "Entry routing remains opaque L4 and selects Exit only by port"
+description = "One Entry hostname is reused across its chains; each globally claimed transport and port tuple maps to one Exit endpoint. Preserve tcp, udp, and tcp_udp overlap semantics, wrong-port isolation, and DB uniqueness as the concurrency arbiter. Do not inspect SNI or terminate TLS or Reality at Entry."
+status = "active"
+created_at = 2026-09-29T20:09:10+09:00
+updated_at = 2026-09-30T19:59:27+09:00
+
+[metadata]
+date = "2026-09-29"
+rationale = "The requested topology uses a real Entry server selected by DNS and a distinct port selected per Exit while preserving the existing nftables DNAT model."

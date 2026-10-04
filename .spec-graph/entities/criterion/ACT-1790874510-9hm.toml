@@ -1,0 +1,13 @@
+schema = 1
+id = "ACT-1790874510-9hm"
+type = "criterion"
+title = "Online 20-second freshness survives Exit switches without stale counts"
+description = "Agent cadence and Redis expiry support the Xray 20-second activity window; empty reports remove prior UUIDs promptly and switching Exits does not reset account-wide online_since."
+status = "draft"
+created_at = 2026-10-02T02:08:30+09:00
+updated_at = 2026-10-02T02:08:30+09:00
+
+[metadata]
+given = "A UUID stops activity on one Exit and reappears on another while other node reports expire"
+then = "It counts the UUID once within the 20-second activity window and preserves a continuous online transition."
+when = "The account concurrency scheduler observes fresh reports"

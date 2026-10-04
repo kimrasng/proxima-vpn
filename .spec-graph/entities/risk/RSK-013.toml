@@ -1,0 +1,12 @@
+schema = 1
+id = "RSK-013"
+type = "risk"
+title = "Reserve subscription domains are discoverable through certificate transparency"
+description = "Withholding a domain from the public pool does not conceal it, because certificates issued for it appear in public certificate transparency logs and can be enumerated by an adversary. Treating unpublished domains as secret would therefore be a false assurance unless a wildcard certificate is used or the certificate is obtained only at activation."
+status = "active"
+created_at = 2026-09-20T14:55:02+09:00
+updated_at = 2026-09-20T14:55:02+09:00
+
+[metadata]
+impact = "low"
+likelihood = "medium"

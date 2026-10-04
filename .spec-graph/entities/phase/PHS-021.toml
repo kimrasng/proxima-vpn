@@ -1,0 +1,25 @@
+schema = 1
+id = "PHS-021"
+type = "phase"
+title = "Phase 4 - Plan grant correctness and monthly traffic reset"
+description = "Introduces a single plan grant entry point that extends rather than replaces a term, preserves traffic usage across a renewal of the same plan, carries remaining time across a plan change, and drives the monthly traffic reset from the prepaid term since no recurring payment event exists. Must land before any checkout work."
+status = "resolved"
+created_at = 2026-09-20T14:56:06+09:00
+updated_at = 2026-09-20T20:44:49+09:00
+
+[metadata]
+exit_criteria = "[Renewing an unexpired identical plan extends the term and preserves traffic usage and the reset anchor A plan change or a purchase after expiry starts a fresh term, clears usage and re-anchors the reset A plan change carries remaining time from the prior term Monthly reset recurs on the anniversary day within the prepaid term and stops once the term expires Existing callers keep working through a compatibility wrapper Covered by automated tests over renewal, change, expiry and reset recurrence]"
+goal = "Grant and renew plan time without destroying paid entitlements"
+order = 4.0
+
+[[relations]]
+to = "PLN-004"
+type = "belongs_to"
+
+[[relations]]
+to = "PHS-023"
+type = "blocks"
+
+[[relations]]
+to = "PHS-022"
+type = "precedes"

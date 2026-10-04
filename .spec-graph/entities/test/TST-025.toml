@@ -1,0 +1,20 @@
+schema = 1
+id = "TST-025"
+type = "test"
+title = "Order audit persistence, endpoint, retention, and administrator UI are verified"
+description = "Database-backed Go tests cover bounded request-context persistence, trusted client IP handling, grant expiry evidence, retention purging, and the authenticated audit endpoint. Playwright admin audit tests cover the responsive localized audit surface and selected-language date rendering against the rebuilt Docker web bundle."
+status = "active"
+created_at = 2026-09-21T22:36:27+09:00
+updated_at = 2026-09-21T22:36:27+09:00
+
+[metadata]
+kind = "integration"
+path = "api-server/internal/handlers/admin_order_audit_test.go; api-server/internal/services/grant_expiry_evidence_test.go; api-server/internal/scheduler/retention_test.go; web/e2e/admin.spec.ts"
+
+[[relations]]
+to = "ACT-034"
+type = "verifies"
+
+[[relations]]
+to = "REQ-033"
+type = "verifies"

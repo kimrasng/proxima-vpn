@@ -1,0 +1,12 @@
+schema = 1
+id = "DEC-030"
+type = "decision"
+title = "Exit admission uses relay source allowlists in the agent-owned nftables table"
+description = "The node agent atomically renders source-address plus protocol-port allowlists and protected-port drops in its existing owned nftables table. This enforces relay-only access without modifying shared firewall tables and fails closed when a protected chain has no relay IPs."
+status = "active"
+created_at = 2026-09-24T01:02:04+09:00
+updated_at = 2026-09-24T01:02:04+09:00
+
+[metadata]
+date = "2026-09-24"
+rationale = "An L4 relay preserves no authentication context at the exit, so the relay source IP is the enforcement boundary."

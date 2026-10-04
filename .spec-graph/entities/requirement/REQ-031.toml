@@ -1,0 +1,21 @@
+schema = 1
+id = "REQ-031"
+type = "requirement"
+title = "Administrators manage multiple checkout routes backed by different payment providers"
+description = "An administrator creates, orders, enables and disables checkout routes from a dedicated panel section. Each route names a payment provider implementation and carries its non-secret configuration, while its credentials are supplied out of band. Adding support for a further provider requires an isolated code change rather than modifications to order handling."
+status = "resolved"
+created_at = 2026-09-20T14:55:02+09:00
+updated_at = 2026-09-30T02:53:56+09:00
+
+[metadata]
+kind = "functional"
+owner = "billing"
+priority = "must"
+
+[[relations]]
+to = "DEC-026"
+type = "constrained_by"
+
+[[relations]]
+to = "ACT-032"
+type = "has_criterion"

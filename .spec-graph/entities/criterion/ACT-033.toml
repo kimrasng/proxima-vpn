@@ -1,0 +1,12 @@
+schema = 1
+id = "ACT-033"
+type = "criterion"
+title = "Promotion redemption honors all restrictions and safely completes or releases the reservation"
+status = "active"
+created_at = 2026-09-21T15:33:35+09:00
+updated_at = 2026-09-21T15:33:35+09:00
+
+[metadata]
+given = "An active promotion code with its configured validity, plan, duration, amount, redemption, first-purchase, and user restrictions"
+then = "Only eligible orders receive the correct discount, caps are never exceeded, a zero-total order is granted without a provider, and each cancelled or expired reservation releases exactly once"
+when = "Eligible and ineligible users create, update, settle, cancel, or expire orders concurrently"

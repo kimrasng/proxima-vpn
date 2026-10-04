@@ -1,0 +1,13 @@
+schema = 1
+id = "ACT-042"
+type = "criterion"
+title = "Legacy chains remain publishable until managed endpoint cutover"
+description = "Migration is additive and repeatable, reports conflicts, keeps old identifiers and assignments, and supports rollback without deleting managed DNS or cleanup intent."
+status = "resolved"
+created_at = 2026-09-29T20:09:11+09:00
+updated_at = 2026-09-30T11:16:19+09:00
+
+[metadata]
+given = "An existing database containing explicit-Entry and legacy pool chains"
+then = "Legacy publication continues unchanged, conflicts are visible, no pool chain is auto-converted, and no chain ID, port, group, or external DNS ownership is lost"
+when = "The migration runs twice, managed DNS is unavailable or incompatible SNI has no intersection, and rollback is exercised"

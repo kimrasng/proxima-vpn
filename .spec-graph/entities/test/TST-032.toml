@@ -1,0 +1,25 @@
+schema = 1
+id = "TST-032"
+type = "test"
+title = "Subscription domain pool API and browser acceptance are verified"
+description = "Database-backed Go integration tests verify transactional default reassignment, hostname boundaries, administrator health classification, persistence failures, and enabled public listing order. Playwright verifies administrator CRUD and health states plus user domain selection, reachability, exact fallback preservation, malformed legacy-row filtering, localization, narrow viewports, and operation without URL.canParse."
+status = "active"
+created_at = 2026-09-30T02:52:31+09:00
+updated_at = 2026-09-30T02:52:31+09:00
+
+[metadata]
+automated = true
+kind = "integration"
+path = "api-server/internal/handlers/admin_subscription_domain_http_integration_test.go; api-server/internal/handlers/admin_subscription_domain_hostname_integration_test.go; api-server/internal/handlers/admin_subscription_domain_health_integration_test.go; api-server/internal/handlers/user_subscription_domain_http_integration_test.go; web/e2e/admin-subscription-domains.spec.ts; web/e2e/user-subscription-domains.spec.ts"
+
+[[relations]]
+to = "ACT-035"
+type = "verifies"
+
+[[relations]]
+to = "API-028"
+type = "verifies"
+
+[[relations]]
+to = "REQ-034"
+type = "verifies"

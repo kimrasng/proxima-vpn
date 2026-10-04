@@ -1,0 +1,25 @@
+schema = 1
+id = "PHS-020"
+type = "phase"
+title = "Phase 3 - Per-language node display names"
+description = "Adds administrator authored node display names per supported language and renders them in subscription output according to the requesting user account language, falling back to the default name."
+status = "resolved"
+created_at = 2026-09-20T14:56:06+09:00
+updated_at = 2026-09-20T18:45:35+09:00
+
+[metadata]
+exit_criteria = "[A node carries an administrator supplied name for each supported panel language Subscription output renders names in the user account language and falls back to the default name when absent All subscription formats reflect the translated name Verified by fetching subscription content as users of differing languages]"
+goal = "Serve node names in the language of the requesting user"
+order = 3.0
+
+[[relations]]
+to = "PLN-004"
+type = "belongs_to"
+
+[[relations]]
+to = "REQ-027"
+type = "covers"
+
+[[relations]]
+to = "REQ-027"
+type = "delivers"

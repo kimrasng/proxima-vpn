@@ -1,0 +1,25 @@
+schema = 1
+id = "PHS-1790885140-bk5"
+type = "phase"
+title = "Expose pending evictions and guarded operator recovery"
+description = "Give administrators a pending/confirmed view with required and acknowledged Exits, timeout/failure reasons, and an audited explicit recovery action that never silently restores an unconfirmed UUID."
+status = "draft"
+created_at = 2026-10-02T05:05:40+09:00
+updated_at = 2026-10-02T05:05:40+09:00
+
+[metadata]
+exit_criteria = ["Admin view distinguishes observation, pending and confirmed eviction states.", "It lists each required Exit and its acknowledgment/freshness.", "An operator can retry or explicitly recover a stuck epoch with audit evidence.", "An unconfirmed UUID never silently becomes authorized."]
+goal = "Make blocked fleet acknowledgments diagnosable and recoverable without weakening the ban."
+order = 6.0
+
+[[relations]]
+to = "PLN-1790874094-3qa"
+type = "belongs_to"
+
+[[relations]]
+to = "REQ-1790885140-3wx"
+type = "covers"
+
+[[relations]]
+to = "PHS-1790885140-z75"
+type = "precedes"
