@@ -1,0 +1,37 @@
+{
+  "TestRealXrayRevocationEstablishedVisionTCP/generated_schema": {
+    "materialized_fields": [
+      "SOCKS port",
+      "SOCKS password"
+    ],
+    "original_outbound_count": 4,
+    "transformer": "services.WithDeviceEgressRouting"
+  },
+  "TestRealXrayRevocationEstablishedVisionTCP/revocation-client-0_log": "Xray 26.3.27 (Xray, Penetrates Everything.) d2758a0 (go1.26.1 darwin/arm64)\nA unified platform for anti-censorship.\n2026/10/02 02:46:05.390955 [Info] infra/conf/serial: Reading config: \u0026{Name:/var/folders/v4/2v1t9sjj6tn1g8l_vsw0x7lh0000gn/T/TestRealXrayRevocationEstablishedVisionTCP1245789837/002/revocation-client-0.json Format:json}\n2026/10/02 02:46:05.392240 [Warning] core: Xray 26.3.27 started\n2026/10/02 02:46:05.504969 from tcp:127.0.0.1:52881 accepted tcp:198.51.100.10:443\n2026/10/02 02:46:06.019693 from tcp:127.0.0.1:52893 accepted tcp:198.51.100.10:443\n2026/10/02 02:46:06.030010 from tcp:127.0.0.1:52897 accepted tcp:198.51.100.10:443\n",
+  "TestRealXrayRevocationEstablishedVisionTCP/revocation-client-1_log": "Xray 26.3.27 (Xray, Penetrates Everything.) d2758a0 (go1.26.1 darwin/arm64)\nA unified platform for anti-censorship.\n2026/10/02 02:46:05.463289 [Info] infra/conf/serial: Reading config: \u0026{Name:/var/folders/v4/2v1t9sjj6tn1g8l_vsw0x7lh0000gn/T/TestRealXrayRevocationEstablishedVisionTCP1245789837/003/revocation-client-1.json Format:json}\n2026/10/02 02:46:05.464336 [Warning] core: Xray 26.3.27 started\n2026/10/02 02:46:05.509587 from tcp:127.0.0.1:52886 accepted tcp:198.51.100.10:443\n",
+  "TestRealXrayRevocationEstablishedVisionTCP/revocation-server_log": "Xray 26.3.27 (Xray, Penetrates Everything.) d2758a0 (go1.26.1 darwin/arm64)\nA unified platform for anti-censorship.\n2026/10/02 02:46:05.326866 [Info] infra/conf/serial: Reading config: \u0026{Name:/var/folders/v4/2v1t9sjj6tn1g8l_vsw0x7lh0000gn/T/TestRealXrayRevocationEstablishedVisionTCP1245789837/001/revocation-server.json Format:json}\n2026/10/02 02:46:05.327258 [Warning] infra/conf: REALITY: Listening on non-443 ports may get your IP blocked by the GFW\n2026/10/02 02:46:05.329387 [Warning] core: Xray 26.3.27 started\n2026/10/02 02:46:05.507717 from 127.0.0.1:52882 accepted tcp:198.51.100.10:443 [vless-reality -\u003e device-egress-[REDACTED]] email: [REDACTED]@proxima\n2026/10/02 02:46:05.511448 from 127.0.0.1:52887 accepted tcp:198.51.100.10:443 [vless-reality -\u003e device-egress-[REDACTED]] email: [REDACTED]@proxima\n2026/10/02 02:46:06.027573 from 127.0.0.1:52894 accepted tcp:198.51.100.10:443 [vless-reality -\u003e device-egress-[REDACTED]] email: [REDACTED]@proxima\n2026/10/02 02:46:06.034996 from 127.0.0.1:52898 accepted tcp:198.51.100.10:443 [vless-reality -\u003e device-egress-[REDACTED]] email: [REDACTED]@proxima\n",
+  "TestRealXrayRevocationEstablishedVisionTCP/vision_tcp_revocation": {
+    "b_continued": true,
+    "central_revoke_after_snapshot_clear_denied": true,
+    "existing_a_closed": true,
+    "fresh_a_denied": true
+  },
+  "TestRealXrayRevocationEstablishedVisionXUDP/generated_schema": {
+    "materialized_fields": [
+      "SOCKS port",
+      "SOCKS password"
+    ],
+    "original_outbound_count": 4,
+    "transformer": "services.WithDeviceEgressRouting"
+  },
+  "TestRealXrayRevocationEstablishedVisionXUDP/revocation-client-0_log": "Xray 26.3.27 (Xray, Penetrates Everything.) d2758a0 (go1.26.1 darwin/arm64)\nA unified platform for anti-censorship.\n2026/10/02 02:46:07.167938 [Info] infra/conf/serial: Reading config: \u0026{Name:/var/folders/v4/2v1t9sjj6tn1g8l_vsw0x7lh0000gn/T/TestRealXrayRevocationEstablishedVisionXUDP208018530/002/revocation-client-0.json Format:json}\n2026/10/02 02:46:07.168951 [Warning] core: Xray 26.3.27 started\n2026/10/02 02:46:07.277915 from udp:127.0.0.1:55237 accepted udp:198.51.100.10:443\n2026/10/02 02:46:09.088803 from udp:127.0.0.1:49742 accepted udp:198.51.100.10:443\n2026/10/02 02:46:09.891999 from udp:127.0.0.1:51552 accepted udp:198.51.100.10:443\n",
+  "TestRealXrayRevocationEstablishedVisionXUDP/revocation-client-1_log": "Xray 26.3.27 (Xray, Penetrates Everything.) d2758a0 (go1.26.1 darwin/arm64)\nA unified platform for anti-censorship.\n2026/10/02 02:46:07.234376 [Info] infra/conf/serial: Reading config: \u0026{Name:/var/folders/v4/2v1t9sjj6tn1g8l_vsw0x7lh0000gn/T/TestRealXrayRevocationEstablishedVisionXUDP208018530/003/revocation-client-1.json Format:json}\n2026/10/02 02:46:07.235223 [Warning] core: Xray 26.3.27 started\n2026/10/02 02:46:07.281204 from udp:127.0.0.1:61293 accepted udp:198.51.100.10:443\n",
+  "TestRealXrayRevocationEstablishedVisionXUDP/revocation-server_log": "Xray 26.3.27 (Xray, Penetrates Everything.) d2758a0 (go1.26.1 darwin/arm64)\nA unified platform for anti-censorship.\n2026/10/02 02:46:07.094565 [Info] infra/conf/serial: Reading config: \u0026{Name:/var/folders/v4/2v1t9sjj6tn1g8l_vsw0x7lh0000gn/T/TestRealXrayRevocationEstablishedVisionXUDP208018530/001/revocation-server.json Format:json}\n2026/10/02 02:46:07.095421 [Warning] infra/conf: REALITY: Listening on non-443 ports may get your IP blocked by the GFW\n2026/10/02 02:46:07.095953 [Warning] core: Xray 26.3.27 started\n2026/10/02 02:46:07.279818 from tcp:127.0.0.1:52922 accepted udp:198.51.100.10:443 [vless-reality -\u003e device-egress-[REDACTED]] email: [REDACTED]@proxima\n2026/10/02 02:46:07.282747 from tcp:127.0.0.1:52927 accepted udp:198.51.100.10:443 [vless-reality -\u003e device-egress-[REDACTED]] email: [REDACTED]@proxima\n2026/10/02 02:46:09.093126 from tcp:127.0.0.1:52931 accepted udp:198.51.100.10:443 [vless-reality -\u003e device-egress-[REDACTED]] email: [REDACTED]@proxima\n2026/10/02 02:46:09.896762 from tcp:127.0.0.1:52935 accepted udp:198.51.100.10:443 [vless-reality -\u003e device-egress-[REDACTED]] email: [REDACTED]@proxima\n",
+  "TestRealXrayRevocationEstablishedVisionXUDP/vision_xudp_revocation": {
+    "b_continued": true,
+    "central_revoke_after_snapshot_clear_denied": true,
+    "existing_a_echoes_after_revoke": 0,
+    "fresh_a_denied": true,
+    "probes": 3
+  }
+}

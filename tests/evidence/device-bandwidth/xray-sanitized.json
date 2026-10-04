@@ -1,0 +1,71 @@
+{
+  "TestControlledSOCKSUDPSharedDirectionalBudget/udp_echo": {
+    "bytes": 1112064,
+    "window_seconds": 8.000140583,
+    "rate_bytes_per_second": 131072,
+    "burst_allowance_bytes": 65536,
+    "ceiling_bytes": 1114130
+  },
+  "TestPermitErrorAndCredentialRevocationCloseExisting/central_revoked/existing_connection_closed": true,
+  "TestPermitErrorAndCredentialRevocationCloseExisting/credential_removed/existing_connection_closed": true,
+  "TestPermitErrorAndCredentialRevocationCloseExisting/credential_rotated/existing_connection_closed": true,
+  "TestPermitErrorAndCredentialRevocationCloseExisting/permit_api_error/existing_connection_closed": true,
+  "TestRealXrayLimiterDownNeverFallsBackToFreedom/closed_limiter_no_freedom_fallback": true,
+  "TestRealXrayLimiterDownNeverFallsBackToFreedom/generated_schema": {
+    "materialized_fields": [
+      "SOCKS port",
+      "SOCKS password"
+    ],
+    "original_outbound_count": 4,
+    "transformer": "services.WithDeviceEgressRouting"
+  },
+  "TestRealXrayLimiterDownNeverFallsBackToFreedom/outage-client_log": "Xray 26.3.27 (Xray, Penetrates Everything.) d2758a0 (go1.26.1 darwin/arm64)\nA unified platform for anti-censorship.\n2026/10/01 17:41:25.520308 [Info] infra/conf/serial: Reading config: \u0026{Name:/var/folders/v4/2v1t9sjj6tn1g8l_vsw0x7lh0000gn/T/TestRealXrayLimiterDownNeverFallsBackToFreedom3984722490/002/outage-client.json Format:json}\n2026/10/01 17:41:25.521300 [Warning] core: Xray 26.3.27 started\n2026/10/01 17:41:25.562426 from tcp:127.0.0.1:52968 accepted tcp:198.51.100.10:443\n2026/10/01 17:41:25.565242 from tcp:127.0.0.1:52973 accepted tcp:198.51.100.10:443\n",
+  "TestRealXrayLimiterDownNeverFallsBackToFreedom/outage-server_log": "Xray 26.3.27 (Xray, Penetrates Everything.) d2758a0 (go1.26.1 darwin/arm64)\nA unified platform for anti-censorship.\n2026/10/01 17:41:25.453426 [Info] infra/conf/serial: Reading config: \u0026{Name:/var/folders/v4/2v1t9sjj6tn1g8l_vsw0x7lh0000gn/T/TestRealXrayLimiterDownNeverFallsBackToFreedom3984722490/001/outage-server.json Format:json}\n2026/10/01 17:41:25.454073 [Warning] infra/conf: REALITY: Listening on non-443 ports may get your IP blocked by the GFW\n2026/10/01 17:41:25.454572 [Warning] core: Xray 26.3.27 started\n2026/10/01 17:41:25.563938 from 127.0.0.1:52969 accepted tcp:198.51.100.10:443 [vless-reality -\u003e device-egress-[REDACTED]] email: [REDACTED]@proxima\n2026/10/01 17:41:25.567092 from 127.0.0.1:52974 accepted tcp:198.51.100.10:443 [vless-reality -\u003e device-egress-[REDACTED]] email: [REDACTED]@proxima\n",
+  "TestRealXrayVisionPerDeviceAndSharedAcrossExits/client-0-0_log": "Xray 26.3.27 (Xray, Penetrates Everything.) d2758a0 (go1.26.1 darwin/arm64)\nA unified platform for anti-censorship.\n2026/10/01 17:41:09.043180 [Info] infra/conf/serial: Reading config: \u0026{Name:/var/folders/v4/2v1t9sjj6tn1g8l_vsw0x7lh0000gn/T/TestRealXrayVisionPerDeviceAndSharedAcrossExits2614691669/002/client-0-0.json Format:json}\n2026/10/01 17:41:09.043999 [Warning] core: Xray 26.3.27 started\n2026/10/01 17:41:09.346225 from tcp:127.0.0.1:52888 accepted tcp:198.51.100.10:443\n2026/10/01 17:41:09.351055 from tcp:127.0.0.1:52893 accepted tcp:198.51.100.10:443\n",
+  "TestRealXrayVisionPerDeviceAndSharedAcrossExits/client-0-1_log": "Xray 26.3.27 (Xray, Penetrates Everything.) d2758a0 (go1.26.1 darwin/arm64)\nA unified platform for anti-censorship.\n2026/10/01 17:41:09.107707 [Info] infra/conf/serial: Reading config: \u0026{Name:/var/folders/v4/2v1t9sjj6tn1g8l_vsw0x7lh0000gn/T/TestRealXrayVisionPerDeviceAndSharedAcrossExits2614691669/003/client-0-1.json Format:json}\n2026/10/01 17:41:09.108630 [Warning] core: Xray 26.3.27 started\n2026/10/01 17:41:09.358236 from tcp:127.0.0.1:52908 accepted tcp:198.51.100.10:443\n2026/10/01 17:41:09.360706 from tcp:127.0.0.1:52913 accepted tcp:198.51.100.10:443\n",
+  "TestRealXrayVisionPerDeviceAndSharedAcrossExits/client-1-0_log": "Xray 26.3.27 (Xray, Penetrates Everything.) d2758a0 (go1.26.1 darwin/arm64)\nA unified platform for anti-censorship.\n2026/10/01 17:41:09.239475 [Info] infra/conf/serial: Reading config: \u0026{Name:/var/folders/v4/2v1t9sjj6tn1g8l_vsw0x7lh0000gn/T/TestRealXrayVisionPerDeviceAndSharedAcrossExits2614691669/005/client-1-0.json Format:json}\n2026/10/01 17:41:09.240371 [Warning] core: Xray 26.3.27 started\n2026/10/01 17:41:09.353308 from tcp:127.0.0.1:52898 accepted tcp:198.51.100.10:443\n2026/10/01 17:41:09.356022 from tcp:127.0.0.1:52903 accepted tcp:198.51.100.10:443\n",
+  "TestRealXrayVisionPerDeviceAndSharedAcrossExits/client-1-1_log": "Xray 26.3.27 (Xray, Penetrates Everything.) d2758a0 (go1.26.1 darwin/arm64)\nA unified platform for anti-censorship.\n2026/10/01 17:41:09.302292 [Info] infra/conf/serial: Reading config: \u0026{Name:/var/folders/v4/2v1t9sjj6tn1g8l_vsw0x7lh0000gn/T/TestRealXrayVisionPerDeviceAndSharedAcrossExits2614691669/006/client-1-1.json Format:json}\n2026/10/01 17:41:09.303118 [Warning] core: Xray 26.3.27 started\n2026/10/01 17:41:09.363040 from tcp:127.0.0.1:52918 accepted tcp:198.51.100.10:443\n2026/10/01 17:41:09.365196 from tcp:127.0.0.1:52923 accepted tcp:198.51.100.10:443\n",
+  "TestRealXrayVisionPerDeviceAndSharedAcrossExits/device_0_four_sessions_two_exits": {
+    "bytes": 1048888,
+    "window_seconds": 8.000288583,
+    "rate_bytes_per_second": 131072,
+    "burst_allowance_bytes": 131072,
+    "ceiling_bytes": 1179685
+  },
+  "TestRealXrayVisionPerDeviceAndSharedAcrossExits/device_1_four_sessions_two_exits": {
+    "bytes": 2113848,
+    "window_seconds": 8.000333375,
+    "rate_bytes_per_second": 262144,
+    "burst_allowance_bytes": 131072,
+    "ceiling_bytes": 2228311
+  },
+  "TestRealXrayVisionPerDeviceAndSharedAcrossExits/generated_schema": {
+    "materialized_fields": [
+      "SOCKS port",
+      "SOCKS password"
+    ],
+    "original_outbound_count": 4,
+    "transformer": "services.WithDeviceEgressRouting"
+  },
+  "TestRealXrayVisionPerDeviceAndSharedAcrossExits/server-0_log": "Xray 26.3.27 (Xray, Penetrates Everything.) d2758a0 (go1.26.1 darwin/arm64)\nA unified platform for anti-censorship.\n2026/10/01 17:41:08.977679 [Info] infra/conf/serial: Reading config: \u0026{Name:/var/folders/v4/2v1t9sjj6tn1g8l_vsw0x7lh0000gn/T/TestRealXrayVisionPerDeviceAndSharedAcrossExits2614691669/001/server-0.json Format:json}\n2026/10/01 17:41:08.978283 [Warning] infra/conf: REALITY: Listening on non-443 ports may get your IP blocked by the GFW\n2026/10/01 17:41:08.980125 [Warning] core: Xray 26.3.27 started\n2026/10/01 17:41:09.349378 from 127.0.0.1:52889 accepted tcp:198.51.100.10:443 [vless-reality -\u003e device-egress-[REDACTED]] email: [REDACTED]@proxima\n2026/10/01 17:41:09.352214 from 127.0.0.1:52894 accepted tcp:198.51.100.10:443 [vless-reality -\u003e device-egress-[REDACTED]] email: [REDACTED]@proxima\n2026/10/01 17:41:09.359536 from 127.0.0.1:52909 accepted tcp:198.51.100.10:443 [vless-reality -\u003e device-egress-[REDACTED]] email: [REDACTED]@proxima\n2026/10/01 17:41:09.361735 from 127.0.0.1:52914 accepted tcp:198.51.100.10:443 [vless-reality -\u003e device-egress-[REDACTED]] email: [REDACTED]@proxima\n",
+  "TestRealXrayVisionPerDeviceAndSharedAcrossExits/server-1_log": "Xray 26.3.27 (Xray, Penetrates Everything.) d2758a0 (go1.26.1 darwin/arm64)\nA unified platform for anti-censorship.\n2026/10/01 17:41:09.177740 [Info] infra/conf/serial: Reading config: \u0026{Name:/var/folders/v4/2v1t9sjj6tn1g8l_vsw0x7lh0000gn/T/TestRealXrayVisionPerDeviceAndSharedAcrossExits2614691669/004/server-1.json Format:json}\n2026/10/01 17:41:09.178756 [Warning] infra/conf: REALITY: Listening on non-443 ports may get your IP blocked by the GFW\n2026/10/01 17:41:09.179302 [Warning] core: Xray 26.3.27 started\n2026/10/01 17:41:09.354612 from 127.0.0.1:52899 accepted tcp:198.51.100.10:443 [vless-reality -\u003e device-egress-[REDACTED]] email: [REDACTED]@proxima\n2026/10/01 17:41:09.357094 from 127.0.0.1:52904 accepted tcp:198.51.100.10:443 [vless-reality -\u003e device-egress-[REDACTED]] email: [REDACTED]@proxima\n2026/10/01 17:41:09.364196 from 127.0.0.1:52919 accepted tcp:198.51.100.10:443 [vless-reality -\u003e device-egress-[REDACTED]] email: [REDACTED]@proxima\n2026/10/01 17:41:09.366466 from 127.0.0.1:52924 accepted tcp:198.51.100.10:443 [vless-reality -\u003e device-egress-[REDACTED]] email: [REDACTED]@proxima\n",
+  "TestRealXrayVisionPerDeviceAndSharedAcrossExits/transport_dials": 8,
+  "TestRealXrayVisionPerDeviceAndSharedAcrossExits/xray_version": "Xray 26.3.27 (Xray, Penetrates Everything.) d2758a0 (go1.26.1 darwin/arm64)\nA unified platform for anti-censorship.\n",
+  "TestRealXrayVisionXUDPEcho/generated_schema": {
+    "materialized_fields": [
+      "SOCKS port",
+      "SOCKS password"
+    ],
+    "original_outbound_count": 4,
+    "transformer": "services.WithDeviceEgressRouting"
+  },
+  "TestRealXrayVisionXUDPEcho/vision_xudp_echo": {
+    "bytes": 1113088,
+    "window_seconds": 8.000128917,
+    "rate_bytes_per_second": 131072,
+    "burst_allowance_bytes": 98304,
+    "ceiling_bytes": 1146896
+  },
+  "TestRealXrayVisionXUDPEcho/xudp-client_log": "Xray 26.3.27 (Xray, Penetrates Everything.) d2758a0 (go1.26.1 darwin/arm64)\nA unified platform for anti-censorship.\n2026/10/01 17:41:26.678319 [Info] infra/conf/serial: Reading config: \u0026{Name:/var/folders/v4/2v1t9sjj6tn1g8l_vsw0x7lh0000gn/T/TestRealXrayVisionXUDPEcho3722376595/002/xudp-client.json Format:json}\n2026/10/01 17:41:26.679093 [Warning] core: Xray 26.3.27 started\n2026/10/01 17:41:26.723112 from udp:127.0.0.1:52464 accepted udp:198.51.100.10:443\n",
+  "TestRealXrayVisionXUDPEcho/xudp-server_log": "Xray 26.3.27 (Xray, Penetrates Everything.) d2758a0 (go1.26.1 darwin/arm64)\nA unified platform for anti-censorship.\n2026/10/01 17:41:26.612245 [Info] infra/conf/serial: Reading config: \u0026{Name:/var/folders/v4/2v1t9sjj6tn1g8l_vsw0x7lh0000gn/T/TestRealXrayVisionXUDPEcho3722376595/001/xudp-server.json Format:json}\n2026/10/01 17:41:26.612860 [Warning] infra/conf: REALITY: Listening on non-443 ports may get your IP blocked by the GFW\n2026/10/01 17:41:26.613350 [Warning] core: Xray 26.3.27 started\n2026/10/01 17:41:26.724826 from tcp:127.0.0.1:52998 accepted udp:198.51.100.10:443 [vless-reality -\u003e device-egress-[REDACTED]] email: [REDACTED]@proxima\n"
+}
