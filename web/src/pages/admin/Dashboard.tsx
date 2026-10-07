@@ -355,7 +355,7 @@ export default function Dashboard() {
                   header: t("admin.dashboard.col.alert"),
                   cell: (item) => (
                     <StatusIndicator type={indicatorType(item.severity)}>
-                      {t(`admin.dashboard.alert.${item.kind}`, { count: item.count })}
+                      {t(`admin.dashboard.alert.${item.kind}`, { count: item.count, defaultValue: item.kind })}
                     </StatusIndicator>
                   ),
                 },
@@ -364,7 +364,7 @@ export default function Dashboard() {
                   header: t("admin.dashboard.col.detail"),
                   cell: (item) => (
                     <Box variant="small" color="text-body-secondary">
-                      {t(`admin.dashboard.alert.${item.kind}_desc`)}
+                      {t(`admin.dashboard.alert.${item.kind}_desc`, { defaultValue: item.kind })}
                     </Box>
                   ),
                 },
@@ -440,7 +440,7 @@ export default function Dashboard() {
                   minWidth: 130,
                   cell: (item) => (
                     <Badge color={badgeColor[item.severity]}>
-                      {t(`admin.dashboard.issue.${item.kind}`)}
+                      {t(`admin.dashboard.issue.${item.kind}`, { defaultValue: item.kind })}
                     </Badge>
                   ),
                 },

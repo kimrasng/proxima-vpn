@@ -25,4 +25,18 @@ export default defineConfig({
     port: 8080,
     proxy: apiProxy,
   },
+  build: {
+    rollupOptions: {
+      output: {
+        // The router is shared by every route but is large enough to push the
+        // entry over Vite's 500 kB threshold. Keep it in a separate shared
+        // chunk without assigning React or Cloudscape's internal modules.
+        manualChunks(id) {
+          if (id.includes("/node_modules/react-router/") || id.includes("/node_modules/react-router-dom/")) {
+            return "router";
+          }
+        },
+      },
+    },
+  },
 });

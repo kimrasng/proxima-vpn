@@ -1,43 +1,47 @@
+// Each route is loaded on demand rather than shipping every admin and portal
+// screen to users before they sign in. Shared UI/i18n still loads normally.
+import { lazy } from "react";
 import { createBrowserRouter, Navigate } from "react-router-dom";
-import NotFound from "./pages/NotFound";
-import AdminLayout from "./layouts/AdminLayout";
-import UserLayout from "./layouts/UserLayout";
-import AuthLayout from "./layouts/AuthLayout";
 import AdminAuthGuard from "./components/AdminAuthGuard";
 import UserAuthGuard from "./components/UserAuthGuard";
 
-import Dashboard from "./pages/admin/Dashboard";
-import Alerts from "./pages/admin/Alerts";
-import Activity from "./pages/admin/Activity";
-import Nodes from "./pages/admin/Nodes";
-import NodeGroups from "./pages/admin/NodeGroups";
-import NodeChains from "./pages/admin/NodeChains";
-import Plans from "./pages/admin/Plans";
-import Promotions from "./pages/admin/Promotions";
-import Users from "./pages/admin/Users";
-import UserDetail from "./pages/admin/UserDetail";
-import Orders from "./pages/admin/Orders";
-import OrderDetail from "./pages/admin/OrderDetail";
-import AdminAnnouncements from "./pages/admin/Announcements";
-import Settings from "./pages/admin/Settings";
-import TwoFactor from "./pages/admin/TwoFactor";
-import NodeInbounds from "./pages/admin/NodeInbounds";
-import NodeDetail from "./pages/admin/NodeDetail";
-import UUIDEvictions from "./pages/admin/UUIDEvictions";
-import Connections from "./pages/admin/Connections";
-import SubscriptionDomains from "./pages/admin/SubscriptionDomains";
+const NotFound = lazy(() => import("./pages/NotFound"));
+const AdminLayout = lazy(() => import("./layouts/AdminLayout"));
+const UserLayout = lazy(() => import("./layouts/UserLayout"));
+const AuthLayout = lazy(() => import("./layouts/AuthLayout"));
 
-import Login from "./pages/auth/Login";
-import AdminLogin from "./pages/auth/AdminLogin";
-import Register from "./pages/auth/Register";
+const Dashboard = lazy(() => import("./pages/admin/Dashboard"));
+const Alerts = lazy(() => import("./pages/admin/Alerts"));
+const Activity = lazy(() => import("./pages/admin/Activity"));
+const Nodes = lazy(() => import("./pages/admin/Nodes"));
+const NodeGroups = lazy(() => import("./pages/admin/NodeGroups"));
+const NodeChains = lazy(() => import("./pages/admin/NodeChains"));
+const Plans = lazy(() => import("./pages/admin/Plans"));
+const Promotions = lazy(() => import("./pages/admin/Promotions"));
+const Users = lazy(() => import("./pages/admin/Users"));
+const UserDetail = lazy(() => import("./pages/admin/UserDetail"));
+const Orders = lazy(() => import("./pages/admin/Orders"));
+const OrderDetail = lazy(() => import("./pages/admin/OrderDetail"));
+const AdminAnnouncements = lazy(() => import("./pages/admin/Announcements"));
+const Settings = lazy(() => import("./pages/admin/Settings"));
+const TwoFactor = lazy(() => import("./pages/admin/TwoFactor"));
+const NodeInbounds = lazy(() => import("./pages/admin/NodeInbounds"));
+const NodeDetail = lazy(() => import("./pages/admin/NodeDetail"));
+const UUIDEvictions = lazy(() => import("./pages/admin/UUIDEvictions"));
+const Connections = lazy(() => import("./pages/admin/Connections"));
+const SubscriptionDomains = lazy(() => import("./pages/admin/SubscriptionDomains"));
 
-import Devices from "./pages/user/Devices";
-import UserDashboard from "./pages/user/Dashboard";
-import UserNodes from "./pages/user/Nodes";
-import Traffic from "./pages/user/Traffic";
-import PlanInfo from "./pages/user/PlanInfo";
-import AccountSettings from "./pages/user/AccountSettings";
-import UserAnnouncements from "./pages/user/Announcements";
+const Login = lazy(() => import("./pages/auth/Login"));
+const AdminLogin = lazy(() => import("./pages/auth/AdminLogin"));
+const Register = lazy(() => import("./pages/auth/Register"));
+
+const Devices = lazy(() => import("./pages/user/Devices"));
+const UserDashboard = lazy(() => import("./pages/user/Dashboard"));
+const UserNodes = lazy(() => import("./pages/user/Nodes"));
+const Traffic = lazy(() => import("./pages/user/Traffic"));
+const PlanInfo = lazy(() => import("./pages/user/PlanInfo"));
+const AccountSettings = lazy(() => import("./pages/user/AccountSettings"));
+const UserAnnouncements = lazy(() => import("./pages/user/Announcements"));
 
 export const router = createBrowserRouter([
   {

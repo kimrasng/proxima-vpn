@@ -73,7 +73,7 @@ export default function Activity() {
     const key = `admin.dashboard.event.${entry.event_type}`;
     return t(key, { defaultValue: entry.event_type });
   };
-  const severityLabel = (severity: string) => t(`admin.nodeEvents.severity.${severity}`);
+  const severityLabel = (severity: string) => t(`admin.nodeEvents.severity.${severity}`, { defaultValue: severity });
   const timeEntries = useMemo(() => {
     const hours = RANGE_HOURS[range] ?? 0;
     const cutoff = (lastUpdated?.getTime() ?? Date.now()) - hours * 3600000;
@@ -196,10 +196,10 @@ export default function Activity() {
           </Container>
           <div ref={workspaceRef} className={selected && !compactDetails ? "activity-workspace activity-workspace--selected" : "activity-workspace"}>
             <div className="activity-log">
-              <div className="activity-log__table">
-                <Table {...collectionProps} {...selection} items={items} trackBy="id" selectionType="single"
+              <div className="activity-log__table intrinsic-table">
+                <Table {...collectionProps} {...selection} items={items} trackBy="id" selectionType="single" resizableColumns={false}
                   onRowClick={({ detail }) => selectEntry(detail.item.id)} loading={loading}
-                  loadingText={t("admin.activity.tableTitle")} header={header} contentDensity="compact" wrapLines
+                  loadingText={t("admin.activity.tableTitle")} header={header} contentDensity="compact" wrapLines={false}
                   columnDefinitions={columns} />
               </div>
               <div className="activity-log__cards">

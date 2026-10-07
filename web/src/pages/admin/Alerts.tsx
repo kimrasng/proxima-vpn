@@ -155,7 +155,7 @@ export default function Alerts() {
     const kinds = Array.from(new Set(issues.map((i) => i.kind))).sort();
     return [
       { value: "all", label: t("admin.alerts.filterKindAll") },
-      ...kinds.map((kind) => ({ value: kind, label: t(`admin.dashboard.issue.${kind}`) })),
+      ...kinds.map((kind) => ({ value: kind, label: t(`admin.dashboard.issue.${kind}`, { defaultValue: kind }) })),
     ];
   }, [issues, t]);
 
@@ -416,7 +416,7 @@ export default function Alerts() {
             cardDefinition={{
               header: (item) => (
                 <StatusIndicator type={indicatorType(item.severity)}>
-                  {t(`admin.dashboard.alert.${item.kind}`, { count: item.count })}
+                  {t(`admin.dashboard.alert.${item.kind}`, { count: item.count, defaultValue: item.kind })}
                 </StatusIndicator>
               ),
               sections: [
@@ -424,7 +424,7 @@ export default function Alerts() {
                   id: "detail",
                   content: (item) => (
                     <Box variant="small" color="text-body-secondary">
-                      {t(`admin.dashboard.alert.${item.kind}_desc`)}
+                      {t(`admin.dashboard.alert.${item.kind}_desc`, { defaultValue: item.kind })}
                     </Box>
                   ),
                 },
@@ -507,7 +507,7 @@ export default function Alerts() {
               maxWidth: 170,
               cell: (item) => (
                 <Badge color={badgeColor[item.severity]}>
-                  {t(`admin.dashboard.issue.${item.kind}`)}
+                  {t(`admin.dashboard.issue.${item.kind}`, { defaultValue: item.kind })}
                 </Badge>
               ),
             },
@@ -570,7 +570,7 @@ export default function Alerts() {
                   </StatusIndicator>
                 ),
                 sections: [
-                  { id: "issue", header: t("admin.dashboard.col.issue"), content: (item) => <Badge color={badgeColor[item.severity]}>{t(`admin.dashboard.issue.${item.kind}`)}</Badge> },
+                  { id: "issue", header: t("admin.dashboard.col.issue"), content: (item) => <Badge color={badgeColor[item.severity]}>{t(`admin.dashboard.issue.${item.kind}`, { defaultValue: item.kind })}</Badge> },
                   { id: "location", header: t("admin.nodes.col.countryRegion"), content: (item) => [item.country, item.region].filter(Boolean).join(" · ") || "—" },
                   { id: "reading", header: t("admin.dashboard.col.reading"), content: renderReading },
                   { id: "duration", header: t("admin.alerts.col.duration"), content: (item) => item.duration_seconds > 0 ? formatDuration(t, item.duration_seconds) : "—" },

@@ -25,7 +25,7 @@ export function ActivityDetails({ entry, eventLabel, onClose }: {
   const requestId = entry.detail.request_id;
   const rawJson = JSON.stringify(entry, null, 2);
   const fields = [
-    { label: t("admin.activity.col.severity"), value: <StatusIndicator type={entry.severity}>{t(`admin.nodeEvents.severity.${entry.severity}`)}</StatusIndicator> },
+    { label: t("admin.activity.col.severity"), value: <StatusIndicator type={entry.severity}>{t(`admin.nodeEvents.severity.${entry.severity}`, { defaultValue: entry.severity })}</StatusIndicator> },
     { label: t("admin.dashboard.col.time"), value: new Date(entry.created_at).toLocaleString() },
     { label: t("admin.dashboard.col.event"), value: eventLabel },
     { label: t("admin.activity.eventType"), value: entry.event_type },

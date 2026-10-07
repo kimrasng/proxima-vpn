@@ -281,10 +281,10 @@ function AdminLayoutShell() {
               {alerts.items.map((item) => (
                 <SpaceBetween key={item.kind} size="xxxs">
                   <StatusIndicator type={indicatorType(item.severity)}>
-                    {t(`admin.dashboard.alert.${item.kind}`, { count: item.count })}
+                    {t(`admin.dashboard.alert.${item.kind}`, { count: item.count, defaultValue: item.kind })}
                   </StatusIndicator>
                   <Box variant="small" color="text-body-secondary">
-                    {t(`admin.dashboard.alert.${item.kind}_desc`)}
+                    {t(`admin.dashboard.alert.${item.kind}_desc`, { defaultValue: item.kind })}
                   </Box>
                 </SpaceBetween>
               ))}
