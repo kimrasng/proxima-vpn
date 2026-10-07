@@ -1,10 +1,8 @@
-import { get, post, del, put, patch, setClientTokenType } from './client';
+import { get, post, put, patch, setClientTokenType } from './client';
 import type {
   UserProfile,
   UpdateProfileRequest,
   TrafficStats,
-  Device,
-  CreateDeviceRequest,
   UserPlanItem,
   Announcement,
   AvailableNode,
@@ -44,21 +42,6 @@ export function getSummary(): Promise<UserSummary> {
 export function regenerateSubToken(): Promise<{ sub_token: string }> {
   applyUserClient();
   return post<{ sub_token: string }>('/api/v1/user/sub-token/regenerate');
-}
-
-export function listDevices(): Promise<Device[]> {
-  applyUserClient();
-  return get<Device[]>('/api/v1/user/devices');
-}
-
-export function createDevice(req: CreateDeviceRequest): Promise<Device> {
-  applyUserClient();
-  return post<Device>('/api/v1/user/devices', req);
-}
-
-export function deleteDevice(id: string): Promise<void> {
-  applyUserClient();
-  return del<void>(`/api/v1/user/devices/${id}`);
 }
 
 export function listPlans(lang?: string): Promise<UserPlanItem[]> {

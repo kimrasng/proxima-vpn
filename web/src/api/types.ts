@@ -537,10 +537,6 @@ export interface Device {
   created_at: string;
 }
 
-export interface CreateDeviceRequest {
-  name?: string;
-}
-
 // User - Profile
 export interface UserProfile {
   sub_token?: string;

@@ -1,5 +1,7 @@
 import { test, expect } from "@playwright/test";
-import { expectSelectedDomain, mockDevices, mockSession, publicDomains } from "./subscription-domain-fixtures";
+import {
+  expectOnlyAccountUrl, expectSelectedDomain, fixtureSubscriptionPath, mockSession, mockSubscription, publicDomains,
+} from "./subscription-domain-fixtures";
 import en from "../src/i18n/locales/en.json" with { type: "json" };
 import ko from "../src/i18n/locales/ko.json" with { type: "json" };
 import zh from "../src/i18n/locales/zh.json" with { type: "json" };
@@ -7,12 +9,11 @@ import zh from "../src/i18n/locales/zh.json" with { type: "json" };
 test.describe("PHS-027 user subscription domains", () => {
   test.beforeEach(async ({ page }) => {
     await mockSession(page, "user");
-    await mockDevices(page);
+    await mockSubscription(page);
   });
 
-  test("baseline: default wins over order and manual choice preserves route/query", async ({ page }) => {
-    // Given an intentionally unsorted public pool and a legacy absolute URL.
-    await mockDevices(page, "https://legacy.example.test/sub/fixture-route?format=clash&source=fixture");
+  test("baseline: default wins over order and manual choice keeps the account path", async ({ page }) => {
+    // Given an intentionally unsorted public pool.
     await page.goto("/portal/devices");
     await expectSelectedDomain(page, "blocked.example.test");
     await expect(page.getByRole("tab")).toHaveText([
@@ -20,41 +21,42 @@ test.describe("PHS-027 user subscription domains", () => {
     ]);
     // When the user manually chooses a different host.
     await page.getByRole("tab", { name: "working.example.test", exact: true }).click();
-    // Then only the host/format change; route and unrelated query survive.
+    // Then only the host changes; the encoded account path survives.
     await expectSelectedDomain(page, "working.example.test");
   });
 
-  test("relative subscription URLs do not inherit the panel port", async ({ page }) => {
+  test("public domains use https and drop any panel port", async ({ page }) => {
     await page.goto("/portal/devices");
-    await expectSelectedDomain(page, "blocked.example.test");
+    await expect(page.getByRole("tabpanel").locator("code")).toHaveText(`https://blocked.example.test${fixtureSubscriptionPath}`);
   });
 
-  test("legacy port replacement preserves encoded subscription token and unrelated parameters", async ({ page }) => {
-    await mockDevices(page, "http://legacy.example.test:9443/sub/fixture%2Fencoded?token=fixture%2Bvalue&format=clash");
+  test("the account token is percent-encoded exactly once and carries no format query", async ({ page }) => {
+    await mockSubscription(page, "a b/ü?#");
     await page.goto("/portal/devices");
-    await expect(page.getByRole("tabpanel").locator("code")).toHaveText(
-      "https://blocked.example.test/sub/fixture%2Fencoded?token=fixture%2Bvalue",
-    );
+    await expect(page.getByRole("tabpanel").locator("code")).toHaveText("https://blocked.example.test/sub/a%20b%2F%C3%BC%3F%23");
+    await expect(page.getByText("format=")).toHaveCount(0);
   });
 
-  test("missing subscription URL retains the device UUID route", async ({ page }) => {
-    await mockDevices(page, "");
+  test("an account without a plan shows the no-plan state and no subscription URL", async ({ page }) => {
+    await page.route("**/api/v1/user/profile", (route) => route.fulfill({
+      json: { name: "Browser fixture", email: "fixture@example.test", sub_token: "fixture/token+value" },
+    }));
     await page.goto("/portal/devices");
-    await expect(page.getByRole("tabpanel").locator("code")).toHaveText("https://blocked.example.test/sub/fixture-uuid");
+    await expect(page.getByText(en.user.devices.noPlan, { exact: true })).toBeVisible();
+    await expect(page.locator("code")).toHaveCount(0);
+    await expect(page.getByRole("tab")).toHaveCount(0);
   });
 
   for (const scenario of ["empty", "error", "malformed"] as const) {
-    test(`verifier: ${scenario} fallback preserves existing format and complete encoded URL`, async ({ page }) => {
-      const original = "https://legacy.example.test:9443/sub/encoded%2Ftoken?format=clash&source=fixture";
-      await mockDevices(page, original);
+    test(`${scenario} public pool falls back to the account URL on the panel origin`, async ({ page }) => {
       await page.route("**/api/v1/user/subscription-domains", (route) => route.fulfill({
         status: scenario === "error" ? 503 : 200,
-        json: scenario === "empty" ? [] : {},
+        json: scenario === "empty" ? [] : { error: "fixture" },
       }));
       await page.goto("/portal/devices");
-      await expect(page.locator("code")).toHaveCount(3);
-      await expect(page.locator("code").last()).toHaveText(original);
+      await expectOnlyAccountUrl(page, new URL(fixtureSubscriptionPath, page.url()).toString());
       await expect(page.getByRole("tab")).toHaveCount(0);
+      await expect(page.getByRole("button", { name: "Test reachability", exact: true })).toHaveCount(0);
     });
   }
 
@@ -86,8 +88,6 @@ test.describe("PHS-027 user subscription domains", () => {
     let rows: unknown[] = [...malformedRows.map(({ row }) => row), ...hosts.map((domain, display_order) => ({
       id: domain, domain, display_order, is_default: false,
     }))];
-    const original = "https://legacy.example.test:9443/sub/encoded%2Ftoken?format=clash&source=fixture";
-    await mockDevices(page, original);
     await page.route("**/api/v1/user/subscription-domains", (route) => route.fulfill({ json: rows }));
     // When the mixed response loads, then only valid DNS hosts remain selectable.
     await page.goto("/portal/devices");
@@ -95,37 +95,49 @@ test.describe("PHS-027 user subscription domains", () => {
     await expect(page.getByRole("tab")).toHaveText(hosts);
     for (const host of hosts) {
       await page.getByRole("tab", { name: host, exact: true }).click();
-      await expect(page.getByRole("tabpanel").locator("code")).toHaveText(
-        `https://${host}/sub/encoded%2Ftoken?source=fixture`,
-      );
+      await expect(page.getByRole("tabpanel").locator("code")).toHaveText(`https://${host}${fixtureSubscriptionPath}`);
     }
     rows = malformedRows.map(({ row }) => row);
     await page.reload();
-    await expect(page.locator("code")).toHaveCount(3);
+    await expectOnlyAccountUrl(page, new URL(fixtureSubscriptionPath, page.url()).toString());
     await expect(page.getByRole("tab")).toHaveCount(0);
-    await expect(page.locator("code").last()).toHaveText(original);
     await expect(page.getByRole("button", { name: "Test reachability", exact: true })).toHaveCount(0);
   });
 
-  test("verifier: explicit QR formats override format without losing route or other query parameters", async ({ page }) => {
-    await mockDevices(page, "https://legacy.example.test:9443/sub/encoded%2Ftoken?format=clash&source=fixture");
+  test("QR dialog shows one account URL without format tabs and follows the selected domain", async ({ page }) => {
     await page.goto("/portal/devices");
     await page.getByRole("button", { name: en.user.devices.showQr, exact: true }).click();
-    const dialog = page.getByRole("dialog");
-    await expect(dialog.locator("code")).toHaveText("https://legacy.example.test:9443/sub/encoded%2Ftoken?source=fixture");
-    await dialog.getByRole("tab", { name: "Clash", exact: true }).click();
-    await expect(dialog.locator("code")).toHaveText("https://legacy.example.test:9443/sub/encoded%2Ftoken?format=clash&source=fixture");
+    let dialog = page.getByRole("dialog");
+    await expect(dialog.locator("code")).toHaveText(`https://blocked.example.test${fixtureSubscriptionPath}`);
+    await expect(dialog.getByRole("tab")).toHaveCount(0);
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await page.getByRole("tab", { name: "working.example.test", exact: true }).click();
+    await page.getByRole("button", { name: en.user.devices.showQr, exact: true }).click();
+    dialog = page.getByRole("dialog");
+    await expect(dialog.locator("code")).toHaveText(`https://working.example.test${fixtureSubscriptionPath}`);
+  });
+
+  test("per-app fallback URLs append the client type to the selected domain's account URL", async ({ page }) => {
+    await page.goto("/portal/devices");
+    await page.getByRole("button", { name: en.user.devices.overrideTitle, exact: true }).click();
+    const overrides = (host: string) => ["clash-meta", "sing-box", "v2ray", "clash", "wireguard"]
+      .map((client) => `https://${host}${fixtureSubscriptionPath}/${client}`);
+    await expect(page.locator("code").filter({ visible: true })).toHaveText([
+      `https://blocked.example.test${fixtureSubscriptionPath}`, ...overrides("blocked.example.test"),
+    ]);
+    await page.getByRole("tab", { name: "working.example.test", exact: true }).click();
+    await expect(page.locator("code").filter({ visible: true })).toHaveText([
+      `https://working.example.test${fixtureSubscriptionPath}`, ...overrides("working.example.test"),
+    ]);
   });
 
   for (const { name, row } of malformedRows) {
     test(`verifier: ${name} leaves no unusable tab and preserves fallback`, async ({ page }) => {
-      const original = "https://legacy.example.test:9443/sub/encoded%2Ftoken?format=clash&source=fixture";
-      await mockDevices(page, original);
       await page.route("**/api/v1/user/subscription-domains", (route) => route.fulfill({ json: [row] }));
       await page.goto("/portal/devices");
-      await expect(page.locator("code")).toHaveCount(3);
+      await expectOnlyAccountUrl(page, new URL(fixtureSubscriptionPath, page.url()).toString());
       await expect(page.getByRole("tab")).toHaveCount(0);
-      await expect(page.locator("code").last()).toHaveText(original);
       await expect(page.getByRole("button", { name: "Test reachability", exact: true })).toHaveCount(0);
     });
   }
@@ -142,9 +154,7 @@ test.describe("PHS-027 user subscription domains", () => {
     rows = malformedRows.map(({ row }) => row);
     await page.reload();
     await expect(page.getByRole("tab")).toHaveCount(0);
-    await expect(page.locator("code").last()).toHaveText(
-      new URL("/sub/fixture-route?format=clash&source=fixture", page.url()).toString(),
-    );
+    await expectOnlyAccountUrl(page, new URL(fixtureSubscriptionPath, page.url()).toString());
   });
 
   test("browser race orders working first, bounds timeout, retries and allows manual fallback", async ({ page }) => {
@@ -171,10 +181,11 @@ test.describe("PHS-027 user subscription domains", () => {
       "working.example.test ✓", "blocked.example.test ✕", "timeout.example.test ✕",
     ], { timeout: 3000 });
     await expectSelectedDomain(page, "working.example.test");
+    // Probes hit the account URL itself, with the token still encoded.
     expect(requests.sort()).toEqual([
-      "https://blocked.example.test/sub/fixture-route?source=fixture",
-      "https://timeout.example.test/sub/fixture-route?source=fixture",
-      "https://working.example.test/sub/fixture-route?source=fixture",
+      `https://blocked.example.test${fixtureSubscriptionPath}`,
+      `https://timeout.example.test${fixtureSubscriptionPath}`,
+      `https://working.example.test${fixtureSubscriptionPath}`,
     ]);
     await page.getByRole("tab", { name: "timeout.example.test ✕", exact: true }).click();
     await expectSelectedDomain(page, "timeout.example.test");
@@ -204,22 +215,7 @@ test.describe("PHS-027 user subscription domains", () => {
     await expectSelectedDomain(page, "blocked.example.test");
   });
 
-  for (const scenario of ["empty", "error", "malformed"] as const) {
-    test(`${scenario} public pool preserves original fallback URL`, async ({ page }) => {
-      await page.route("**/api/v1/user/subscription-domains", (route) => route.fulfill({
-        status: scenario === "error" ? 503 : 200,
-        json: scenario === "empty" ? [] : { error: "fixture" },
-      }));
-      await page.goto("/portal/devices");
-      const expected = new URL("/sub/fixture-route?format=clash&source=fixture", page.url()).toString();
-      await expect(page.locator("code")).toHaveCount(3);
-      await expect(page.locator("code").last()).toHaveText(expected);
-      await expect(page.getByRole("tab")).toHaveCount(0);
-      await expect(page.getByRole("button", { name: "Test reachability", exact: true })).toHaveCount(0);
-    });
-  }
-
-  test("interrupted probes do not carry results into remounted devices", async ({ page }) => {
+  test("interrupted probes do not carry results into a remounted subscription page", async ({ page }) => {
     await page.route("https://*.example.test/**", () => {});
     for (let attempt = 0; attempt < 3; attempt++) {
       await page.goto("/portal/devices");
@@ -237,7 +233,7 @@ test.describe("PHS-027 user subscription domains", () => {
     for (const width of [375, 1280]) {
       test(`${language} guidance and selection at ${width}px`, async ({ page }) => {
         await mockSession(page, "user", language);
-        await mockDevices(page);
+        await mockSubscription(page);
         await page.setViewportSize({ width, height: 900 });
         const adminRequests: string[] = [];
         page.on("request", (request) => {

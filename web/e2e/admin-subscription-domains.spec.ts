@@ -200,13 +200,10 @@ test.describe("PHS-027 public filtering integration", () => {
         localStorage.setItem("proxima_user_token", token);
         localStorage.setItem("i18nextLng", "en");
       }, user.token);
-      await page.route("**/api/v1/user/profile", (route) => route.fulfill({ json: { plan_name: "Fixture", max_devices: 1 } }));
-      await page.route("**/api/v1/user/devices", (route) => route.fulfill({ json: [{
-        id: "fixture", name: "Fixture", xray_uuid: "fixture", subscription_url: "/sub/fixture-route",
-      }] }));
+      await page.route("**/api/v1/user/profile", (route) => route.fulfill({ json: { plan_name: "Fixture", sub_token: "fixture-token" } }));
       await page.goto("/portal/devices");
       await expect(page.getByRole("tab")).toHaveText([`public-${suffix}.example.test`]);
-      await expect(page.getByRole("tabpanel").locator("code")).toHaveText(`https://public-${suffix}.example.test/sub/fixture-route`);
+      await expect(page.getByRole("tabpanel").locator("code")).toHaveText(`https://public-${suffix}.example.test/sub/fixture-token`);
     } finally {
       for (const id of ids) {
         const deleted = await request.delete(`/api/v1/admin/subscription-domains/${id}`, { headers });

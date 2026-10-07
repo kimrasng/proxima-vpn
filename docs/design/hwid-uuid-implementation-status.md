@@ -21,4 +21,4 @@ Graph: `PLN-1790874094-3qa` (draft); Phase 1 `PHS-1790874094-cgs` is active. The
 - Browser tests for the full import/refresh flow, plan wording in every language and observation state; one mock URL render check is not evidence of a real client sending headers.
 - Staged deployment: upgrade node agents before new API config, keep enforcement off until observer coverage and active-session termination are demonstrated.
 
-No changes were deployed or committed. Existing unrelated workspace edits were preserved.
+No production rollout was established at this checkpoint. Subsequent implementation work was committed and pushed to main; see the later status/evidence documents for the current verification boundaries.

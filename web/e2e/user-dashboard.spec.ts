@@ -3,8 +3,8 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { QRCodeSVG } from "qrcode.react";
 import type {
-  Announcement, AvailableNode, CreateDeviceRequest, CreateOrderRequest,
-  Device, OrderResponse, UserPlanItem, UserProfile, UserSummary,
+  Announcement, AvailableNode, CreateOrderRequest,
+  OrderResponse, UserPlanItem, UserProfile, UserSummary,
 } from "../src/api/types";
 import en from "../src/i18n/locales/en.json" with { type: "json" };
 import ko from "../src/i18n/locales/ko.json" with { type: "json" };
@@ -22,17 +22,11 @@ const profile: UserProfile = {
   id: "dashboard-user", name: "Browser fixture", email: "fixture@example.test",
   status: "active", language: "en", plan_name: "Everyday Plus",
   traffic_used: 25 * GB, traffic_limit: 100 * GB, plan_expires_at: EXPIRES,
+  // Reserved characters prove the token is percent-encoded once into the path.
+  sub_token: "account/token+secret",
 };
-const devices: Device[] = [
-  {
-    id: "phone", name: "My phone", xray_uuid: "phone-uuid", created_at: NOW,
-    subscription_url: "http://legacy.example.test:9443/sub/phone%2Ftoken?token=value%2Bsecret&format=clash&source=dashboard",
-  },
-  {
-    id: "laptop", name: "My laptop", xray_uuid: "laptop-uuid", created_at: NOW,
-    subscription_url: "/sub/laptop%2Ftoken?source=dashboard&format=clash&token=other%2Bsecret",
-  },
-];
+const ACCOUNT_PATH = "/sub/account%2Ftoken%2Bsecret";
+const accountUrl = (host: string) => `https://${host}${ACCOUNT_PATH}`;
 const nodes: AvailableNode[] = [
   { name: "Seoul edge", country: "KR", region: "Seoul", status: "online" },
   { name: "Tokyo edge", country: "JP", region: "Tokyo", status: "offline" },
@@ -83,17 +77,10 @@ async function mockDashboard(page: Page, language = "en") {
   });
   const state = {
     summary: { ...overview }, profile: { ...profile, language },
-    devices: devices.map((device) => ({ ...device })),
     announcements: [{ ...bulletin }], nodes: nodes.map((node) => ({ ...node })),
     plans, orders: [] as OrderResponse[],
     failures: new Set<string>(), reads: new Map<string, number>(),
-    devicePosts: [] as CreateDeviceRequest[], orderPosts: [] as CreateOrderRequest[],
-    unexpectedWrites: [] as string[], summaryGate: null as Promise<void> | null,
-    deviceGate: null as Promise<void> | null,
-    newDevice: {
-      id: "new-device", name: "New phone", xray_uuid: "new-uuid", created_at: NOW,
-      subscription_url: "/sub/account%2Ftoken/new-device?token=new%2Bsecret&source=dashboard",
-    } satisfies Device,
+    orderPosts: [] as CreateOrderRequest[], unexpectedWrites: [] as string[],
   };
   await page.route("**/api/v1/user/**", async (route) => {
     const request = route.request();
@@ -104,25 +91,13 @@ async function mockDashboard(page: Page, language = "en") {
         await route.fulfill({ status: 503, json: { error: "fixture unavailable" } });
         return;
       }
-      if (path === "summary" && state.summaryGate) await state.summaryGate;
-      if (path === "devices" && state.deviceGate) await state.deviceGate;
       const responses: Record<string, unknown> = {
-        summary: state.summary, profile: state.profile, devices: state.devices,
+        summary: state.summary, profile: state.profile,
         "subscription-domains": publicDomains, nodes: state.nodes,
         announcements: state.announcements, plans: state.plans, orders: state.orders,
         "payment-providers": [{ name: "manual", mode: "manual" }],
       };
       await route.fulfill({ json: responses[path] ?? {} });
-    } else if (request.method() === "POST" && path === "devices") {
-      state.devicePosts.push(request.postDataJSON());
-      state.devices.push({ ...state.newDevice });
-      state.summary.devices = state.devices.length;
-      // The real create endpoint omits the token-bearing subscription URL.
-      const createdDevice: Device = {
-        id: state.newDevice.id, name: state.newDevice.name,
-        xray_uuid: state.newDevice.xray_uuid, created_at: state.newDevice.created_at,
-      };
-      await route.fulfill({ status: 201, json: createdDevice });
     } else if (request.method() === "POST" && path === "orders") {
       const body: CreateOrderRequest = request.postDataJSON();
       state.orderPosts.push(body);
@@ -148,15 +123,19 @@ async function openOverview(page: Page, title = en.user.dashboard.title) {
   await expect(page.getByRole("heading", { name: title, exact: true })).toBeVisible();
 }
 
+function accountUrlInput(page: Page, label = en.user.devices.accountUrl) {
+  return page.getByRole("textbox", { name: label, exact: true });
+}
+
 function purchaseButton(page: Page, planName = "Everyday Plus") {
   return page.getByRole("button", { name: `${en.user.plan.order.placeOrder} ${planName}`, exact: true });
 }
 
 test.describe("mocked user dashboard and purchase journey", () => {
-  test("overview shows monthly used-of-cap, days left and device counts, not IP counts", async ({ page }, testInfo) => {
+  test("overview shows monthly used-of-cap, days left and concurrent connections, without a device tile", async ({ page }, testInfo) => {
     await page.setViewportSize({ width: 1280, height: 1000 });
     await page.emulateMedia({ colorScheme: "light" });
-    await mockDashboard(page);
+    const state = await mockDashboard(page);
     await openOverview(page);
     await expect(page.getByRole("heading", { name: "Everyday Plus", exact: true })).toBeVisible();
     await expect(page.getByText(en.user.dashboard.monthlyTraffic, { exact: true })).toBeVisible();
@@ -164,69 +143,26 @@ test.describe("mocked user dashboard and purchase journey", () => {
     await expect(page.getByText("100.0 GB per month", { exact: true })).toBeVisible();
     await expect(page.getByText("75.0 GB remaining", { exact: true })).toBeVisible();
     await expect(page.getByText("10 days left", { exact: true })).toBeVisible();
-    await expect(page.getByText("2 of 4", { exact: true })).toBeVisible();
-    await expect(page.getByText("1 currently connected", { exact: true })).toBeVisible();
+    // The registered-devices tile (devices / max_devices) is gone.
+    await expect(page.getByText("2 of 4", { exact: true })).toHaveCount(0);
     await page.getByRole("button", { name: en.user.dashboard.connections, exact: true }).click();
     await expect(page.getByText("2 of 5", { exact: true })).toBeVisible();
     await expect(page.getByText("1 of 2 online", { exact: true })).toBeVisible();
-    await expect(page.getByRole("button", { name: en.user.devices.addDevice, exact: true })).toBeEnabled();
+    await expect(accountUrlInput(page)).toHaveValue(accountUrl("blocked.example.test"));
+    await expect(page.getByRole("button", { name: "Add Device" })).toHaveCount(0);
     await expect(page.getByRole("dialog")).toHaveCount(0);
+    expect(state.reads.get("devices")).toBeUndefined();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await testInfo.attach("dashboard-desktop-light", { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });
   });
 
-  test("quick-add reloads the canonical URL after POST and refreshes summary without navigation", async ({ page }) => {
-    const state = await mockDashboard(page);
-    state.devices = [];
-    state.summary.devices = 0;
-    state.summary.max_devices = 3;
-    await openOverview(page);
-    await expect(page.getByText("0 of 3", { exact: true })).toBeVisible();
-    const initialSummaryReads = state.reads.get("summary") ?? 0;
-    const initialDeviceReads = state.reads.get("devices") ?? 0;
-    let releaseSummary!: () => void;
-    let releaseDevices!: () => void;
-    state.summaryGate = new Promise<void>((resolve) => { releaseSummary = resolve; });
-    state.deviceGate = new Promise<void>((resolve) => { releaseDevices = resolve; });
-    try {
-      await page.getByRole("button", { name: en.user.devices.addDevice, exact: true }).click();
-      const dialog = page.getByRole("dialog");
-      await dialog.getByRole("textbox", { name: en.user.devices.deviceName, exact: true }).fill("  New phone  ");
-      await dialog.getByRole("button", { name: en.user.dashboard.addAndGetUrl, exact: true }).click();
-      await expect(page.getByRole("dialog")).toHaveCount(0);
-      expect(state.devicePosts).toEqual([{ name: "New phone" }]);
-      await expect.poll(() => state.reads.get("devices") ?? 0).toBeGreaterThan(initialDeviceReads);
-      await expect.poll(() => state.reads.get("summary") ?? 0).toBeGreaterThan(initialSummaryReads);
-      await expect(page.getByRole("textbox", { name: en.user.devices.subscriptionUrl, exact: true })).toHaveCount(0);
-      await expect(page.getByRole("button", { name: en.user.dashboard.copyUrl, exact: true })).toHaveCount(0);
-      state.deviceGate = null;
-      releaseDevices();
-      await expect(page.getByText(en.user.dashboard.deviceReady, { exact: true })).toBeVisible();
-      await expect(page.getByRole("textbox", { name: en.user.devices.subscriptionUrl, exact: true })).toHaveValue(
-        "https://blocked.example.test/sub/account%2Ftoken/new-device?token=new%2Bsecret&source=dashboard",
-      );
-      await expect(page).toHaveURL(/\/portal\/dashboard$/);
-    } finally {
-      state.summaryGate = null;
-      state.deviceGate = null;
-      releaseSummary();
-      releaseDevices();
-    }
-    await expect(page.getByText("1 of 3", { exact: true })).toBeVisible();
-    expect(state.unexpectedWrites).toEqual([]);
-  });
-
-  test("device, app format and public host selections preserve encoded route/query for copy and QR", async ({ page }) => {
+  test("public host selection changes only the host of the account URL for copy and QR", async ({ page }) => {
     await mockDashboard(page);
     await openOverview(page);
-    const url = page.getByRole("textbox", { name: en.user.devices.subscriptionUrl, exact: true });
-    await expect(url).toHaveValue(
-      "https://blocked.example.test/sub/phone%2Ftoken?token=value%2Bsecret&source=dashboard",
-    );
-    await choose(page, en.user.dashboard.selectDevice, "My laptop");
-    await choose(page, en.user.dashboard.clientFormat, "Sing-box");
+    const url = accountUrlInput(page);
+    await expect(url).toHaveValue(accountUrl("blocked.example.test"));
     await choose(page, en.user.dashboard.subscriptionDomain, "working.example.test");
-    const selected = "https://working.example.test/sub/laptop%2Ftoken?source=dashboard&format=singbox&token=other%2Bsecret";
+    const selected = accountUrl("working.example.test");
     await expect(url).toHaveValue(selected);
     await page.getByRole("button", { name: en.user.dashboard.copyUrl, exact: true }).click();
     await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(selected);
@@ -236,7 +172,7 @@ test.describe("mocked user dashboard and purchase journey", () => {
     const qr = dialog.locator('svg[width="220"][height="220"]');
     await expect(qr).toBeVisible();
     // Compare the encoded matrix, not just the presence of an SVG: the QR must
-    // encode exactly the selected URL, including its token and chosen format.
+    // encode exactly the selected account URL, including its encoded token.
     const expectedSvg = renderToStaticMarkup(createElement(QRCodeSVG, { value: selected, size: 220 }));
     const expectedPaths = [...expectedSvg.matchAll(/<path\b[^>]*\bd="([^"]+)"/g)].map((match) => match[1]);
     expect(expectedPaths.length).toBeGreaterThan(0);
@@ -245,48 +181,48 @@ test.describe("mocked user dashboard and purchase journey", () => {
     await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(selected);
   });
 
-  test("no-plan overview offers purchase navigation and disables device creation", async ({ page }) => {
+  test("subscription details link opens the account subscription page", async ({ page }) => {
+    await mockDashboard(page);
+    await openOverview(page);
+    await page.getByRole("button", { name: en.user.dashboard.subscriptionDetails, exact: true }).click();
+    await expect(page).toHaveURL(/\/portal\/devices$/);
+    await expect(page.getByRole("heading", { name: en.user.devices.title, exact: true })).toBeVisible();
+  });
+
+  test("no-plan overview offers purchase navigation and explains that connecting needs a plan", async ({ page }) => {
     const state = await mockDashboard(page);
     state.summary = { ...overview, plan_name: null, plan_expires_at: null, traffic_limit: null, devices: 0 };
     state.profile = { ...profile, plan_name: undefined, plan_expires_at: undefined };
-    state.devices = [];
     await openOverview(page);
     await expect(page.getByRole("heading", { name: en.user.dashboard.noPlanTitle, exact: true })).toBeVisible();
     await expect(page.getByText(en.user.dashboard.noPlanDescription, { exact: true })).toBeVisible();
-    await expect(page.getByRole("button", { name: en.user.devices.addDevice, exact: true })).toBeDisabled();
+    await expect(page.getByText(en.user.dashboard.connectNeedsPlan, { exact: true })).toBeVisible();
     await page.getByRole("button", { name: en.user.dashboard.browsePlans, exact: true }).first().click();
     await expect(page).toHaveURL(/\/portal\/plan$/);
     await expect(page.getByRole("heading", { name: en.user.plan.availablePlans, exact: true })).toBeVisible();
     await expect(purchaseButton(page)).toBeEnabled();
-    expect(state.devicePosts).toEqual([]);
     expect(state.orderPosts).toEqual([]);
   });
 
-  for (const scenario of ["expired", "suspended", "device-limit"] as const) {
-    test(`${scenario} account cannot quick-add a device`, async ({ page }) => {
+  for (const scenario of ["expired", "suspended"] as const) {
+    test(`${scenario} account sees why it cannot connect`, async ({ page }) => {
       const state = await mockDashboard(page);
       if (scenario === "expired") {
         // A stale active status must not override an already elapsed expiry.
         state.summary.plan_expires_at = "2032-05-31T12:00:00Z";
-      } else if (scenario === "suspended") {
-        state.summary.status = "suspended";
       } else {
-        // A stale summary undercount must not override the loaded device list.
-        state.summary.devices = 0;
-        state.summary.max_devices = 2;
+        state.summary.status = "suspended";
       }
       await openOverview(page);
-      await expect(page.getByRole("button", { name: en.user.devices.addDevice, exact: true })).toBeDisabled();
       if (scenario === "expired") {
         await expect(page.getByText(en.user.dashboard.expiredHint, { exact: true })).toBeVisible();
-      } else if (scenario === "suspended") {
-        await expect(page.getByText(en.user.dashboard.suspendedHint, { exact: true })).toHaveCount(2);
+        await expect(page.getByText(en.user.dashboard.connectNeedsPlan, { exact: true })).toBeVisible();
       } else {
-        await expect(page.getByText(en.user.devices.limitReached, { exact: true })).toBeVisible();
+        await expect(page.getByText(en.user.dashboard.suspendedHint, { exact: true })).toHaveCount(2);
       }
       await expect(page.getByRole("heading", { name: en.user.dashboard.noPlanTitle, exact: true })).toHaveCount(0);
       await expect(page.getByRole("dialog")).toHaveCount(0);
-      expect(state.devicePosts).toEqual([]);
+      expect(state.unexpectedWrites).toEqual([]);
     });
   }
 
@@ -296,14 +232,14 @@ test.describe("mocked user dashboard and purchase journey", () => {
       ...overview, traffic_used: 0, traffic_limit: 0, plan_expires_at: null,
       devices: 0, max_devices: 0, online: 0, online_ips: 0, max_concurrent: 0,
     };
-    state.devices = [];
     await openOverview(page);
     await expect(page.getByRole("heading", { name: "Everyday Plus", exact: true })).toBeVisible();
     await expect(page.getByText("0 B", { exact: true })).toBeVisible();
     await expect(page.getByText(en.user.dashboard.trafficUnlimited, { exact: true })).toBeVisible();
     await expect(page.getByText(en.user.dashboard.noExpiry, { exact: true })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "0 · No limit", exact: true })).toBeVisible();
-    await expect(page.getByRole("button", { name: en.user.devices.addDevice, exact: true })).toBeEnabled();
+    await page.getByRole("button", { name: en.user.dashboard.connections, exact: true }).click();
+    await expect(page.getByText("0 · No limit", { exact: true })).toBeVisible();
+    await expect(accountUrlInput(page)).toHaveValue(accountUrl("blocked.example.test"));
     await expect(page.getByRole("heading", { name: en.user.dashboard.noPlanTitle, exact: true })).toHaveCount(0);
     await expect(page.getByText(en.user.dashboard.connectNeedsPlan, { exact: true })).toHaveCount(0);
     await expect(page.getByRole("progressbar")).toHaveCount(0);
@@ -311,7 +247,7 @@ test.describe("mocked user dashboard and purchase journey", () => {
 
   test("independent API failures preserve the plan and healthy sections; retries recover only their resource", async ({ page }) => {
     const state = await mockDashboard(page);
-    for (const path of ["devices", "nodes", "announcements", "subscription-domains"]) state.failures.add(path);
+    for (const path of ["profile", "nodes", "announcements", "subscription-domains"]) state.failures.add(path);
     await openOverview(page);
     await expect(page.getByRole("heading", { name: "Everyday Plus", exact: true })).toBeVisible();
     for (const message of [en.user.devices.loadError, en.user.nodes.loadError, en.user.announcements.loadError]) {
@@ -320,11 +256,10 @@ test.describe("mocked user dashboard and purchase journey", () => {
     await expect(page.getByRole("heading", { name: en.user.dashboard.noPlanTitle, exact: true })).toHaveCount(0);
     const nodeReads = state.reads.get("nodes");
     const announcementReads = state.reads.get("announcements");
-    state.failures.delete("devices");
+    state.failures.delete("profile");
     await page.getByRole("button", { name: en.user.dashboard.retry, exact: true }).first().click();
-    await expect(page.getByRole("textbox", { name: en.user.devices.subscriptionUrl, exact: true })).toHaveValue(
-      "http://legacy.example.test:9443/sub/phone%2Ftoken?token=value%2Bsecret&source=dashboard",
-    );
+    // Without public domains the account URL falls back to the panel origin.
+    await expect(accountUrlInput(page)).toHaveValue(new URL(ACCOUNT_PATH, page.url()).toString());
     await expect(page.getByText(en.user.dashboard.domainFallback, { exact: true })).toBeVisible();
     expect(state.reads.get("nodes")).toBe(nodeReads);
     expect(state.reads.get("announcements")).toBe(announcementReads);
@@ -343,16 +278,14 @@ test.describe("mocked user dashboard and purchase journey", () => {
     await expect(page.getByText(en.user.dashboard.loadError, { exact: true })).toBeVisible();
     await expect(page.getByText("Seoul edge", { exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: bulletin.title, exact: true })).toBeVisible();
-    await expect(page.getByRole("textbox", { name: en.user.devices.subscriptionUrl, exact: true })).toHaveValue(
-      "https://blocked.example.test/sub/phone%2Ftoken?token=value%2Bsecret&source=dashboard",
-    );
+    await expect(accountUrlInput(page)).toHaveValue(accountUrl("blocked.example.test"));
     await expect(page.getByText(en.user.dashboard.domainFallback, { exact: true })).toHaveCount(0);
     await expect(page.getByText(en.user.dashboard.connectNeedsPlan, { exact: true })).toHaveCount(0);
     await expect(page.getByRole("heading", { name: en.user.dashboard.noPlanTitle, exact: true })).toHaveCount(0);
     state.failures.delete("summary");
     await page.getByRole("button", { name: en.user.dashboard.retry, exact: true }).click();
     await expect(page.getByRole("heading", { name: "Everyday Plus", exact: true })).toBeVisible();
-    await expect(page.getByRole("button", { name: en.user.devices.addDevice, exact: true })).toBeEnabled();
+    await expect(accountUrlInput(page)).toHaveValue(accountUrl("blocked.example.test"));
     await expect(page.getByText(en.user.dashboard.loadError, { exact: true })).toHaveCount(0);
   });
 
@@ -441,12 +374,10 @@ test.describe("mocked user dashboard and purchase journey", () => {
       await expect(page.getByRole("heading", { name: "Everyday Plus", exact: true })).toBeVisible();
       await expect(page.getByText(ko.user.dashboard.monthlyTraffic, { exact: true })).toBeVisible();
       await expect(page.getByRole("heading", { name: ko.user.dashboard.quickConnect, exact: true })).toBeVisible();
-      await expect(page.getByRole("textbox", { name: ko.user.devices.subscriptionUrl, exact: true })).toHaveValue(
-        "https://blocked.example.test/sub/phone%2Ftoken?token=value%2Bsecret&source=dashboard",
-      );
+      await expect(accountUrlInput(page, ko.user.devices.accountUrl)).toHaveValue(accountUrl("blocked.example.test"));
+      await expect(page.getByRole("button", { name: ko.user.dashboard.subscriptionDetails, exact: true })).toBeVisible();
       await expect(page.getByRole("heading", { name: ko.user.dashboard.serverStatus, exact: true })).toBeVisible();
       await expect(page.getByRole("button", { name: bulletin.title, exact: true })).toBeVisible();
-      await expect(page.getByRole("button", { name: ko.user.devices.addDevice, exact: true })).toBeEnabled();
       expect(await page.evaluate(() => document.body.classList.contains("awsui-dark-mode"))).toBe(theme === "dark");
       expect(await page.evaluate(() => ({ document: document.documentElement.scrollWidth, body: document.body.scrollWidth, viewport: innerWidth }))).toEqual({ document: 390, body: 390, viewport: 390 });
       await testInfo.attach(`dashboard-ko-390-${theme}`, { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });

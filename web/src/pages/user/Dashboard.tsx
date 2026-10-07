@@ -84,7 +84,7 @@ export default function Dashboard() {
                         {t(expired ? "user.dashboard.expiredHint" : "user.dashboard.expiringHint", { days: daysRemaining })}
                       </Alert>
                     )}
-                  <ColumnLayout columns={3} variant="text-grid">
+                  <ColumnLayout columns={2} variant="text-grid">
                     <SpaceBetween size="xs">
                       <Box variant="awsui-key-label">{t("user.dashboard.monthlyTraffic")}</Box>
                       <Box variant="h2">{formatBytes(data.traffic_used)}</Box>
@@ -101,14 +101,6 @@ export default function Dashboard() {
                       <Box variant="h2">{daysRemaining === null ? t("user.dashboard.noExpiry") :
                         t(expired ? "user.dashboard.statusExpired" : "user.dashboard.daysLeft", { days: daysRemaining })}</Box>
                       {expires && <Box color="text-body-secondary">{dateFormat(expires)}</Box>}
-                    </SpaceBetween>
-                    <SpaceBetween size="xs">
-                      <Box variant="awsui-key-label">{t("user.dashboard.devices")}</Box>
-                      <Box variant="h2">{data.max_devices > 0
-                        ? t("user.dashboard.countOfCap", { current: data.devices, cap: data.max_devices })
-                        : t("user.dashboard.countUnlimited", { current: data.devices })}</Box>
-                      <Box color="text-body-secondary">{t("user.dashboard.devicesOnlineHint", { online: data.online })}</Box>
-                      <Button variant="link" onClick={() => navigate("/portal/devices")}>{t("user.dashboard.manageDevices")}</Button>
                     </SpaceBetween>
                   </ColumnLayout>
                   {trafficPercentage >= 80 && <Alert type="warning">{t(trafficPercentage >= 100
@@ -131,7 +123,7 @@ export default function Dashboard() {
         )}
 
         <Grid gridDefinition={[{ colspan: { default: 12, m: 7 } }, { colspan: { default: 12, m: 5 } }]}>
-          <DeviceQuickConnect summary={data} refreshKey={connectionRefresh} onCreated={summary.refresh} />
+          <DeviceQuickConnect summary={data} refreshKey={connectionRefresh} />
           <SpaceBetween size="l">
             <Container header={<Header variant="h2" description={t("user.dashboard.serverScope")} actions={
               <Button variant="link" onClick={() => navigate("/portal/nodes")}>{t("user.dashboard.viewAll")}</Button>
