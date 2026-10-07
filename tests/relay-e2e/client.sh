@@ -35,7 +35,7 @@ start_client() {
 }
 marker() {
   curl --noproxy '' --socks5-hostname "127.0.0.1:$1" --connect-timeout 2 --max-time 6 -fsS \
-    http://127.0.0.1:9090/ 2>/dev/null
+    http://198.51.100.10:9090/ 2>/dev/null
 }
 healthy() {
   local label=$1 socks=$2 expected port response

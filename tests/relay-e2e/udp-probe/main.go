@@ -80,7 +80,9 @@ func probe(socks, marker string) error {
 		return err
 	}
 	nonce := hex.EncodeToString(random[:])
-	request := append([]byte{0, 0, 0, 1, 127, 0, 0, 1, 0x23, 0x83}, nonce...)
+	// 198.51.100.10:9091 is a documentation address that only the relaye2e
+	// node-agent build maps to the Exit's loopback UDP marker.
+	request := append([]byte{0, 0, 0, 1, 198, 51, 100, 10, 0x23, 0x83}, nonce...)
 	if _, err := udp.Write(request); err != nil {
 		return err
 	}
@@ -90,7 +92,7 @@ func probe(socks, marker string) error {
 		return fmt.Errorf("SOCKS UDP response: %w", err)
 	}
 	if n < 10 || response[0] != 0 || response[1] != 0 || response[2] != 0 || response[3] != 1 ||
-		response[4] != 127 || response[5] != 0 || response[6] != 0 || response[7] != 1 ||
+		response[4] != 198 || response[5] != 51 || response[6] != 100 || response[7] != 10 ||
 		response[8] != 0x23 || response[9] != 0x83 {
 		return errors.New("invalid SOCKS UDP response")
 	}

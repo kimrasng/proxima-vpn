@@ -1,0 +1,7 @@
+table inet proxima_relay {
+	chain input {
+		type filter hook input priority filter; policy accept;
+		ip saddr 10.126.59.20 tcp dport 8443 accept
+		tcp dport 8443 drop
+	}
+}
