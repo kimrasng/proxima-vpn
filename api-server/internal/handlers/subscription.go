@@ -96,24 +96,29 @@ func (n subscriptionNode) dialHost() string {
 	return n.IP
 }
 
-// GetSubscription returns the subscription configuration for a device.
+// GetSubscription serves /sub/{sub_token}/{second}. The second segment is
+// either a client type override (clash-meta, sing-box, ...) for the account URL
+// or, for links issued before the account URL, a device ID.
 // @Summary Get subscription
-// @Description Returns proxy configuration for a device based on subscription token
+// @Description Returns proxy configuration for a client type or a legacy device
 // @Tags subscription
 // @Produce plain
 // @Param sub_token path string true "Subscription token"
-// @Param device_id path string true "Device ID"
-// @Success 200 {string} string "Base64-encoded proxy configuration"
+// @Param device_id path string true "Client type (clash-meta, clash, sing-box, v2ray, wireguard) or legacy device ID"
+// @Success 200 {string} string "Proxy configuration"
 // @Failure 400 {object} map[string]string
 // @Failure 403 {object} map[string]string
 // @Failure 404 {object} map[string]string
 // @Router /sub/{sub_token}/{device_id} [get]
 func (h *SubscriptionHandler) GetSubscription(c *fiber.Ctx) error {
-	deviceID := c.Params("device_id")
-	return h.getSubscriptionForDevice(c, deviceID)
+	second := c.Params("device_id")
+	if format, ok := pathClientTypes[strings.ToLower(second)]; ok {
+		return h.getAccountSubscription(c, format)
+	}
+	return h.getSubscriptionForDevice(c, second, "")
 }
 
-func (h *SubscriptionHandler) getSubscriptionForDevice(c *fiber.Ctx, deviceID string) error {
+func (h *SubscriptionHandler) getSubscriptionForDevice(c *fiber.Ctx, deviceID, formatOverride string) error {
 	subToken := c.Params("sub_token")
 	if subToken == "" || deviceID == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
@@ -266,17 +271,26 @@ func (h *SubscriptionHandler) getSubscriptionForDevice(c *fiber.Ctx, deviceID st
 		speedMbps = int(*user.SpeedLimit)
 	}
 
-	format := strings.ToLower(c.Query("format"))
-	if format == "" {
-		format = detectFormatFromUA(c.Get("User-Agent"))
+	format := resolveSubscriptionFormat(c, formatOverride)
+	if format == formatHTML {
+		return renderSubscriptionPage(c, user)
 	}
 
 	var body []byte
 	var contentType string
 
 	switch format {
-	case "clash":
+	case formatClashMeta, formatClash:
 		nodeInfos := buildNodeInfoList(nodes, deviceUUID, speedMbps, deviceWGPrivateKey, deviceWGAddress)
+		if format == formatClash {
+			nodeInfos = subscription.LegacyClashCompatible(nodeInfos)
+		}
+		// A Clash profile without proxies is invalid, and nodes are withheld
+		// until they apply the current config (e.g. right after a new UUID is
+		// issued). Tell the client to retry instead of reporting a server fault.
+		if len(nodeInfos) == 0 {
+			return noReadyServers(c)
+		}
 		infoLabels := buildPlanInfoLabels(user)
 		result, err := subscription.GenerateClash(nodeInfos, deviceUUID, infoLabels)
 		if err != nil {
@@ -285,8 +299,11 @@ func (h *SubscriptionHandler) getSubscriptionForDevice(c *fiber.Ctx, deviceID st
 		body = result
 		contentType = "text/yaml; charset=utf-8"
 
-	case "singbox":
+	case formatSingbox:
 		nodeInfos := buildNodeInfoList(nodes, deviceUUID, speedMbps, deviceWGPrivateKey, deviceWGAddress)
+		if len(nodeInfos) == 0 {
+			return noReadyServers(c)
+		}
 		result, err := subscription.GenerateSingbox(nodeInfos, deviceUUID)
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to generate singbox config"})
@@ -294,7 +311,7 @@ func (h *SubscriptionHandler) getSubscriptionForDevice(c *fiber.Ctx, deviceID st
 		body = result
 		contentType = "application/json; charset=utf-8"
 
-	case "surfboard":
+	case formatSurfboard:
 		nodeInfos := buildNodeInfoList(nodes, deviceUUID, speedMbps, deviceWGPrivateKey, deviceWGAddress)
 		result, err := subscription.GenerateSurfboard(nodeInfos, deviceUUID)
 		if err != nil {
@@ -303,7 +320,7 @@ func (h *SubscriptionHandler) getSubscriptionForDevice(c *fiber.Ctx, deviceID st
 		body = result
 		contentType = "text/plain; charset=utf-8"
 
-	case "quantumult":
+	case formatQuantumult:
 		nodeInfos := buildNodeInfoList(nodes, deviceUUID, speedMbps, deviceWGPrivateKey, deviceWGAddress)
 		result, err := subscription.GenerateQuantumult(nodeInfos, deviceUUID)
 		if err != nil {
@@ -312,7 +329,7 @@ func (h *SubscriptionHandler) getSubscriptionForDevice(c *fiber.Ctx, deviceID st
 		body = result
 		contentType = "text/plain; charset=utf-8"
 
-	case "wireguard":
+	case formatWireGuard:
 		// Single-node wg-quick .conf for the plain WireGuard app, which can't
 		// import Clash/Sing-box configs. Speed-limited plans are VLESS-only
 		// (see buildNodeInfoList) so WireGuard isn't offered here either.
@@ -393,19 +410,6 @@ func (h *SubscriptionHandler) getSubscriptionForDevice(c *fiber.Ctx, deviceID st
 		contentType = "text/plain; charset=utf-8"
 	}
 
-	var totalTraffic int64
-	if user.TrafficLimit != nil {
-		totalTraffic = *user.TrafficLimit
-	}
-
-	var expireTimestamp int64
-	if user.PlanExpiresAt != nil {
-		expireTimestamp = user.PlanExpiresAt.Unix()
-	}
-
-	userinfo := fmt.Sprintf("upload=0; download=%d; total=%d; expire=%d",
-		user.TrafficUsed, totalTraffic, expireTimestamp)
-
 	updateInterval := h.updateInterval
 	var dbInterval int
 	err = h.db.QueryRow(ctx,
@@ -414,10 +418,21 @@ func (h *SubscriptionHandler) getSubscriptionForDevice(c *fiber.Ctx, deviceID st
 	if err == nil && dbInterval > 0 {
 		updateInterval = dbInterval
 	}
+	var profileTitle, supportURL string
+	_ = h.db.QueryRow(ctx,
+		`SELECT COALESCE((SELECT value FROM settings WHERE key = 'subscription_profile_title'), ''),
+		        COALESCE((SELECT value FROM settings WHERE key = 'subscription_support_url'), '')`,
+	).Scan(&profileTitle, &supportURL)
+	if strings.TrimSpace(profileTitle) == "" {
+		profileTitle = "Proxima VPN"
+	}
 
 	c.Set("Content-Type", contentType)
-	c.Set("Profile-Update-Interval", fmt.Sprintf("%d", updateInterval))
-	c.Set("Subscription-Userinfo", userinfo)
+	setSubscriptionHeaders(c, user, subscriptionSettings{
+		updateIntervalSeconds: updateInterval,
+		profileTitle:          strings.TrimSpace(profileTitle),
+		supportURL:            strings.TrimSpace(supportURL),
+	})
 
 	return c.Send(body)
 }
@@ -433,22 +448,6 @@ func subscriptionEligibility(user subscriptionUser) (int, string) {
 		return fiber.StatusForbidden, "traffic limit exceeded"
 	}
 	return 0, ""
-}
-
-func detectFormatFromUA(ua string) string {
-	uaLower := strings.ToLower(ua)
-	switch {
-	case strings.Contains(uaLower, "clash"):
-		return "clash"
-	case strings.Contains(uaLower, "singbox"), strings.Contains(uaLower, "sing-box"):
-		return "singbox"
-	case strings.Contains(uaLower, "surfboard"):
-		return "surfboard"
-	case strings.Contains(uaLower, "quantumult"):
-		return "quantumult"
-	default:
-		return "v2ray"
-	}
 }
 
 // buildPlanInfoLabels builds Korean informational pseudo-node labels shown in
