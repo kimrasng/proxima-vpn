@@ -116,6 +116,12 @@ export function getNode(id: string): Promise<Node> {
   return get<Node>(`/api/v1/admin/nodes/${id}`);
 }
 
+/** Atomically sets the node SNI and every enabled Reality listener's target. */
+export function setRealityTarget(id: string, hostname: string): Promise<{ reality_client_sni: string }> {
+  applyAdminClient();
+  return put<{ reality_client_sni: string }>(`/api/v1/admin/nodes/${id}/reality-target`, { hostname });
+}
+
 export function getNodeEvents(nodeId: string, query: NodeEventQuery = {}): Promise<NodeEventPage> {
   applyAdminClient();
   const params = new URLSearchParams();

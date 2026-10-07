@@ -56,6 +56,7 @@ func (s *Server) registerRoutes() {
 	adminNodes.Get("/event-filters", adminNodeHandler.GetNodeEventFilters)
 	adminNodes.Get("/:id", adminNodeHandler.GetNode)
 	adminNodes.Put("/:id", adminNodeHandler.UpdateNode)
+	adminNodes.Put("/:id/reality-target", adminNodeHandler.SetRealityTarget)
 	adminNodes.Delete("/:id", adminNodeHandler.DeleteNode)
 	adminNodes.Get("/:id/xray", adminNodeHandler.GetXrayVersion)
 	adminNodes.Post("/:id/xray/update", adminNodeHandler.UpdateXray)
@@ -253,7 +254,7 @@ func (s *Server) registerRoutes() {
 	})
 	sub := s.app.Group("/sub")
 	sub.Get("/:sub_token/:device_id", subLimiter, subscriptionHandler.GetSubscription)
-	sub.Get("/:sub_token", subLimiter, subscriptionHandler.GetHWIDSubscription)
+	sub.Get("/:sub_token", subLimiter, subscriptionHandler.GetAccountSubscription)
 
 	// Outside /api/v1 and outside any JWT-protected group: a hosted payment
 	// provider authenticates its callback with a signature, not a bearer

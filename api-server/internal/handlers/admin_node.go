@@ -27,6 +27,8 @@ type AdminNodeHandler struct {
 	redis    *redis.Client
 	panelURL string
 	activity *services.ActivityService
+	// realityProbe overrides the Reality target pre-flight check in tests.
+	realityProbe services.RealityTargetProbe
 }
 
 // NewAdminNodeHandler creates a new AdminNodeHandler.
