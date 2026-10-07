@@ -654,6 +654,7 @@ type onlineIPEntry struct {
 }
 
 type statsRequest struct {
+	BatchID     string                     `json:"batch_id,omitempty"`
 	Stats       []statEntry                `json:"stats"`
 	OnlineUUIDs []string                   `json:"online_uuids"`
 	OnlineIPs   map[string][]onlineIPEntry `json:"online_ips"`
@@ -694,32 +695,30 @@ func (h *NodeAgentHandler) Stats(c *fiber.Ctx) error {
 	}
 
 	ctx := context.Background()
-
-	multiplier := h.trafficMultiplier(ctx, nodeID)
-
-	for _, s := range req.Stats {
-		var deviceID string
-		err := h.db.QueryRow(ctx,
-			`SELECT id FROM devices WHERE xray_uuid = $1`,
-			s.XrayUUID,
-		).Scan(&deviceID)
+	if len(req.Stats) > 10000 || (len(req.Stats) == 0 && req.BatchID != "") {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid traffic batch"})
+	}
+	if len(req.Stats) > 0 {
+		duplicate, err := accountStats(ctx, h.db, nodeID, req.BatchID, req.Stats)
 		if err != nil {
-			continue
+			if errors.Is(err, errInvalidStats) {
+				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid traffic batch"})
+			}
+			if errors.Is(err, errBatchConflict) {
+				return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "traffic batch ID conflict"})
+			}
+			if errors.Is(err, errUnknownDevice) {
+				return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "unknown traffic device; batch not acknowledged"})
+			}
+			log.Printf("node %s traffic batch %s failed: %v", nodeID, req.BatchID, err)
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "traffic batch not committed"})
 		}
-
-		_, _ = h.db.Exec(ctx,
-			`INSERT INTO traffic_logs (device_id, node_id, up_bytes, dn_bytes) VALUES ($1, $2, $3, $4)`,
-			deviceID, nodeID, s.UpBytes, s.DnBytes,
-		)
-
-		_, _ = h.db.Exec(ctx,
-			`UPDATE users SET traffic_used = traffic_used + $1
-			 WHERE id = (SELECT user_id FROM devices WHERE xray_uuid = $2)`,
-			chargedBytes(s.UpBytes+s.DnBytes, multiplier), s.XrayUUID,
-		)
-
-		metrics.TrafficBytesTotal.WithLabelValues("up").Add(float64(s.UpBytes))
-		metrics.TrafficBytesTotal.WithLabelValues("down").Add(float64(s.DnBytes))
+		if !duplicate {
+			for _, stat := range req.Stats {
+				metrics.TrafficBytesTotal.WithLabelValues("up").Add(float64(stat.UpBytes))
+				metrics.TrafficBytesTotal.WithLabelValues("down").Add(float64(stat.DnBytes))
+			}
+		}
 	}
 
 	if err := services.NewOnlineTracker(h.redis).PublishOnlineReport(ctx, nodeID, req.OnlineUUIDs, req.OnlineIPs); err != nil {

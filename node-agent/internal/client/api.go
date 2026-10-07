@@ -68,6 +68,7 @@ type OnlineIP struct {
 }
 
 type StatsPayload struct {
+	BatchID     string                `json:"batch_id,omitempty"`
 	Traffic     []TrafficStat         `json:"stats"`
 	OnlineUUIDs []string              `json:"online_uuids"`
 	OnlineIPs   map[string][]OnlineIP `json:"online_ips,omitempty"`
@@ -506,8 +507,12 @@ func (c *APIClient) GetHysteria2Users(ctx context.Context) ([]string, error) {
 	return uuids, nil
 }
 
-func (c *APIClient) SendStats(ctx context.Context, stats []TrafficStat, onlineUUIDs []string, onlineIPs map[string][]OnlineIP) error {
+func (c *APIClient) SendStats(ctx context.Context, batchID string, stats []TrafficStat, onlineUUIDs []string, onlineIPs map[string][]OnlineIP) error {
+	if len(stats) > 0 && batchID == "" {
+		return fmt.Errorf("stats with traffic require batch ID")
+	}
 	payload := StatsPayload{
+		BatchID:     batchID,
 		Traffic:     stats,
 		OnlineUUIDs: onlineUUIDs,
 		OnlineIPs:   onlineIPs,

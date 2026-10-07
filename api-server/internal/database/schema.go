@@ -119,6 +119,16 @@ CREATE TABLE IF NOT EXISTS traffic_logs (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Never prune this ledger without an enforced maximum agent replay age: an old
+-- batch replayed after pruning would otherwise be billed a second time.
+CREATE TABLE IF NOT EXISTS traffic_batches (
+    node_id      UUID NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
+    batch_id     UUID NOT NULL,
+    payload_hash TEXT NOT NULL,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (node_id, batch_id)
+);
+
 CREATE TABLE IF NOT EXISTS settings (
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL
