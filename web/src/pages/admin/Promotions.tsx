@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Box,
@@ -19,19 +19,22 @@ import {
   deletePromotion,
   listPlans,
 } from "../../api/admin";
-import type { Plan, PromotionCode, PromotionRequest } from "../../api/types";
+import type { Plan, PromotionCode } from "../../api/types";
 import { formatPriceCents } from "../../utils/planPricing";
+import { focusFirstInvalid, hasFieldErrors } from "../../utils/formValidation";
 import PromotionFormFields from "./PromotionFormFields";
 import {
   emptyPromotionForm,
-  localDateTimeToIso,
-  splitList,
   toPromotionForm,
+  toPromotionRequest,
+  validatePromotionForm,
   type PromotionForm,
 } from "./promotionFormModel";
 
 export default function Promotions() {
   const { t } = useTranslation();
+  const tRef = useRef(t);
+  tRef.current = t;
   const [promotions, setPromotions] = useState<PromotionCode[]>([]);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
@@ -41,23 +44,26 @@ export default function Promotions() {
   const [deleteModal, setDeleteModal] = useState<PromotionCode | null>(null);
   const [form, setForm] = useState<PromotionForm>(emptyPromotionForm);
   const [actionLoading, setActionLoading] = useState(false);
+  // Field errors stay hidden until the first save attempt, then track edits.
+  const [showErrors, setShowErrors] = useState(false);
+  const formErrors = validatePromotionForm(form, t);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       const [promotionData, planData] = await Promise.all([listPromotions(), listPlans()]);
       setPromotions(promotionData);
       setPlans(planData);
       setError(null);
     } catch {
-      setError(t("admin.promotions.fetchError"));
+      setError(tRef.current("admin.promotions.fetchError"));
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     void fetchData();
-  }, []);
+  }, [fetchData]);
 
   const formatDiscount = (item: PromotionCode) =>
     item.discount_type === "percent"
@@ -69,98 +75,20 @@ export default function Promotions() {
       ? t("admin.promotions.redeemedUnlimited", { count: item.redeemed_count })
       : `${item.redeemed_count} / ${item.max_redemptions}`;
 
-  // Returns null and sets the inline error when a field is unusable, so the
-  // caller can abort before touching the API.
-  const collectRequest = (includeActive: boolean): PromotionRequest | null => {
-    const code = form.code.trim();
-    if (!code) {
-      setError(t("admin.promotions.form.codeRequired"));
-      return null;
+  const checkForm = () => {
+    setShowErrors(true);
+    if (hasFieldErrors(formErrors)) {
+      focusFirstInvalid();
+      return false;
     }
-
-    const rawValue = Number(form.discountValue);
-    if (!Number.isFinite(rawValue)) {
-      setError(t("admin.promotions.form.discountValueInvalid"));
-      return null;
-    }
-    if (form.discountType === "percent") {
-      if (!Number.isInteger(rawValue) || rawValue < 1 || rawValue > 100) {
-        setError(t("admin.promotions.form.percentRangeInvalid"));
-        return null;
-      }
-    } else if (rawValue <= 0) {
-      setError(t("admin.promotions.form.fixedRangeInvalid"));
-      return null;
-    }
-    const discountValue =
-      form.discountType === "percent" ? rawValue : Math.round(rawValue * 100);
-
-    const validFrom = localDateTimeToIso(form.validFromDate, form.validFromTime);
-    const validUntil = localDateTimeToIso(form.validUntilDate, form.validUntilTime);
-    if (!validFrom || !validUntil) {
-      setError(t("admin.promotions.form.windowRequired"));
-      return null;
-    }
-    if (new Date(validUntil) <= new Date(validFrom)) {
-      setError(t("admin.promotions.form.windowOrderInvalid"));
-      return null;
-    }
-
-    const minOrderDollars = Number(form.minOrderDollars || "0");
-    if (!Number.isFinite(minOrderDollars) || minOrderDollars < 0) {
-      setError(t("admin.promotions.form.minOrderInvalid"));
-      return null;
-    }
-
-    let maxRedemptions: number | null = null;
-    if (!form.unlimitedRedemptions) {
-      const parsed = Number(form.maxRedemptions);
-      if (!Number.isInteger(parsed) || parsed <= 0) {
-        setError(t("admin.promotions.form.maxRedemptionsInvalid"));
-        return null;
-      }
-      maxRedemptions = parsed;
-    }
-
-    const perUser = Number(form.maxRedemptionsPerUser);
-    if (!Number.isInteger(perUser) || perUser <= 0) {
-      setError(t("admin.promotions.form.perUserInvalid"));
-      return null;
-    }
-
-    const durationDays: number[] = [];
-    for (const entry of splitList(form.durationDays)) {
-      const days = Number(entry);
-      if (!Number.isInteger(days) || days <= 0) {
-        setError(t("admin.promotions.form.durationDaysInvalid"));
-        return null;
-      }
-      durationDays.push(days);
-    }
-
-    return {
-      code,
-      discount_type: form.discountType,
-      discount_value: discountValue,
-      valid_from: validFrom,
-      valid_until: validUntil,
-      min_order_cents: Math.round(minOrderDollars * 100),
-      max_redemptions: maxRedemptions,
-      max_redemptions_per_user: perUser,
-      first_purchase_only: form.firstPurchaseOnly,
-      plan_ids: form.planIds,
-      duration_days: durationDays,
-      allowed_user_ids: splitList(form.allowedUserIds),
-      ...(includeActive ? { is_active: form.isActive } : {}),
-    };
+    return true;
   };
 
   const handleCreate = async () => {
-    const req = collectRequest(false);
-    if (!req) return;
+    if (!checkForm()) return;
     setActionLoading(true);
     try {
-      await createPromotion(req);
+      await createPromotion(toPromotionRequest(form, false));
       setCreateModal(false);
       setForm(emptyPromotionForm);
       await fetchData();
@@ -172,12 +100,10 @@ export default function Promotions() {
   };
 
   const handleEdit = async () => {
-    if (!editModal) return;
-    const req = collectRequest(true);
-    if (!req) return;
+    if (!editModal || !checkForm()) return;
     setActionLoading(true);
     try {
-      await updatePromotion(editModal.id, req);
+      await updatePromotion(editModal.id, toPromotionRequest(form, true));
       setEditModal(null);
       setForm(emptyPromotionForm);
       await fetchData();
@@ -204,12 +130,14 @@ export default function Promotions() {
 
   const handleEditOpen = (promotion: PromotionCode) => {
     setForm(toPromotionForm(promotion));
+    setShowErrors(false);
     setEditModal(promotion);
   };
 
   const renderForm = (showActive: boolean) => (
     <PromotionFormFields
       form={form}
+      errors={showErrors ? formErrors : undefined}
       plans={plans}
       showActive={showActive}
       onChange={(patch) => setForm((f) => ({ ...f, ...patch }))}
@@ -247,6 +175,7 @@ export default function Promotions() {
                   variant="primary"
                   onClick={() => {
                     setForm(emptyPromotionForm);
+                    setShowErrors(false);
                     setCreateModal(true);
                   }}
                 >

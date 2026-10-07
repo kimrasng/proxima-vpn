@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
@@ -24,6 +24,7 @@ import {
 import { listUsers, updateUser, createUser, resetUserTraffic } from "../../api/admin";
 import type { User, CreateUserRequest } from "../../api/types";
 import { formatBytes } from "../../utils/format";
+import { focusFirstInvalid, hasFieldErrors } from "../../utils/formValidation";
 import { formatDate } from "../../utils/relativeTime";
 
 interface CreateUserForm {
@@ -70,6 +71,8 @@ function statusIndicatorType(user: User): StatusIndicatorProps.Type {
 export default function Users() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const tRef = useRef(t);
+  tRef.current = t;
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [flash, setFlash] = useState<{ type: "success" | "error"; content: string }[]>([]);
@@ -82,35 +85,48 @@ export default function Users() {
   const [createModal, setCreateModal] = useState(false);
   const [createForm, setCreateForm] = useState<CreateUserForm>(emptyCreateForm);
   const [createLoading, setCreateLoading] = useState(false);
+  const [showCreateErrors, setShowCreateErrors] = useState(false);
+  const createErrors = {
+    email: !createForm.email.trim() ? t("admin.users.emailRequired") :
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(createForm.email.trim()) ? t("admin.users.emailInvalid") : undefined,
+    password: createForm.password ? undefined : t("admin.users.passwordRequired"),
+    name: createForm.name.trim() ? undefined : t("admin.users.nameRequired"),
+  };
 
   const limit = 20;
+  const searchRef = useRef(search);
+  searchRef.current = search;
+  // Only submitted search terms affect polling; typing alone must not refetch.
+  const submittedSearchRef = useRef(search);
 
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     setLoading(true);
     try {
       const data = await listUsers({
         page,
         limit,
-        search: search || undefined,
+        search: submittedSearchRef.current || undefined,
         status: statusFilter || undefined,
       });
       setUsers(data.users);
       setTotal(data.total);
       setError(null);
     } catch {
-      setError(t("admin.users.fetchError"));
+      setError(tRef.current("admin.users.fetchError"));
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, statusFilter]);
 
   useEffect(() => {
+    submittedSearchRef.current = searchRef.current;
     void fetchUsers();
     const interval = setInterval(() => void fetchUsers(), 60000);
     return () => clearInterval(interval);
-  }, [page, statusFilter]);
+  }, [fetchUsers]);
 
   const handleSearch = () => {
+    submittedSearchRef.current = search;
     setPage(1);
     void fetchUsers();
   };
@@ -128,16 +144,19 @@ export default function Users() {
   };
 
   const handleCreateUser = async () => {
+    setShowCreateErrors(true);
+    if (hasFieldErrors(createErrors)) { focusFirstInvalid(); return; }
     setCreateLoading(true);
     try {
       const req: CreateUserRequest = {
-        email: createForm.email,
+        email: createForm.email.trim(),
         password: createForm.password,
-        name: createForm.name,
+        name: createForm.name.trim(),
       };
       await createUser(req);
       setCreateModal(false);
       setCreateForm(emptyCreateForm);
+      setShowCreateErrors(false);
       await fetchUsers();
       setFlash([{ type: "success", content: t("admin.users.createSuccess") }]);
     } catch {
@@ -200,7 +219,7 @@ export default function Users() {
             <Header
               counter={`(${total})`}
               actions={
-                <Button variant="primary" onClick={() => setCreateModal(true)}>
+                <Button variant="primary" onClick={() => { setCreateForm(emptyCreateForm); setShowCreateErrors(false); setCreateModal(true); }}>
                   {t("admin.users.createUser")}
                 </Button>
               }
@@ -312,6 +331,7 @@ export default function Users() {
         onDismiss={() => {
           setCreateModal(false);
           setCreateForm(emptyCreateForm);
+          setShowCreateErrors(false);
         }}
         header={t("admin.users.createUserModalTitle")}
         footer={
@@ -322,6 +342,7 @@ export default function Users() {
                 onClick={() => {
                   setCreateModal(false);
                   setCreateForm(emptyCreateForm);
+                  setShowCreateErrors(false);
                 }}
               >
                 {t("common.cancel")}
@@ -334,21 +355,21 @@ export default function Users() {
         }
       >
         <SpaceBetween size="m">
-          <FormField label={t("admin.users.email")}>
+          <FormField label={t("admin.users.email")} errorText={showCreateErrors ? createErrors.email : undefined}>
             <Input
               value={createForm.email}
               onChange={({ detail }) => setCreateForm((f) => ({ ...f, email: detail.value }))}
               type="email"
             />
           </FormField>
-          <FormField label={t("admin.users.password")}>
+          <FormField label={t("admin.users.password")} errorText={showCreateErrors ? createErrors.password : undefined}>
             <Input
               value={createForm.password}
               onChange={({ detail }) => setCreateForm((f) => ({ ...f, password: detail.value }))}
               type="password"
             />
           </FormField>
-          <FormField label={t("admin.users.col.name")}>
+          <FormField label={t("admin.users.col.name")} errorText={showCreateErrors ? createErrors.name : undefined}>
             <Input
               value={createForm.name}
               onChange={({ detail }) => setCreateForm((f) => ({ ...f, name: detail.value }))}

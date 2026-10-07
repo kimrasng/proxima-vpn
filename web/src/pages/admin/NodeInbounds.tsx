@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
@@ -32,6 +32,7 @@ import {
 } from "../../api/admin";
 import type { Inbound, CreateInboundRequest, NodeTLSStatus, XrayVersionResponse } from "../../api/types";
 import { usePublishBreadcrumbLeaf } from "../../hooks/useBreadcrumbLeaf";
+import { focusFirstInvalid, hasFieldErrors } from "../../utils/formValidation";
 
 const PROTOCOL_OPTIONS = [
   { value: "vless_reality", label: "VLESS Reality" },
@@ -54,6 +55,8 @@ const SS_METHOD_OPTIONS = [
 export default function NodeInbounds() {
   const { nodeId } = useParams<{ nodeId: string }>();
   const { t } = useTranslation();
+  const tRef = useRef(t);
+  tRef.current = t;
   const [nodeName, setNodeName] = useState<string | null>(null);
   const [inbounds, setInbounds] = useState<Inbound[]>([]);
   const [loading, setLoading] = useState(true);
@@ -81,6 +84,20 @@ export default function NodeInbounds() {
   const [wsPath, setWsPath] = useState("");
   const [ssMethod, setSsMethod] = useState("2022-blake3-aes-128-gcm");
   const [ssPassword, setSsPassword] = useState("");
+  const [showInboundErrors, setShowInboundErrors] = useState(false);
+  const [showTlsErrors, setShowTlsErrors] = useState(false);
+  const inboundErrors = {
+    port: !port.trim() ? t("admin.nodeInbounds.field.portRequired") :
+      !Number.isInteger(Number(port)) || Number(port) < 1 || Number(port) > 65535
+        ? t("admin.nodeInbounds.field.portInvalid") : undefined,
+    tag: tag.trim() ? undefined : t("admin.nodeInbounds.field.tagRequired"),
+  };
+  const tlsErrors = {
+    domain: tlsDomain.trim() ? undefined : t("admin.nodeInbounds.tls.domainRequired"),
+    email: !tlsEmail.trim() ? t("admin.nodeInbounds.tls.emailRequired") :
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(tlsEmail.trim())
+        ? t("admin.nodeInbounds.tls.emailInvalid") : undefined,
+  };
 
   usePublishBreadcrumbLeaf(nodeName);
 
@@ -92,20 +109,20 @@ export default function NodeInbounds() {
     if (lockedProtocol) setProtocol(lockedProtocol);
   }, [lockedProtocol]);
 
-  const fetchInbounds = async () => {
+  const fetchInbounds = useCallback(async () => {
     if (!nodeId) return;
     try {
       const data = await listInbounds(nodeId);
       setInbounds(data);
       setError(null);
     } catch {
-      setError(t("admin.nodeInbounds.fetchError"));
+      setError(tRef.current("admin.nodeInbounds.fetchError"));
     } finally {
       setLoading(false);
     }
-  };
+  }, [nodeId]);
 
-  const fetchNodeInfo = async () => {
+  const fetchNodeInfo = useCallback(async () => {
     if (!nodeId) return;
     const [node, tls, xray] = await Promise.allSettled([
       getNode(nodeId),
@@ -115,7 +132,7 @@ export default function NodeInbounds() {
     if (node.status === "fulfilled") setNodeName(node.value.name);
     if (tls.status === "fulfilled") setTlsStatus(tls.value);
     if (xray.status === "fulfilled") setXrayVersion(xray.value);
-  };
+  }, [nodeId]);
 
   useEffect(() => {
     void fetchInbounds();
@@ -125,14 +142,17 @@ export default function NodeInbounds() {
       void fetchNodeInfo();
     }, 30000);
     return () => clearInterval(interval);
-  }, [nodeId]);
+  }, [fetchInbounds, fetchNodeInfo]);
 
   const handleIssueCert = async () => {
-    if (!nodeId || !tlsDomain || !tlsEmail) return;
+    if (!nodeId) return;
+    setShowTlsErrors(true);
+    if (hasFieldErrors(tlsErrors)) { focusFirstInvalid(); return; }
     setTlsLoading(true);
     try {
       await issueNodeCertificate(nodeId, { domain: tlsDomain, email: tlsEmail });
       setTlsModal(false);
+      setShowTlsErrors(false);
       setTlsDomain("");
       setTlsEmail("");
       await fetchNodeInfo();
@@ -167,6 +187,7 @@ export default function NodeInbounds() {
     setWsPath("");
     setSsMethod("2022-blake3-aes-128-gcm");
     setSsPassword("");
+    setShowInboundErrors(false);
   };
 
   const buildSettings = (): Record<string, unknown> => {
@@ -183,13 +204,15 @@ export default function NodeInbounds() {
   };
 
   const handleCreate = async () => {
-    if (!nodeId || !port || !tag) return;
+    if (!nodeId) return;
+    setShowInboundErrors(true);
+    if (hasFieldErrors(inboundErrors)) { focusFirstInvalid(); return; }
     setActionLoading(true);
     try {
       const req: CreateInboundRequest = {
         protocol,
-        port: parseInt(port, 10),
-        tag,
+        port: Number(port),
+        tag: tag.trim(),
         settings: buildSettings(),
       };
       await createInbound(nodeId, req);
@@ -396,7 +419,7 @@ export default function NodeInbounds() {
               />
             </FormField>
 
-            <FormField label={t("admin.nodeInbounds.field.port")}>
+            <FormField label={t("admin.nodeInbounds.field.port")} errorText={showInboundErrors ? inboundErrors.port : undefined}>
               <Input
                 type="number"
                 value={port}
@@ -405,7 +428,7 @@ export default function NodeInbounds() {
               />
             </FormField>
 
-            <FormField label={t("admin.nodeInbounds.field.tag")}>
+            <FormField label={t("admin.nodeInbounds.field.tag")} errorText={showInboundErrors ? inboundErrors.tag : undefined}>
               <Input
                 value={tag}
                 onChange={({ detail }) => setTag(detail.value)}
@@ -484,16 +507,15 @@ export default function NodeInbounds() {
 
         <Modal
           visible={tlsModal}
-          onDismiss={() => { setTlsModal(false); setTlsDomain(""); setTlsEmail(""); }}
+          onDismiss={() => { setTlsModal(false); setTlsDomain(""); setTlsEmail(""); setShowTlsErrors(false); }}
           header={t("admin.nodeInbounds.tls.modalTitle")}
           footer={
             <Box float="right">
               <SpaceBetween direction="horizontal" size="xs">
-                <Button onClick={() => { setTlsModal(false); setTlsDomain(""); setTlsEmail(""); }}>{t("admin.nodeInbounds.cancel")}</Button>
+                <Button onClick={() => { setTlsModal(false); setTlsDomain(""); setTlsEmail(""); setShowTlsErrors(false); }}>{t("admin.nodeInbounds.cancel")}</Button>
                 <Button
                   variant="primary"
                   loading={tlsLoading}
-                  disabled={!tlsDomain || !tlsEmail}
                   onClick={() => void handleIssueCert()}
                 >
                   {t("admin.nodeInbounds.tls.issue")}
@@ -503,14 +525,14 @@ export default function NodeInbounds() {
           }
         >
           <SpaceBetween size="m">
-            <FormField label={t("admin.nodeInbounds.tls.domain")} description={t("admin.nodeInbounds.tls.domainHint")}>
+            <FormField label={t("admin.nodeInbounds.tls.domain")} description={t("admin.nodeInbounds.tls.domainHint")} errorText={showTlsErrors ? tlsErrors.domain : undefined}>
               <Input
                 value={tlsDomain}
                 onChange={({ detail }) => setTlsDomain(detail.value)}
                 placeholder={t("admin.nodeInbounds.tls.domainPlaceholder")}
               />
             </FormField>
-            <FormField label={t("admin.nodeInbounds.tls.email")} description={t("admin.nodeInbounds.tls.emailHint")}>
+            <FormField label={t("admin.nodeInbounds.tls.email")} description={t("admin.nodeInbounds.tls.emailHint")} errorText={showTlsErrors ? tlsErrors.email : undefined}>
               <Input
                 type="email"
                 value={tlsEmail}

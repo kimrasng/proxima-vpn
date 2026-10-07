@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
@@ -24,9 +24,12 @@ import {
   listNodes,
 } from "../../api/admin";
 import type { NodeGroup, NodeGroupDetail, Node } from "../../api/types";
+import { focusFirstInvalid } from "../../utils/formValidation";
 
 export default function NodeGroups() {
   const { t } = useTranslation();
+  const tRef = useRef(t);
+  tRef.current = t;
   const [groups, setGroups] = useState<NodeGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -36,29 +39,33 @@ export default function NodeGroups() {
   const [detailModal, setDetailModal] = useState<NodeGroupDetail | null>(null);
   const [allNodes, setAllNodes] = useState<Node[]>([]);
   const [name, setName] = useState("");
+  const [showNameError, setShowNameError] = useState(false);
+  const nameError = name.trim() ? undefined : t("admin.nodeGroups.nameRequired");
   const [actionLoading, setActionLoading] = useState(false);
   const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([]);
 
-  const fetchGroups = async () => {
+  const fetchGroups = useCallback(async () => {
     try {
       const data = await listNodeGroups();
       setGroups(data);
       setError(null);
     } catch {
-      setError(t("admin.nodeGroups.fetchError"));
+      setError(tRef.current("admin.nodeGroups.fetchError"));
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     void fetchGroups();
-  }, []);
+  }, [fetchGroups]);
 
   const handleCreate = async () => {
+    setShowNameError(true);
+    if (nameError) { focusFirstInvalid(); return; }
     setActionLoading(true);
     try {
-      await createNodeGroup({ name });
+      await createNodeGroup({ name: name.trim() });
       setCreateModal(false);
       setName("");
       await fetchGroups();
@@ -71,9 +78,11 @@ export default function NodeGroups() {
 
   const handleEdit = async () => {
     if (!editModal) return;
+    setShowNameError(true);
+    if (nameError) { focusFirstInvalid(); return; }
     setActionLoading(true);
     try {
-      await updateNodeGroup(editModal.id, { name });
+      await updateNodeGroup(editModal.id, { name: name.trim() });
       setEditModal(null);
       setName("");
       await fetchGroups();
@@ -151,7 +160,7 @@ export default function NodeGroups() {
           header={
             <Header
               actions={
-                <Button variant="primary" onClick={() => { setName(""); setCreateModal(true); }}>
+                <Button variant="primary" onClick={() => { setName(""); setShowNameError(false); setCreateModal(true); }}>
                   {t("admin.nodeGroups.create")}
                 </Button>
               }
@@ -178,7 +187,7 @@ export default function NodeGroups() {
               header: t("admin.nodeGroups.col.actions"),
               cell: (item) => (
                 <SpaceBetween direction="horizontal" size="xs">
-                  <Button variant="inline-link" onClick={() => { setName(item.name); setEditModal(item); }}>
+                  <Button variant="inline-link" onClick={() => { setName(item.name); setShowNameError(false); setEditModal(item); }}>
                     {t("admin.nodeGroups.edit")}
                   </Button>
                   <Button variant="inline-link" onClick={() => setDeleteModal(item)}>
@@ -206,7 +215,7 @@ export default function NodeGroups() {
             </Box>
           }
         >
-          <FormField label={t("admin.nodeGroups.nameLabel")}>
+          <FormField label={t("admin.nodeGroups.nameLabel")} errorText={showNameError && createModal ? nameError : undefined}>
             <Input value={name} onChange={({ detail }) => setName(detail.value)} />
           </FormField>
         </Modal>
@@ -226,7 +235,7 @@ export default function NodeGroups() {
             </Box>
           }
         >
-          <FormField label={t("admin.nodeGroups.nameLabel")}>
+          <FormField label={t("admin.nodeGroups.nameLabel")} errorText={showNameError && editModal ? nameError : undefined}>
             <Input value={name} onChange={({ detail }) => setName(detail.value)} />
           </FormField>
         </Modal>

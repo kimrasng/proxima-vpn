@@ -25,10 +25,19 @@ export default function AdminLogin() {
   const [showTotp, setShowTotp] = useState(false);
   const [loading, setLoading] = useState(false);
   const [flash, setFlash] = useState<FlashbarProps.MessageDefinition[]>([]);
+  const [showErrors, setShowErrors] = useState(false);
+  const required = t("auth.validation.required", { defaultValue: "This field is required." });
+  const errors = {
+    email: email.trim() ? undefined : required,
+    password: password.trim() ? undefined : required,
+    totpCode: showTotp && !totpCode.trim() ? required : undefined,
+  };
 
   const handleSubmit = async () => {
-    setLoading(true);
+    setShowErrors(true);
     setFlash([]);
+    if (errors.email || errors.password || errors.totpCode) return;
+    setLoading(true);
 
     try {
       const req = { email, password, ...(showTotp ? { totp_code: totpCode } : {}) };
@@ -93,7 +102,7 @@ export default function AdminLogin() {
             }
           >
             <SpaceBetween size="m">
-              <FormField label={t("auth.adminLogin.email")}>
+              <FormField label={t("auth.adminLogin.email")} errorText={showErrors ? errors.email : undefined}>
                 <Input
                   value={email}
                   onChange={({ detail }) => setEmail(detail.value)}
@@ -102,7 +111,7 @@ export default function AdminLogin() {
                   autoFocus
                 />
               </FormField>
-              <FormField label={t("auth.adminLogin.password")}>
+              <FormField label={t("auth.adminLogin.password")} errorText={showErrors ? errors.password : undefined}>
                 <Input
                   value={password}
                   onChange={({ detail }) => setPassword(detail.value)}
@@ -113,6 +122,7 @@ export default function AdminLogin() {
                 <FormField
                   label={t("auth.adminLogin.totpCode")}
                   description={t("auth.adminLogin.totpDescription")}
+                  errorText={showErrors ? errors.totpCode : undefined}
                 >
                   <Input
                     value={totpCode}

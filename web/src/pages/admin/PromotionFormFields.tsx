@@ -13,10 +13,12 @@ import {
   Toggle,
 } from "@cloudscape-design/components";
 import type { Plan, PromotionDiscountType } from "../../api/types";
-import type { PromotionForm } from "./promotionFormModel";
+import type { PromotionForm, PromotionFormErrors } from "./promotionFormModel";
 
 interface PromotionFormFieldsProps {
   form: PromotionForm;
+  // Omitted until the first save attempt so a fresh form is not shown as invalid.
+  errors?: PromotionFormErrors;
   plans: Plan[];
   showActive: boolean;
   onChange: (patch: Partial<PromotionForm>) => void;
@@ -28,6 +30,7 @@ function isDiscountType(value: string): value is PromotionDiscountType {
 
 export default function PromotionFormFields({
   form,
+  errors = {},
   plans,
   showActive,
   onChange,
@@ -49,6 +52,7 @@ export default function PromotionFormFields({
         <FormField
           label={t("admin.promotions.form.code")}
           constraintText={t("admin.promotions.form.codeHint")}
+          errorText={errors.code}
         >
           <Input
             value={form.code}
@@ -81,6 +85,7 @@ export default function PromotionFormFields({
               ? t("admin.promotions.form.discountValuePercentHint")
               : t("admin.promotions.form.discountValueFixedHint")
           }
+          errorText={errors.discountValue}
         >
           <Input
             value={form.discountValue}
@@ -93,6 +98,7 @@ export default function PromotionFormFields({
         <FormField
           label={t("admin.promotions.form.minOrder")}
           constraintText={t("admin.promotions.form.minOrderHint")}
+          errorText={errors.minOrderDollars}
         >
           <Input
             value={form.minOrderDollars}
@@ -105,11 +111,12 @@ export default function PromotionFormFields({
       </ColumnLayout>
 
       <ColumnLayout columns={2} minColumnWidth={220}>
-        <FormField label={t("admin.promotions.form.validFrom")}>
+        <FormField label={t("admin.promotions.form.validFrom")} errorText={errors.validFrom}>
           <SpaceBetween direction="horizontal" size="xs">
             <DatePicker
               value={form.validFromDate}
               placeholder="YYYY/MM/DD"
+              ariaRequired
               onChange={({ detail }) => onChange({ validFromDate: detail.value })}
             />
             <TimeInput
@@ -120,11 +127,12 @@ export default function PromotionFormFields({
             />
           </SpaceBetween>
         </FormField>
-        <FormField label={t("admin.promotions.form.validUntil")}>
+        <FormField label={t("admin.promotions.form.validUntil")} errorText={errors.validUntil}>
           <SpaceBetween direction="horizontal" size="xs">
             <DatePicker
               value={form.validUntilDate}
               placeholder="YYYY/MM/DD"
+              ariaRequired
               onChange={({ detail }) => onChange({ validUntilDate: detail.value })}
             />
             <TimeInput
@@ -141,6 +149,7 @@ export default function PromotionFormFields({
         <FormField
           label={t("admin.promotions.form.maxRedemptions")}
           constraintText={t("admin.promotions.form.maxRedemptionsHint")}
+          errorText={errors.maxRedemptions}
         >
           <SpaceBetween size="xs">
             <Toggle
@@ -166,6 +175,7 @@ export default function PromotionFormFields({
         <FormField
           label={t("admin.promotions.form.maxRedemptionsPerUser")}
           constraintText={t("admin.promotions.form.maxRedemptionsPerUserHint")}
+          errorText={errors.maxRedemptionsPerUser}
         >
           <Input
             value={form.maxRedemptionsPerUser}
@@ -198,6 +208,7 @@ export default function PromotionFormFields({
         <FormField
           label={t("admin.promotions.form.durationDays")}
           constraintText={t("admin.promotions.form.durationDaysHint")}
+          errorText={errors.durationDays}
         >
           <Input
             value={form.durationDays}

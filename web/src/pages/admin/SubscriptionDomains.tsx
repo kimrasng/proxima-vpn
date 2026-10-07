@@ -29,6 +29,7 @@ import type {
   SubscriptionDomainHealth,
   SubscriptionDomainHealthStatus,
 } from "../../api/types";
+import { focusFirstInvalid, hasFieldErrors } from "../../utils/formValidation";
 
 interface DomainForm {
   domain: string;
@@ -71,6 +72,16 @@ export default function SubscriptionDomains() {
   const [editing, setEditing] = useState<SubscriptionDomain | null>(null);
   const [deleting, setDeleting] = useState<SubscriptionDomain | null>(null);
   const [formVisible, setFormVisible] = useState(false);
+  // Field errors stay hidden until the first save attempt, then track edits.
+  const [showErrors, setShowErrors] = useState(false);
+  const formErrors = {
+    domain: form.domain.trim() ? undefined : t("admin.subscriptionDomains.domainRequired"),
+    displayOrder:
+      form.displayOrder.trim() && Number.isInteger(Number(form.displayOrder)) && Number(form.displayOrder) >= 0
+        ? undefined
+        : t("admin.subscriptionDomains.orderInvalid"),
+  };
+  const visibleErrors: Partial<typeof formErrors> = showErrors ? formErrors : {};
 
   const load = async () => {
     try {
@@ -105,6 +116,7 @@ export default function SubscriptionDomains() {
   const openCreate = () => {
     setEditing(null);
     setForm({ ...EMPTY_FORM, displayOrder: String(domains.length) });
+    setShowErrors(false);
     setFormVisible(true);
   };
 
@@ -117,21 +129,18 @@ export default function SubscriptionDomains() {
       displayOrder: String(domain.display_order),
       isDefault: domain.is_default,
     });
+    setShowErrors(false);
     setFormVisible(true);
   };
 
   const handleSave = async () => {
+    setShowErrors(true);
+    if (hasFieldErrors(formErrors)) {
+      focusFirstInvalid();
+      return;
+    }
     const domain = form.domain.trim();
-    if (!domain) {
-      setError(t("admin.subscriptionDomains.domainRequired"));
-      return;
-    }
-
     const displayOrder = Number(form.displayOrder);
-    if (!Number.isInteger(displayOrder) || displayOrder < 0) {
-      setError(t("admin.subscriptionDomains.orderInvalid"));
-      return;
-    }
 
     setActionLoading(true);
     try {
@@ -218,9 +227,12 @@ export default function SubscriptionDomains() {
           <Box variant="p">{t("admin.subscriptionDomains.healthDescription")}</Box>
         </Container>
 
-        <Table
-          items={domains}
-          header={
+        <div className="intrinsic-table">
+          <Table
+            items={domains}
+            wrapLines={false}
+            resizableColumns={false}
+            header={
             <Header
               variant="h2"
               counter={`(${domains.length})`}
@@ -308,7 +320,8 @@ export default function SubscriptionDomains() {
             },
           ]}
           empty={<Box textAlign="center">{t("admin.subscriptionDomains.empty")}</Box>}
-        />
+          />
+        </div>
       </SpaceBetween>
 
       <Modal
@@ -327,10 +340,10 @@ export default function SubscriptionDomains() {
         }
       >
         <SpaceBetween size="m">
-          <FormField label={t("admin.subscriptionDomains.domain")} description={t("admin.subscriptionDomains.domainHint")}>
+          <FormField label={t("admin.subscriptionDomains.domain")} description={t("admin.subscriptionDomains.domainHint")} errorText={visibleErrors.domain}>
             <Input value={form.domain} onChange={({ detail }) => setForm({ ...form, domain: detail.value })} />
           </FormField>
-          <FormField label={t("admin.subscriptionDomains.order")} description={t("admin.subscriptionDomains.orderHint")}>
+          <FormField label={t("admin.subscriptionDomains.order")} description={t("admin.subscriptionDomains.orderHint")} errorText={visibleErrors.displayOrder}>
             <Input
               type="number"
               value={form.displayOrder}

@@ -25,22 +25,23 @@ export default function Register() {
   const [passwordConfirm, setPasswordConfirm] = useState("");
   const [loading, setLoading] = useState(false);
   const [flash, setFlash] = useState<FlashbarProps.MessageDefinition[]>([]);
+  const [showErrors, setShowErrors] = useState(false);
+  const required = t("auth.validation.required", { defaultValue: "This field is required." });
+  const errors = {
+    name: name.trim() ? undefined : required,
+    email: email.trim() ? undefined : required,
+    password: password.trim() ? undefined : required,
+    passwordConfirm: !passwordConfirm.trim()
+      ? required
+      : password !== passwordConfirm
+        ? t("auth.register.passwordMismatch")
+        : undefined,
+  };
 
   const handleSubmit = async () => {
+    setShowErrors(true);
     setFlash([]);
-
-    if (password !== passwordConfirm) {
-      setFlash([
-        {
-          type: "error",
-          content: t("auth.register.passwordMismatch"),
-          dismissible: true,
-          onDismiss: () => setFlash([]),
-        },
-      ]);
-      return;
-    }
-
+    if (Object.values(errors).some(Boolean)) return;
     setLoading(true);
 
     try {
@@ -98,7 +99,7 @@ export default function Register() {
             }
           >
             <SpaceBetween size="m">
-              <FormField label={t("auth.register.name")}>
+              <FormField label={t("auth.register.name")} errorText={showErrors ? errors.name : undefined}>
                 <Input
                   value={name}
                   onChange={({ detail }) => setName(detail.value)}
@@ -106,7 +107,7 @@ export default function Register() {
                   autoFocus
                 />
               </FormField>
-              <FormField label={t("auth.register.email")}>
+              <FormField label={t("auth.register.email")} errorText={showErrors ? errors.email : undefined}>
                 <Input
                   value={email}
                   onChange={({ detail }) => setEmail(detail.value)}
@@ -114,14 +115,14 @@ export default function Register() {
                   placeholder="user@example.com"
                 />
               </FormField>
-              <FormField label={t("auth.register.password")}>
+              <FormField label={t("auth.register.password")} errorText={showErrors ? errors.password : undefined}>
                 <Input
                   value={password}
                   onChange={({ detail }) => setPassword(detail.value)}
                   type="password"
                 />
               </FormField>
-              <FormField label={t("auth.register.passwordConfirm")}>
+              <FormField label={t("auth.register.passwordConfirm")} errorText={showErrors ? errors.passwordConfirm : undefined}>
                 <Input
                   value={passwordConfirm}
                   onChange={({ detail }) => setPasswordConfirm(detail.value)}

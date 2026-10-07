@@ -23,10 +23,18 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [flash, setFlash] = useState<FlashbarProps.MessageDefinition[]>([]);
+  const [showErrors, setShowErrors] = useState(false);
+  const required = t("auth.validation.required", { defaultValue: "This field is required." });
+  const errors = {
+    email: email.trim() ? undefined : required,
+    password: password.trim() ? undefined : required,
+  };
 
   const handleSubmit = async () => {
-    setLoading(true);
+    setShowErrors(true);
     setFlash([]);
+    if (errors.email || errors.password) return;
+    setLoading(true);
 
     try {
       const res = await userLogin({ email, password });
@@ -78,7 +86,7 @@ export default function Login() {
             }
           >
             <SpaceBetween size="m">
-              <FormField label={t("auth.login.email")}>
+              <FormField label={t("auth.login.email")} errorText={showErrors ? errors.email : undefined}>
                 <Input
                   value={email}
                   onChange={({ detail }) => setEmail(detail.value)}
@@ -87,7 +95,7 @@ export default function Login() {
                   autoFocus
                 />
               </FormField>
-              <FormField label={t("auth.login.password")}>
+              <FormField label={t("auth.login.password")} errorText={showErrors ? errors.password : undefined}>
                 <Input
                   value={password}
                   onChange={({ detail }) => setPassword(detail.value)}

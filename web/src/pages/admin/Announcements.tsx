@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Box,
@@ -24,9 +24,12 @@ import {
   uploadAnnouncementImage,
 } from "../../api/admin";
 import type { Announcement } from "../../api/types";
+import { focusFirstInvalid, hasFieldErrors } from "../../utils/formValidation";
 
 export default function Announcements() {
   const { t } = useTranslation();
+  const tRef = useRef(t);
+  tRef.current = t;
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -40,24 +43,34 @@ export default function Announcements() {
   const [content, setContent] = useState("");
   const [imageUrl, setImageUrl] = useState("");
   const [expiresAt, setExpiresAt] = useState("");
+  const [showFormErrors, setShowFormErrors] = useState(false);
+  const formErrors = {
+    title: title.trim() ? undefined : t("admin.announcements.form.titleRequired"),
+    content: content.trim() ? undefined : t("admin.announcements.form.contentRequired"),
+  };
+  const checkForm = () => {
+    setShowFormErrors(true);
+    if (hasFieldErrors(formErrors)) { focusFirstInvalid(); return false; }
+    return true;
+  };
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const fetchAnnouncements = async () => {
+  const fetchAnnouncements = useCallback(async () => {
     try {
       const data = await listAnnouncements();
       setAnnouncements(data);
       setError(null);
     } catch {
-      setError(t("admin.announcements.fetchError"));
+      setError(tRef.current("admin.announcements.fetchError"));
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     void fetchAnnouncements();
-  }, []);
+  }, [fetchAnnouncements]);
 
   const resetForm = () => {
     setTitle("");
@@ -79,6 +92,7 @@ export default function Announcements() {
   };
 
   const handleCreate = async () => {
+    if (!checkForm()) return;
     setActionLoading(true);
     try {
       await createAnnouncement({
@@ -98,7 +112,7 @@ export default function Announcements() {
   };
 
   const handleEdit = async () => {
-    if (!editModal) return;
+    if (!editModal || !checkForm()) return;
     setActionLoading(true);
     try {
       await updateAnnouncement(editModal.id, {
@@ -142,6 +156,7 @@ export default function Announcements() {
 
   const openCreate = () => {
     resetForm();
+    setShowFormErrors(false);
     setCreateModal(true);
   };
 
@@ -150,6 +165,7 @@ export default function Announcements() {
     setContent(item.content);
     setImageUrl(item.image_url ?? "");
     setExpiresAt(item.expires_at ? new Date(item.expires_at).toISOString().slice(0, 16) : "");
+    setShowFormErrors(false);
     setEditModal(item);
   };
 
@@ -163,10 +179,10 @@ export default function Announcements() {
 
   const formFields = (
     <SpaceBetween size="m">
-      <FormField label={t("admin.announcements.form.title")}>
+      <FormField label={t("admin.announcements.form.title")} errorText={showFormErrors ? formErrors.title : undefined}>
         <Input value={title} onChange={({ detail }) => setTitle(detail.value)} />
       </FormField>
-      <FormField label={t("admin.announcements.form.content")}>
+      <FormField label={t("admin.announcements.form.content")} errorText={showFormErrors ? formErrors.content : undefined}>
         <Textarea value={content} onChange={({ detail }) => setContent(detail.value)} rows={6} />
       </FormField>
       <FormField

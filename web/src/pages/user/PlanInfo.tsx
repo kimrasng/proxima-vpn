@@ -23,6 +23,7 @@ import {
   Select,
   Alert,
 } from "@cloudscape-design/components";
+import { focusFirstInvalid } from "../../utils/formValidation";
 import type {
   UserProfile,
   UserPlanItem,
@@ -106,6 +107,7 @@ export default function PlanInfo() {
   const [cancelModal, setCancelModal] = useState<OrderResponse | null>(null);
   const [promotionCode, setPromotionCode] = useState("");
   const [promotionLoading, setPromotionLoading] = useState(false);
+  const [showPromotionError, setShowPromotionError] = useState(false);
 
   const loadData = async () => {
     try {
@@ -200,12 +202,14 @@ export default function PlanInfo() {
 
   const handleApplyPromotion = async (orderId: string) => {
     const code = promotionCode.trim();
-    if (!code) return;
+    setShowPromotionError(true);
+    if (!code) { focusFirstInvalid(); return; }
     try {
       setPromotionLoading(true);
       await userApi.applyPromotionToOrder(orderId, code);
       setFlash([{ type: "success", content: t("user.plan.promotion.applied"), dismissible: true, onDismiss: () => setFlash([]) }]);
       setPromotionCode("");
+      setShowPromotionError(false);
       await loadData();
     } catch (err) {
       const reason = rejectionFromError(err);
@@ -348,6 +352,7 @@ export default function PlanInfo() {
               <FormField
                 label={t("user.plan.promotion.label")}
                 description={t("user.plan.promotion.pendingHint")}
+                errorText={showPromotionError && !promotionCode.trim() ? t("user.plan.promotion.codeRequired") : undefined}
               >
                 <SpaceBetween direction="horizontal" size="xs">
                   <Input
@@ -357,7 +362,7 @@ export default function PlanInfo() {
                   />
                   <Button
                     loading={promotionLoading}
-                    disabled={promotionCode.trim().length === 0}
+                    disabled={promotionLoading}
                     onClick={() => void handleApplyPromotion(pendingOrder.id)}
                   >
                     {t("user.plan.promotion.apply")}

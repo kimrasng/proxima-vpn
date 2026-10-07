@@ -41,10 +41,12 @@ import type {
 } from "../../api/types";
 import { formatAbsoluteTime, formatRelativeTime } from "../../utils/relativeTime";
 import { formatPorts, parsePortInput, resolvePorts } from "../../utils/nodePorts";
+import { focusFirstInvalid, hasFieldErrors } from "../../utils/formValidation";
 import { HoverTooltip } from "../../components/HoverTooltip";
 import { NodeProvisionWizard } from "../../components/NodeProvisionWizard";
 import { NodeEndpointState } from "../../components/NodeEndpointState";
 import { NodeSNIEditor } from "../../components/NodeSNIEditor";
+import { LocalizedTextEditor } from "../../components/LocalizedTextEditor";
 import { useManualRefresh } from "../../hooks/useManualRefresh";
 import "./nodesTable.css";
 
@@ -193,12 +195,35 @@ export default function Nodes() {
   });
   const [editSuccess, setEditSuccess] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+  // Field errors stay hidden until the first save attempt, then track edits.
+  const [showEditErrors, setShowEditErrors] = useState(false);
+  const editMultiplier = Number(editForm.trafficMultiplier);
+  const editMaxConns = Number(editForm.maxConns);
+  const editCustomPorts = parsePortInput(editForm.customPorts);
+  const editErrors = {
+    trafficMultiplier:
+      editForm.trafficMultiplier.trim() && Number.isFinite(editMultiplier) && editMultiplier > 0 && editMultiplier <= 100
+        ? undefined
+        : t("admin.nodes.multiplierInvalid"),
+    maxConns:
+      editForm.maxConns.trim() && Number.isInteger(editMaxConns) && editMaxConns >= 0
+        ? undefined
+        : t("admin.nodes.wizard.maxConnsInvalid"),
+    customPorts:
+      editForm.firewallPreset !== "custom"
+        ? undefined
+        : editCustomPorts.invalid.length > 0
+          ? t("admin.nodes.wizard.portsInvalid", { entries: editCustomPorts.invalid.join(", ") })
+          : editCustomPorts.specs.length === 0
+            ? t("admin.nodes.wizard.portsRequired")
+            : undefined,
+  };
+  const visibleEditErrors: Partial<typeof editErrors> = showEditErrors ? editErrors : {};
 
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [regionFilter, setRegionFilter] = useState<string>("all");
   const [preferences, setPreferences] = useState<CollectionPreferencesProps.Preferences>({
     pageSize: DEFAULT_PAGE_SIZE,
-    wrapLines: false,
     contentDisplay: [
       { id: "name", visible: true },
       { id: "role", visible: true },
@@ -211,8 +236,8 @@ export default function Nodes() {
       { id: "resources", visible: false },
       { id: "traffic", visible: true },
       { id: "connections", visible: true },
-      { id: "multiplier", visible: true },
-      { id: "lastCheck", visible: true },
+      { id: "multiplier", visible: false },
+      { id: "lastCheck", visible: false },
       { id: "health", visible: false },
       { id: "actions", visible: true },
     ],
@@ -350,6 +375,7 @@ export default function Nodes() {
 
   const handleEditOpen = (node: Node) => {
     setEditModal(node);
+    setShowEditErrors(false);
     setEditForm({
       name: node.name,
       country: node.country,
@@ -372,44 +398,25 @@ export default function Nodes() {
 
   const handleEditSubmit = async () => {
     if (!editModal) return;
+    setShowEditErrors(true);
+    if (hasFieldErrors(editErrors)) {
+      focusFirstInvalid();
+      return;
+    }
     setActionLoading(true);
     try {
-      const multiplier = Number(editForm.trafficMultiplier);
-      if (!Number.isFinite(multiplier) || multiplier <= 0 || multiplier > 100) {
-        setError(t("admin.nodes.multiplierInvalid"));
-        return;
-      }
-      const maxConns = Number(editForm.maxConns);
-      if (!Number.isInteger(maxConns) || maxConns < 0) {
-        setError(t("admin.nodes.wizard.maxConnsInvalid"));
-        return;
-      }
-
       const preset = editForm.firewallPreset as NodeFirewallPreset;
-      const parsedCustom = parsePortInput(editForm.customPorts);
-      if (preset === "custom") {
-        if (parsedCustom.invalid.length > 0) {
-          setError(
-            t("admin.nodes.wizard.portsInvalid", { entries: parsedCustom.invalid.join(", ") }),
-          );
-          return;
-        }
-        if (parsedCustom.specs.length === 0) {
-          setError(t("admin.nodes.wizard.portsRequired"));
-          return;
-        }
-      }
 
       const req: UpdateNodeRequest = {
         name: editForm.name,
         country: editForm.country,
         region: editForm.region,
-        traffic_multiplier: multiplier,
-        max_concurrent_conns: maxConns,
+        traffic_multiplier: editMultiplier,
+        max_concurrent_conns: editMaxConns,
         role: editForm.role,
         publish_direct: editForm.publishDirect,
         firewall_preset: preset,
-        custom_ports: preset === "custom" ? parsedCustom.specs : undefined,
+        custom_ports: preset === "custom" ? editCustomPorts.specs : undefined,
         labels: editForm.labels,
       };
       if (editForm.osFamily !== "") {
@@ -554,8 +561,9 @@ export default function Nodes() {
             {...collectionProps}
             variant="container"
             contentDensity="compact"
-            stickyHeader
-            wrapLines={preferences.wrapLines}
+            stickyColumns={{ first: 1, last: 1 }}
+            resizableColumns={false}
+            wrapLines={false}
             columnDisplay={preferences.contentDisplay}
             items={items}
             trackBy="id"
@@ -626,7 +634,6 @@ export default function Nodes() {
                     label: t("admin.nodes.pageSizeOption", { count: size }),
                   })),
                 }}
-                wrapLinesPreference={{ label: t("admin.nodes.wrapLines"), description: "" }}
                 contentDisplayPreference={{
                   title: t("admin.nodes.visibleColumns"),
                   options: [
@@ -758,7 +765,7 @@ export default function Nodes() {
                       triggerType="custom"
                       content={t("admin.nodes.resourcesInfo")}
                     >
-                      <Button variant="inline-icon" iconName="status-info" ariaLabel="info" />
+                      <Button variant="inline-icon" iconName="status-info" ariaLabel={t("admin.nodes.resourcesInfoLabel")} />
                     </Popover>
                   </div>
                 ),
@@ -1063,20 +1070,24 @@ export default function Nodes() {
                 <Box variant="p" color="text-body-secondary">
                   {t("admin.nodes.editSections.labelsHint")}
                 </Box>
-                {(["ko", "en", "zh"] as const).map((code) => (
-                  <FormField key={code} label={t(`admin.nodes.editSections.labelLang.${code}`)}>
-                    <Input
-                      value={editForm.labels[code] ?? ""}
-                      placeholder={editForm.name}
-                      onChange={({ detail }) =>
-                        setEditForm((f) => ({
-                          ...f,
-                          labels: { ...f.labels, [code]: detail.value },
-                        }))
-                      }
-                    />
-                  </FormField>
-                ))}
+                <LocalizedTextEditor
+                  baseValue={editForm.name}
+                  values={editForm.labels}
+                  languages={(["ko", "en", "zh"] as const).map((code) => ({
+                    code,
+                    label: t(`admin.nodes.editSections.labelLang.${code}`),
+                  }))}
+                  onChange={(code, value) => setEditForm((form) => ({
+                    ...form,
+                    labels: { ...form.labels, [code]: value },
+                  }))}
+                  messages={{
+                    baseLabel: t("admin.nodes.editSections.baseName"),
+                    filled: t("admin.nodes.editSections.translationFilled"),
+                    fallback: t("admin.nodes.editSections.translationFallback"),
+                    preview: t("admin.nodes.editSections.subscriptionPreview"),
+                  }}
+                />
               </SpaceBetween>
             </Container>
 
@@ -1085,6 +1096,7 @@ export default function Nodes() {
                 <FormField
                   label={t("admin.nodes.col.multiplier")}
                   description={t("admin.nodes.multiplierHint")}
+                  errorText={visibleEditErrors.trafficMultiplier}
                 >
                   <Input
                     value={editForm.trafficMultiplier}
@@ -1099,6 +1111,7 @@ export default function Nodes() {
                 <FormField
                   label={t("admin.nodes.wizard.maxConns")}
                   description={t("admin.nodes.wizard.maxConnsHint")}
+                  errorText={visibleEditErrors.maxConns}
                 >
                   <Input
                     value={editForm.maxConns}
@@ -1138,6 +1151,7 @@ export default function Nodes() {
                   <FormField
                     label={t("admin.nodes.wizard.customPorts")}
                     description={t("admin.nodes.wizard.customPortsHint")}
+                    errorText={visibleEditErrors.customPorts}
                   >
                     <Input
                       value={editForm.customPorts}

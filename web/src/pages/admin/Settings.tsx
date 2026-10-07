@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Box,
@@ -49,6 +49,8 @@ const defaultForm: SettingsForm = {
 
 export default function Settings() {
   const { t } = useTranslation();
+  const tRef = useRef(t);
+  tRef.current = t;
   const [form, setForm] = useState<SettingsForm>(defaultForm);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -58,7 +60,7 @@ export default function Settings() {
   const [backupLoading, setBackupLoading] = useState(false);
   const [backupTriggerLoading, setBackupTriggerLoading] = useState(false);
 
-  const fetchBackups = async () => {
+  const fetchBackups = useCallback(async () => {
     setBackupLoading(true);
     try {
       const data = await listBackups();
@@ -72,7 +74,7 @@ export default function Settings() {
     } finally {
       setBackupLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -92,14 +94,14 @@ export default function Settings() {
         }
         setForm({ ...defaultForm, ...mapped });
       } catch {
-        setError(t("admin.settings.fetchError"));
+        setError(tRef.current("admin.settings.fetchError"));
       } finally {
         setLoading(false);
       }
     };
     void fetchSettings();
     void fetchBackups();
-  }, []);
+  }, [fetchBackups]);
 
   const handleTriggerBackup = async () => {
     setBackupTriggerLoading(true);

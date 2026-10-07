@@ -17,11 +17,13 @@ import {
 } from "@cloudscape-design/components";
 import PlanDurationInput from "./PlanDurationInput";
 import type { NodeGroup } from "../../api/types";
-import { featureLanguages, type PlanForm, type PriceRow, type FeatureRow } from "./planFormModel";
+import { featureLanguages, type PlanForm, type PlanFormErrors, type PriceRow, type FeatureRow } from "./planFormModel";
 
 interface PlanFormFieldsProps {
   editing?: boolean;
   form: PlanForm;
+  // Omitted until the first save attempt so a fresh form is not shown as invalid.
+  errors?: PlanFormErrors;
   nodeGroups: NodeGroup[];
   onChange: (patch: Partial<PlanForm>) => void;
   onFormUpdate: (update: (form: PlanForm) => PlanForm) => void;
@@ -30,11 +32,13 @@ interface PlanFormFieldsProps {
 export default function PlanFormFields({
   editing = false,
   form,
+  errors,
   nodeGroups,
   onChange,
   onFormUpdate,
 }: PlanFormFieldsProps) {
   const { t } = useTranslation();
+  const fieldErrors = errors?.fields ?? {};
 
   const groupOptions = nodeGroups.map((g) => ({ label: g.name, value: g.id }));
 
@@ -69,19 +73,20 @@ export default function PlanFormFields({
       <Container header={<Header variant="h2">{t("admin.plans.editor.basics")}</Header>}>
       <SpaceBetween size="m">
       <ColumnLayout columns={2} minColumnWidth={220}>
-        <FormField label={t("admin.plans.form.name")}>
+        <FormField label={t("admin.plans.form.name")} errorText={fieldErrors.name}>
           <Input value={form.name} onChange={({ detail }) => onChange({ name: detail.value })} />
         </FormField>
-        <FormField label={t("admin.plans.form.nodeGroup")}>
+        <FormField label={t("admin.plans.form.nodeGroup")} errorText={fieldErrors.node_group_id}>
           <Select
             selectedOption={groupOptions.find((o) => o.value === form.node_group_id) ?? null}
             options={groupOptions}
+            ariaRequired
             onChange={({ detail }) => onChange({ node_group_id: detail.selectedOption.value ?? "" })}
           />
         </FormField>
       </ColumnLayout>
 
-      <FormField label={t("admin.plans.editor.planId")} constraintText={t(editing ? "admin.plans.editor.idImmutable" : "admin.plans.editor.idHint")}>
+      <FormField label={t("admin.plans.editor.planId")} constraintText={t(editing ? "admin.plans.editor.idImmutable" : "admin.plans.editor.idHint")} errorText={fieldErrors.id}>
         <Input value={form.id} disabled={editing} onChange={({ detail }) => onChange({ id: detail.value })} />
       </FormField>
       <Checkbox checked={form.advertise} onChange={({ detail }) => onChange({ advertise: detail.checked })} description={t("admin.plans.editor.advertiseHint")}>{t("admin.plans.editor.advertise")}</Checkbox>
@@ -94,6 +99,7 @@ export default function PlanFormFields({
         <FormField
           label={t("admin.plans.form.trafficLimit")}
           constraintText={t("admin.plans.form.trafficHint")}
+          errorText={fieldErrors.traffic_limit}
         >
           <Input
             value={form.traffic_limit}
@@ -101,12 +107,13 @@ export default function PlanFormFields({
             onChange={({ detail }) => onChange({ traffic_limit: detail.value })}
           />
         </FormField>
-        <FormField label={t("admin.plans.editor.assignmentDuration")} constraintText={`${t("admin.plans.editor.assignmentHint")} ${t("admin.plans.editor.durationHint")}`}>
+        <FormField label={t("admin.plans.editor.assignmentDuration")} constraintText={`${t("admin.plans.editor.assignmentHint")} ${t("admin.plans.editor.durationHint")}`} errorText={fieldErrors.duration_days}>
           <PlanDurationInput days={form.duration_days} onChange={duration_days => onChange({ duration_days })} />
         </FormField>
         <FormField
           label={t("admin.plans.form.speedLimit")}
           constraintText={t("admin.plans.form.speedHint")}
+          errorText={fieldErrors.speed_limit}
         >
           <Input
             value={form.speed_limit}
@@ -114,7 +121,7 @@ export default function PlanFormFields({
             onChange={({ detail }) => onChange({ speed_limit: detail.value })}
           />
         </FormField>
-        <FormField label={t("admin.plans.form.maxDevices")} constraintText={t("admin.plans.form.maxDevicesHint")}>
+        <FormField label={t("admin.plans.form.maxDevices")} constraintText={t("admin.plans.form.maxDevicesHint")} errorText={fieldErrors.max_devices}>
           <Input
             value={form.max_devices}
             type="number"
@@ -125,6 +132,7 @@ export default function PlanFormFields({
           <FormField
             label={t("admin.plans.form.maxConcurrent")}
             constraintText={t("admin.plans.form.maxConcurrentHint")}
+            errorText={fieldErrors.max_concurrent}
           >
             <Input
               value={form.max_concurrent}
@@ -171,12 +179,14 @@ export default function PlanFormFields({
           definition={[
             {
               label: t("admin.plans.editor.duration"),
+              errorText: (_item: PriceRow, index) => errors?.prices[index]?.durationDays,
               control: (item: PriceRow, index) => (
                 <PlanDurationInput days={item.durationDays} onChange={durationDays => updatePriceRow(index, { durationDays })} />
               ),
             },
             {
               label: t("admin.plans.pricing.priceLabel"),
+              errorText: (_item: PriceRow, index) => errors?.prices[index]?.priceDollars,
               control: (item: PriceRow, index) => (
                 <Input
                   value={item.priceDollars}
@@ -225,6 +235,7 @@ export default function PlanFormFields({
                 row={row}
                 index={index}
                 total={form.features.length}
+                error={errors?.features[index]}
                 onUpdate={updateFeatureRow}
                 onMove={moveFeatureRow}
                 onRemove={(i) =>
@@ -246,6 +257,7 @@ interface FeatureEditorProps {
   row: FeatureRow;
   index: number;
   total: number;
+  error?: string;
   onUpdate: (index: number, patch: Partial<FeatureRow>) => void;
   onMove: (index: number, direction: -1 | 1) => void;
   onRemove: (index: number) => void;
@@ -255,7 +267,7 @@ interface FeatureEditorProps {
 // stacked inputs, which is what made the section unusable past a few bullets;
 // the per-tab badge is how you tell which languages are still empty without
 // opening each one.
-function FeatureEditor({ row, index, total, onUpdate, onMove, onRemove }: FeatureEditorProps) {
+function FeatureEditor({ row, index, total, error, onUpdate, onMove, onRemove }: FeatureEditorProps) {
   const { t } = useTranslation();
 
   return (
@@ -307,8 +319,10 @@ function FeatureEditor({ row, index, total, onUpdate, onMove, onRemove }: Featur
                   </Badge>
                 </SpaceBetween>
               ),
+              // The rule is "at least one language", so the message rides on
+              // whichever language tab is open rather than on all three.
               content: (
-                <FormField label={t(`admin.plans.features.textLang.${code}`)}>
+                <FormField label={t(`admin.plans.features.textLang.${code}`)} errorText={error}>
                   <Input
                     value={row.text[code] ?? ""}
                     placeholder={t("admin.plans.features.textPlaceholder")}

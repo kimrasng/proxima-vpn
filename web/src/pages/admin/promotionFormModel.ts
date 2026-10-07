@@ -1,4 +1,5 @@
-import type { PromotionCode, PromotionDiscountType } from "../../api/types";
+import type { TFunction } from "i18next";
+import type { PromotionCode, PromotionDiscountType, PromotionRequest } from "../../api/types";
 
 // Every field is edited as a string and converted only on submit, matching the
 // plan form. `discountValue` carries percent points or dollars depending on
@@ -89,4 +90,80 @@ export function splitList(value: string): string[] {
 export function localDateTimeToIso(date: string, time: string): string | null {
   const parsed = new Date(`${date}T${time.length === 5 ? `${time}:00` : time}`);
   return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+}
+
+// Translated messages keyed by the field they belong to; an absent key means
+// the field is valid.
+export type PromotionFormErrors = Partial<Record<
+  "code" | "discountValue" | "minOrderDollars" | "validFrom" | "validUntil" | "maxRedemptions" | "maxRedemptionsPerUser" | "durationDays",
+  string
+>>;
+
+export function validatePromotionForm(form: PromotionForm, t: TFunction): PromotionFormErrors {
+  const errors: PromotionFormErrors = {};
+  if (!form.code.trim()) errors.code = t("admin.promotions.form.codeRequired");
+
+  const rawValue = Number(form.discountValue);
+  if (!form.discountValue.trim()) {
+    errors.discountValue = t("admin.promotions.form.discountValueRequired");
+  } else if (!Number.isFinite(rawValue)) {
+    errors.discountValue = t("admin.promotions.form.discountValueInvalid");
+  } else if (form.discountType === "percent") {
+    if (!Number.isInteger(rawValue) || rawValue < 1 || rawValue > 100) {
+      errors.discountValue = t("admin.promotions.form.percentRangeInvalid");
+    }
+  } else if (rawValue <= 0) {
+    errors.discountValue = t("admin.promotions.form.fixedRangeInvalid");
+  }
+
+  const minOrderDollars = Number(form.minOrderDollars || "0");
+  if (!Number.isFinite(minOrderDollars) || minOrderDollars < 0) {
+    errors.minOrderDollars = t("admin.promotions.form.minOrderInvalid");
+  }
+
+  const validFrom = localDateTimeToIso(form.validFromDate, form.validFromTime);
+  const validUntil = localDateTimeToIso(form.validUntilDate, form.validUntilTime);
+  if (!validFrom) errors.validFrom = t("admin.promotions.form.validFromRequired");
+  if (!validUntil) {
+    errors.validUntil = t("admin.promotions.form.validUntilRequired");
+  } else if (validFrom && new Date(validUntil) <= new Date(validFrom)) {
+    errors.validUntil = t("admin.promotions.form.windowOrderInvalid");
+  }
+
+  if (!form.unlimitedRedemptions) {
+    const parsed = Number(form.maxRedemptions);
+    if (!form.maxRedemptions.trim() || !Number.isInteger(parsed) || parsed <= 0) {
+      errors.maxRedemptions = t("admin.promotions.form.maxRedemptionsInvalid");
+    }
+  }
+
+  const perUser = Number(form.maxRedemptionsPerUser);
+  if (!form.maxRedemptionsPerUser.trim() || !Number.isInteger(perUser) || perUser <= 0) {
+    errors.maxRedemptionsPerUser = t("admin.promotions.form.perUserInvalid");
+  }
+
+  if (splitList(form.durationDays).some((entry) => !Number.isInteger(Number(entry)) || Number(entry) <= 0)) {
+    errors.durationDays = t("admin.promotions.form.durationDaysInvalid");
+  }
+  return errors;
+}
+
+// Assumes validatePromotionForm already passed.
+export function toPromotionRequest(form: PromotionForm, includeActive: boolean): PromotionRequest {
+  const rawValue = Number(form.discountValue);
+  return {
+    code: form.code.trim(),
+    discount_type: form.discountType,
+    discount_value: form.discountType === "percent" ? rawValue : Math.round(rawValue * 100),
+    valid_from: localDateTimeToIso(form.validFromDate, form.validFromTime) ?? "",
+    valid_until: localDateTimeToIso(form.validUntilDate, form.validUntilTime) ?? "",
+    min_order_cents: Math.round(Number(form.minOrderDollars || "0") * 100),
+    max_redemptions: form.unlimitedRedemptions ? null : Number(form.maxRedemptions),
+    max_redemptions_per_user: Number(form.maxRedemptionsPerUser),
+    first_purchase_only: form.firstPurchaseOnly,
+    plan_ids: form.planIds,
+    duration_days: splitList(form.durationDays).map(Number),
+    allowed_user_ids: splitList(form.allowedUserIds),
+    ...(includeActive ? { is_active: form.isActive } : {}),
+  };
 }

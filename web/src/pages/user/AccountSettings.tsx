@@ -18,6 +18,7 @@ import {
 } from "@cloudscape-design/components";
 import type { UserProfile } from "../../api/types";
 import * as userApi from "../../api/user";
+import { focusFirstInvalid, hasFieldErrors } from "../../utils/formValidation";
 
 export default function AccountSettings() {
   const { t } = useTranslation();
@@ -32,6 +33,14 @@ export default function AccountSettings() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [savingPassword, setSavingPassword] = useState(false);
+  // Field errors stay hidden until the first save attempt, then track edits.
+  const [showPasswordErrors, setShowPasswordErrors] = useState(false);
+  const passwordErrors = {
+    currentPassword: currentPassword ? undefined : t("user.account.currentPasswordRequired"),
+    newPassword: newPassword ? undefined : t("user.account.newPasswordRequired"),
+    confirmPassword: newPassword && confirmPassword !== newPassword ? t("user.account.passwordMismatch") : undefined,
+  };
+  const visiblePasswordErrors: Partial<typeof passwordErrors> = showPasswordErrors ? passwordErrors : {};
 
   const [subToken, setSubToken] = useState("");
   const [showRegenModal, setShowRegenModal] = useState(false);
@@ -67,12 +76,9 @@ export default function AccountSettings() {
   };
 
   const handleSavePassword = async () => {
-    if (newPassword !== confirmPassword) {
-      setFlash([{ type: "error", content: t("user.account.passwordMismatch"), dismissible: true, onDismiss: () => setFlash([]) }]);
-      return;
-    }
-    if (!currentPassword || !newPassword) {
-      setFlash([{ type: "error", content: t("user.account.passwordRequired"), dismissible: true, onDismiss: () => setFlash([]) }]);
+    setShowPasswordErrors(true);
+    if (hasFieldErrors(passwordErrors)) {
+      focusFirstInvalid();
       return;
     }
     try {
@@ -81,6 +87,7 @@ export default function AccountSettings() {
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
+      setShowPasswordErrors(false);
       setFlash([{ type: "success", content: t("user.account.passwordSaved"), dismissible: true, onDismiss: () => setFlash([]) }]);
     } catch {
       setFlash([{ type: "error", content: t("user.account.passwordError"), dismissible: true, onDismiss: () => setFlash([]) }]);
@@ -134,13 +141,13 @@ export default function AccountSettings() {
 
         <Container header={<Header variant="h2">{t("user.account.passwordSection")}</Header>}>
           <SpaceBetween size="m">
-            <FormField label={t("user.account.currentPassword")}>
+            <FormField label={t("user.account.currentPassword")} errorText={visiblePasswordErrors.currentPassword}>
               <Input type="password" value={currentPassword} onChange={({ detail }) => setCurrentPassword(detail.value)} />
             </FormField>
-            <FormField label={t("user.account.newPassword")}>
+            <FormField label={t("user.account.newPassword")} errorText={visiblePasswordErrors.newPassword}>
               <Input type="password" value={newPassword} onChange={({ detail }) => setNewPassword(detail.value)} />
             </FormField>
-            <FormField label={t("user.account.confirmPassword")}>
+            <FormField label={t("user.account.confirmPassword")} errorText={visiblePasswordErrors.confirmPassword}>
               <Input type="password" value={confirmPassword} onChange={({ detail }) => setConfirmPassword(detail.value)} />
             </FormField>
             <Button variant="primary" onClick={handleSavePassword} loading={savingPassword}>

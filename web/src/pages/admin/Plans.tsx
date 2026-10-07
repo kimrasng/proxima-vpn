@@ -1,8 +1,10 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Box,
   Button,
+  ButtonDropdown,
+  Container,
   Grid,
   Alert,
   ContentLayout,
@@ -12,7 +14,6 @@ import {
   SpaceBetween,
   Spinner,
   StatusIndicator,
-  Table,
 } from "@cloudscape-design/components";
 import {
   listPlans,
@@ -27,30 +28,33 @@ import type {
   CreatePlanRequest,
   UpdatePlanRequest,
   NodeGroup,
-  PlanPrice,
-  PlanFeature,
   PlanRoutesResponse,
 } from "../../api/types";
 import PlanFormFields from "./PlanFormFields";
 import PlanPreview from "./PlanPreview";
 import PlanRoutesPanel from "./PlanRoutesPanel";
 import { adminError } from "../../utils/adminError";
+import { focusFirstInvalid } from "../../utils/formValidation";
 import "./planEditor.css";
+import "./plansList.css";
 import {
   emptyForm,
-  featureLanguages,
+  hasPlanFormErrors,
+  toPlanFeatures,
+  toPlanPrices,
   toPriceRows,
   toFeatureRows,
+  validatePlanForm,
   type PlanForm,
 } from "./planFormModel";
 
-function formatTraffic(bytes?: number): string {
-  if (bytes == null || bytes === 0) return "Unlimited";
+function formatTraffic(bytes: number | undefined, unlimited: string): string {
+  if (bytes == null || bytes === 0) return unlimited;
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
 }
 
-function formatSpeed(bps?: number): string {
-  if (bps == null || bps === 0) return "Unlimited";
+function formatSpeed(bps: number | undefined, unlimited: string): string {
+  if (bps == null || bps === 0) return unlimited;
   return `${bps} Mbps`;
 }
 
@@ -58,6 +62,8 @@ function formatSpeed(bps?: number): string {
 
 export default function Plans() {
   const { t } = useTranslation();
+  const tRef = useRef(t);
+  tRef.current = t;
   const [plans, setPlans] = useState<Plan[]>([]);
   const [nodeGroups, setNodeGroups] = useState<NodeGroup[]>([]);
   const [loading, setLoading] = useState(true);
@@ -75,6 +81,9 @@ export default function Plans() {
   const [routeDirty, setRouteDirty] = useState(false);
   const [routeGroupConflict, setRouteGroupConflict] = useState(false);
   const [focusRoutes, setFocusRoutes] = useState(false);
+  // Field errors stay hidden until the first save attempt, then track edits.
+  const [showErrors, setShowErrors] = useState(false);
+  const formErrors = validatePlanForm(form, t);
   const routeConflict = routeGroupConflict && editModal !== null && form.node_group_id !== editModal.node_group_id;
   const closeEditor = () => {
     if (actionLoading || routeBusy) return;
@@ -83,96 +92,37 @@ export default function Plans() {
     setCreateModal(false);
     setEditModal(null);
     setError(null);
+    setShowErrors(false);
   };
-  const validateForm = () => {
-    if (!form.name.trim() || !form.node_group_id) {
-      setError(t("admin.plans.editor.required"));
-      return false;
-    }
-    if (form.id.trim() && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(form.id.trim())) {
-      setError(t("admin.plans.editor.idInvalid"));
-      return false;
-    }
-    const positive = [form.duration_days, form.max_devices, ...(form.max_concurrent ? [form.max_concurrent] : [])];
-    const limits = [form.traffic_limit, form.speed_limit].filter(Boolean);
-    if (positive.some(value => !Number.isSafeInteger(Number(value)) || Number(value) <= 0) || limits.some(value => !Number.isFinite(Number(value)) || Number(value) < 0) || (form.speed_limit && !Number.isSafeInteger(Number(form.speed_limit)))) {
-      setError(t("admin.plans.editor.limitsInvalid"));
+  const checkForm = () => {
+    setShowErrors(true);
+    if (hasPlanFormErrors(formErrors)) {
+      focusFirstInvalid();
       return false;
     }
     return true;
   };
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       const [plansData, groupsData] = await Promise.all([listPlans(), listNodeGroups()]);
       setPlans(plansData);
       setNodeGroups(groupsData);
       setError(null);
     } catch {
-      setError(t("admin.plans.fetchError"));
+      setError(tRef.current("admin.plans.fetchError"));
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     void fetchData();
-  }, []);
-
-  // Returns null and sets the inline error when a row is unusable, so the
-  // caller can abort before touching the API.
-  const collectPrices = (): PlanPrice[] | null => {
-    const prices: PlanPrice[] = [];
-    const seen = new Set<number>();
-    for (const row of form.prices) {
-      const days = Number(row.durationDays);
-      if (!Number.isInteger(days) || days <= 0) {
-        setError(t("admin.plans.pricing.durationInvalid"));
-        return null;
-      }
-      if (seen.has(days)) {
-        setError(t("admin.plans.pricing.durationDuplicate", { days }));
-        return null;
-      }
-      if (!row.priceDollars.trim()) {
-        setError(t("admin.plans.editor.priceRequired"));
-        return null;
-      }
-      const dollars = Number(row.priceDollars);
-      if (!Number.isFinite(dollars) || dollars < 0) {
-        setError(t("admin.plans.pricing.priceInvalid"));
-        return null;
-      }
-      seen.add(days);
-      prices.push({ duration_days: days, price_cents: Math.round(dollars * 100) });
-    }
-    return prices;
-  };
-
-  const collectFeatures = (): PlanFeature[] | null => {
-    const features: PlanFeature[] = [];
-    for (const row of form.features) {
-      const text: Record<string, string> = {};
-      for (const code of featureLanguages) {
-        const value = row.text[code]?.trim();
-        if (value) text[code] = value;
-      }
-      if (Object.keys(text).length === 0) {
-        setError(t("admin.plans.features.textRequired"));
-        return null;
-      }
-      features.push({ included: row.included, text });
-    }
-    return features;
-  };
+  }, [fetchData]);
 
   const handleCreate = async () => {
-    if (!validateForm()) return;
+    if (!checkForm()) return;
     setError(null);
-    const prices = collectPrices();
-    if (!prices) return;
-    const features = collectFeatures();
-    if (!features) return;
     setActionLoading(true);
     try {
       const req: CreatePlanRequest = {
@@ -186,12 +136,13 @@ export default function Plans() {
         speed_limit: form.speed_limit ? Number(form.speed_limit) : undefined,
         node_group_id: form.node_group_id,
         is_active: form.is_active,
-        prices,
-        features,
+        prices: toPlanPrices(form.prices),
+        features: toPlanFeatures(form.features),
       };
       await createPlan(req);
       setCreateModal(false);
       setForm(emptyForm);
+      setShowErrors(false);
       await fetchData();
     } catch (err) {
       setError(adminError(err, t("admin.plans.createError")));
@@ -201,12 +152,8 @@ export default function Plans() {
   };
 
   const handleEdit = async () => {
-    if (!editModal || routeBusy || routeDirty || routeConflict || !validateForm()) return;
+    if (!editModal || routeBusy || routeDirty || routeConflict || !checkForm()) return;
     setError(null);
-    const prices = collectPrices();
-    if (!prices) return;
-    const features = collectFeatures();
-    if (!features) return;
     setActionLoading(true);
     try {
       const req: UpdatePlanRequest = {
@@ -219,12 +166,13 @@ export default function Plans() {
         speed_limit: form.speed_limit ? Number(form.speed_limit) : null,
         node_group_id: form.node_group_id,
         is_active: form.is_active,
-        prices,
-        features,
+        prices: toPlanPrices(form.prices),
+        features: toPlanFeatures(form.features),
       };
       await updatePlan(editModal.id, req);
       setEditModal(null);
       setForm(emptyForm);
+      setShowErrors(false);
       await fetchData();
     } catch (err) {
       setError(adminError(err, t("admin.plans.updateError")));
@@ -281,6 +229,7 @@ export default function Plans() {
     };
     setForm(nextForm);
     setInitialForm(JSON.stringify(nextForm));
+    setShowErrors(false);
     setEditModal(full);
     setRouteDirty(false);
     setRouteGroupConflict(false);
@@ -325,7 +274,7 @@ export default function Plans() {
     form.speed_limit !== savedForm.speed_limit
   );
 
-  const discardConfirmation = <Modal visible={discardModal} onDismiss={() => setDiscardModal(false)} header={t("admin.plans.editor.discardTitle")} footer={<Box float="right"><SpaceBetween direction="horizontal" size="xs"><Button onClick={() => setDiscardModal(false)}>{t("admin.plans.cancel")}</Button><Button variant="primary" onClick={() => { setDiscardModal(false); setRouteDirty(false); setRouteGroupConflict(false); setCreateModal(false); setEditModal(null); setError(null); }}>{t("admin.plans.editor.discard")}</Button></SpaceBetween></Box>}><SpaceBetween size="s"><div>{t("admin.plans.editor.discardMessage")}</div>{routeDirty && <div>{t("admin.routeManagement.discardRouteChanges", { defaultValue: "Your unapplied route selection changes will also be discarded." })}</div>}</SpaceBetween></Modal>;
+  const discardConfirmation = <Modal visible={discardModal} onDismiss={() => setDiscardModal(false)} header={t("admin.plans.editor.discardTitle")} footer={<Box float="right"><SpaceBetween direction="horizontal" size="xs"><Button onClick={() => setDiscardModal(false)}>{t("admin.plans.cancel")}</Button><Button variant="primary" onClick={() => { setDiscardModal(false); setRouteDirty(false); setRouteGroupConflict(false); setCreateModal(false); setEditModal(null); setError(null); setShowErrors(false); }}>{t("admin.plans.editor.discard")}</Button></SpaceBetween></Box>}><SpaceBetween size="s"><div>{t("admin.plans.editor.discardMessage")}</div>{routeDirty && <div>{t("admin.routeManagement.discardRouteChanges", { defaultValue: "Your unapplied route selection changes will also be discarded." })}</div>}</SpaceBetween></Modal>;
 
   if (createModal || editModal) {
     return <ContentLayout header={<Header variant="h1" description={t("admin.plans.editor.description")} actions={<SpaceBetween direction="horizontal" size="xs"><Button disabled={actionLoading || routeBusy} onClick={closeEditor}>{t("admin.plans.cancel")}</Button><Button variant="primary" loading={actionLoading} disabled={routeBusy || routeDirty || routeConflict} onClick={() => void (editModal ? handleEdit() : handleCreate())}>{t("admin.plans.save")}</Button></SpaceBetween>}>{t(editModal ? "admin.plans.editTitle" : "admin.plans.createTitle")}</Header>}>
@@ -334,7 +283,7 @@ export default function Plans() {
         {routeConflict && <Alert type="warning">{t("admin.routeManagement.groupConflict", { defaultValue: "The saved route group changed while you were editing. Your group draft was retained. Select the current saved group shown in Plan routes, or cancel and reopen, before saving." })}</Alert>}
         <Grid gridDefinition={[{ colspan: { default: 12, m: 8 } }, { colspan: { default: 12, m: 4 } }]}>
           <fieldset disabled={actionLoading || routeBusy} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
-            <PlanFormFields editing={!!editModal} form={form} nodeGroups={nodeGroups} onChange={patch => { if (!actionLoading && !routeBusy) setForm(f => ({ ...f, ...patch })); }} onFormUpdate={update => { if (!actionLoading && !routeBusy) setForm(update); }} />
+            <PlanFormFields editing={!!editModal} form={form} errors={showErrors ? formErrors : undefined} nodeGroups={nodeGroups} onChange={patch => { if (!actionLoading && !routeBusy) setForm(f => ({ ...f, ...patch })); }} onFormUpdate={update => { if (!actionLoading && !routeBusy) setForm(update); }} />
           </fieldset>
           <div className="plan-editor-preview"><PlanPreview form={form} /></div>
         </Grid>
@@ -369,64 +318,66 @@ export default function Plans() {
           <Flashbar items={[{ type: "error", content: error, dismissible: true, onDismiss: () => setError(null) }]} />
         )}
 
-        <Table
-          header={
-            <Header
-              actions={
-                <Button variant="primary" disabled={detailLoading} onClick={() => { setError(null); setForm(emptyForm); setInitialForm(JSON.stringify(emptyForm)); setCreateModal(true); }}>
-                  {t("admin.plans.create")}
-                </Button>
-              }
-              counter={`(${plans.length})`}
-            >
-              {t("admin.plans.title")}
-            </Header>
-          }
-          items={plans}
-          columnDefinitions={[
-            { id: "advertisement", header: t("admin.plans.editor.publication"), cell: item => <StatusIndicator type={item.is_advertised ? "success" : "stopped"}>{t(item.is_advertised ? "admin.plans.editor.published" : item.advertise ? "admin.plans.editor.ready" : "admin.plans.editor.private")}</StatusIndicator> },
-            { id: "name", header: t("admin.plans.col.name"), cell: (item) => item.name },
-            { id: "traffic", header: t("admin.plans.col.trafficLimit"), cell: (item) => formatTraffic(item.traffic_limit) },
-            { id: "duration", header: t("admin.plans.col.duration"), cell: (item) => `${item.duration_days}d` },
-            { id: "devices", header: t("admin.plans.col.maxDevices"), cell: (item) => item.max_devices },
-            {
-              id: "concurrent",
-              header: t("admin.plans.col.maxConcurrent"),
-              cell: (item) => (item.max_concurrent === null ? item.max_devices : item.max_concurrent),
-            },
-            { id: "speed", header: t("admin.plans.col.speedLimit"), cell: (item) => formatSpeed(item.speed_limit) },
-            { id: "nodeGroup", header: t("admin.plans.col.nodeGroup"), cell: (item) => item.node_group_name ?? "-" },
-            {
-              id: "active",
-              header: t("admin.plans.col.active"),
-              cell: (item) => item.is_active ? t("admin.plans.yes") : t("admin.plans.no"),
-            },
-            {
-              id: "purchasable",
-              header: t("admin.plans.col.purchasable"),
-              cell: (item) => (
-                <StatusIndicator type={item.purchasable ? "success" : "stopped"}>
-                  {item.purchasable
-                    ? t("admin.plans.purchasableYes")
-                    : t("admin.plans.purchasableNo")}
-                </StatusIndicator>
-              ),
-            },
-            {
-              id: "actions",
-              header: t("admin.plans.col.actions"),
-              cell: (item) => (
-                <SpaceBetween direction="horizontal" size="xs">
-                  <Button variant="inline-link" disabled={detailLoading} onClick={() => void handleEditOpen(item)}>{t("admin.plans.edit")}</Button>
-                  <Button variant="inline-link" disabled={detailLoading} onClick={() => void handleEditOpen(item, true)}>{t("admin.routeManagement.manage")}</Button>
-                  <Button variant="inline-link" disabled={actionLoading || detailLoading || (!item.is_advertised && (!item.advertise || !item.is_active || !item.purchasable))} onClick={() => setPublishModal(item)}>{t(item.is_advertised ? "admin.plans.editor.unpublish" : "admin.plans.editor.publish")}</Button>
-                  <Button variant="inline-link" onClick={() => setDeleteModal(item)}>{t("admin.plans.delete")}</Button>
-                </SpaceBetween>
-              ),
-            },
-          ]}
-          empty={<Box textAlign="center">{t("admin.plans.empty")}</Box>}
-        />
+        <div className="plans-list">
+          <Header
+            actions={
+              <Button variant="primary" disabled={detailLoading} onClick={() => { setError(null); setShowErrors(false); setForm(emptyForm); setInitialForm(JSON.stringify(emptyForm)); setCreateModal(true); }}>
+                {t("admin.plans.create")}
+              </Button>
+            }
+            counter={`(${plans.length})`}
+          >
+            {t("admin.plans.title")}
+          </Header>
+          {plans.length === 0 ? <Box textAlign="center">{t("admin.plans.empty")}</Box> : (
+            <ul className="plans-list__items">
+              {plans.map(item => (
+                <li key={item.id}>
+                  <Container>
+                    <div className="plans-list__heading">
+                      <div className="plans-list__identity">
+                        <h2 className="plans-list__name">{item.name}</h2>
+                        <div className="plans-list__publication">
+                          <Box variant="small" color="text-body-secondary">{t("admin.plans.editor.publication")}</Box>
+                          <StatusIndicator type={item.is_advertised ? "success" : "stopped"}>
+                            {t(item.is_advertised ? "admin.plans.editor.published" : item.advertise ? "admin.plans.editor.ready" : "admin.plans.editor.private")}
+                          </StatusIndicator>
+                        </div>
+                      </div>
+                      <ButtonDropdown
+                        variant="inline-icon"
+                        ariaLabel={`${t("admin.plans.col.actions")}: ${item.name}`}
+                        expandToViewport
+                        items={[
+                          { id: "edit", text: t("admin.plans.edit"), disabled: detailLoading },
+                          { id: "routes", text: t("admin.routeManagement.manage"), disabled: detailLoading },
+                          { id: "publish", text: t(item.is_advertised ? "admin.plans.editor.unpublish" : "admin.plans.editor.publish"), disabled: actionLoading || detailLoading || (!item.is_advertised && (!item.advertise || !item.is_active || !item.purchasable)) },
+                          { id: "delete", text: t("admin.plans.delete") },
+                        ]}
+                        onItemClick={({ detail }) => {
+                          if (detail.id === "edit") void handleEditOpen(item);
+                          if (detail.id === "routes") void handleEditOpen(item, true);
+                          if (detail.id === "publish") setPublishModal(item);
+                          if (detail.id === "delete") setDeleteModal(item);
+                        }}
+                      />
+                    </div>
+                    <dl className="plans-list__details">
+                      <div><dt>{t("admin.plans.col.trafficLimit")}</dt><dd>{formatTraffic(item.traffic_limit, t("admin.plans.unlimited"))}</dd></div>
+                      <div><dt>{t("admin.plans.col.duration")}</dt><dd>{t("common.duration.days", { count: item.duration_days })}</dd></div>
+                      <div><dt>{t("admin.plans.col.maxDevices")}</dt><dd>{item.max_devices}</dd></div>
+                      <div><dt>{t("admin.plans.col.maxConcurrent")}</dt><dd>{item.max_concurrent === null ? item.max_devices : item.max_concurrent}</dd></div>
+                      <div><dt>{t("admin.plans.col.speedLimit")}</dt><dd>{formatSpeed(item.speed_limit, t("admin.plans.unlimited"))}</dd></div>
+                      <div><dt>{t("admin.plans.col.nodeGroup")}</dt><dd>{item.node_group_name ?? "-"}</dd></div>
+                      <div><dt>{t("admin.plans.col.active")}</dt><dd>{item.is_active ? t("admin.plans.yes") : t("admin.plans.no")}</dd></div>
+                      <div><dt>{t("admin.plans.col.purchasable")}</dt><dd><StatusIndicator type={item.purchasable ? "success" : "stopped"}>{t(item.purchasable ? "admin.plans.purchasableYes" : "admin.plans.purchasableNo")}</StatusIndicator></dd></div>
+                    </dl>
+                  </Container>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
 
         <Modal visible={publishModal !== null} onDismiss={() => !actionLoading && setPublishModal(null)} header={t(publishModal?.is_advertised ? "admin.plans.editor.unpublish" : "admin.plans.editor.publish")} footer={<Box float="right"><SpaceBetween direction="horizontal" size="xs"><Button disabled={actionLoading} onClick={() => setPublishModal(null)}>{t("admin.plans.cancel")}</Button><Button variant="primary" loading={actionLoading} onClick={() => void handlePublish()}>{t(publishModal?.is_advertised ? "admin.plans.editor.unpublish" : "admin.plans.editor.publish")}</Button></SpaceBetween></Box>}>
           {t(publishModal?.is_advertised ? "admin.plans.editor.unpublishConfirm" : "admin.plans.editor.publishConfirm", { name: publishModal?.name })}
