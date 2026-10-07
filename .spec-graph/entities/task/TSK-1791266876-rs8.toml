@@ -1,0 +1,28 @@
+schema = 1
+id = "TSK-1791266876-rs8"
+type = "task"
+title = "Recompose plan-management list for responsive readability"
+description = "Address the dense and clipped plan table shown in the supplied screenshot during the collected frontend design batch."
+status = "active"
+created_at = 2026-10-06T15:07:56+09:00
+updated_at = 2026-10-06T15:09:47+09:00
+
+[metadata]
+acceptance = ["The plan row and headings are not cut off or awkwardly wrapped in the supplied wide layout.", "All original plan values and actions remain accessible, and narrower widths do not hide critical state or controls.", "Publication, active state, and purchasability retain their distinct meanings."]
+instructions = ["Rebalance the plan list around plan identity, essential limits, availability, and publication status rather than eleven equal-weight columns.", "Keep secondary attributes discoverable through a clear detail or expansion pattern and consolidate the four row actions into a predictable control.", "Review long names, translated labels, value formatting, and narrow-width overflow or responsive behavior in a browser."]
+must_not = ["Do not change plan pricing, concurrency, advertisement, or purchase semantics.", "Do not implement until the collected batch is approved."]
+order = 6.0
+qa = [{command = "cd web && npm run build && npm run check:locales", evidence = "", expected = "exit 0; wide and narrow browser review confirms readable rows and reachable actions"}]
+references = ["web/src/pages/admin/Plans.tsx", "web/src/i18n/locales/ko.json"]
+
+[[relations]]
+to = "PHS-1791263728-b0s"
+type = "belongs_to"
+
+[[relations]]
+to = "REQ-1791266876-2zk"
+type = "covers"
+
+[[relations]]
+to = "REQ-1791266876-2zk"
+type = "delivers"

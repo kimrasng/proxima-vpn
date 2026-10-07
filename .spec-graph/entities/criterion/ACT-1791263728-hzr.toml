@@ -1,0 +1,12 @@
+schema = 1
+id = "ACT-1791263728-hzr"
+type = "criterion"
+title = "Node list layout is balanced across widths"
+status = "draft"
+created_at = 2026-10-06T14:15:28+09:00
+updated_at = 2026-10-06T14:15:28+09:00
+
+[metadata]
+given = "The admin node list has its normal columns and rows"
+then = "The table aligns with its container without a large unexplained right-side gap, dividers and columns are consistent, and narrow widths retain usable overflow."
+when = "It is viewed at wide and narrow viewport widths"

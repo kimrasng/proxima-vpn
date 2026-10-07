@@ -6,6 +6,7 @@ import {
   Button,
   Container,
   Header,
+  Popover,
   SpaceBetween,
   StatusIndicator,
   Table,
@@ -14,6 +15,7 @@ import { getPlanRoutes, listNodeChains, listNodes, setPlanRoutes } from "../../a
 import type { Node, NodeChain, NodeGroup, Plan, PlanRoutesResponse } from "../../api/types";
 import { adminError } from "../../utils/adminError";
 import { routeConfigurationIssues } from "../../utils/routeConfiguration";
+import "./planRoutesPanel.css";
 
 interface PlanRoutesPanelProps {
   plan: Plan;
@@ -114,6 +116,20 @@ export default function PlanRoutesPanel({
   const blocked = disabled || policyChanged || applying || loading || routes === null;
   const routeName = (row: RouteRow) => row.chain?.name ?? t("admin.routeManagement.missingRoute", { id: row.id });
   const groupName = routes && (nodeGroups.find((group) => group.id === routes.node_group_id)?.name ?? routes.node_group_id);
+  const policyLabel = routes?.speed_enforcement === "device_global_v1"
+    ? t("admin.routeManagement.deviceSpeed", { speed: routes.speed_limit ?? plan.speed_limit ?? 0 })
+    : routes?.speed_enforcement === "shared_tier"
+      ? t("admin.routeManagement.sharedTierSpeed", { speed: routes.speed_limit ?? plan.speed_limit ?? 0 })
+      : t("admin.routeManagement.unlimitedSpeed");
+  const guidance = [
+    t("admin.routeManagement.availabilityWarning"),
+    ...(routes?.speed_enforcement === "device_global_v1" ? [t("admin.routeManagement.devicePolicyWarning")] :
+      routes?.speed_enforcement === "shared_tier" ? [t("admin.routeManagement.perDeviceWarning")] : []),
+    t("admin.routeManagement.sharedGroupWarning"),
+    ...(routes?.warnings ?? []).filter((warning) => warning !== "route_assignment_not_subscriber_readiness" &&
+      !(routes?.speed_enforcement === "device_global_v1" && warning === "device_bandwidth_requires_current_agent_ack"))
+      .map((warning) => t(`admin.routeManagement.serverWarnings.${warning}`, { defaultValue: warning })),
+  ];
 
   const serverStatus = (nodeId: string) => {
     const node = nodes.find((item) => item.id === nodeId);
@@ -124,29 +140,26 @@ export default function PlanRoutesPanel({
 
   return (
     <section id="plan-routes" aria-label={t("admin.routeManagement.planTitle")}>
-      <Container header={<Header variant="h2" description={t("admin.routeManagement.planDescription")}>{t("admin.routeManagement.planTitle")}</Header>}>
-        <SpaceBetween size="m">
-          <Alert type="info">{t("admin.routeManagement.availabilityWarning")}</Alert>
-          <Alert type="warning">{t(routes?.speed_enforcement === "device_global_v1" ? "admin.routeManagement.devicePolicyWarning" : "admin.routeManagement.perDeviceWarning")}</Alert>
-          <Alert type="info">{t("admin.routeManagement.sharedGroupWarning")}</Alert>
+      <Container header={<Header variant="h2">{t("admin.routeManagement.planTitle")}</Header>}>
+        <SpaceBetween size="s">
+          <div className="plan-routes-summary">
+            {routes && <Box>{t("admin.routeManagement.savedGroup", { group: groupName })} · {t("admin.routeManagement.speedPolicy")}: {policyLabel}</Box>}
+            <Popover triggerType="custom" position="top" header={t("admin.routeManagement.guidance")}
+              content={<SpaceBetween size="xs">{guidance.map((message, index) => <Box key={`${index}-${message}`}>{message}</Box>)}</SpaceBetween>}>
+              <Button variant="inline-link" iconName="status-info">{t("admin.routeManagement.guidance")}</Button>
+            </Popover>
+          </div>
           {policyChanged && <Alert type="warning">{t("admin.routeManagement.groupChanged")}</Alert>}
           {dirty && <Alert type="warning">{t("admin.routeManagement.pendingChanges", { defaultValue: "Apply or discard your route changes before saving plan settings. Refresh is disabled while route changes are unapplied." })}</Alert>}
           {error && <Alert type="error">{error}</Alert>}
           {applied && <Alert type="success">{t("admin.routeManagement.applied")}</Alert>}
-          {routes && <>
-            <Box>{t("admin.routeManagement.savedGroup", { group: groupName })}</Box>
-            <Box>{t("admin.routeManagement.speedPolicy")}: {routes.speed_enforcement === "device_global_v1"
-              ? t("admin.routeManagement.deviceSpeed", { speed: routes.speed_limit ?? plan.speed_limit ?? 0 })
-              : routes.speed_enforcement === "shared_tier"
-                ? t("admin.routeManagement.sharedTierSpeed", { speed: routes.speed_limit ?? plan.speed_limit ?? 0 })
-                : t("admin.routeManagement.unlimitedSpeed")}</Box>
-            {routes.warnings.map((warning, index) => <Alert key={`${index}-${warning}`} type="warning">{warning}</Alert>)}
-          </>}
           {missingIds.length > 0 && <Alert type="warning">{t("admin.routeManagement.missingRoutesWarning")}</Alert>}
+          <div className="intrinsic-table">
           <Table<RouteRow>
             items={rows}
             trackBy="id"
-            wrapLines
+            wrapLines={false}
+            resizableColumns={false}
             loading={loading}
             loadingText={t("admin.routeManagement.loading")}
             selectionType="multi"
@@ -171,27 +184,31 @@ export default function PlanRoutesPanel({
             empty={<Box textAlign="center">{t("admin.routeManagement.planEmpty")}</Box>}
             columnDefinitions={[
               { id: "name", header: t("admin.routeManagement.name"), cell: routeName },
-              { id: "path", header: t("admin.routeManagement.path"), cell: ({ chain }) => chain ? <>
-                <Box>{chain.entry_host}{chain.entry_port ? `:${chain.entry_port}` : ""} → {chain.exit_node_name}:{chain.exit_port}</Box>
-                <Box variant="small" color="text-body-secondary">{chain.entry_node_name ?? chain.relay_pool_name ?? chain.exit_node_name} → {chain.exit_node_name}</Box>
-              </> : "—" },
+              { id: "path", header: t("admin.routeManagement.path"), cell: ({ chain }) => chain ? (
+                <Box>{chain.entry_host || nodes.find((node) => node.id === chain.exit_node_id)?.ip || "—"}:{chain.entry_port ?? chain.exit_port} → {chain.exit_node_name}:{chain.exit_port}</Box>
+              ) : "—" },
               { id: "enabled", header: t("admin.routeManagement.enabled"), cell: ({ chain }) => chain ? <StatusIndicator type={chain.enabled ? "success" : "stopped"}>
                 {t(`admin.routeManagement.${chain.enabled ? "enabled" : "disabled"}`)}
               </StatusIndicator> : t("admin.routeManagement.unknown") },
-              { id: "health", header: t("admin.routeManagement.serverHealth"), cell: ({ chain }) => chain ? <SpaceBetween size="xs">
-                {chain.entry_node_id && <div>{t("admin.routeManagement.entryServer")}: {serverStatus(chain.entry_node_id)}</div>}
-                <div>{t("admin.routeManagement.exitServer")}: {serverStatus(chain.exit_node_id)}</div>
-                <div>{t("admin.routeManagement.routeHealth")}: <StatusIndicator type={chain.health === "healthy" ? "success" : !chain.health || chain.health === "unknown" ? "info" : "warning"}>
-                  {t(`admin.routeManagement.${chain.health === "healthy" ? "healthHealthy" : !chain.health || chain.health === "unknown" ? "healthUnknown" : "healthUnhealthy"}`)}
-                </StatusIndicator></div>
+              { id: "health", header: t("admin.routeManagement.serverHealth"), cell: ({ chain }) => chain ? <SpaceBetween direction="horizontal" size="xs" alignItems="center">
+                {chain.entry_node_id && <span>{t("admin.routeManagement.entryServer")}: {serverStatus(chain.entry_node_id)}</span>}
+                <span>{t("admin.routeManagement.exitServer")}: {serverStatus(chain.exit_node_id)}</span>
               </SpaceBetween> : t("admin.routeManagement.unknown") },
               { id: "checks", header: t("admin.routeManagement.checks"), cell: ({ chain }) => {
                 if (!chain) return t("admin.routeManagement.unknown");
-                const issues = routeConfigurationIssues(chain, nodes);
-                return issues.length > 0 ? <SpaceBetween size="xs">{issues.map((issue) => <Box key={issue}>{t(`admin.routeManagement.issues.${issue}`)}</Box>)}</SpaceBetween> : t("admin.routeManagement.noIssues");
+                const issues = routeConfigurationIssues(chain, nodes).filter(
+                  (issue) => issue !== "disabled" && issue !== "entryOffline" && issue !== "exitOffline",
+                );
+                return issues.length ? <Popover triggerType="custom" position="top" header={t("admin.routeManagement.checks")}
+                  content={<SpaceBetween size="xs">{issues.map((issue) => <Box key={issue}>{t(`admin.routeManagement.issues.${issue}`)}</Box>)}</SpaceBetween>}>
+                  <Button variant="inline-link" ariaLabel={t("admin.routeManagement.issueDetails", { count: issues.length })}>
+                    {t("admin.routeManagement.issueCount", { count: issues.length })}
+                  </Button>
+                </Popover> : t("admin.routeManagement.noIssues");
               } },
             ]}
           />
+          </div>
           <SpaceBetween direction="horizontal" size="xs">
             <Button disabled={disabled || applying || loading || dirty} onClick={() => void load()}>{t("admin.routeManagement.refresh")}</Button>
             {dirty && <Button disabled={disabled || applying || loading} onClick={() => {

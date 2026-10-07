@@ -1,0 +1,12 @@
+schema = 1
+id = "ACT-1791263728-kqv"
+type = "criterion"
+title = "Localized node-name editor exposes coverage and fallback"
+status = "draft"
+created_at = 2026-10-06T14:15:28+09:00
+updated_at = 2026-10-06T14:15:28+09:00
+
+[metadata]
+given = "An administrator edits a node with a base name and optional ko/en/zh labels"
+then = "The editor shows which translations are set, previews the effective subscription name per language, explains fallback to the base name, and does not silently overwrite other languages."
+when = "They select a language, edit a label, or leave it blank"

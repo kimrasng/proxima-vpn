@@ -1,0 +1,69 @@
+.plans-list {
+  min-width: 0;
+}
+
+.plans-list__items {
+  display: grid;
+  gap: 16px;
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+}
+
+.plans-list__items > li {
+  min-width: 0;
+}
+
+.plans-list__heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  min-width: 0;
+}
+
+.plans-list__identity {
+  min-width: 0;
+}
+
+.plans-list__name {
+  font-size: 1.125rem;
+  line-height: 1.4;
+  margin: 0 0 8px;
+  overflow-wrap: anywhere;
+  word-break: keep-all;
+}
+
+.plans-list__publication {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: keep-all;
+}
+
+.plans-list__details {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+  gap: 16px 24px;
+  margin: 20px 0 0;
+  min-width: 0;
+}
+
+.plans-list__details > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: keep-all;
+}
+
+.plans-list__details dt {
+  opacity: 0.7;
+  font-size: 0.875rem;
+  margin-bottom: 4px;
+}
+
+.plans-list__details dd {
+  margin: 0;
+}

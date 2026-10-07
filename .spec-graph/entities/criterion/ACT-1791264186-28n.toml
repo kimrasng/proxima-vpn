@@ -1,0 +1,12 @@
+schema = 1
+id = "ACT-1791264186-28n"
+type = "criterion"
+title = "Node role badges do not imply direct publication"
+status = "draft"
+created_at = 2026-10-06T14:23:06+09:00
+updated_at = 2026-10-06T14:23:06+09:00
+
+[metadata]
+given = "An Exit node may have relayed routes, direct routes, both, or no published routes"
+then = "The role badge remains Entry, Exit, or both; any direct-route indicator is separately labeled and derives from the relevant configured and published route state rather than the Exit role alone."
+when = "An administrator views node roles and route links"

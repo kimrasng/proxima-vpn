@@ -1,0 +1,17 @@
+schema = 1
+id = "PHS-1791263728-b0s"
+type = "phase"
+title = "Collected frontend design polish"
+description = "Implement the collected design corrections in one coordinated frontend batch. Keep draft while gathering requests."
+status = "active"
+created_at = 2026-10-06T14:15:28+09:00
+updated_at = 2026-10-06T15:09:47+09:00
+
+[metadata]
+exit_criteria = ["Collected visual issues meet their browser acceptance criteria", "The web build passes"]
+goal = "Improve table readability and localized-content editing without changing underlying node behavior"
+order = 1.0
+
+[[relations]]
+to = "PLN-1791263728-8pn"
+type = "belongs_to"

@@ -1,0 +1,28 @@
+schema = 1
+id = "TSK-1791264186-hj5"
+type = "task"
+title = "Clarify node role versus direct-connection labels"
+description = "Keep topology role distinct from route type and subscription publication in the node list and linked route-management UI during the collected design batch."
+status = "active"
+created_at = 2026-10-06T14:23:06+09:00
+updated_at = 2026-10-06T15:09:47+09:00
+
+[metadata]
+acceptance = ["An Exit node is not automatically described as direct-only.", "The list can distinguish role from direct versus relayed paths without implying an unverified or unpublished path is live."]
+instructions = ["Keep the node role column limited to Entry, Exit and combined role.", "If showing direct access, place it under a clearly named route/publication indicator rather than changing the role badge.", "Distinguish route configuration from actually published subscription access and keep related wording consistent with route management."]
+must_not = ["Do not change role, route or subscription semantics merely to simplify labels.", "Do not implement until the collected batch is approved."]
+order = 5.0
+qa = [{command = "cd web && npm run build && npm run check:locales", evidence = "", expected = "exit 0; browser labels reviewed for Entry, Exit and combined nodes with direct and relayed routes"}]
+references = ["web/src/pages/admin/Nodes.tsx", "web/src/pages/admin/NodeChains.tsx", "web/src/i18n/locales/ko.json"]
+
+[[relations]]
+to = "PHS-1791263728-b0s"
+type = "belongs_to"
+
+[[relations]]
+to = "REQ-1791264186-rvg"
+type = "covers"
+
+[[relations]]
+to = "REQ-1791264186-rvg"
+type = "delivers"

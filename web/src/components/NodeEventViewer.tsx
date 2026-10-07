@@ -10,6 +10,7 @@ import {
   Multiselect,
   type MultiselectProps,
   Pagination,
+  Popover,
   Select,
   type SelectProps,
   SpaceBetween,
@@ -18,6 +19,7 @@ import {
 } from "@cloudscape-design/components";
 import { getNodeEventFilters, getNodeEvents } from "../api/admin";
 import type { ActivityEntry } from "../api/types";
+import "./NodeEventViewer.css";
 
 const PAGE_SIZE = 20;
 
@@ -231,8 +233,11 @@ export function NodeEventViewer({ nodeId }: { nodeId: string }) {
             <StatusIndicator type="error">{t("admin.nodeEvents.error")}</StatusIndicator>
           </Box>
         ) : (
-          <Table
+          <div className="intrinsic-table node-event-viewer__table">
+            <Table
             variant="embedded"
+            wrapLines={false}
+            resizableColumns={false}
             loading={loading}
             loadingText={t("admin.nodeEvents.title")}
             items={page.items}
@@ -248,56 +253,76 @@ export function NodeEventViewer({ nodeId }: { nodeId: string }) {
               {
                 id: "time",
                 header: t("admin.nodeEvents.colTime"),
-                width: 130,
+                minWidth: 130,
                 cell: (item) => (
                   <Box variant="small" color="text-body-secondary">
-                    {formatTime(item.created_at)}
+                    <span className="node-event-viewer__time">{formatTime(item.created_at)}</span>
                   </Box>
                 ),
               },
               {
                 id: "severity",
                 header: t("admin.nodeEvents.colSeverity"),
-                width: 110,
+                minWidth: 130,
                 cell: (item) => (
-                  <SpaceBetween direction="horizontal" size="xxs" alignItems="center">
+                  <span className="node-event-viewer__severity">
                     <Icon
                       name={SEVERITY_ICON[item.severity].name}
                       variant={SEVERITY_ICON[item.severity].variant}
                     />
-                    <Box variant="small">{t(`admin.nodeEvents.severity.${item.severity}`)}</Box>
-                  </SpaceBetween>
+                    <Box variant="small">{t(`admin.nodeEvents.severity.${item.severity}`, { defaultValue: item.severity })}</Box>
+                  </span>
                 ),
               },
               {
                 id: "event",
                 header: t("admin.nodeEvents.colEvent"),
+                minWidth: 140,
                 cell: (item) => eventLabel(item),
               },
               {
                 id: "actor",
                 header: t("admin.nodeEvents.colActor"),
-                width: 170,
+                minWidth: 130,
                 cell: (item) => (
-                  <Box variant="small">{item.actor_label || item.actor_type}</Box>
+                  <Box variant="small">
+                    <span className="node-event-viewer__actor">{item.actor_label || item.actor_type}</span>
+                  </Box>
                 ),
               },
               {
                 id: "detail",
                 header: t("admin.nodeEvents.colDetail"),
+                minWidth: 180,
                 cell: (item) => {
                   const text = formatDetail(item.detail);
                   return text ? (
-                    <Box variant="small" color="text-body-secondary">
-                      <span style={{ fontFamily: "monospace" }}>{text}</span>
-                    </Box>
+                    <div className="node-event-viewer__detail">
+                      <Box variant="small" color="text-body-secondary">
+                        <span className="node-event-viewer__detail-preview">{text}</span>
+                      </Box>
+                      <Popover
+                        triggerType="custom"
+                        position="top"
+                        size="medium"
+                        header={t("admin.nodeEvents.colDetail")}
+                        content={<div className="node-event-viewer__detail-full">{text}</div>}
+                      >
+                        <Button
+                          variant="inline-icon"
+                          iconName="status-info"
+                          ariaLabel={`${t("admin.nodeEvents.colDetail")}: ${text}`}
+                        />
+                      </Popover>
+                    </div>
                   ) : (
                     <Box color="text-status-inactive">—</Box>
                   );
                 },
               },
             ]}
-          />
+            />
+          </div>
         )}
 
         {pagesCount > 1 && (

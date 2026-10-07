@@ -1,0 +1,17 @@
+schema = 1
+id = "REQ-1791263728-q6s"
+type = "requirement"
+title = "Admin node list table uses its container coherently"
+description = "The supplied wide-viewport screenshot shows a table that ends well before the card edge with uneven column spacing and header dividers. Correct its visual balance while retaining narrow-width usability."
+status = "active"
+created_at = 2026-10-06T14:15:28+09:00
+updated_at = 2026-10-06T15:30:48+09:00
+
+[metadata]
+kind = "functional"
+owner = "frontend"
+priority = "should"
+
+[[relations]]
+to = "ACT-1791263728-hzr"
+type = "has_criterion"

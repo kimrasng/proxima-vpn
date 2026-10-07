@@ -1,0 +1,17 @@
+schema = 1
+id = "REQ-1791264103-397"
+type = "requirement"
+title = "Route management presents one coherent selection and route hierarchy"
+description = "The supplied route-management screenshot shows an all-routes entry selector alongside a node-specific filter banner, an always-large port-map card even without a selected Entry, and a dense table mixing endpoint, destination, plans, configuration and actions. Restructure this as a clear selection-to-route workflow without changing routing semantics."
+status = "active"
+created_at = 2026-10-06T14:21:43+09:00
+updated_at = 2026-10-06T15:30:48+09:00
+
+[metadata]
+kind = "functional"
+owner = "frontend"
+priority = "should"
+
+[[relations]]
+to = "ACT-1791264103-t50"
+type = "has_criterion"

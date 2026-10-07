@@ -1,0 +1,38 @@
+/* Keep scope controls and rows in one full-width card. The browser shares
+   extra width across data columns while Cloudscape scrolls on narrow screens. */
+.route-table {
+  min-inline-size: 0;
+  inline-size: 100%;
+}
+
+.route-table table {
+  table-layout: auto !important;
+  inline-size: 100% !important;
+  min-inline-size: max-content !important;
+}
+
+.route-table th:last-child {
+  width: 64px !important;
+}
+
+.route-table__filter {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  min-inline-size: 0;
+}
+
+.route-table__select {
+  inline-size: min(100%, 24rem);
+  min-inline-size: 0;
+}
+
+.route-table__filter-context {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-inline-size: 0;
+  padding-block-end: 4px;
+}

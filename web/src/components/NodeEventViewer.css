@@ -1,0 +1,46 @@
+.node-event-viewer__time {
+  white-space: nowrap;
+}
+
+.node-event-viewer__severity {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  white-space: nowrap;
+}
+
+.node-event-viewer__actor {
+  overflow-wrap: anywhere;
+}
+
+.node-event-viewer__detail {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.node-event-viewer__detail > :first-child {
+  min-width: 0;
+}
+
+.node-event-viewer__table td:last-child {
+  max-inline-size: min(32rem, 45vw);
+}
+
+.node-event-viewer__detail-preview {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: monospace;
+}
+
+.node-event-viewer__detail-full {
+  max-height: 20rem;
+  overflow: auto;
+  font-family: monospace;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}

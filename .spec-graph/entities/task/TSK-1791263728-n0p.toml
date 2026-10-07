@@ -1,0 +1,28 @@
+schema = 1
+id = "TSK-1791263728-n0p"
+type = "task"
+title = "Polish admin node list table layout"
+description = "Address the visual defect in the first supplied screenshot during the collected design batch."
+status = "active"
+created_at = 2026-10-06T14:15:28+09:00
+updated_at = 2026-10-06T15:09:47+09:00
+
+[metadata]
+acceptance = ["The node table no longer leaves a large unexplained blank area on wide screens.", "Headers, row cells and narrow-screen overflow remain readable."]
+instructions = ["Review Cloudscape table sizing and the scoped max-content CSS against the screenshot.", "Correct node list sizing, column distribution and header alignment without changing data behavior."]
+must_not = ["Do not change backend APIs or unrelated tables.", "Do not implement until the batch is approved."]
+order = 1.0
+qa = [{command = "cd web && npm run build", evidence = "", expected = "exit 0; browser layout reviewed at wide and narrow widths"}]
+references = ["web/src/pages/admin/Nodes.tsx", "web/src/pages/admin/nodesTable.css"]
+
+[[relations]]
+to = "PHS-1791263728-b0s"
+type = "belongs_to"
+
+[[relations]]
+to = "REQ-1791263728-q6s"
+type = "covers"
+
+[[relations]]
+to = "REQ-1791263728-q6s"
+type = "delivers"

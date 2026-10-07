@@ -1,0 +1,12 @@
+schema = 1
+id = "ACT-1791267849-09g"
+type = "criterion"
+title = "Tables preserve text and column access at wide and narrow widths"
+status = "draft"
+created_at = 2026-10-06T15:24:09+09:00
+updated_at = 2026-10-06T15:24:09+09:00
+
+[metadata]
+given = "Tables show localized labels, typical values and some long values"
+then = "Ordinary headers and cells are not cut off or unexpectedly wrapped, columns fit their content where practical, user column resizing is disabled, and horizontal scrolling keeps remaining columns reachable."
+when = "They render at desktop and mobile widths"

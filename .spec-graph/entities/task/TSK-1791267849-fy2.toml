@@ -1,0 +1,28 @@
+schema = 1
+id = "TSK-1791267849-fy2"
+type = "task"
+title = "Apply consistent intrinsic non-wrapping table sizing"
+description = "Apply a shared readable Cloudscape table sizing pattern across existing data tables, including the subscription domain pool, without changing data or row actions."
+status = "active"
+created_at = 2026-10-06T15:24:09+09:00
+updated_at = 2026-10-06T15:24:09+09:00
+
+[metadata]
+acceptance = ["The subscription-domain pool and the remaining data tables do not break short headers and values across lines.", "Narrow widths can reach all columns by horizontal scrolling without page-wide overflow or draggable column separators."]
+instructions = ["Use a shared opt-in table wrapper style, preserving Cloudscape horizontal scrolling and appropriate full-text affordances for long payloads.", "Apply to tabular admin and user screens with no interactive column resizing, retaining explicit exceptions for long text layouts."]
+must_not = ["Do not convert non-tabular plan summary cards into tables.", "Do not force unbounded event details or descriptions into one enormous column."]
+order = 7.0
+qa = [{command = "cd web && npm run build && npm run check:locales", evidence = "", expected = "exit 0; browser checks confirm table width and narrow-screen scrolling"}]
+references = ["web/src/pages/admin/SubscriptionDomains.tsx", "web/src/pages/admin/Nodes.tsx", "web/src/components/NodeEventViewer.tsx"]
+
+[[relations]]
+to = "PHS-1791263728-b0s"
+type = "belongs_to"
+
+[[relations]]
+to = "REQ-1791267849-v35"
+type = "covers"
+
+[[relations]]
+to = "REQ-1791267849-v35"
+type = "delivers"

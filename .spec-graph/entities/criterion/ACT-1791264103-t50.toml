@@ -1,0 +1,12 @@
+schema = 1
+id = "ACT-1791264103-t50"
+type = "criterion"
+title = "Route scope and next action are unambiguous"
+status = "draft"
+created_at = 2026-10-06T14:21:43+09:00
+updated_at = 2026-10-06T14:21:43+09:00
+
+[metadata]
+given = "An administrator opens route management either directly or from a node deep link"
+then = "One visible selection context agrees with the actual route list, the Entry port map is shown only when relevant, each route summarizes Entry address and port to Exit and plan with readable status, and edit or enable actions remain discoverable."
+when = "They view all routes or select an Entry node"

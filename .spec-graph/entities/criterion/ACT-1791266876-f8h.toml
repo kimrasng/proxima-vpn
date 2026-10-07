@@ -1,0 +1,12 @@
+schema = 1
+id = "ACT-1791266876-f8h"
+type = "criterion"
+title = "Plan summary, statuses and actions remain legible across widths"
+status = "draft"
+created_at = 2026-10-06T15:07:56+09:00
+updated_at = 2026-10-06T15:07:56+09:00
+
+[metadata]
+given = "The plan list includes long names, traffic and speed limits, route groups, publication and purchase status, and four management actions"
+then = "The primary plan identity and key limits are readable, secondary details remain accessible, status meanings are distinct, and actions do not clip or wrap into an ambiguous cluster."
+when = "An administrator views it at wide or narrow viewport widths in supported languages"

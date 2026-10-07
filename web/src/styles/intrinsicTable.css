@@ -1,0 +1,43 @@
+/* Cloudscape tables keep their own scroll wrapper; let intrinsic content define
+   columns and let that wrapper scroll when the viewport is too narrow. This is
+   shared by every data table, not just the explicitly marked examples. */
+.intrinsic-table {
+  min-inline-size: 0;
+  max-inline-size: 100%;
+}
+
+.intrinsic-table table,
+table[class*="awsui_table_"] {
+  table-layout: auto !important;
+  inline-size: 100% !important;
+  min-inline-size: max-content !important;
+}
+
+/* Cloudscape writes measured widths inline on headers. Let the browser
+   measure labels and cells instead of retaining stale or fixed widths. */
+.intrinsic-table th,
+table[class*="awsui_table_"] th {
+  width: auto !important;
+}
+
+.intrinsic-table th,
+.intrinsic-table td,
+table[class*="awsui_table_"] th,
+table[class*="awsui_table_"] td {
+  white-space: nowrap !important;
+  overflow-wrap: normal !important;
+  word-break: normal !important;
+}
+
+/* A few tables have deliberately bounded long-form detail cells. */
+.intrinsic-table td:has([data-intrinsic-wrap]),
+table[class*="awsui_table_"] td:has([data-intrinsic-wrap]) {
+  max-inline-size: 30rem;
+  white-space: normal !important;
+}
+
+.intrinsic-table [data-intrinsic-wrap],
+table[class*="awsui_table_"] [data-intrinsic-wrap] {
+  white-space: normal !important;
+  overflow-wrap: anywhere !important;
+}

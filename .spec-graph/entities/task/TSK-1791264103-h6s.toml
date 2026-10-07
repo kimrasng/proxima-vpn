@@ -1,0 +1,28 @@
+schema = 1
+id = "TSK-1791264103-h6s"
+type = "task"
+title = "Simplify route management hierarchy and list"
+description = "Recompose the route-management page in the collected frontend design batch so selection, port mapping, route summaries and row actions follow a single understandable workflow."
+status = "active"
+created_at = 2026-10-06T14:21:43+09:00
+updated_at = 2026-10-06T15:09:47+09:00
+
+[metadata]
+acceptance = ["The selection label, active filter and visible results do not contradict each other.", "The all-routes view is concise, while selecting an Entry reveals the relevant port-to-Exit map and add-Exit action.", "Wide and narrow layouts keep route summary and actions understandable without losing warning meaning."]
+instructions = ["Unify Entry, Exit and node deep-link filters into one coherent visible filter context with clear reset behavior.", "Present the port map only for a selected Entry and make each route legibly summarize public endpoint and port, Exit destination, assigned plans and configuration state.", "De-emphasize repeated setup and state disclaimers; consolidate row actions while preserving create, edit, enable and plan navigation."]
+must_not = ["Do not change route configuration, publication or endpoint semantics.", "Do not imply an unapplied or unverified configuration is healthy.", "Do not implement until the collected batch is approved."]
+order = 4.0
+qa = [{command = "cd web && npm run build && npm run check:locales", evidence = "", expected = "exit 0; browser flow reviewed for all-routes, deep-link and selected-Entry states"}]
+references = ["web/src/pages/admin/NodeChains.tsx", "web/src/pages/admin/NodeChainForm.tsx"]
+
+[[relations]]
+to = "PHS-1791263728-b0s"
+type = "belongs_to"
+
+[[relations]]
+to = "REQ-1791264103-397"
+type = "covers"
+
+[[relations]]
+to = "REQ-1791264103-397"
+type = "delivers"

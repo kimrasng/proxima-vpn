@@ -1,17 +1,32 @@
+/* Fill the available card width and share spare room across data columns.
+   Keep the trailing action column compact and scroll the table on small screens. */
 .nodes-table {
   min-inline-size: 0;
-  max-inline-size: 100%;
+  inline-size: 100%;
 }
 
-/* Size columns from their labels and values, without distributing spare
-   viewport space across every column. Cloudscape handles overflow internally. */
 .nodes-table table {
-  /* Cloudscape's scoped rules use :not(#...) specificity and measured widths.
-     Override those only here so intrinsic content, not stale measurements,
-     determines the column sizes. */
   table-layout: auto !important;
-  inline-size: max-content !important;
-  min-inline-size: 0 !important;
+  inline-size: 100% !important;
+  min-inline-size: max-content !important;
+}
+
+.nodes-table th[data-focus-id="header-actions"] {
+  width: 60px !important;
+}
+
+/* Cloudscape's trailing sticky column needs a positioning context with the
+   intrinsic-width table; keep actions visible while scrolling on mobile. */
+.nodes-table th:last-child,
+.nodes-table td:last-child {
+  position: sticky !important;
+  right: 0 !important;
+  z-index: 2;
+  background: #fff;
+}
+
+.nodes-table th:last-child {
+  z-index: 3;
 }
 
 /* Keep labels (including sorting and info controls) on a single line.
