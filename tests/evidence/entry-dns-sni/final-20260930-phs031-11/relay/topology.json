@@ -1,1 +1,0 @@
-{"entry_hostname":"entry.relay-e2e.test","entry_ports":[24443,24444],"exit_count":2,"exit_port":8443,"sni":"decoy.relay-e2e.test","legacy_fixture":"DB-seeded"}
