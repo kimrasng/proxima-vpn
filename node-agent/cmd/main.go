@@ -208,7 +208,11 @@ func runCmd() *cobra.Command {
 				return fmt.Errorf("fetch initial config: %w", err)
 			}
 			state := newNodeState(xrayConfig)
-			egressServer := deviceegress.New(apiClient.RequestBandwidthPermit)
+			// Speed limits are enforced locally on this node: the panel only
+			// distributes plan rates via config. No per-chunk control-plane
+			// round trip sits in the direct-mode data path.
+			limiter := newLocalBandwidth()
+			egressServer := deviceegress.NewWithDialer(limiter.Permit, egressDialer())
 			egressServer.SetAdmitter(apiClient.AdmitDevice)
 			// No SOCKS authentication until an authoritative revocation snapshot
 			// has been fetched; stale state cannot preserve idle associations.
@@ -220,6 +224,7 @@ func runCmd() *cobra.Command {
 			}
 			defer func() { _ = egressServer.Close() }()
 			egress := newDeviceEgress(egressServer.SetCredentials)
+			egress.setRates = limiter.SetRates
 			egress.ready = func() bool { return ctx.Err() == nil && egressServer.Addr() != nil }
 			state.deviceCapability = egress.Capability
 			runner.SetConfigTransform(egress.TransformConfig)
@@ -263,10 +268,16 @@ func runCmd() *cobra.Command {
 				log.Printf("warning: could not connect to xray stats: %v", err)
 			}
 
+			collector, err := stats.NewCollector(statsClient, apiClient, stats.DefaultInterval, state.ProvisionedEmails, stats.OutboxPath(configPath, cfg.NodeID))
+			if err != nil {
+				if statsClient != nil {
+					_ = statsClient.Close()
+				}
+				return fmt.Errorf("open stats outbox: %w", err)
+			}
+			collector.Start(ctx)
+			defer collector.Stop()
 			if statsClient != nil {
-				collector := stats.NewCollector(statsClient, apiClient, stats.DefaultInterval, state.ProvisionedEmails)
-				collector.Start(ctx)
-				defer collector.Stop()
 				defer func() { _ = statsClient.Close() }()
 			}
 

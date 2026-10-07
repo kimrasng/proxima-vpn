@@ -15,11 +15,16 @@ import (
 )
 
 func bandwidthNodeID(c *fiber.Ctx) string {
-	if c.Method() != fiber.MethodPost {
+	var suffix string
+	switch c.Method() {
+	case fiber.MethodPost:
+		suffix = "/bandwidth/permit"
+	case fiber.MethodGet:
+		suffix = "/revoked-devices"
+	default:
 		return ""
 	}
 	const prefix = "/api/v1/nodes/"
-	const suffix = "/bandwidth/permit"
 	path := c.Path()
 	if !strings.HasPrefix(path, prefix) || !strings.HasSuffix(path, suffix) {
 		return ""
@@ -32,6 +37,7 @@ func bandwidthNodeID(c *fiber.Ctx) string {
 	return parsed.String()
 }
 
+// High-frequency permit and revocation polling share the authentication guard.
 // Exemption is based on prior successful authentication, never merely presence
 // of a supplied key. Unknown keys are rate-limited before touching PostgreSQL.
 func isBandwidthPermitRequest(c *fiber.Ctx) bool {

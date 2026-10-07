@@ -22,6 +22,11 @@ func TestBandwidthPermitLimiterExemptionRequiresAuthenticatedExactRoute(t *testi
 		{"POST", "/api/v1/nodes/00000000-0000-0000-0000-000000000001/bandwidth/permit", "true", true},
 		{"GET", "/api/v1/nodes/00000000-0000-0000-0000-000000000001/bandwidth/permit", "true", false},
 		{"POST", "/api/v1/nodes/00000000-0000-0000-0000-000000000001/config", "true", false},
+		{"GET", "/api/v1/nodes/00000000-0000-0000-0000-000000000001/revoked-devices", "true", true},
+		{"GET", "/api/v1/nodes/00000000-0000-0000-0000-000000000001/revoked-devices", "false", false},
+		{"POST", "/api/v1/nodes/00000000-0000-0000-0000-000000000001/revoked-devices", "true", false},
+		{"GET", "/api/v1/nodes/00000000-0000-0000-0000-000000000002/revoked-devices", "true", false},
+		{"GET", "/api/v1/nodes/no/revoked-devices", "true", false},
 		{"POST", "/api/v1/nodes/no/bandwidth/permit", "true", false},
 		{"POST", "/api/v1/nodes/00000000-0000-0000-0000-000000000001/bandwidth/permit", "false", false},
 	} {
@@ -44,12 +49,21 @@ func TestBandwidthPermitLimiterExemptionRequiresAuthenticatedExactRoute(t *testi
 }
 
 func TestInvalidBandwidthKeysAreThrottledBeforeDatabaseAuthentication(t *testing.T) {
+	testInvalidNodeKeysThrottled(t, "POST", "/bandwidth/permit")
+}
+
+func TestInvalidRevocationKeysAreThrottledBeforeDatabaseAuthentication(t *testing.T) {
+	testInvalidNodeKeysThrottled(t, "GET", "/revoked-devices")
+}
+
+func testInvalidNodeKeysThrottled(t *testing.T, method, suffix string) {
+	t.Helper()
 	app := fiber.New()
 	guard, auth := bandwidthAuthentication(nil)
 	app.Use(guard, auth)
-	app.Post("/api/v1/nodes/:id/bandwidth/permit", func(c *fiber.Ctx) error { return c.SendStatus(200) })
+	app.Add(method, "/api/v1/nodes/:id"+suffix, func(c *fiber.Ctx) error { return c.SendStatus(200) })
 	for i := 0; i < 101; i++ {
-		req := httptest.NewRequest("POST", "/api/v1/nodes/00000000-0000-0000-0000-000000000001/bandwidth/permit", nil)
+		req := httptest.NewRequest(method, "/api/v1/nodes/00000000-0000-0000-0000-000000000001"+suffix, nil)
 		req.Header.Set("X-Node-Key", "arbitrary")
 		res, err := app.Test(req)
 		if err != nil {

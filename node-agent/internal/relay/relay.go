@@ -13,6 +13,7 @@ package relay
 import (
 	"bytes"
 	"fmt"
+	"log"
 	"net/netip"
 	"os/exec"
 	"sort"
@@ -257,6 +258,25 @@ func (m *Manager) Apply(role nodeprov.Role, rules []nodeprov.RelayRule, exitRule
 		return nil
 	}
 
+	// A direct-mode Exit with no relay-only listeners has nothing to filter:
+	// the rendered input chain is empty and accepts everything. Requiring
+	// nftables there only breaks unprivileged hosts (e.g. NAT containers
+	// without CAP_NET_ADMIN) while adding no protection; Xray's API and the
+	// device-egress SOCKS bind loopback regardless.
+	//
+	// A table left by an earlier relay-protected policy (possibly from a
+	// previous agent process) must still be removed. The add-then-delete
+	// script cannot fail on a missing table, only on missing permission - and
+	// without permission no such table could have been installed - so its
+	// error is not fatal here.
+	if !role.Forwards() && !hasRelayOnlyExit(exitRules) {
+		if err := runScript(fmt.Sprintf("table inet %s\ndelete table inet %s\n", tableName, tableName)); err != nil {
+			log.Printf("node policy: direct Exit needs no nftables table; skipping (%v)", err)
+		}
+		m.applied = script
+		return nil
+	}
+
 	if role.Forwards() && len(rules) > 0 {
 		if err := enableForwarding(); err != nil {
 			return err
@@ -268,6 +288,13 @@ func (m *Manager) Apply(role nodeprov.Role, rules []nodeprov.RelayRule, exitRule
 
 	m.applied = script
 	return nil
+}
+
+// hasRelayOnlyExit reports whether any Exit port must be restricted to relay
+// addresses. Those rules exist to make a non-published Exit unreachable
+// directly; they need nftables, and failing to install them must fail closed.
+func hasRelayOnlyExit(exitRules []nodeprov.ExitRule) bool {
+	return len(exitRules) > 0
 }
 
 // Clear removes the table, so a node that stops being a relay stops forwarding.

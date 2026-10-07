@@ -416,8 +416,8 @@ func (c *session) allow(ctx context.Context, direction devicebandwidth.Direction
 		}
 		// Clamp before converting to duration, including malicious integer values.
 		retry := response.RetryAfterMS
-		if retry < 10 {
-			retry = 10
+		if retry < 1 {
+			retry = 1
 		} else if retry > 1000 {
 			retry = 1000
 		}

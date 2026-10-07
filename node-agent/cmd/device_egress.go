@@ -21,11 +21,14 @@ const deviceEgressPlaceholder = "materialize-at-node"
 type deviceEgress struct {
 	mu             sync.Mutex
 	setCredentials func([]devicebandwidth.Credential) error
-	passwords      map[string]string
-	authorized     map[string]struct{}
-	managed        map[string]struct{}
-	ready          func() bool
-	count          int
+	// setRates receives per-device plan speeds for local enforcement; nil
+	// means rates are unknown and metered traffic must be denied.
+	setRates   func(map[string]int)
+	passwords  map[string]string
+	authorized map[string]struct{}
+	managed    map[string]struct{}
+	ready      func() bool
+	count      int
 }
 
 func newDeviceEgress(setCredentials func([]devicebandwidth.Credential) error) *deviceEgress {
@@ -37,6 +40,9 @@ type deviceConfig struct {
 	outbounds  []map[string]json.RawMessage
 	devices    map[string]int
 	identities map[string]struct{}
+	// rates maps each managed device UUID to its plan speed in Mbps (0 =
+	// unlimited), taken from the limit tier of the inbound it belongs to.
+	rates map[string]int
 }
 
 type deviceSOCKSServer struct {
@@ -51,7 +57,7 @@ type deviceSOCKSServer struct {
 // parseDeviceConfig rejects invalid declarations and missing exact routing.
 // Legacy unlimited configs without device declarations are left unchanged.
 func parseDeviceConfig(data []byte) (*deviceConfig, error) {
-	cfg := &deviceConfig{devices: make(map[string]int), identities: make(map[string]struct{})}
+	cfg := &deviceConfig{devices: make(map[string]int), identities: make(map[string]struct{}), rates: make(map[string]int)}
 	if err := json.Unmarshal(data, &cfg.root); err != nil || cfg.root == nil {
 		return nil, fmt.Errorf("invalid xray configuration")
 	}
@@ -117,7 +123,7 @@ func parseDeviceConfig(data []byte) (*deviceConfig, error) {
 	}
 	matched := make(map[string]bool)
 	for _, inbound := range inbounds {
-		_, limited := speedtier.ParseLimitTag(inbound.Tag)
+		limitMbps, limited := speedtier.ParseLimitTag(inbound.Tag)
 		for _, user := range inbound.Settings.Clients {
 			identity := user.ID
 			if identity == "" {
@@ -154,6 +160,10 @@ func parseDeviceConfig(data []byte) (*deviceConfig, error) {
 				return nil, fmt.Errorf("device %q lacks first-match authenticated egress routing", user.ID)
 			}
 			matched[user.ID] = true
+			// A device listed on several inbounds takes the strictest tier.
+			if previous, seen := cfg.rates[user.ID]; !seen || (limitMbps > 0 && (previous == 0 || limitMbps < previous)) {
+				cfg.rates[user.ID] = limitMbps
+			}
 		}
 	}
 	for id := range cfg.devices {
@@ -173,6 +183,12 @@ func containsString(values []string, want string) bool {
 	return false
 }
 
+func (e *deviceEgress) applyRates(rates map[string]int) {
+	if e.setRates != nil {
+		e.setRates(rates)
+	}
+}
+
 func (e *deviceEgress) TransformConfig(canonical []byte) ([]byte, error) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -183,6 +199,7 @@ func (e *deviceEgress) TransformConfig(canonical []byte) ([]byte, error) {
 		e.authorized = nil
 		e.managed = nil
 		e.count = 0
+		e.applyRates(nil)
 		_ = e.setCredentials(nil)
 		return nil, err
 	}
@@ -190,9 +207,13 @@ func (e *deviceEgress) TransformConfig(canonical []byte) ([]byte, error) {
 		e.authorized = nil
 		e.managed = nil
 		e.count = 0
+		e.applyRates(nil)
 		_ = e.setCredentials(nil)
 		return nil, fmt.Errorf("local device egress listener is unavailable")
 	}
+	// Rates first: a device whose credential is installed below must already
+	// have its speed limit, never a window of unknown (denied) or stale rate.
+	e.applyRates(cfg.rates)
 	e.authorized = cfg.identities
 	e.managed = make(map[string]struct{}, len(cfg.devices))
 	for id := range cfg.devices {
