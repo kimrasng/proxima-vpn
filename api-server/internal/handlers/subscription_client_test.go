@@ -44,8 +44,13 @@ func TestDetectClientFormat(t *testing.T) {
 		{"Shadowrocket/2070", "", formatV2ray},
 		{"", "", formatV2ray},
 		{"curl/8.4.0", "*/*", formatV2ray},
+		{"curl/8.4.0", "text/html", formatV2ray},
+		{"unknown-app/1.0", "text/html,application/xhtml+xml", formatV2ray},
+		{"", "text/html", formatV2ray},
 		// Browsers get the readable page; a recognized client never does.
 		{"Mozilla/5.0 (Macintosh)", "text/html,application/xhtml+xml", formatHTML},
+		{"Mozilla/5.0 (Macintosh)", "*/*", formatV2ray},
+		{"Opera/9.80", "text/html", formatHTML},
 		{"clash-verge/v2.0.3", "text/html", formatClashMeta},
 	} {
 		if got := detectClientFormat(tc.ua, tc.accept); got != tc.want {
@@ -69,6 +74,8 @@ func TestResolveSubscriptionFormatPriority(t *testing.T) {
 		{"?format=bogus", "SFA/1.10.0", "", formatSingbox},       // unknown query ignored
 		{"?format=v2ray", "clash-verge/v2.0.3", "", formatV2ray}, //
 		{"", "Mozilla/5.0", formatClashMeta, formatClashMeta},    // override beats browser page
+		{"", "unknown-app/1.0", formatSurfboard, formatSurfboard},
+		{"", "unknown-app/1.0", formatQuantumult, formatQuantumult},
 	} {
 		req := httptest.NewRequest(fiber.MethodGet, "/"+tc.query, nil)
 		req.Header.Set("User-Agent", tc.ua)
