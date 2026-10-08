@@ -34,8 +34,8 @@ export async function expectSelectedDomain(page: Page, domain: string) {
   await expect(page.getByRole("tabpanel").locator("code")).toHaveText(`https://${domain}${fixtureSubscriptionPath}`);
 }
 
-// While the per-app fallback list is collapsed and the QR dialog is closed,
-// the account URL is the only visible <code> on the subscription page.
+// While the QR dialog is closed, the account URL is the only visible <code>
+// on the subscription page.
 export async function expectOnlyAccountUrl(page: Page, url: string) {
   await expect(page.locator("code").filter({ visible: true })).toHaveText([url]);
 }

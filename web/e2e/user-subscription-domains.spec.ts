@@ -118,18 +118,14 @@ test.describe("PHS-027 user subscription domains", () => {
     await expect(dialog.locator("code")).toHaveText(`https://working.example.test${fixtureSubscriptionPath}`);
   });
 
-  test("per-app fallback URLs append the client type to the selected domain's account URL", async ({ page }) => {
+  test("portal exposes only the account URL and QR, without per-app format URLs", async ({ page }) => {
     await page.goto("/portal/devices");
-    await page.getByRole("button", { name: en.user.devices.overrideTitle, exact: true }).click();
-    const overrides = (host: string) => ["clash-meta", "sing-box", "v2ray", "clash", "wireguard"]
-      .map((client) => `https://${host}${fixtureSubscriptionPath}/${client}`);
-    await expect(page.locator("code").filter({ visible: true })).toHaveText([
-      `https://blocked.example.test${fixtureSubscriptionPath}`, ...overrides("blocked.example.test"),
-    ]);
+    await expectOnlyAccountUrl(page, `https://blocked.example.test${fixtureSubscriptionPath}`);
+    await expect(page.getByRole("button", { name: en.user.devices.overrideTitle })).toHaveCount(0);
+    await expect(page.locator("a[href*='/sub/']")).toHaveCount(0);
     await page.getByRole("tab", { name: "working.example.test", exact: true }).click();
-    await expect(page.locator("code").filter({ visible: true })).toHaveText([
-      `https://working.example.test${fixtureSubscriptionPath}`, ...overrides("working.example.test"),
-    ]);
+    await expectOnlyAccountUrl(page, `https://working.example.test${fixtureSubscriptionPath}`);
+    await expect(page.getByRole("button", { name: en.user.devices.showQr, exact: true })).toBeVisible();
   });
 
   for (const { name, row } of malformedRows) {
