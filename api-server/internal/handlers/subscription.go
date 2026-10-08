@@ -104,7 +104,7 @@ func (n subscriptionNode) dialHost() string {
 // @Tags subscription
 // @Produce plain
 // @Param sub_token path string true "Subscription token"
-// @Param device_id path string true "Client type (clash-meta, clash, sing-box, v2ray, wireguard) or legacy device ID"
+// @Param device_id path string true "Client type (clash-meta, clash, sing-box, v2ray, surfboard, quantumult, wireguard) or legacy device ID"
 // @Success 200 {string} string "Proxy configuration"
 // @Failure 400 {object} map[string]string
 // @Failure 403 {object} map[string]string
@@ -285,9 +285,8 @@ func (h *SubscriptionHandler) getSubscriptionForDevice(c *fiber.Ctx, deviceID, f
 		if format == formatClash {
 			nodeInfos = subscription.LegacyClashCompatible(nodeInfos)
 		}
-		// A Clash profile without proxies is invalid, and nodes are withheld
-		// until they apply the current config (e.g. right after a new UUID is
-		// issued). Tell the client to retry instead of reporting a server fault.
+		// Legacy clients cannot use all published protocols. Do not return
+		// a successful-but-empty profile when filtering removes every proxy.
 		if len(nodeInfos) == 0 {
 			return noReadyServers(c)
 		}
@@ -317,6 +316,9 @@ func (h *SubscriptionHandler) getSubscriptionForDevice(c *fiber.Ctx, deviceID, f
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to generate surfboard config"})
 		}
+		if len(result) == 0 {
+			return noReadyServers(c)
+		}
 		body = result
 		contentType = "text/plain; charset=utf-8"
 
@@ -325,6 +327,9 @@ func (h *SubscriptionHandler) getSubscriptionForDevice(c *fiber.Ctx, deviceID, f
 		result, err := subscription.GenerateQuantumult(nodeInfos, deviceUUID)
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to generate quantumult config"})
+		}
+		if len(result) == 0 {
+			return noReadyServers(c)
 		}
 		body = result
 		contentType = "text/plain; charset=utf-8"

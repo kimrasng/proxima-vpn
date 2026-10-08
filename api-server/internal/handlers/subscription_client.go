@@ -33,6 +33,8 @@ var pathClientTypes = map[string]string{
 	"clash":      formatClash,
 	"sing-box":   formatSingbox,
 	"v2ray":      formatV2ray,
+	"surfboard":  formatSurfboard,
+	"quantumult": formatQuantumult,
 	"wireguard":  formatWireGuard,
 }
 
@@ -65,9 +67,15 @@ var userAgentRules = []userAgentRule{
 	{regexp.MustCompile(`(?i)^quantumult`), formatQuantumult},
 }
 
-// detectClientFormat maps a known client User-Agent to its native format. A
-// browser gets a readable page; every other client (v2rayN/NG, Happ, Streisand,
-// Shadowrocket, NekoBox, ...) gets base64 share links.
+// Only a browser navigation should receive the human-readable page. Some
+// subscription clients request text/html (or */*) while importing a URL, so
+// Accept alone cannot distinguish them from a browser. Unknown clients get
+// the universal base64 share-link format instead.
+var browserUserAgent = regexp.MustCompile(`(?i)^(mozilla/|opera/|opr/)`)
+
+// detectClientFormat maps a known client User-Agent to its native format.
+// Unrecognized apps (v2rayN/NG, Happ, Streisand, Shadowrocket, NekoBox, ...)
+// receive base64 links, even if they happen to send Accept: text/html.
 func detectClientFormat(userAgent, accept string) string {
 	ua := strings.TrimSpace(userAgent)
 	for _, rule := range userAgentRules {
@@ -75,7 +83,7 @@ func detectClientFormat(userAgent, accept string) string {
 			return rule.format
 		}
 	}
-	if strings.Contains(strings.ToLower(accept), "text/html") {
+	if browserUserAgent.MatchString(ua) && strings.Contains(strings.ToLower(accept), "text/html") {
 		return formatHTML
 	}
 	return formatV2ray

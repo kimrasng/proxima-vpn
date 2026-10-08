@@ -28,7 +28,7 @@ func (h *SubscriptionHandler) getAccountSubscription(c *fiber.Ctx, formatOverrid
 	// The row lock serializes concurrent first fetches so an account without a
 	// device gets exactly one, not one per racing request.
 	var user subscriptionUser
-	err = tx.QueryRow(ctx, `SELECT u.id, u.plan_id, u.is_active, u.status, u.traffic_used,
+	err = tx.QueryRow(ctx, `SELECT u.id::text, u.plan_id::text, u.is_active, u.status, u.traffic_used,
  p.traffic_limit, p.speed_limit, u.plan_expires_at, u.language
  FROM users u LEFT JOIN plans p ON p.id = u.plan_id
  WHERE u.sub_token = $1 FOR UPDATE OF u`, c.Params("sub_token")).Scan(
@@ -47,7 +47,7 @@ func (h *SubscriptionHandler) getAccountSubscription(c *fiber.Ctx, formatOverrid
 	// Reuse the account's oldest live device so existing accounts keep the UUID
 	// their nodes already admit; only an account with none gets a new one.
 	var deviceID string
-	err = tx.QueryRow(ctx, `SELECT id FROM devices WHERE user_id = $1 AND retired_at IS NULL
+	err = tx.QueryRow(ctx, `SELECT id::text FROM devices WHERE user_id = $1 AND retired_at IS NULL
  ORDER BY created_at, id LIMIT 1`, user.ID).Scan(&deviceID)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return accountSubscriptionError(c)
@@ -62,7 +62,7 @@ func (h *SubscriptionHandler) getAccountSubscription(c *fiber.Ctx, formatOverrid
 			return accountSubscriptionError(c)
 		}
 		err = tx.QueryRow(ctx, `INSERT INTO devices (user_id, name, xray_uuid, wg_private_key, wg_public_key, wg_address)
- VALUES ($1, 'Account', $2, $3, $4, $5) RETURNING id`,
+ VALUES ($1, 'Account', $2, $3, $4, $5) RETURNING id::text`,
 			user.ID, crypto.NewUUID(), privateKey, publicKey, wgAddressForIndex(index)).Scan(&deviceID)
 		if err != nil {
 			return accountSubscriptionError(c)
