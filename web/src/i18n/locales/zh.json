@@ -1700,7 +1700,7 @@
     },
     "devices": {
       "accountUrl": "账户订阅 URL",
-      "accountUrlHint": "只需在 VPN 应用中添加这一条 URL。服务器会自动识别您使用的应用，并返回对应的配置格式。",
+      "accountUrlHint": "只需在 VPN 应用中添加这一条 URL。服务器会根据应用的 User-Agent 自动返回对应配置，无需选择格式或使用单独的应用 URL。",
       "concurrentHint": "无需登记设备。同时在线数按实际连接到服务器的连接计算，不超过套餐限制。",
       "overrideTitle": "应用未被自动识别时",
       "overrideDescription": "如果无法通过上方 URL 导入可用的配置，请改为添加与您的应用对应的以下 URL。",
@@ -1709,6 +1709,8 @@
         "singBox": "sing-box（SFA、SFI、SFM）、Hiddify、Karing",
         "v2ray": "v2rayN、v2rayNG、Happ、Streisand、Shadowrocket · Base64 分享链接",
         "clash": "旧版 Clash、Stash",
+        "surfboard": "Surfboard（不支持 VLESS Reality）",
+        "quantumult": "Quantumult X（不支持 VLESS Reality）",
         "wireguard": "WireGuard 应用"
       },
       "title": "订阅",

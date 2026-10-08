@@ -1699,7 +1699,7 @@
     },
     "devices": {
       "accountUrl": "계정 구독 URL",
-      "accountUrlHint": "이 URL 하나를 VPN 앱에 등록하세요. 서버가 사용 중인 앱을 자동으로 인식해 알맞은 설정 형식으로 제공합니다.",
+      "accountUrlHint": "이 URL 하나를 VPN 앱에 등록하세요. 서버가 앱의 User-Agent에 맞는 설정 형식을 자동으로 제공합니다. 형식 선택이나 별도 앱 URL은 필요하지 않습니다.",
       "concurrentHint": "기기를 따로 등록할 필요가 없습니다. 동시 접속 수는 서버에 실제로 연결된 접속을 기준으로 플랜 한도 안에서 제한됩니다.",
       "overrideTitle": "앱이 자동 인식되지 않을 때",
       "overrideDescription": "위 URL로 설정을 제대로 가져오지 못하면, 사용 중인 앱에 맞는 아래 URL을 대신 등록하세요.",
@@ -1708,6 +1708,8 @@
         "singBox": "sing-box (SFA·SFI·SFM), Hiddify, Karing",
         "v2ray": "v2rayN, v2rayNG, Happ, Streisand, Shadowrocket · Base64 공유 링크",
         "clash": "기존 Clash, Stash",
+        "surfboard": "Surfboard (VLESS Reality 설정 미지원)",
+        "quantumult": "Quantumult X (VLESS Reality 설정 미지원)",
         "wireguard": "WireGuard 앱"
       },
       "title": "구독",

@@ -12,14 +12,13 @@ import {
   type FlashbarProps,
   StatusIndicator,
   Container,
-  ExpandableSection,
   Tabs,
 } from "@cloudscape-design/components";
 import { QRCodeSVG } from "qrcode.react";
 import type { PublicSubscriptionDomain, UserProfile } from "../../api/types";
 import * as userApi from "../../api/user";
 
-import { CLIENT_TYPES, getAccountSubscriptionUrl } from "../../utils/subscriptionUrl";
+import { getAccountSubscriptionUrl } from "../../utils/subscriptionUrl";
 
 function CopyableUrl({ url }: { url: string }) {
   const { t } = useTranslation();
@@ -151,7 +150,7 @@ function SubscriptionDomainPicker({
 
   const selectedDomain = domains.length > 0 ? activeDomain ?? orderedDomains[0]?.domain : undefined;
 
-  // The QR code and per-app fallback URLs follow the domain shown here.
+  // The QR code follows the selected public domain.
   useEffect(() => {
     onDomainChange?.(selectedDomain);
   }, [onDomainChange, selectedDomain]);
@@ -269,18 +268,6 @@ export default function Devices() {
                 <Button onClick={() => setShowQrModal(true)}>{t("user.devices.showQr")}</Button>
               </Box>
               <Box variant="small" color="text-body-secondary">{t("user.devices.concurrentHint")}</Box>
-              <ExpandableSection headerText={t("user.devices.overrideTitle")}>
-                <SpaceBetween size="m">
-                  <Box variant="p">{t("user.devices.overrideDescription")}</Box>
-                  {CLIENT_TYPES.map((client) => (
-                    <SpaceBetween key={client.id} size="xxs">
-                      <Box variant="awsui-key-label">{client.label}</Box>
-                      <Box variant="small" color="text-body-secondary">{t(client.appsKey)}</Box>
-                      <CopyableUrl url={getAccountSubscriptionUrl(subToken, domain, client.id)} />
-                    </SpaceBetween>
-                  ))}
-                </SpaceBetween>
-              </ExpandableSection>
             </SpaceBetween>
           </Container>
         )}

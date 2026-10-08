@@ -1699,7 +1699,7 @@
     },
     "devices": {
       "accountUrl": "Account subscription URL",
-      "accountUrlHint": "Add this one URL to your VPN app. The server recognizes your app automatically and returns the matching config format.",
+      "accountUrlHint": "Add this one URL to your VPN app. The server chooses the config format from the app's User-Agent; no format selection or separate app URL is needed.",
       "concurrentHint": "No device registration is needed. Concurrent use is limited by your plan, counted from active connections to the servers.",
       "overrideTitle": "If your app is not recognized automatically",
       "overrideDescription": "If your app cannot import a working config from the URL above, add the URL that matches your app instead.",
@@ -1708,6 +1708,8 @@
         "singBox": "sing-box (SFA, SFI, SFM), Hiddify, Karing",
         "v2ray": "v2rayN, v2rayNG, Happ, Streisand, Shadowrocket · Base64 share links",
         "clash": "Legacy Clash, Stash",
+        "surfboard": "Surfboard (no VLESS Reality support)",
+        "quantumult": "Quantumult X (no VLESS Reality support)",
         "wireguard": "WireGuard app"
       },
       "title": "Subscription",
