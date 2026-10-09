@@ -1,0 +1,15 @@
+schema = 1
+id = "API-1791530172-j3p"
+type = "interface"
+title = "NodeEventViewer severity and detail cells stay single-line with full-text popover"
+description = "web/src/components/NodeEventViewer.tsx and NodeEventViewer.css: severity icon+label are wrapped in a non-wrapping flex span (.node-event-viewer__severity); long detail values show a truncated monospace preview plus a Popover with the full text (.node-event-viewer__detail)."
+status = "active"
+created_at = 2026-10-09T16:16:12+09:00
+updated_at = 2026-10-09T16:16:12+09:00
+
+[metadata]
+kind = "component"
+
+[[relations]]
+to = "REQ-1791263728-kmd"
+type = "implements"

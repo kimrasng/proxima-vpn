@@ -1,0 +1,15 @@
+schema = 1
+id = "API-1791530172-cn0"
+type = "interface"
+title = "NodeChains route table unifies Entry selection with a single filter context"
+description = "web/src/pages/admin/NodeChains.tsx: one Entry Select drives route-table.css scope, and Exit/node query-param filters render as a dismissible context line (route-table__filter-context) instead of a separate always-visible banner or always-large port-map card."
+status = "active"
+created_at = 2026-10-09T16:16:12+09:00
+updated_at = 2026-10-09T16:16:12+09:00
+
+[metadata]
+kind = "component"
+
+[[relations]]
+to = "REQ-1791264103-397"
+type = "implements"

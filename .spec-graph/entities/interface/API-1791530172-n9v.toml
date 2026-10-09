@@ -1,0 +1,15 @@
+schema = 1
+id = "API-1791530172-n9v"
+type = "interface"
+title = "Plans admin list renders a card summary instead of a wide multi-column table"
+description = "web/src/pages/admin/Plans.tsx and plansList.css: each plan renders as a Container with a <dl> definition-list summary (plans-list__details) and a ButtonDropdown for all management actions, reachable at any viewport width."
+status = "active"
+created_at = 2026-10-09T16:16:12+09:00
+updated_at = 2026-10-09T16:16:12+09:00
+
+[metadata]
+kind = "component"
+
+[[relations]]
+to = "REQ-1791266876-2zk"
+type = "implements"

@@ -3,16 +3,16 @@ id = "TSK-1791263728-3w4"
 type = "task"
 title = "Correct node event table wrapping"
 description = "Fix severity wrapping and long detail layout in the supplied node-event screenshot during the design batch."
-status = "active"
+status = "resolved"
 created_at = 2026-10-06T14:15:28+09:00
-updated_at = 2026-10-06T15:09:47+09:00
+updated_at = 2026-10-09T15:28:07+09:00
 
 [metadata]
 acceptance = ["Severity labels do not wrap below icons in the normal table layout.", "Long detail strings remain available in full without breaking the table or viewport."]
 instructions = ["Keep severity icon and localized label together as one non-wrapping unit.", "Give long monospace details a bounded, accessible presentation, such as truncation with a full-detail affordance, while maintaining responsive table behavior."]
 must_not = ["Do not discard event detail or change event API data.", "Do not implement until the batch is approved."]
 order = 3.0
-qa = [{command = "cd web && npm run build", evidence = "", expected = "exit 0; browser event rows reviewed at wide and narrow widths"}]
+qa = [{command = "cd web && npm run build", evidence = "web/src/components/NodeEventViewer.css", expected = "exit 0; browser event rows reviewed at wide and narrow widths"}]
 references = ["web/src/components/NodeEventViewer.tsx"]
 
 [[relations]]
@@ -20,8 +20,16 @@ to = "PHS-1791263728-b0s"
 type = "belongs_to"
 
 [[relations]]
+to = "API-1791530172-j3p"
+type = "covers"
+
+[[relations]]
 to = "REQ-1791263728-kmd"
 type = "covers"
+
+[[relations]]
+to = "API-1791530172-j3p"
+type = "delivers"
 
 [[relations]]
 to = "REQ-1791263728-kmd"

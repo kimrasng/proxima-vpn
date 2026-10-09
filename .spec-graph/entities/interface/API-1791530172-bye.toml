@@ -1,0 +1,15 @@
+schema = 1
+id = "API-1791530172-bye"
+type = "interface"
+title = "Nodes admin table fills its container with intrinsic column sizing"
+description = "web/src/pages/admin/Nodes.tsx table and nodesTable.css: table-layout:auto and inline-size:100% on .nodes-table make the Cloudscape table fill the card width, with sticky first/last columns and nowrap headers."
+status = "active"
+created_at = 2026-10-09T16:16:12+09:00
+updated_at = 2026-10-09T16:16:12+09:00
+
+[metadata]
+kind = "component"
+
+[[relations]]
+to = "REQ-1791263728-q6s"
+type = "implements"

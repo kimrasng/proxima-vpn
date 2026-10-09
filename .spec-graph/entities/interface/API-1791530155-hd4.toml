@@ -1,0 +1,15 @@
+schema = 1
+id = "API-1791530155-hd4"
+type = "interface"
+title = "LocalizedTextEditor renders translation tabs with completion and fallback preview"
+description = "web/src/components/LocalizedTextEditor.tsx: a reusable Tabs-based editor for admin-authored localized text, used by the node edit modal (web/src/pages/admin/Nodes.tsx) for node name labels. Shows per-language filled/fallback badges and a base-name fallback preview grid."
+status = "active"
+created_at = 2026-10-09T16:15:55+09:00
+updated_at = 2026-10-09T16:15:55+09:00
+
+[metadata]
+kind = "component"
+
+[[relations]]
+to = "REQ-1791263728-6rd"
+type = "implements"

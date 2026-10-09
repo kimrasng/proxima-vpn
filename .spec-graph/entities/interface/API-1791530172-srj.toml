@@ -1,0 +1,15 @@
+schema = 1
+id = "API-1791530172-srj"
+type = "interface"
+title = "Admin and user data tables disable column resizing with shared intrinsic sizing"
+description = "resizableColumns={false} is set on every admin/user Table (Nodes, NodeChains, PlanRoutesPanel, NodeEventViewer, Activity, SubscriptionDomains), paired with table-layout:auto CSS wrappers (nodesTable.css, nodeChainsTable.css, intrinsic-table class) for consistent non-interactive column sizing."
+status = "active"
+created_at = 2026-10-09T16:16:12+09:00
+updated_at = 2026-10-09T16:16:12+09:00
+
+[metadata]
+kind = "component"
+
+[[relations]]
+to = "REQ-1791267849-v35"
+type = "implements"

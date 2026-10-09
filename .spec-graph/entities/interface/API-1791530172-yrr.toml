@@ -1,0 +1,15 @@
+schema = 1
+id = "API-1791530172-yrr"
+type = "interface"
+title = "Nodes admin table separates role badge from publish-direct setting"
+description = "web/src/pages/admin/Nodes.tsx: the role column cell renders only Node.role (exit/relay/both) via ROLE_BADGE_COLORS; Node.publish_direct is edited through a separate Select field in the edit modal (admin.nodes.role.publishDirect), never folded into the role badge."
+status = "active"
+created_at = 2026-10-09T16:16:12+09:00
+updated_at = 2026-10-09T16:16:12+09:00
+
+[metadata]
+kind = "component"
+
+[[relations]]
+to = "REQ-1791264186-rvg"
+type = "implements"
