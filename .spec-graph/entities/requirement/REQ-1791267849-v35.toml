@@ -3,9 +3,9 @@ id = "REQ-1791267849-v35"
 type = "requirement"
 title = "Frontend data tables size columns to labels and values without interactive resizing"
 description = "Across admin and user data tables, columns should use readable intrinsic widths from headings and values instead of arbitrary cramped widths. Do not let users drag column dividers. Keep ordinary short cells on one line and provide horizontal scrolling at narrow widths; long unbounded payloads retain full-text affordances rather than making the table unmanageably wide."
-status = "active"
+status = "resolved"
 created_at = 2026-10-06T15:24:09+09:00
-updated_at = 2026-10-06T15:30:48+09:00
+updated_at = 2026-10-09T18:28:40+09:00
 
 [metadata]
 kind = "functional"

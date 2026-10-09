@@ -1,0 +1,17 @@
+schema = 1
+id = "REQ-1791536405-ry0"
+type = "requirement"
+title = "Dashboard KPI day-over-day change reads as secondary context"
+description = "The admin dashboard KPI cards show the change against the 24h-old baseline as a trailing clause of the secondary caption under the large figure (e.g. 'Items needing action · +2 vs yesterday'), not as an info-icon status indicator beside the figure. A zero change and an unavailable baseline render nothing."
+status = "resolved"
+created_at = 2026-10-09T18:00:05+09:00
+updated_at = 2026-10-09T18:28:40+09:00
+
+[metadata]
+kind = "functional"
+owner = "frontend"
+priority = "should"
+
+[[relations]]
+to = "ACT-1791536405-5ch"
+type = "has_criterion"

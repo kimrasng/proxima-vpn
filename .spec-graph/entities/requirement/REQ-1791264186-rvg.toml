@@ -3,9 +3,9 @@ id = "REQ-1791264186-rvg"
 type = "requirement"
 title = "Node role and direct route availability are labeled separately"
 description = "The admin node list should identify a node as Entry, Exit, or both by its role. Direct client connection is a route and publication property, not a fourth node role; avoid labeling all Exit nodes as standalone/direct or suggesting configured routes are necessarily published."
-status = "active"
+status = "resolved"
 created_at = 2026-10-06T14:23:06+09:00
-updated_at = 2026-10-06T15:30:48+09:00
+updated_at = 2026-10-09T18:28:40+09:00
 
 [metadata]
 kind = "functional"

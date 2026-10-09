@@ -1,0 +1,28 @@
+schema = 1
+id = "TSK-1791536405-9q6"
+type = "task"
+title = "Expose node inbound protocol in the admin node list"
+description = "Return each node's inbound protocol and port from GET /admin/nodes and render them in a protocol column of the admin node list."
+status = "resolved"
+created_at = 2026-10-09T18:00:05+09:00
+updated_at = 2026-10-09T18:07:19+09:00
+
+[metadata]
+acceptance = ["The list response carries the protocol and port for nodes with an inbound and null otherwise.", "The column renders the three cases correctly."]
+instructions = ["Add nullable inbound_protocol and inbound_port to the ListNodes response via a lateral join on inbounds.", "Add the fields to the web Node type.", "Add a visible protocol column: label and port, not-configured warning for exit-capable nodes without an inbound, L4 forwarding for relay-only nodes.", "Add locale strings for ko, en and zh."]
+must_not = ["Do not relax the one-protocol-per-node rule."]
+order = 2.0
+qa = [{command = "cd api-server && go build ./... && go vet ./internal/handlers/", evidence = "api-server/internal/handlers/admin_node_list_protocol_http_test.go", expected = "exit 0"}, {command = "cd web && npm run build && npm run check:locales", evidence = "web/src/pages/admin/Nodes.tsx", expected = "exit 0"}]
+references = ["api-server/internal/handlers/admin_node.go", "web/src/pages/admin/Nodes.tsx", "web/src/api/types.ts"]
+
+[[relations]]
+to = "PHS-1791536405-zvq"
+type = "belongs_to"
+
+[[relations]]
+to = "REQ-1791536405-9bc"
+type = "covers"
+
+[[relations]]
+to = "REQ-1791536405-9bc"
+type = "delivers"

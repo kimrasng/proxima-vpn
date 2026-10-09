@@ -1,0 +1,17 @@
+schema = 1
+id = "REQ-1791536405-9bc"
+type = "requirement"
+title = "Admin node list shows the protocol each node hosts"
+description = "Each node serves exactly one inbound protocol (enforced by the inbound handler and idx_inbounds_one_protocol_per_node). The admin node list exposes that protocol and its port in a dedicated column, flags exit-capable nodes with no inbound as not configured, and labels relay-only nodes as L4 forwarding since they terminate no protocol."
+status = "resolved"
+created_at = 2026-10-09T18:00:05+09:00
+updated_at = 2026-10-09T18:28:40+09:00
+
+[metadata]
+kind = "functional"
+owner = "frontend"
+priority = "should"
+
+[[relations]]
+to = "ACT-1791536405-7rr"
+type = "has_criterion"

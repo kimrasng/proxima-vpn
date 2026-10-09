@@ -1,0 +1,12 @@
+schema = 1
+id = "ACT-1791536405-5ch"
+type = "criterion"
+title = "KPI change appears only in the caption and only when non-zero"
+status = "draft"
+created_at = 2026-10-09T18:00:05+09:00
+updated_at = 2026-10-09T18:00:05+09:00
+
+[metadata]
+given = "Dashboard stats with a baseline available"
+then = "Zero or unavailable shows only the caption; non-zero appends a signed vs-yesterday clause to the caption; no icon or indicator sits beside the large figure"
+when = "A KPI delta is zero, non-zero, or the baseline is unavailable"
