@@ -1,0 +1,15 @@
+schema = 1
+id = "TST-1791530819-546"
+type = "test"
+title = "validateHWID and hwidFingerprint unit tests"
+description = "api-server/internal/handlers/subscription_account_hwid_test.go: unit tests covering HWID format validation (10-64 printable ASCII), fingerprint determinism, and pepper/HWID isolation."
+status = "active"
+created_at = 2026-10-09T16:26:59+09:00
+updated_at = 2026-10-09T16:26:59+09:00
+
+[metadata]
+kind = "unit"
+
+[[relations]]
+to = "REQ-1790874510-ky7"
+type = "verifies"

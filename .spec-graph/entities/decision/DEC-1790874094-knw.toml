@@ -3,9 +3,9 @@ id = "DEC-1790874094-knw"
 type = "decision"
 title = "Use optional validated HWID for logical subscription identity"
 description = "Validate x-hwid with the accepted 10-64 character ASCII format. Treat HWID as client-supplied logical installation identity, not physical-device attestation. Begin optional and retain legacy per-device subscriptions; strict missing-HWID rejection requires separate rollout approval."
-status = "draft"
+status = "active"
 created_at = 2026-10-02T02:01:34+09:00
-updated_at = 2026-10-02T02:01:34+09:00
+updated_at = 2026-10-09T16:26:59+09:00
 
 [metadata]
 date = "2026-10-01"

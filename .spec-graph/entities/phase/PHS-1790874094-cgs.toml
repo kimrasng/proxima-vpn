@@ -3,9 +3,9 @@ id = "PHS-1790874094-cgs"
 type = "phase"
 title = "HWID identity and single subscription endpoint"
 description = "Persist privacy-safe HWID identities and provide atomic UUID issuance/reuse from the account subscription endpoint without breaking legacy links."
-status = "active"
+status = "resolved"
 created_at = 2026-10-02T02:01:34+09:00
-updated_at = 2026-10-02T02:03:27+09:00
+updated_at = 2026-10-09T16:27:00+09:00
 
 [metadata]
 exit_criteria = ["Valid same-HWID refreshes reuse one UUID under concurrency.", "Distinct concurrent HWIDs cannot exceed the registered-HWID cap (initial default 10).", "Invalid or missing HWID creates no record.", "Legacy device-specific subscription remains compatible.", "Migration and API tests pass."]
@@ -27,6 +27,14 @@ type = "covers"
 [[relations]]
 to = "RSK-1790874094-624"
 type = "covers"
+
+[[relations]]
+to = "DEC-1790874094-knw"
+type = "delivers"
+
+[[relations]]
+to = "REQ-1790874510-ky7"
+type = "delivers"
 
 [[relations]]
 to = "PHS-1790874094-9ax"

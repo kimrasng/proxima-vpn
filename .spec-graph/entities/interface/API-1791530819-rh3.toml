@@ -1,0 +1,15 @@
+schema = 1
+id = "API-1791530819-rh3"
+type = "interface"
+title = "Account subscription resolves UUID slot by HMAC-keyed x-hwid fingerprint"
+description = "api-server/internal/handlers/subscription_account.go: when x-hwid (10-64 printable ASCII) is present, an HMAC-SHA256 fingerprint is derived from the per-deployment pepper (hwid_secrets) and the raw header. The resulting slot is created on first registration (up to hwid_registration_cap) and reused on every subsequent refresh. Absent or invalid x-hwid falls back to the single shared account UUID."
+status = "active"
+created_at = 2026-10-09T16:26:59+09:00
+updated_at = 2026-10-09T16:26:59+09:00
+
+[metadata]
+kind = "component"
+
+[[relations]]
+to = "REQ-1790874510-ky7"
+type = "implements"
