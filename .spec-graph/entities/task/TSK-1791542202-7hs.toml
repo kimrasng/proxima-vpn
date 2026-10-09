@@ -1,0 +1,28 @@
+schema = 1
+id = "TSK-1791542202-7hs"
+type = "task"
+title = "Rewrite Korean node role and entrance wording"
+description = "Update ko.json role labels, hints and every admin string containing 진입 to the approved entrance and exit wording."
+status = "resolved"
+created_at = 2026-10-09T19:36:42+09:00
+updated_at = 2026-10-09T19:39:38+09:00
+
+[metadata]
+acceptance = ["No Korean admin string contains 진입.", "Role names match in wizard, list, edit form and detail."]
+instructions = ["Set wizard role labels to 출구 전용 노드, 입구 전용 노드, 입구·출구 겸용 노드 with the approved hints.", "Set compact role labels to 출구 전용, 입구 전용, 입구·출구 겸용.", "Replace 진입 with 입구 in all admin Korean strings, correcting particles."]
+must_not = ["Do not change en or zh copy.", "Do not change role values or API semantics."]
+order = 1.0
+qa = [{command = "cd web && npm run build && npm run check:locales", evidence = "web/src/i18n/locales/ko.json", expected = "exit 0"}]
+references = ["web/src/i18n/locales/ko.json", "web/src/components/NodeProvisionWizard.tsx"]
+
+[[relations]]
+to = "PHS-1791542202-xcy"
+type = "belongs_to"
+
+[[relations]]
+to = "REQ-1791542202-137"
+type = "covers"
+
+[[relations]]
+to = "REQ-1791542202-137"
+type = "delivers"

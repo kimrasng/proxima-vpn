@@ -1,0 +1,17 @@
+schema = 1
+id = "REQ-1791542202-137"
+type = "requirement"
+title = "Korean admin UI names node roles in plain entrance and exit terms"
+description = "Korean admin copy names the three node roles 'exit-only node' (출구 전용 노드), 'entrance-only node' (입구 전용 노드) and 'entrance-and-exit node' (입구·출구 겸용 노드), shortened to 출구 전용 / 입구 전용 / 입구·출구 겸용 in compact list cells. Every admin occurrence of the term 진입 is replaced with 입구. 'Direct' stays reserved for the connection mode where a client dials an exit node itself, so it is not used as a role name. English and Chinese copy are unchanged."
+status = "resolved"
+created_at = 2026-10-09T19:36:42+09:00
+updated_at = 2026-10-09T19:39:38+09:00
+
+[metadata]
+kind = "functional"
+owner = "frontend"
+priority = "should"
+
+[[relations]]
+to = "ACT-1791542202-6xq"
+type = "has_criterion"
