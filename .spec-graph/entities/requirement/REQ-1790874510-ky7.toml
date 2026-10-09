@@ -3,9 +3,9 @@ id = "REQ-1790874510-ky7"
 type = "requirement"
 title = "Single account subscription URL issues stable UUIDs from HWID"
 description = "A valid x-hwid on GET /sub/{sub_token} identifies a logical client installation. Concurrent refreshes for the same HWID reuse one UUID; distinct concurrent HWIDs cannot exceed the separately configured registration cap (initial default 10). Invalid or missing HWID creates no record. Retain compatible legacy device-specific links and only retire inactive HWID records after an online/accounting safety check."
-status = "active"
+status = "resolved"
 created_at = 2026-10-02T02:08:30+09:00
-updated_at = 2026-10-09T16:26:59+09:00
+updated_at = 2026-10-09T16:34:59+09:00
 
 [metadata]
 kind = "functional"

@@ -3,9 +3,9 @@ id = "REQ-036"
 type = "requirement"
 title = "Administrators provision and manage relay and exit node roles in dashboard"
 description = "The node dashboard provisions relay, exit, and both roles; node views separate subscription-published operating nodes, all managed nodes, entry-only relays, exit-only nodes, and directly published exits while preserving node actions."
-status = "active"
+status = "resolved"
 created_at = 2026-09-25T21:32:30+09:00
-updated_at = 2026-09-30T16:15:51+09:00
+updated_at = 2026-10-09T16:34:49+09:00
 
 [metadata]
 kind = "functional"

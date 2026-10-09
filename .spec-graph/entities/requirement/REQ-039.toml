@@ -3,9 +3,9 @@ id = "REQ-039"
 type = "requirement"
 title = "Managed Entry DNS converges durably and idempotently"
 description = "Persist desired address, provider record identifier, ownership marker, generation, observed state, retry state, and deletion intent without storing credentials. Registration commits DNS intent independently of provider availability; reconciliation recovers ambiguous creates, serializes per node, rejects stale generations, retries transient failures with bounded backoff and jitter, and deletes only owned records after explicit node deletion."
-status = "active"
+status = "resolved"
 created_at = 2026-09-29T20:09:10+09:00
-updated_at = 2026-09-30T13:55:24+09:00
+updated_at = 2026-10-09T16:34:49+09:00
 
 [metadata]
 kind = "non_functional"
