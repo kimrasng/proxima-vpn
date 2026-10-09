@@ -272,6 +272,7 @@
       "trafficTodayTotal": "오늘 총 트래픽",
       "uploadDownloadSplit": "업로드 {{upload}} | 다운로드 {{download}}",
       "noComparison": "비교 기준 없음",
+      "vsYesterday": "어제보다 {{delta}}",
       "alertsTitle": "경고 및 조치 필요",
       "noAlerts": "조치가 필요한 항목이 없습니다",
       "nodeSummary": "노드 상태 요약",
@@ -443,7 +444,13 @@
         "connections": "현재 접속",
         "lastCheck": "마지막 확인",
         "countryRegion": "국가 / 지역",
-        "multiplier": "트래픽 배율"
+        "multiplier": "트래픽 배율",
+        "protocol": "프로토콜"
+      },
+      "protocol": {
+        "l4Forward": "L4 전달",
+        "notConfigured": "미설정",
+        "disabled": "비활성"
       },
       "occupancyValue": "{{capacity}}대 중 {{online}}대",
       "shapingNotApplied": "속도 제한이 적용되지 않음",

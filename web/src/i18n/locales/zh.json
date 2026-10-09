@@ -272,6 +272,7 @@
       "trafficTodayTotal": "今日总流量",
       "uploadDownloadSplit": "上传 {{upload}} | 下载 {{download}}",
       "noComparison": "暂无比较基准",
+      "vsYesterday": "较昨日 {{delta}}",
       "alertsTitle": "警告与待处理事项",
       "noAlerts": "没有需要处理的项目",
       "nodeSummary": "节点状态概要",
@@ -433,7 +434,13 @@
         "connections": "当前连接",
         "lastCheck": "最后检查",
         "countryRegion": "国家 / 地区",
-        "multiplier": "流量倍率"
+        "multiplier": "流量倍率",
+        "protocol": "协议"
+      },
+      "protocol": {
+        "l4Forward": "L4 转发",
+        "notConfigured": "未配置",
+        "disabled": "已停用"
       },
       "occupancyValue": "{{online}} / {{capacity}} 台设备",
       "shapingNotApplied": "限速未生效",

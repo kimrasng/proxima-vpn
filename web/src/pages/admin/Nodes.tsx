@@ -57,6 +57,15 @@ const DEFAULT_PAGE_SIZE = 20;
 const NODE_VIEWS = ["all", "entry", "exit"] as const;
 type NodeView = (typeof NODE_VIEWS)[number];
 const ROLE_BADGE_COLORS = { relay: "green", exit: "blue", both: "grey" } as const;
+// Product names, identical in every locale, so they are not translation keys.
+const PROTOCOL_LABELS: Record<string, string> = {
+  vless_reality: "VLESS Reality",
+  vmess_ws: "VMess WebSocket",
+  trojan_tls: "Trojan TLS",
+  shadowsocks: "Shadowsocks",
+  hysteria2: "Hysteria2",
+  wireguard: "WireGuard",
+};
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return "0 B";
@@ -227,6 +236,7 @@ export default function Nodes() {
     contentDisplay: [
       { id: "name", visible: true },
       { id: "role", visible: true },
+      { id: "protocol", visible: true },
       { id: "country", visible: true },
       { id: "ip", visible: false },
       { id: "entryDns", visible: false },
@@ -639,6 +649,7 @@ export default function Nodes() {
                   options: [
                     { id: "name", label: t("admin.nodes.col.name"), alwaysVisible: true },
                     { id: "role", label: t("admin.nodes.role.label") },
+                    { id: "protocol", label: t("admin.nodes.col.protocol") },
                     { id: "country", label: t("admin.nodes.col.countryRegion") },
                     { id: "ip", label: t("admin.nodes.col.ip") },
                     { id: "entryDns", label: t("admin.nodes.endpoints.dns") },
@@ -702,6 +713,25 @@ export default function Nodes() {
                 id: "role",
                 header: t("admin.nodes.role.label"),
                 cell: (item) => <span className="nodes-table__identity"><Badge color={ROLE_BADGE_COLORS[item.role]}>{t(`admin.nodes.role.${item.role}`)}</Badge></span>,
+              },
+              {
+                id: "protocol",
+                header: t("admin.nodes.col.protocol"),
+                cell: (item) => {
+                  if (item.inbound_protocol) {
+                    const label = `${PROTOCOL_LABELS[item.inbound_protocol] ?? item.inbound_protocol} · ${item.inbound_port}`;
+                    return item.inbound_enabled === false
+                      ? <StatusIndicator type="stopped">{`${label} (${t("admin.nodes.protocol.disabled")})`}</StatusIndicator>
+                      : label;
+                  }
+                  // A relay forwards bytes and terminates no protocol, so an empty
+                  // inbound list is its normal state rather than a gap.
+                  if (item.role === "relay") {
+                    return <Box color="text-body-secondary">{t("admin.nodes.protocol.l4Forward")}</Box>;
+                  }
+                  if (item.status === "pending") return <Box color="text-status-inactive">—</Box>;
+                  return <StatusIndicator type="warning">{t("admin.nodes.protocol.notConfigured")}</StatusIndicator>;
+                },
               },
               {
                 id: "country",

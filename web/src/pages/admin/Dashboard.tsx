@@ -67,14 +67,14 @@ function formatStamp(iso: string): string {
   })}`;
 }
 
-/** Cloudscape has no neutral indicator, so an unchanged value uses the info type. */
-function deltaIndicator(delta: number, format: (value: number) => string = String) {
-  if (delta === 0) return <StatusIndicator type="info">{format(0)}</StatusIndicator>;
-  return (
-    <StatusIndicator type={delta > 0 ? "success" : "error"}>
-      {`${delta > 0 ? "+" : "−"}${format(Math.abs(delta))}`}
-    </StatusIndicator>
-  );
+/**
+ * Signed day-over-day change for a KPI caption, or undefined when there is
+ * nothing to say: an unchanged value is noise next to the figure, and a missing
+ * baseline is not a change at all.
+ */
+function formatDelta(delta: number, format: (value: number) => string = String): string | undefined {
+  if (delta === 0) return undefined;
+  return `${delta > 0 ? "+" : "−"}${format(Math.abs(delta))}`;
 }
 
 const alertActionKey: Record<AlertSeverity, string> = {
@@ -104,24 +104,23 @@ function MetricValue({
 }: {
   value: string;
   suffix?: string;
-  delta?: React.ReactNode;
+  /** Already-localized change clause; appended to the caption, never beside the figure. */
+  delta?: string;
   emphasis?: boolean;
 }) {
+  const caption = [suffix, delta].filter(Boolean).join(" · ");
   return (
     <SpaceBetween size="xxxs">
-      <SpaceBetween size="xs" direction="horizontal" alignItems="center">
-        <Box
-          fontSize="display-l"
-          fontWeight="bold"
-          color={emphasis ? "text-status-error" : "inherit"}
-        >
-          {value}
-        </Box>
-        {delta}
-      </SpaceBetween>
-      {suffix && (
+      <Box
+        fontSize="display-l"
+        fontWeight="bold"
+        color={emphasis ? "text-status-error" : "inherit"}
+      >
+        {value}
+      </Box>
+      {caption && (
         <Box variant="small" color="text-body-secondary">
-          {suffix}
+          {caption}
         </Box>
       )}
     </SpaceBetween>
@@ -202,6 +201,11 @@ export default function Dashboard() {
   }
 
   const deltas = stats?.deltas;
+  const deltaClause = (delta: number | undefined, format?: (value: number) => string) => {
+    if (!deltas?.available || delta === undefined) return undefined;
+    const signed = formatDelta(delta, format);
+    return signed && t("admin.dashboard.vsYesterday", { delta: signed });
+  };
 
   const renderIssueLabel = (issue: NodeIssue) => {
     switch (issue.kind) {
@@ -272,7 +276,7 @@ export default function Dashboard() {
                     <MetricValue
                       value={String(stats?.active_alerts ?? 0)}
                       suffix={t("admin.dashboard.alertsNeedAction")}
-                      delta={deltas?.available ? deltaIndicator(deltas.active_alerts) : undefined}
+                      delta={deltaClause(deltas?.active_alerts)}
                       emphasis={Boolean(stats?.active_alerts)}
                     />
                   ),
@@ -287,7 +291,7 @@ export default function Dashboard() {
                     <MetricValue
                       value={`${stats?.online_nodes ?? 0} / ${stats?.total_nodes ?? 0}`}
                       suffix={t("admin.dashboard.onlineNodesOf")}
-                      delta={deltas?.available ? deltaIndicator(deltas.online_nodes) : undefined}
+                      delta={deltaClause(deltas?.online_nodes)}
                     />
                   ),
                 },
@@ -301,7 +305,7 @@ export default function Dashboard() {
                     <MetricValue
                       value={String(stats?.online_users ?? 0)}
                       suffix={t("admin.dashboard.ofTotalUsers", { total: stats?.total_users ?? 0 })}
-                      delta={deltas?.available ? deltaIndicator(deltas.online_users) : undefined}
+                      delta={deltaClause(deltas?.online_users)}
                     />
                   ),
                 },
@@ -318,11 +322,7 @@ export default function Dashboard() {
                         upload: formatBytes(stats?.upload_today ?? 0),
                         download: formatBytes(stats?.download_today ?? 0),
                       })}
-                      delta={
-                        deltas?.available
-                          ? deltaIndicator(deltas.traffic_today, formatBytes)
-                          : undefined
-                      }
+                      delta={deltaClause(deltas?.traffic_today, formatBytes)}
                     />
                   ),
                 },

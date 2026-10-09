@@ -437,6 +437,13 @@ type nodeListItem struct {
 	// Per-language names keyed by language code, populated by GetNode only;
 	// the list endpoint omits them rather than joining for every row.
 	Labels map[string]string `json:"labels,omitempty"`
+
+	// The protocol this node terminates, populated by ListNodes only. A node
+	// serves at most one inbound (idx_inbounds_one_protocol_per_node), so these
+	// describe it fully; absent means the node has no inbound yet.
+	InboundProtocol *string `json:"inbound_protocol,omitempty"`
+	InboundPort     *int    `json:"inbound_port,omitempty"`
+	InboundEnabled  *bool   `json:"inbound_enabled,omitempty"`
 }
 
 // ListNodes returns all nodes including pending ones.
@@ -451,13 +458,22 @@ type nodeListItem struct {
 func (h *AdminNodeHandler) ListNodes(c *fiber.Ctx) error {
 	rows, err := h.db.Query(
 		context.Background(),
-		`SELECT nodes.id, name, country, region, ip::text, port, status, xray_version,
+		`SELECT nodes.id, name, country, region, host(nodes.ip), port, status, xray_version,
 		        cpu_usage, memory_usage, disk_usage, load_avg, network_in, network_out,
 			        last_seen, nodes.created_at, nodes.updated_at, last_ping_at, status_changed_at,
 		        xray_running, config_hash,
 		        shaping_ok, shaping_tiers, shaping_error, traffic_multiplier, shaping_mode,
-		        os_family, role, publish_direct, max_concurrent_conns, firewall_preset, firewall_ports`+
-			nodeEndpointSelection+` ORDER BY nodes.created_at DESC`,
+		        os_family, role, publish_direct, max_concurrent_conns, firewall_preset, firewall_ports,
+		        ib.inbound_protocol, ib.inbound_port, ib.inbound_enabled`+
+			nodeEndpointSelection+`
+		 LEFT JOIN LATERAL (
+		   -- LIMIT 1 keeps a legacy multi-inbound node (one that predates the
+		   -- unique index) from duplicating its row; the oldest is what it served first.
+		   SELECT i.protocol AS inbound_protocol, i.port AS inbound_port, i.enabled AS inbound_enabled
+		   FROM inbounds i WHERE i.node_id = nodes.id
+		   ORDER BY i.created_at LIMIT 1
+		 ) ib ON true
+		 ORDER BY nodes.created_at DESC`,
 	)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -477,6 +493,7 @@ func (h *AdminNodeHandler) ListNodes(c *fiber.Ctx) error {
 			&n.XrayRunning, &n.ConfigHash,
 			&n.ShapingOK, &n.ShapingTiers, &n.ShapingError, &n.TrafficMultiplier, &n.ShapingMode,
 			&n.OSFamily, &n.Role, &n.PublishDirect, &n.MaxConcurrentConns, &n.FirewallPreset, &n.FirewallPorts,
+			&n.InboundProtocol, &n.InboundPort, &n.InboundEnabled,
 		}
 		if err := rows.Scan(append(targets, n.nodeEndpointFields.scanTargets()...)...); err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -576,7 +593,7 @@ func (h *AdminNodeHandler) GetNode(c *fiber.Ctx) error {
 	var n nodeListItem
 	row := h.db.QueryRow(
 		context.Background(),
-		`SELECT nodes.id, name, country, region, ip::text, port, status, xray_version,
+		`SELECT nodes.id, name, country, region, host(nodes.ip), port, status, xray_version,
 		        cpu_usage, memory_usage, disk_usage, load_avg, network_in, network_out,
 			        last_seen, nodes.created_at, nodes.updated_at, last_ping_at, status_changed_at,
 		        xray_running, config_hash,
@@ -1233,7 +1250,7 @@ func (h *AdminNodeHandler) UpdateNode(c *fiber.Ctx) error {
 	}
 
 	query := fmt.Sprintf(
-		"UPDATE nodes SET %s WHERE id = $%d RETURNING id, name, country, region, ip::text, port, status, xray_version, traffic_multiplier, os_family, max_concurrent_conns, firewall_preset, firewall_ports, created_at",
+		"UPDATE nodes SET %s WHERE id = $%d RETURNING id, name, country, region, host(ip), port, status, xray_version, traffic_multiplier, os_family, max_concurrent_conns, firewall_preset, firewall_ports, created_at",
 		strings.Join(setClauses, ", "), argIdx,
 	)
 	args = append(args, id)

@@ -80,6 +80,11 @@ export interface Node {
   // Resolved list the installer was given, e.g. "443,20001-22000".
   firewall_ports: string;
   created_at: string;
+  // The node's single inbound; only ListNodes fills these, and they are absent
+  // when the node has no inbound yet.
+  inbound_protocol?: string;
+  inbound_port?: number;
+  inbound_enabled?: boolean;
   // Only populated by GetNode, keyed by language code; absent on list rows.
   labels?: Record<string, string>;
 }

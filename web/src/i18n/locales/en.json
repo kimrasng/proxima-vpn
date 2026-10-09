@@ -272,6 +272,7 @@
       "trafficTodayTotal": "Total traffic today",
       "uploadDownloadSplit": "Upload {{upload}} | Download {{download}}",
       "noComparison": "No baseline yet",
+      "vsYesterday": "{{delta}} vs yesterday",
       "alertsTitle": "Alerts and actions",
       "noAlerts": "Nothing needs attention",
       "nodeSummary": "Node status summary",
@@ -443,7 +444,13 @@
         "connections": "Connections",
         "lastCheck": "Last check",
         "countryRegion": "Country / Region",
-        "multiplier": "Traffic multiplier"
+        "multiplier": "Traffic multiplier",
+        "protocol": "Protocol"
+      },
+      "protocol": {
+        "l4Forward": "L4 forwarding",
+        "notConfigured": "Not configured",
+        "disabled": "disabled"
       },
       "occupancyValue": "{{online}} of {{capacity}} devices",
       "shapingNotApplied": "Speed limits not in force",
