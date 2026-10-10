@@ -313,8 +313,14 @@ python3 -m http.server 9090 --directory "$WORKDIR/www" > "$LOGDIR/http-target.lo
 PIDS+=($!)
 wait_for "local HTTP target" 10 curl -sf http://127.0.0.1:9090/marker.txt
 
+# Tunnelled traffic leaves the Exit through node-agent's device egress, which
+# refuses loopback/private destinations exactly as production does. The agent
+# under test is built with the relaye2e tag, whose fixture dialer maps only
+# this TEST-NET-2 documentation address to the local target on port 9090, so
+# the tunnel exercises the real public-destination path end to end.
+E2E_TARGET_HOST="198.51.100.10"
 fetch_via_socks() {
-  curl -s --max-time 10 -x "socks5h://127.0.0.1:$1" http://127.0.0.1:9090/marker.txt
+  curl -s --max-time 10 -x "socks5h://127.0.0.1:$1" "http://${E2E_TARGET_HOST}:9090/marker.txt"
 }
 
 # ---------------------------------------------------------------------------

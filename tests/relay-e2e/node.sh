@@ -14,6 +14,12 @@ if [[ "${E2E_ROLE}" == exit-* ]]; then
     -keyout /tmp/decoy.key -out /tmp/decoy.crt >/dev/null 2>&1
   openssl s_server -quiet -accept 127.0.0.1:9443 \
     -cert /tmp/decoy.crt -key /tmp/decoy.key >/tmp/decoy.log 2>&1 &
+  # An Exit agent keeps a durable stats outbox beside its config file, as it
+  # does under /etc/node-agent on a real host. The provisioned /state volume
+  # stays read-only, so run from a private writable copy.
+  install -d -m 700 /var/lib/node-agent
+  install -m 600 "$config" /var/lib/node-agent/agent.json
+  config=/var/lib/node-agent/agent.json
 fi
 
 echo "starting real node-agent role=${E2E_ROLE} config=${config}"

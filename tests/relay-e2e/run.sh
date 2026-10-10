@@ -21,13 +21,49 @@ export CLIENT_BACK_IP="10.${octet}.$((third+1)).10" RELAY_BACK_IP="10.${octet}.$
 export EXIT_A_BACK_IP="10.${octet}.$((third+1)).30" EXIT_B_BACK_IP="10.${octet}.$((third+1)).40"
 compose=(docker compose -f "${root}/tests/relay-e2e/compose.yml")
 work=$(mktemp -d)
+# Masks credentials before anything reaches the (public) job log: UUIDs, JWTs,
+# hex API keys/tokens, base64url Reality keys, short IDs and share links.
+redact() {
+  sed -E \
+    -e 's/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/<uuid>/g' \
+    -e 's/eyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_-]*\.[A-Za-z0-9_-]*/<jwt>/g' \
+    -e 's#(vless|vmess|trojan|ss|hysteria2)://[^[:space:]"]*#\1://<link>#g' \
+    -e 's/[0-9a-fA-F]{16,}/<hex>/g' \
+    -e 's/[A-Za-z0-9_-]{40,}/<key>/g' \
+    -e 's/((pbk|sid|password|pass|secret|token|api_key|privateKey|publicKey|shortIds?)"?[:=][[:space:]]*\[?"?)[^",&[:space:]]+/\1<redacted>/g'
+}
+# Failure-only view of the disposable topology: what the control plane thinks
+# of each node and chain, the live nft policy, and redacted service logs.
+diagnose() {
+  echo '=== relay E2E failure diagnostics (credentials redacted) ==='
+  "${compose[@]}" ps -a 2>&1 | redact || true
+  echo '--- control-plane node/chain state ---'
+  "${compose[@]}" exec -T postgres psql -U relay_e2e -d relay_e2e -P pager=off -c \
+    "SELECT name, role, status, xray_running, config_hash <> '' AS has_config_hash,
+            EXTRACT(EPOCH FROM NOW() - last_seen)::int AS last_seen_age_s,
+            reality_sni_status, publish_direct, shaping_ok, shaping_mode
+       FROM nodes ORDER BY name" \
+    -c "SELECT name, entry_port, exit_port, mode, enabled, health FROM node_chains ORDER BY name" \
+    2>&1 | redact || true
+  local service
+  for service in relay exit-a exit-b; do
+    echo "--- nft ruleset: ${service} ---"
+    "${compose[@]}" exec -T "$service" nft list ruleset 2>&1 | redact || true
+  done
+  for service in api relay exit-a exit-b; do
+    echo "--- logs: ${service} (last 150 lines) ---"
+    "${compose[@]}" logs --no-color --no-log-prefix --tail=150 "$service" 2>&1 | redact || true
+  done
+  echo '=== end of relay E2E diagnostics ==='
+}
 cleanup() {
   local status=$?
   trap - EXIT
+  if ((status != 0)); then diagnose >&2 || true; fi
   "${compose[@]}" down --volumes --remove-orphans >/dev/null 2>&1 || true
   docker image rm "$E2E_IMAGE" >/dev/null 2>&1 || true
   rm -rf "$work"
-  if ((status != 0)); then echo 'Relay E2E failed; no raw logs or evidence retained' >&2; fi
+  if ((status != 0)); then echo 'Relay E2E failed; redacted diagnostics above, no evidence retained' >&2; fi
   exit "$status"
 }
 trap cleanup EXIT

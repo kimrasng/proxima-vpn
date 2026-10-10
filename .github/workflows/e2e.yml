@@ -89,7 +89,9 @@ jobs:
       - name: Build api-server and node-agent
         run: |
           cd api-server && go build -o /tmp/api-server ./cmd
-          cd ../node-agent && go build -o /tmp/node-agent ./cmd
+          # relaye2e only adds a fixture dialer for TEST-NET-2 198.51.100.10 (see
+          # node-agent/cmd/egress_dialer_relaye2e.go); production builds omit it.
+          cd ../node-agent && go build -tags relaye2e -o /tmp/node-agent ./cmd
 
       - name: Install real Xray-core
         run: |
