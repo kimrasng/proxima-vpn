@@ -1,0 +1,24 @@
+schema = 1
+id = "TSK-1791620104-xs5"
+type = "task"
+title = "Collect and show per-route forwarding traffic"
+description = "Entry nodes do not report per-route forwarded bytes."
+status = "draft"
+created_at = 2026-10-10T17:15:04+09:00
+updated_at = 2026-10-10T17:15:04+09:00
+
+[metadata]
+acceptance = ["Per-route forwarded bytes appear for active relayed routes."]
+instructions = ["Add named nftables counters per relay rule in node-agent.", "Report deltas in the heartbeat or a dedicated endpoint; persist per route.", "Show forwarded traffic in the route list."]
+must_not = ["Do not move forwarding to userspace."]
+order = 1.0
+qa = [{command = "cd node-agent && go test ./...", evidence = "", expected = "exit 0"}, {command = "cd api-server && TEST_DATABASE_URL=$TEST_DATABASE_URL TEST_REDIS_ADDR=$TEST_REDIS_ADDR go test -p 1 ./...", evidence = "", expected = "exit 0"}]
+references = ["node-agent/internal/relay", "api-server/internal/handlers/node_agent.go", "web/src/pages/admin/NodeChains.tsx"]
+
+[[relations]]
+to = "PHS-1791620103-882"
+type = "belongs_to"
+
+[[relations]]
+to = "REQ-1791620102-h3d"
+type = "covers"

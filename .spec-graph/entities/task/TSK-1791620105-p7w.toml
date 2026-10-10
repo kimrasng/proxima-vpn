@@ -1,0 +1,24 @@
+schema = 1
+id = "TSK-1791620105-p7w"
+type = "task"
+title = "Enforce concurrent device caps from server-observed sessions"
+description = "Real apps do not send x-hwid, so concurrency must be measured from Exit observations."
+status = "draft"
+created_at = 2026-10-10T17:15:05+09:00
+updated_at = 2026-10-10T17:15:05+09:00
+
+[metadata]
+acceptance = ["N+1 concurrent sessions without x-hwid are detected and enforced."]
+instructions = ["Define the concurrency signal from agent-reported online sessions and source addresses per account UUID.", "Count per account across Exits and enforce the plan cap with the existing eviction machinery.", "Keep x-hwid as an optional hint only.", "Add end-to-end tests."]
+must_not = ["Do not require x-hwid."]
+order = 1.0
+qa = [{command = "cd api-server && TEST_DATABASE_URL=$TEST_DATABASE_URL TEST_REDIS_ADDR=$TEST_REDIS_ADDR go test -p 1 ./...", evidence = "", expected = "exit 0"}]
+references = ["api-server/internal/services/online_tracker.go", "api-server/internal/scheduler/concurrency.go"]
+
+[[relations]]
+to = "PHS-1791620103-avd"
+type = "belongs_to"
+
+[[relations]]
+to = "REQ-1791620102-300"
+type = "covers"

@@ -1,0 +1,12 @@
+schema = 1
+id = "ACT-1791620101-7z8"
+type = "criterion"
+title = "Authenticated permit returns 200"
+status = "draft"
+created_at = 2026-10-10T17:15:01+09:00
+updated_at = 2026-10-10T17:15:01+09:00
+
+[metadata]
+given = "A registered node and a reachable budget store"
+then = "The response is 200 with a permit body"
+when = "The node requests a bandwidth permit"

@@ -1,0 +1,17 @@
+schema = 1
+id = "REQ-1791620102-hp3"
+type = "requirement"
+title = "Direct route exit port matches the Exit's actual inbound port"
+description = "A direct route's exit_port always equals the port its Exit inbound listens on; creating or changing an inbound keeps direct routes consistent, existing mismatches are repaired, and the route UI shows the real port."
+status = "draft"
+created_at = 2026-10-10T17:15:02+09:00
+updated_at = 2026-10-10T17:15:02+09:00
+
+[metadata]
+kind = "functional"
+owner = "backend"
+priority = "must"
+
+[[relations]]
+to = "ACT-1791620102-ym4"
+type = "has_criterion"

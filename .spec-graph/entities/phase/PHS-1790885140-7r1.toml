@@ -3,9 +3,9 @@ id = "PHS-1790885140-7r1"
 type = "phase"
 title = "Verify complete UUID epochs and distributed eviction acknowledgment"
 description = "Run isolated PostgreSQL/Redis and real Xray multi-Exit tests for complete/ambiguous observations, pending and confirmed eviction epochs, failure handling, cooldown and unaffected UUID continuity. Repair only demonstrated failures; do not deploy."
-status = "draft"
+status = "deprecated"
 created_at = 2026-10-02T05:05:40+09:00
-updated_at = 2026-10-02T05:05:40+09:00
+updated_at = 2026-10-10T17:15:19+09:00
 
 [metadata]
 exit_criteria = ["Fresh isolated PostgreSQL and Redis tests execute with zero required skips.", "A missing or stale Exit report cannot select a victim or reset session age.", "Two-Exit eviction remains pending after one ack and confirms only after every required ack.", "Real Vision TCP and XUDP sessions close for the selected UUID while another UUID stays connected.", "All services and temporary data are cleaned up."]

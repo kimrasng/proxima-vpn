@@ -1,0 +1,17 @@
+schema = 1
+id = "REQ-1791620101-z97"
+type = "requirement"
+title = "Speed-limited plans publish their generated speed-tier Reality endpoints"
+description = "Subscriptions for a speed-limited plan include the VLESS Reality endpoint on the generated speed-tier port of each eligible Exit and are never empty when such an inbound exists."
+status = "draft"
+created_at = 2026-10-10T17:15:01+09:00
+updated_at = 2026-10-10T17:15:01+09:00
+
+[metadata]
+kind = "functional"
+owner = "backend"
+priority = "must"
+
+[[relations]]
+to = "ACT-1791620101-yfa"
+type = "has_criterion"

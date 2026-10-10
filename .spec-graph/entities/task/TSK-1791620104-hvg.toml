@@ -1,0 +1,24 @@
+schema = 1
+id = "TSK-1791620104-hvg"
+type = "task"
+title = "Keep direct route exit port in sync with the Exit inbound port"
+description = "AkileNode's direct route says 8443 while its inbound listens on 20100."
+status = "draft"
+created_at = 2026-10-10T17:15:04+09:00
+updated_at = 2026-10-10T17:15:04+09:00
+
+[metadata]
+acceptance = ["Direct routes always match the inbound port; existing mismatches are repaired."]
+instructions = ["Find how direct routes get their exit_port and why it diverged.", "Sync on inbound create/update and add a migration that repairs existing direct routes.", "Add a regression test."]
+must_not = ["Do not change relayed route ports."]
+order = 1.0
+qa = [{command = "cd api-server && TEST_DATABASE_URL=$TEST_DATABASE_URL TEST_REDIS_ADDR=$TEST_REDIS_ADDR go test -p 1 ./... ./internal/handlers/ ./internal/database/", evidence = "", expected = "exit 0"}]
+references = ["api-server/internal/handlers/admin_inbound.go", "api-server/internal/database/schema.go"]
+
+[[relations]]
+to = "PHS-1791620103-0r8"
+type = "belongs_to"
+
+[[relations]]
+to = "REQ-1791620102-hp3"
+type = "covers"

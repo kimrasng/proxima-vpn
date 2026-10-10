@@ -1,0 +1,7 @@
+schema = 1
+id = "PLN-1791620102-waf"
+type = "plan"
+title = "Stabilize CI, fix route/installer defects, and complete route and concurrency features"
+status = "active"
+created_at = 2026-10-10T17:15:02+09:00
+updated_at = 2026-10-10T17:15:02+09:00

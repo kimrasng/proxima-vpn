@@ -1,0 +1,17 @@
+schema = 1
+id = "REQ-1791620102-t01"
+type = "requirement"
+title = "Entry and Exit forwarding is load-validated with a reproducible benchmark"
+description = "A repeatable load test measures throughput, latency and connection concurrency through Entry to Exit chains for TCP and UDP, with results recorded in docs."
+status = "draft"
+created_at = 2026-10-10T17:15:02+09:00
+updated_at = 2026-10-10T17:15:02+09:00
+
+[metadata]
+kind = "functional"
+owner = "platform"
+priority = "should"
+
+[[relations]]
+to = "ACT-1791620102-m5g"
+type = "has_criterion"

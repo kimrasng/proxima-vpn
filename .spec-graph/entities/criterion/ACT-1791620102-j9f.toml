@@ -1,0 +1,12 @@
+schema = 1
+id = "ACT-1791620102-j9f"
+type = "criterion"
+title = "Choosing any wizard OS produces a working install"
+status = "draft"
+created_at = 2026-10-10T17:15:02+09:00
+updated_at = 2026-10-10T17:15:02+09:00
+
+[metadata]
+given = "The admin picks an OS family in the wizard"
+then = "The agent installs, registers and starts"
+when = "The generated command runs on that OS"

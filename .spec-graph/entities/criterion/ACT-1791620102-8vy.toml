@@ -1,0 +1,12 @@
+schema = 1
+id = "ACT-1791620102-8vy"
+type = "criterion"
+title = "Route shows applied after the Entry applies it"
+status = "draft"
+created_at = 2026-10-10T17:15:02+09:00
+updated_at = 2026-10-10T17:15:02+09:00
+
+[metadata]
+given = "A route was created or changed"
+then = "The route's configuration check shows applied; a node that fails shows failed"
+when = "The Entry and Exit apply the new generation and acknowledge it"

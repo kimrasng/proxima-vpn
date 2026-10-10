@@ -1,0 +1,12 @@
+schema = 1
+id = "ACT-1791620102-wr1"
+type = "criterion"
+title = "Route list shows forwarded bytes per route"
+status = "draft"
+created_at = 2026-10-10T17:15:02+09:00
+updated_at = 2026-10-10T17:15:02+09:00
+
+[metadata]
+given = "A relayed route carrying traffic"
+then = "The route list shows non-zero forwarded traffic for that route"
+when = "The Entry reports counters"

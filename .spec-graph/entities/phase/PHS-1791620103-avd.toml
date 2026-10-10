@@ -1,0 +1,17 @@
+schema = 1
+id = "PHS-1791620103-avd"
+type = "phase"
+title = "Server-observed concurrent device enforcement"
+description = "Enforce device caps without x-hwid"
+status = "draft"
+created_at = 2026-10-10T17:15:03+09:00
+updated_at = 2026-10-10T17:15:03+09:00
+
+[metadata]
+exit_criteria = ["Concurrency detected from Exit observations", "Enforcement verified end to end"]
+goal = "Enforce device caps without x-hwid"
+order = 4.0
+
+[[relations]]
+to = "PLN-1791620102-waf"
+type = "belongs_to"

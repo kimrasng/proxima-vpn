@@ -1,0 +1,12 @@
+schema = 1
+id = "ACT-1791620101-yfa"
+type = "criterion"
+title = "Speed-tier projection lists the generated port"
+status = "draft"
+created_at = 2026-10-10T17:15:01+09:00
+updated_at = 2026-10-10T17:15:01+09:00
+
+[metadata]
+given = "An Exit with a generated speed-tier Reality inbound"
+then = "The profile contains that Exit on port 20000+N"
+when = "A speed-limited user's subscription is rendered"

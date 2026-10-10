@@ -1,0 +1,17 @@
+schema = 1
+id = "REQ-1791620101-x31"
+type = "requirement"
+title = "Concurrent first subscription fetches issue exactly one UUID per account without client identity"
+description = "When an account without x-hwid fetches its subscription concurrently for the first time, exactly one shared UUID/device row is created."
+status = "draft"
+created_at = 2026-10-10T17:15:01+09:00
+updated_at = 2026-10-10T17:15:01+09:00
+
+[metadata]
+kind = "functional"
+owner = "backend"
+priority = "must"
+
+[[relations]]
+to = "ACT-1791620101-534"
+type = "has_criterion"

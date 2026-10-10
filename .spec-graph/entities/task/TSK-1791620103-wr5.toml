@@ -1,0 +1,24 @@
+schema = 1
+id = "TSK-1791620103-wr5"
+type = "task"
+title = "Align PostgreSQL version between CI and TestUUIDEvictionEndToEnd"
+description = "TestUUIDEvictionEndToEnd requires PostgreSQL 17+ but CI runs 16."
+status = "draft"
+created_at = 2026-10-10T17:15:03+09:00
+updated_at = 2026-10-10T17:15:03+09:00
+
+[metadata]
+acceptance = ["The test passes in CI."]
+instructions = ["Decide whether the feature truly needs PG17; if so move CI (and compose images) to postgres:17, otherwise relax the version guard to what the code needs.", "Keep production compose and CI on the same major version."]
+must_not = ["Do not skip the test silently."]
+order = 4.0
+qa = [{command = "cd api-server && TEST_DATABASE_URL=$TEST_DATABASE_URL TEST_REDIS_ADDR=$TEST_REDIS_ADDR go test -p 1 ./... -run TestUUIDEvictionEndToEnd ./internal/scheduler/", evidence = "", expected = "exit 0"}]
+references = [".github/workflows/ci.yml", "api-server/internal/scheduler/uuid_end_to_end_test.go", "docker-compose.yml"]
+
+[[relations]]
+to = "PHS-1791620103-egt"
+type = "belongs_to"
+
+[[relations]]
+to = "REQ-1791620101-tq6"
+type = "covers"

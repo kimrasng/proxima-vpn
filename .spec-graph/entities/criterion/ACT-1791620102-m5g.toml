@@ -1,0 +1,12 @@
+schema = 1
+id = "ACT-1791620102-m5g"
+type = "criterion"
+title = "Load benchmark produces recorded throughput and latency"
+status = "draft"
+created_at = 2026-10-10T17:15:02+09:00
+updated_at = 2026-10-10T17:15:02+09:00
+
+[metadata]
+given = "A test topology of client, Entry and Exit"
+then = "Throughput, latency percentiles and error rate are recorded for TCP and UDP"
+when = "The load benchmark runs"

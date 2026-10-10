@@ -1,0 +1,12 @@
+schema = 1
+id = "ACT-1791620102-ym4"
+type = "criterion"
+title = "Direct route shows the inbound's real port"
+status = "draft"
+created_at = 2026-10-10T17:15:02+09:00
+updated_at = 2026-10-10T17:15:02+09:00
+
+[metadata]
+given = "An Exit whose inbound listens on port P"
+then = "The route's exit port is P"
+when = "Its direct route is listed or its inbound changes"

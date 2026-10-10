@@ -1,0 +1,17 @@
+schema = 1
+id = "REQ-1791620102-wfg"
+type = "requirement"
+title = "Route configuration apply status is confirmed by the nodes"
+description = "Each node acknowledges the relay/policy generation it has applied; the route list shows applied, pending or failed per route instead of 'no apply confirmation'."
+status = "draft"
+created_at = 2026-10-10T17:15:02+09:00
+updated_at = 2026-10-10T17:15:02+09:00
+
+[metadata]
+kind = "functional"
+owner = "backend"
+priority = "must"
+
+[[relations]]
+to = "ACT-1791620102-8vy"
+type = "has_criterion"

@@ -1,0 +1,12 @@
+schema = 1
+id = "ACT-1791620102-rpt"
+type = "criterion"
+title = "Exceeding the cap without x-hwid is detected and enforced"
+status = "draft"
+created_at = 2026-10-10T17:15:02+09:00
+updated_at = 2026-10-10T17:15:02+09:00
+
+[metadata]
+given = "A plan with cap N and clients that send no x-hwid"
+then = "The panel detects N+1 concurrent sessions and enforces the cap per policy"
+when = "N+1 sessions are online for one account"

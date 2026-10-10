@@ -1,0 +1,17 @@
+schema = 1
+id = "REQ-1791620101-bbs"
+type = "requirement"
+title = "Every OS family offered by the provisioning wizard is installable"
+description = "The node provisioning wizard offers only OS families that scripts/install.sh can install end to end; Alpine either gains a working apk path with OpenRC service management or is removed from the wizard."
+status = "draft"
+created_at = 2026-10-10T17:15:01+09:00
+updated_at = 2026-10-10T17:15:01+09:00
+
+[metadata]
+kind = "functional"
+owner = "platform"
+priority = "should"
+
+[[relations]]
+to = "ACT-1791620102-j9f"
+type = "has_criterion"

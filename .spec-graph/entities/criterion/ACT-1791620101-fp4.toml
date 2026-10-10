@@ -1,0 +1,12 @@
+schema = 1
+id = "ACT-1791620101-fp4"
+type = "criterion"
+title = "A push to main produces green CI and E2E runs"
+status = "draft"
+created_at = 2026-10-10T17:15:01+09:00
+updated_at = 2026-10-10T17:15:01+09:00
+
+[metadata]
+given = "The current main branch"
+then = "All jobs succeed with no skipped-because-broken tests"
+when = "CI and E2E workflows run"

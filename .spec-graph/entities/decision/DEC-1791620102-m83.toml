@@ -1,0 +1,16 @@
+schema = 1
+id = "DEC-1791620102-m83"
+type = "decision"
+title = "Detect concurrent devices on the server instead of relying on client x-hwid"
+description = "Verified that real VPN clients do not send x-hwid. Concurrency is therefore measured from what Exit nodes observe for each account (online sessions and source addresses reported by the agent), and x-hwid, when present, is only an optional correlation hint. This supersedes the optional-HWID identity approach for enforcement purposes."
+status = "draft"
+created_at = 2026-10-10T17:15:02+09:00
+updated_at = 2026-10-10T17:15:02+09:00
+
+[metadata]
+date = "2026-10-10"
+rationale = "Client-supplied identity is absent in practice; server observation is the only signal every client produces."
+
+[[relations]]
+to = "DEC-1790874094-knw"
+type = "supersedes"

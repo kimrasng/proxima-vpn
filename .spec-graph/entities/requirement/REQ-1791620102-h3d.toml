@@ -1,0 +1,17 @@
+schema = 1
+id = "REQ-1791620102-h3d"
+type = "requirement"
+title = "Entry nodes report per-route forwarding traffic"
+description = "Entry nodes count bytes and packets per relay route (nftables counters) and report them to the panel; the route list and dashboard show per-route forwarded traffic."
+status = "draft"
+created_at = 2026-10-10T17:15:02+09:00
+updated_at = 2026-10-10T17:15:02+09:00
+
+[metadata]
+kind = "functional"
+owner = "backend"
+priority = "must"
+
+[[relations]]
+to = "ACT-1791620102-wr1"
+type = "has_criterion"

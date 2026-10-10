@@ -1,0 +1,21 @@
+schema = 1
+id = "REQ-1791620102-300"
+type = "requirement"
+title = "Concurrent device limits are enforced from server-observed connections without x-hwid"
+description = "Because real VPN apps do not send x-hwid, concurrent-device limits are detected on the server from connections observed by Exit nodes (distinct online client sessions/IPs per account UUID) and enforced against the plan cap, without relying on any client-supplied identity."
+status = "draft"
+created_at = 2026-10-10T17:15:02+09:00
+updated_at = 2026-10-10T17:15:02+09:00
+
+[metadata]
+kind = "functional"
+owner = "backend"
+priority = "must"
+
+[[relations]]
+to = "DEC-1791620102-m83"
+type = "constrained_by"
+
+[[relations]]
+to = "ACT-1791620102-rpt"
+type = "has_criterion"
