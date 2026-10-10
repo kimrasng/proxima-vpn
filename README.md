@@ -529,6 +529,13 @@ More cases are in [docs/troubleshooting.md](docs/troubleshooting.md).
 
 > All documents under `docs/` are written in English. A Korean overview is available in [README.ko.md](README.ko.md).
 
+## 👥 Maintainers
+
+| | Name | Role | Contact |
+|:---:|---|---|---|
+| <img src="https://github.com/kimrasng.png?size=96" width="48" alt="kimrasng"> | **Dohyun Kim** · [@kimrasng](https://github.com/kimrasng) | Maintainer | <dohyun.kim@solix.kr> |
+| <img src="https://github.com/h053698.png?size=96" width="48" alt="h053698"> | **Yuchan Han** · [@h053698](https://github.com/h053698) | Co-maintainer | <yuchan.han@solixsolutions.us> |
+
 ## 📄 License
 
 MIT

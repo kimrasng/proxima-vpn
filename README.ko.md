@@ -375,6 +375,13 @@ ss -tlnp | grep -E ':(8080|2053)'
 | [사용자 포털 UX](docs/user-portal-ux.md) | 포털 화면 구성과 검증 방법 |
 | [설계 문서](docs/design/) | 입구·출구 관리, HWID·UUID 동시 접속, 기기별 대역폭 |
 
+## 👥 메인테이너
+
+| | 이름 | 역할 | 연락처 |
+|:---:|---|---|---|
+| <img src="https://github.com/kimrasng.png?size=96" width="48" alt="kimrasng"> | **Dohyun Kim** · [@kimrasng](https://github.com/kimrasng) | 메인테이너 | <dohyun.kim@solix.kr> |
+| <img src="https://github.com/h053698.png?size=96" width="48" alt="h053698"> | **Yuchan Han** · [@h053698](https://github.com/h053698) | 공동 메인테이너 | <yuchan.han@solixsolutions.us> |
+
 ## 📄 라이선스
 
 MIT
