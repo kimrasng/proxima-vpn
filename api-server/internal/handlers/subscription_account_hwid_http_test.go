@@ -60,7 +60,7 @@ func TestAccountSubscriptionHWIDSlots(t *testing.T) {
 			t.Error(err)
 			return result{}
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		body, err := io.ReadAll(resp.Body)
 		if err != nil {
 			t.Error(err)
@@ -143,12 +143,12 @@ func TestAccountSubscriptionHWIDSlots(t *testing.T) {
 	if err != nil {
 		t.Fatalf("connect lock holder: %v", err)
 	}
-	defer blocker.Close(ctx)
+	defer func() { _ = blocker.Close(ctx) }()
 	lockTx, err := blocker.Begin(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer lockTx.Rollback(ctx)
+	defer func() { _ = lockTx.Rollback(ctx) }()
 	if _, err := lockTx.Exec(ctx, `LOCK TABLE devices IN EXCLUSIVE MODE`); err != nil {
 		t.Fatalf("lock devices: %v", err)
 	}
@@ -175,7 +175,7 @@ func TestAccountSubscriptionHWIDSlots(t *testing.T) {
 			break
 		}
 		if time.Now().After(deadline) {
-			lockTx.Rollback(ctx)
+			_ = lockTx.Rollback(ctx)
 			wg.Wait()
 			t.Fatalf("only %d of %d concurrent requests reached a lock wait", waiting, wantWaiting)
 		}
@@ -220,13 +220,9 @@ func TestAccountSubscriptionHWIDSlots(t *testing.T) {
 		}
 	}
 
-	// Beyond the cap a new x-hwid registers nothing and gets no subscription.
-	// Current behaviour is 400, not the 403 "hwid registration cap reached"
-	// that resolveHWIDDevice writes: c.JSON returns nil, so the caller treats
-	// the refusal as success with an empty device ID and getSubscriptionForDevice
-	// overwrites the response. Update this assertion if that is fixed.
-	if r := fetch(crypto.NewUUID()); r.status != fiber.StatusBadRequest || !strings.Contains(r.body, "sub_token and device_id are required") {
-		t.Errorf("x-hwid beyond cap: status %d body %s, want current 400 response", r.status, r.body)
+	// Beyond the cap a new x-hwid is refused with 403 and registers nothing.
+	if r := fetch(crypto.NewUUID()); r.status != fiber.StatusForbidden || strings.TrimSpace(r.body) != `{"error":"hwid registration cap reached"}` {
+		t.Errorf("x-hwid beyond cap: status %d body %s, want 403 cap reached", r.status, r.body)
 	}
 	if slots, shared := devices(); len(slots) != cap || shared != 1 {
 		t.Fatalf("after refused registration: %d slots, %d shared devices, want %d slots", len(slots), shared, cap)

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
@@ -12,6 +13,10 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/proximavpn/proxima-vpn/pkg/crypto"
 )
+
+// errHWIDCapReached refuses a new x-hwid once the account has used every
+// registration slot.
+var errHWIDCapReached = fiber.NewError(fiber.StatusForbidden, "hwid registration cap reached")
 
 // hwidPattern accepts 10–64 printable non-space ASCII characters, which is the
 // full range of sane client-supplied installation identifiers.
@@ -82,23 +87,19 @@ func (h *SubscriptionHandler) getAccountSubscription(c *fiber.Ctx, formatOverrid
 
 	var deviceID string
 	if hasHWID {
-		deviceID, err = h.resolveHWIDDevice(c, tx, user.ID, rawHWID)
-		if err != nil {
-			return err // already a fiber response
-		}
+		deviceID, err = h.resolveHWIDDevice(ctx, tx, user.ID, rawHWID)
 	} else {
 		// Legacy path: reuse the account's oldest live device or create one.
 		err = tx.QueryRow(ctx, `SELECT id::text FROM devices WHERE user_id = $1 AND retired_at IS NULL
  ORDER BY created_at, id LIMIT 1`, user.ID).Scan(&deviceID)
-		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-			return accountSubscriptionError(c)
-		}
 		if errors.Is(err, pgx.ErrNoRows) {
-			deviceID, err = h.createAccountDevice(c, tx, user.ID)
-			if err != nil {
-				return err
-			}
+			deviceID, err = h.createAccountDevice(ctx, tx, user.ID)
 		}
+	}
+	if err != nil {
+		// Stop before Commit: the deferred Rollback discards any write made
+		// before the failure, and no subscription is served.
+		return sendAccountSubscriptionError(c, err)
 	}
 
 	if err := tx.Commit(ctx); err != nil {
@@ -109,14 +110,13 @@ func (h *SubscriptionHandler) getAccountSubscription(c *fiber.Ctx, formatOverrid
 
 // resolveHWIDDevice finds or creates the device slot for a validated HWID. It
 // enforces the per-account registration cap from the settings table and updates
-// the last-seen timestamp on every successful refresh.
-func (h *SubscriptionHandler) resolveHWIDDevice(c *fiber.Ctx, tx pgx.Tx, userID, rawHWID string) (string, error) {
-	ctx := c.UserContext()
-
+// the last-seen timestamp on every successful refresh. A full account yields
+// errHWIDCapReached.
+func (h *SubscriptionHandler) resolveHWIDDevice(ctx context.Context, tx pgx.Tx, userID, rawHWID string) (string, error) {
 	// Load the server pepper once per request; it never changes after init.
 	var pepper string
 	if err := tx.QueryRow(ctx, `SELECT pepper FROM hwid_secrets WHERE id = true`).Scan(&pepper); err != nil {
-		return "", accountSubscriptionError(c)
+		return "", err
 	}
 	fp := hwidFingerprint(pepper, rawHWID)
 
@@ -130,7 +130,7 @@ func (h *SubscriptionHandler) resolveHWIDDevice(c *fiber.Ctx, tx pgx.Tx, userID,
 		return deviceID, nil
 	}
 	if !errors.Is(err, pgx.ErrNoRows) {
-		return "", accountSubscriptionError(c)
+		return "", err
 	}
 
 	// New fingerprint: check registration cap.
@@ -143,31 +143,26 @@ func (h *SubscriptionHandler) resolveHWIDDevice(c *fiber.Ctx, tx pgx.Tx, userID,
 	if err := tx.QueryRow(ctx,
 		`SELECT COUNT(*) FROM devices WHERE user_id = $1 AND hwid_fingerprint IS NOT NULL AND retired_at IS NULL`,
 		userID).Scan(&active); err != nil {
-		return "", accountSubscriptionError(c)
+		return "", err
 	}
 	if active >= cap {
-		return "", c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "hwid registration cap reached"})
+		return "", errHWIDCapReached
 	}
 
 	// Register a new slot for this fingerprint.
-	deviceID, err = h.createHWIDDevice(c, tx, userID, fp)
-	if err != nil {
-		return "", err
-	}
-	return deviceID, nil
+	return h.createHWIDDevice(ctx, tx, userID, fp)
 }
 
 // createHWIDDevice inserts a new device row with a fingerprint and all required
 // fields, using the same WireGuard address pool as manual device registration.
-func (h *SubscriptionHandler) createHWIDDevice(c *fiber.Ctx, tx pgx.Tx, userID, fp string) (string, error) {
-	ctx := c.UserContext()
+func (h *SubscriptionHandler) createHWIDDevice(ctx context.Context, tx pgx.Tx, userID, fp string) (string, error) {
 	privateKey, publicKey, err := crypto.GenerateWireGuardKeypair()
 	if err != nil {
-		return "", accountSubscriptionError(c)
+		return "", err
 	}
 	var index int64
 	if err := tx.QueryRow(ctx, `SELECT nextval('wg_ip_seq')`).Scan(&index); err != nil {
-		return "", accountSubscriptionError(c)
+		return "", err
 	}
 	var deviceID string
 	err = tx.QueryRow(ctx,
@@ -179,21 +174,20 @@ func (h *SubscriptionHandler) createHWIDDevice(c *fiber.Ctx, tx pgx.Tx, userID, 
 		userID, crypto.NewUUID(), privateKey, publicKey, wgAddressForIndex(index), fp,
 	).Scan(&deviceID)
 	if err != nil {
-		return "", accountSubscriptionError(c)
+		return "", err
 	}
 	return deviceID, nil
 }
 
 // createAccountDevice inserts the single legacy account device (no fingerprint).
-func (h *SubscriptionHandler) createAccountDevice(c *fiber.Ctx, tx pgx.Tx, userID string) (string, error) {
-	ctx := c.UserContext()
+func (h *SubscriptionHandler) createAccountDevice(ctx context.Context, tx pgx.Tx, userID string) (string, error) {
 	privateKey, publicKey, err := crypto.GenerateWireGuardKeypair()
 	if err != nil {
-		return "", accountSubscriptionError(c)
+		return "", err
 	}
 	var index int64
 	if err := tx.QueryRow(ctx, `SELECT nextval('wg_ip_seq')`).Scan(&index); err != nil {
-		return "", accountSubscriptionError(c)
+		return "", err
 	}
 	var deviceID string
 	err = tx.QueryRow(ctx,
@@ -202,9 +196,20 @@ func (h *SubscriptionHandler) createAccountDevice(c *fiber.Ctx, tx pgx.Tx, userI
 		userID, crypto.NewUUID(), privateKey, publicKey, wgAddressForIndex(index),
 	).Scan(&deviceID)
 	if err != nil {
-		return "", accountSubscriptionError(c)
+		return "", err
 	}
 	return deviceID, nil
+}
+
+// sendAccountSubscriptionError writes a device-resolution failure: a
+// *fiber.Error keeps its status and message, anything else is the generic 500
+// so database details never reach the client.
+func sendAccountSubscriptionError(c *fiber.Ctx, err error) error {
+	var clientError *fiber.Error
+	if errors.As(err, &clientError) {
+		return c.Status(clientError.Code).JSON(fiber.Map{"error": clientError.Message})
+	}
+	return accountSubscriptionError(c)
 }
 
 func accountSubscriptionError(c *fiber.Ctx) error {
