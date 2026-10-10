@@ -23,7 +23,7 @@ func TestNewUUIDCapacityRejectedBeforeConnectSuccessAndKeepsIncumbent(t *testing
 	}
 	assertActive(t, s, []string{"device-a"})
 	newcomer := authenticate(t, s, "device-b", "secret-b")
-	newcomer.SetReadDeadline(time.Now().Add(time.Second))
+	_ = newcomer.SetReadDeadline(time.Now().Add(time.Second))
 	if code, _ := request(t, newcomer, 1); code == 0 {
 		t.Fatal("newcomer received SOCKS success at capacity")
 	}

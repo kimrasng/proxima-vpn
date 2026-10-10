@@ -38,7 +38,7 @@ func (c *APIClient) GetRevokedDevices(ctx context.Context) (RevocationSnapshot, 
 	if err != nil {
 		return result, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != 200 {
 		return result, fmt.Errorf("revocation status %d", resp.StatusCode)
 	}
@@ -94,7 +94,7 @@ func (c *APIClient) AcknowledgeRevocation(ctx context.Context, revocation Revoca
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusNoContent {
 		return fmt.Errorf("revocation ack status %d", resp.StatusCode)
 	}

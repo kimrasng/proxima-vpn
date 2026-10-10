@@ -52,7 +52,7 @@ func TestBlockedWriteDoesNotAccumulateDeviceGrantsAcrossSessions(t *testing.T) {
 			t.Fatalf("CONNECT: %d", code)
 		}
 	}
-	connections[0].Write([]byte("blocked"))
+	_, _ = connections[0].Write([]byte("blocked"))
 	select {
 	case <-entered:
 	case <-time.After(time.Second):
@@ -66,8 +66,8 @@ func TestBlockedWriteDoesNotAccumulateDeviceGrantsAcrossSessions(t *testing.T) {
 	default:
 		t.Fatal("write before grant")
 	}
-	connections[1].Write([]byte("queued without grant"))
-	connections[2].Write([]byte("independent device"))
+	_, _ = connections[1].Write([]byte("queued without grant"))
+	_, _ = connections[2].Write([]byte("independent device"))
 	select {
 	case uuid := <-grants:
 		if uuid != "device-b" {

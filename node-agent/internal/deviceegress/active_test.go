@@ -49,9 +49,9 @@ func TestActiveAdmittedTCPAssociationLifetime(t *testing.T) {
 		}
 	}
 	assertActive(t, s, []string{"device-a", "device-b"})
-	first.Close()
+	_ = first.Close()
 	assertActive(t, s, []string{"device-a", "device-b"})
-	second.Close()
+	_ = second.Close()
 	assertActive(t, s, []string{"device-b"})
 	s.ReconcileRevokedUUIDs([]string{"device-b"})
 	assertActive(t, s, nil)
@@ -76,9 +76,9 @@ func TestActiveAdmittedUDPAssociationLifetime(t *testing.T) {
 	udpEcho(t, udpClient(t), relayA, udpFrame(8443, []byte("first")))
 	udpEcho(t, udpClient(t), relayB, udpFrame(8443, []byte("second")))
 	assertActive(t, s, []string{"device-a"})
-	first.Close()
+	_ = first.Close()
 	assertActive(t, s, []string{"device-a"})
-	second.Close()
+	_ = second.Close()
 	assertActive(t, s, nil)
 }
 
@@ -141,7 +141,7 @@ func TestActiveAdmittedExcludesDeniedAndPendingPermits(t *testing.T) {
 		t.Fatal("permit was not requested")
 	}
 	assertActive(t, s, nil)
-	conn.Close()
+	_ = conn.Close()
 	assertActive(t, s, nil)
 	if attempts.Load() == 0 {
 		t.Fatal("missing permit attempt")

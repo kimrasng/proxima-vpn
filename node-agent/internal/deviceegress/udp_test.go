@@ -20,7 +20,7 @@ func echoUDP(t *testing.T) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { conn.Close() })
+	t.Cleanup(func() { _ = conn.Close() })
 	go func() {
 		buffer := make([]byte, 65535)
 		for {
@@ -28,7 +28,7 @@ func echoUDP(t *testing.T) string {
 			if err != nil {
 				return
 			}
-			conn.WriteToUDP(buffer[:n], addr)
+			_, _ = conn.WriteToUDP(buffer[:n], addr)
 		}
 	}()
 	return conn.LocalAddr().String()
@@ -40,7 +40,7 @@ func udpClient(t *testing.T) *net.UDPConn {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { conn.Close() })
+	t.Cleanup(func() { _ = conn.Close() })
 	return conn
 }
 
@@ -50,7 +50,7 @@ func udpFrame(port int, payload []byte) []byte {
 
 func udpEcho(t *testing.T, client *net.UDPConn, relay *net.UDPAddr, frame []byte) {
 	t.Helper()
-	client.SetDeadline(time.Now().Add(3 * time.Second))
+	_ = client.SetDeadline(time.Now().Add(3 * time.Second))
 	if _, err := client.WriteToUDP(frame, relay); err != nil {
 		t.Fatal(err)
 	}
@@ -132,13 +132,13 @@ func TestUDPRejectsFragmentsAndPinsFirstSourceTuple(t *testing.T) {
 	udpEcho(t, client, relay, udpFrame(8443, []byte("pin")))
 	fragment := udpFrame(8443, []byte("fragment"))
 	fragment[2] = 1
-	client.WriteToUDP(fragment, relay)
+	_, _ = client.WriteToUDP(fragment, relay)
 	intruder := udpClient(t)
-	intruder.WriteToUDP(udpFrame(8443, []byte("intruder")), relay)
+	_, _ = intruder.WriteToUDP(udpFrame(8443, []byte("intruder")), relay)
 	// A subsequent valid echo from the pinned source proves the fragment was
 	// processed and discarded without forwarding or invalidating the association.
 	udpEcho(t, client, relay, udpFrame(8443, []byte("valid")))
-	intruder.SetReadDeadline(time.Now().Add(50 * time.Millisecond))
+	_ = intruder.SetReadDeadline(time.Now().Add(50 * time.Millisecond))
 	var buffer [100]byte
 	if _, _, err := intruder.ReadFromUDP(buffer[:]); err == nil {
 		t.Fatal("unpinned source received traffic")
@@ -174,7 +174,7 @@ func TestUDPRejectsMalformedAndProhibitedDestinationsWithoutPermits(t *testing.T
 		{0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 80, 1},
 		{0, 0, 0, 3, 9, 'l', 'o', 'c', 'a', 'l', 'h', 'o', 's', 't', 0, 80, 1},
 	} {
-		client.WriteToUDP(frame, relay)
+		_, _ = client.WriteToUDP(frame, relay)
 	}
 	udpEcho(t, client, relay, udpFrame(8443, []byte("valid")))
 	if permits.Load() != 2 {
@@ -214,7 +214,7 @@ func TestUDPLifetimeClosesRemoteSockets(t *testing.T) {
 			udpEcho(t, udpClient(t), relay, udpFrame(8443, []byte("alive")))
 			switch lifetime {
 			case "control EOF":
-				control.Close()
+				_ = control.Close()
 			case "revocation":
 				if err := s.SetCredentials(nil); err != nil {
 					t.Fatal(err)
@@ -254,9 +254,9 @@ func TestUDPPermitErrorsFailClosedInBothDirections(t *testing.T) {
 				t.Fatalf("UDP ASSOCIATE: %d", code)
 			}
 			client := udpClient(t)
-			client.WriteToUDP(udpFrame(8443, []byte("must not echo")), relay)
+			_, _ = client.WriteToUDP(udpFrame(8443, []byte("must not echo")), relay)
 			mustClose(t, control)
-			client.SetReadDeadline(time.Now().Add(50 * time.Millisecond))
+			_ = client.SetReadDeadline(time.Now().Add(50 * time.Millisecond))
 			var buffer [100]byte
 			if _, _, err := client.ReadFromUDP(buffer[:]); err == nil {
 				t.Fatal("UDP permit error forwarded traffic")
@@ -281,7 +281,7 @@ func TestUDPHasAtMost64RemoteDestinations(t *testing.T) {
 	for i := range 64 {
 		udpEcho(t, client, relay, udpFrame(8000+i, []byte(strconv.Itoa(i))))
 	}
-	client.WriteToUDP(udpFrame(9000, []byte("over limit")), relay)
+	_, _ = client.WriteToUDP(udpFrame(9000, []byte("over limit")), relay)
 	udpEcho(t, client, relay, udpFrame(8000, []byte("existing destination")))
 	if dials.Load() != 64 {
 		t.Fatalf("destination bound exceeded: %d dials", dials.Load())
@@ -305,13 +305,13 @@ func TestUDPControlEOFCancelsBlockedPermit(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("UDP ASSOCIATE: %d", code)
 	}
-	udpClient(t).WriteToUDP(udpFrame(8443, []byte("wait")), relay)
+	_, _ = udpClient(t).WriteToUDP(udpFrame(8443, []byte("wait")), relay)
 	select {
 	case <-entered:
 	case <-time.After(time.Second):
 		t.Fatal("permit callback not entered")
 	}
-	control.Close()
+	_ = control.Close()
 	select {
 	case <-cancelled:
 	case <-time.After(time.Second):
@@ -340,7 +340,7 @@ func TestUDPInvalidFirstDatagramDoesNotClaimWildcardAssociation(t *testing.T) {
 				t.Fatalf("UDP ASSOCIATE: %d", code)
 			}
 			intruder := udpClient(t)
-			intruder.WriteToUDP(frame, relay)
+			_, _ = intruder.WriteToUDP(frame, relay)
 			udpEcho(t, udpClient(t), relay, udpFrame(8443, []byte("valid first sender")))
 			if permits.Load() != 2 {
 				t.Fatalf("invalid first datagram charged budget: %d", permits.Load())
@@ -370,12 +370,12 @@ func TestUDPSpecifiedSourceRejectsAttackerBeforePinning(t *testing.T) {
 				t.Fatalf("UDP ASSOCIATE: %d", code)
 			}
 			intruder := udpClient(t)
-			intruder.WriteToUDP(udpFrame(8443, []byte("attacker")), relay)
+			_, _ = intruder.WriteToUDP(udpFrame(8443, []byte("attacker")), relay)
 			udpEcho(t, client, relay, udpFrame(8443, []byte("specified source")))
 			if permits.Load() != 2 {
 				t.Fatalf("attacker charged budget: %d", permits.Load())
 			}
-			intruder.SetReadDeadline(time.Now().Add(50 * time.Millisecond))
+			_ = intruder.SetReadDeadline(time.Now().Add(50 * time.Millisecond))
 			var buffer [100]byte
 			if _, _, err := intruder.ReadFromUDP(buffer[:]); err == nil {
 				t.Fatal("attacker received traffic")

@@ -39,7 +39,7 @@ func (c *APIClient) RequestBandwidthPermit(ctx context.Context, uuid string, dir
 	if err != nil {
 		return result, fmt.Errorf("request bandwidth permit: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		return result, fmt.Errorf("bandwidth permit rejected (status %d)", resp.StatusCode)
 	}

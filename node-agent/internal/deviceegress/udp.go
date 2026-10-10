@@ -43,46 +43,46 @@ type udpRemote struct {
 // constrained to the authenticated TCP peer and checked before source pinning.
 func (c *session) associate(host string, port int) {
 	if err := c.reserveBeforeSuccess(); err != nil {
-		c.reply(2, nil)
+		_ = c.reply(2, nil)
 		return
 	}
 	peer := c.conn.RemoteAddr().(*net.TCPAddr)
 	requestedIP := net.ParseIP(host)
 	if requestedIP == nil || (!requestedIP.IsUnspecified() && !requestedIP.Equal(peer.IP)) {
-		c.reply(2, nil)
+		_ = c.reply(2, nil)
 		return
 	}
 	local, err := net.ListenUDP("udp", &net.UDPAddr{IP: c.conn.LocalAddr().(*net.TCPAddr).IP})
 	if err != nil {
-		c.reply(1, nil)
+		_ = c.reply(1, nil)
 		return
 	}
 	ctx, cancel := context.WithCancel(c.ctx)
 	a := &udpAssociation{session: c, ctx: ctx, cancel: cancel, local: local, remotes: make(map[string]*udpRemote)}
-	stop := context.AfterFunc(ctx, func() { local.Close() })
+	stop := context.AfterFunc(ctx, func() { _ = local.Close() })
 	defer stop()
 	defer func() {
 		cancel()
-		local.Close()
+		_ = local.Close()
 		a.mu.Lock()
 		for _, remote := range a.remotes {
 			remote.cancel()
-			remote.conn.Close()
+			_ = remote.conn.Close()
 		}
 		a.mu.Unlock()
-		c.conn.Close()
+		_ = c.conn.Close()
 		a.wg.Wait()
 	}()
 	if err := c.reply(0, local.LocalAddr()); err != nil {
 		return
 	}
-	c.conn.SetDeadline(time.Time{})
+	_ = c.conn.SetDeadline(time.Time{})
 	// The TCP connection is the association lifetime, never an egress stream.
 	a.wg.Add(1)
 	go func() {
 		defer a.wg.Done()
 		var control [1]byte
-		c.conn.Read(control[:])
+		_, _ = c.conn.Read(control[:])
 		cancel()
 	}()
 	a.wg.Add(1)
@@ -164,7 +164,7 @@ func (a *udpAssociation) send(address string, payload []byte) error {
 		}
 		return err
 	}
-	remote.conn.SetWriteDeadline(time.Now().Add(writeTimeout))
+	_ = remote.conn.SetWriteDeadline(time.Now().Add(writeTimeout))
 	n, err := remote.conn.Write(payload)
 	if err != nil || n != len(payload) {
 		a.remove(address, remote)
@@ -190,7 +190,7 @@ func (c *session) allowPayload(ctx context.Context, direction devicebandwidth.Di
 func (a *udpAssociation) receive(address string, remote *udpRemote) {
 	defer a.wg.Done()
 	defer a.remove(address, remote)
-	stop := context.AfterFunc(remote.ctx, func() { remote.conn.Close() })
+	stop := context.AfterFunc(remote.ctx, func() { _ = remote.conn.Close() })
 	defer stop()
 	buffer := make([]byte, maxUDPDatagram)
 	for {
@@ -215,7 +215,7 @@ func (a *udpAssociation) receive(address string, remote *udpRemote) {
 		}
 		frame := append([]byte{0, 0, 0}, encodeAddress(remote.ip, remote.port)...)
 		frame = append(frame, buffer[:n]...)
-		a.local.SetWriteDeadline(time.Now().Add(writeTimeout))
+		_ = a.local.SetWriteDeadline(time.Now().Add(writeTimeout))
 		written, err := a.local.WriteToUDP(frame, sender)
 		release()
 		if err != nil || written != len(frame) {
@@ -227,7 +227,7 @@ func (a *udpAssociation) receive(address string, remote *udpRemote) {
 
 func (a *udpAssociation) remove(address string, remote *udpRemote) {
 	remote.cancel()
-	remote.conn.Close()
+	_ = remote.conn.Close()
 	a.mu.Lock()
 	if a.remotes[address] == remote {
 		delete(a.remotes, address)
@@ -248,7 +248,7 @@ func (a *udpAssociation) expire() {
 			for address, remote := range a.remotes {
 				if now.Sub(remote.lastUsed) >= udpIdleTimeout {
 					remote.cancel()
-					remote.conn.Close()
+					_ = remote.conn.Close()
 					delete(a.remotes, address)
 				}
 			}

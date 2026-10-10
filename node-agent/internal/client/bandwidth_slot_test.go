@@ -12,7 +12,7 @@ import (
 func TestBandwidthPermitConcurrencyLimitIsTerminal(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"allowed":false,"retry_after_ms":0,"denied_reason":"concurrency_limit"}`))
+		_, _ = w.Write([]byte(`{"allowed":false,"retry_after_ms":0,"denied_reason":"concurrency_limit"}`))
 	}))
 	defer srv.Close()
 	c := NewAPIClient(&config.AgentConfig{ServerURL: srv.URL, NodeID: "node", APIKey: "key"})

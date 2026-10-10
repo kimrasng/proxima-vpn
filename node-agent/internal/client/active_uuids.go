@@ -39,7 +39,7 @@ func (c *APIClient) ReportActiveUUIDs(ctx context.Context, report ActiveUUIDRepo
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusNoContent {
 		return fmt.Errorf("active UUID report status %d", resp.StatusCode)
 	}

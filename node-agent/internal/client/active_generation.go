@@ -26,7 +26,7 @@ func (c *APIClient) BeginActiveUUIDGeneration(ctx context.Context, generation st
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusNoContent {
 		return fmt.Errorf("start admitted generation status %d", resp.StatusCode)
 	}
