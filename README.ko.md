@@ -15,6 +15,7 @@
 ![Redis](https://img.shields.io/badge/Redis-7-DC382D?logo=redis&logoColor=white)
 ![Xray-core](https://img.shields.io/badge/Xray--core-%E2%89%A5%20v25.1.1-6E40C9)
 ![Prometheus](https://img.shields.io/badge/Prometheus-metrics-E6522C?logo=prometheus&logoColor=white)
+[![License](https://img.shields.io/badge/license-AGPL--3.0-A42E2B)](LICENSE)
 
 [빠른 시작](#-빠른-시작) · [아키텍처](#-아키텍처) · [기능](#-주요-기능) · [배포](#-운영-환경-배포) · [개발](#-개발) · [문서](#-문서)
 
@@ -384,7 +385,19 @@ ss -tlnp | grep -E ':(8080|2053)'
 
 ## 📄 라이선스
 
-MIT
+Copyright © 2026 Solix Solutions LLC.
+
+Proxima VPN Panel은 자유 소프트웨어입니다. 자유 소프트웨어 재단(FSF)이 발표한 [GNU Affero 일반 공중 사용 허가서 버전 3](LICENSE)(`AGPL-3.0-only`)의 조건에 따라 재배포하거나 수정할 수 있습니다.
+
+이 소프트웨어를 수정해 네트워크 서비스로 운영한다면, AGPL에 따라 그 서비스의 사용자에게 수정한 버전의 소스 코드를 제공해야 합니다.
+
+Solix와 Proxima의 이름과 로고(`docs/assets/` 안의 파일 포함)는 이 라이선스의 대상이 아닙니다. AGPL은 이를 사용할 권리를 부여하지 않습니다.
+
+## ⚠️ 면책 조항
+
+이 소프트웨어는 어떠한 보증도 없이 **"있는 그대로"** 제공됩니다. 관련 법률이 허용하는 최대 범위에서, Solix Solutions LLC와 기여자는 이 소프트웨어를 사용하거나 사용하지 못해 생긴 어떠한 손해나 손실에도 책임을 지지 않습니다. 여기에는 서비스 중단, 데이터 손실, 보안 사고, VPN 서비스 운영에 따른 법적·규제상 결과가 포함됩니다. 자세한 내용은 [라이선스](LICENSE) 제15조와 제16조를 참고하세요.
+
+이 소프트웨어를 어떻게 배포하고 운영할지는 전적으로 사용자의 책임입니다. 서버 보안, 사용자 데이터 보호, 본인과 사용자에게 적용되는 법률과 서비스 약관 준수가 여기에 포함됩니다.
 
 ---
 

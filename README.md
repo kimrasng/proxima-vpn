@@ -16,6 +16,7 @@ Entry → exit node chains · six VPN protocols · one subscription URL that ada
 ![Xray-core](https://img.shields.io/badge/Xray--core-%E2%89%A5%20v25.1.1-6E40C9)
 ![nftables](https://img.shields.io/badge/relay-nftables-555555)
 ![Prometheus](https://img.shields.io/badge/metrics-Prometheus-E6522C?logo=prometheus&logoColor=white)
+[![License](https://img.shields.io/badge/license-AGPL--3.0-A42E2B)](LICENSE)
 
 [Quick start](#-quick-start) · [Architecture](#-architecture) · [Infrastructure](#-infrastructure) · [Features](#-features) · [Deploy](#-production-deployment) · [Develop](#-development)
 
@@ -538,7 +539,19 @@ More cases are in [docs/troubleshooting.md](docs/troubleshooting.md).
 
 ## 📄 License
 
-MIT
+Copyright © 2026 Solix Solutions LLC.
+
+Proxima VPN Panel is free software: you can redistribute it and/or modify it under the terms of the [GNU Affero General Public License, version 3](LICENSE) as published by the Free Software Foundation (`AGPL-3.0-only`).
+
+If you run a modified version of this software as a network service, the AGPL requires you to offer the corresponding source code of your version to the users of that service.
+
+The Solix and Proxima names and logos, including the files in `docs/assets/`, are not covered by this license. The AGPL grants no right to use them.
+
+## ⚠️ Disclaimer
+
+This software is provided **"as is"**, without warranty of any kind. To the maximum extent permitted by applicable law, Solix Solutions LLC and the contributors are not liable for any damages or losses arising from its use or inability to use it, including service outages, data loss, security incidents, and the legal or regulatory consequences of operating a VPN service. See sections 15 and 16 of the [license](LICENSE).
+
+You are solely responsible for how you deploy and operate it: securing your servers, protecting your users' data, and complying with the laws and terms of service that apply to you and to your users.
 
 ---
 
