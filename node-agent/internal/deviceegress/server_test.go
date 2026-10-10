@@ -25,7 +25,7 @@ func startServer(t *testing.T, permit deviceegress.PermitFunc, dial deviceegress
 	if err := s.Start(context.Background(), "127.0.0.1:0"); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { s.Close() })
+	t.Cleanup(func() { _ = s.Close() })
 	return s
 }
 
@@ -35,9 +35,9 @@ func authenticate(t *testing.T, s *deviceegress.Server, uuid, password string) n
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { c.Close() })
-	c.SetDeadline(time.Now().Add(5 * time.Second))
-	c.Write([]byte{5, 2, 0, 2})
+	t.Cleanup(func() { _ = c.Close() })
+	_ = c.SetDeadline(time.Now().Add(5 * time.Second))
+	_, _ = c.Write([]byte{5, 2, 0, 2})
 	var response [2]byte
 	if _, err := io.ReadFull(c, response[:]); err != nil || response != [2]byte{5, 2} {
 		t.Fatalf("authentication method: %v, %v", response, err)
@@ -45,7 +45,7 @@ func authenticate(t *testing.T, s *deviceegress.Server, uuid, password string) n
 	request := append([]byte{1, byte(len(uuid))}, []byte(uuid)...)
 	request = append(request, byte(len(password)))
 	request = append(request, []byte(password)...)
-	c.Write(request)
+	_, _ = c.Write(request)
 	if _, err := io.ReadFull(c, response[:]); err != nil || response != [2]byte{1, 0} {
 		t.Fatalf("authentication: %v, %v", response, err)
 	}
@@ -98,7 +98,7 @@ func echoTCP(t *testing.T) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { listener.Close() })
+	t.Cleanup(func() { _ = listener.Close() })
 	go func() {
 		for {
 			c, err := listener.Accept()
@@ -106,8 +106,8 @@ func echoTCP(t *testing.T) string {
 				return
 			}
 			go func() {
-				defer c.Close()
-				io.Copy(c, c)
+				defer func() { _ = c.Close() }()
+				_, _ = io.Copy(c, c)
 			}()
 		}
 	}()
@@ -151,7 +151,7 @@ func TestTCPChargesAllSessionsToTheirAuthenticatedDevice(t *testing.T) {
 		if _, err := io.ReadFull(c, got); err != nil || !bytes.Equal(got, payload) {
 			t.Fatalf("echo: %v", err)
 		}
-		c.Close()
+		_ = c.Close()
 	}
 	mu.Lock()
 	defer mu.Unlock()
@@ -176,7 +176,7 @@ func dialEcho(t *testing.T) deviceegress.DialFunc {
 
 func mustClose(t *testing.T, c net.Conn) {
 	t.Helper()
-	c.SetReadDeadline(time.Now().Add(time.Second))
+	_ = c.SetReadDeadline(time.Now().Add(time.Second))
 	var value [1]byte
 	_, err := c.Read(value[:])
 	if err == nil {
@@ -202,9 +202,9 @@ func TestAuthenticationIsRequired(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer c.Close()
-			c.SetDeadline(time.Now().Add(time.Second))
-			c.Write(test.greeting)
+			defer func() { _ = c.Close() }()
+			_ = c.SetDeadline(time.Now().Add(time.Second))
+			_, _ = c.Write(test.greeting)
 			response := make([]byte, 2)
 			if _, err := io.ReadFull(c, response); err != nil || !bytes.Equal(response, test.want) {
 				t.Fatalf("method response %v: %v", response, err)
@@ -220,19 +220,19 @@ func TestAuthenticationIsRequired(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		c.SetDeadline(time.Now().Add(time.Second))
-		c.Write([]byte{5, 1, 2})
+		_ = c.SetDeadline(time.Now().Add(time.Second))
+		_, _ = c.Write([]byte{5, 1, 2})
 		var response [2]byte
-		io.ReadFull(c, response[:])
+		_, _ = io.ReadFull(c, response[:])
 		message := append([]byte{1, byte(len(test.uuid))}, []byte(test.uuid)...)
 		message = append(message, byte(len(test.password)))
 		message = append(message, []byte(test.password)...)
-		c.Write(message)
+		_, _ = c.Write(message)
 		if _, err := io.ReadFull(c, response[:]); err != nil || response != [2]byte{1, 1} {
 			t.Fatalf("expected failed authentication: %v %v", response, err)
 		}
 		mustClose(t, c)
-		c.Close()
+		_ = c.Close()
 	}
 }
 
@@ -249,7 +249,7 @@ func TestTCPRetriesDeniedPermitsBeforeForwarding(t *testing.T) {
 	if code, _ := request(t, c, 1); code != 0 {
 		t.Fatalf("CONNECT: %d", code)
 	}
-	c.Write([]byte("hello"))
+	_, _ = c.Write([]byte("hello"))
 	got := make([]byte, 5)
 	if _, err := io.ReadFull(c, got); err != nil || string(got) != "hello" {
 		t.Fatalf("echo: %s %v", got, err)
@@ -274,7 +274,7 @@ func TestPermitErrorsFailClosedInBothDirections(t *testing.T) {
 			if code, _ := request(t, c, 1); code != 0 {
 				t.Fatalf("CONNECT: %d", code)
 			}
-			c.Write([]byte("must not echo"))
+			_, _ = c.Write([]byte("must not echo"))
 			mustClose(t, c)
 		})
 	}
@@ -295,7 +295,7 @@ func TestCredentialReplacementRevokesChangedOrRemovedSessionsOnly(t *testing.T) 
 	}
 	mustClose(t, a1)
 	mustClose(t, a2)
-	b.Write([]byte("ok"))
+	_, _ = b.Write([]byte("ok"))
 	var echo [2]byte
 	if _, err := io.ReadFull(b, echo[:]); err != nil || string(echo[:]) != "ok" {
 		t.Fatalf("unchanged device revoked: %v", err)
@@ -322,7 +322,7 @@ func TestInvalidCredentialsDoNotReplaceCurrentSet(t *testing.T) {
 		}
 	}
 	c := authenticate(t, s, "device-a", "secret-a")
-	c.Close()
+	_ = c.Close()
 }
 
 func TestShutdownCancelsPermitWaits(t *testing.T) {
@@ -338,7 +338,7 @@ func TestShutdownCancelsPermitWaits(t *testing.T) {
 	if code, _ := request(t, c, 1); code != 0 {
 		t.Fatalf("CONNECT: %d", code)
 	}
-	c.Write([]byte("wait"))
+	_, _ = c.Write([]byte("wait"))
 	select {
 	case <-entered:
 	case <-time.After(time.Second):
@@ -368,7 +368,7 @@ func TestRetryWaitCancelledOnRevocation(t *testing.T) {
 	if code, _ := request(t, c, 1); code != 0 {
 		t.Fatalf("CONNECT: %d", code)
 	}
-	c.Write([]byte("wait"))
+	_, _ = c.Write([]byte("wait"))
 	select {
 	case <-entered:
 	case <-time.After(time.Second):
@@ -412,7 +412,7 @@ func TestDestinationsCheckedBeforeDial(t *testing.T) {
 				frame = append(frame, ip...)
 			}
 			frame = append(frame, 0, 80)
-			c.Write(frame)
+			_, _ = c.Write(frame)
 			var response [10]byte
 			if _, err := io.ReadFull(c, response[:]); err != nil || response[1] != 2 {
 				t.Fatalf("denied destination response %v: %v", response, err)
@@ -429,7 +429,7 @@ func TestListenerRejectsNonLoopbackBindings(t *testing.T) {
 	for _, address := range []string{"0.0.0.0:0", "[::]:0", ":0", "localhost:0", "203.0.113.1:0"} {
 		s := deviceegress.New(allowAll)
 		if err := s.Start(context.Background(), address); err == nil {
-			s.Close()
+			_ = s.Close()
 			t.Errorf("unsafe binding accepted: %s", address)
 		}
 	}

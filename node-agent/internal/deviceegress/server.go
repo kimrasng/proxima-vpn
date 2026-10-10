@@ -216,7 +216,7 @@ func (s *Server) Start(ctx context.Context, address string) error {
 	go s.accept()
 	go func() {
 		<-s.ctx.Done()
-		s.Close()
+		_ = s.Close()
 	}()
 	return nil
 }
@@ -240,7 +240,7 @@ func (s *Server) Close() error {
 			s.cancel()
 		}
 		if s.listener != nil {
-			s.listener.Close()
+			_ = s.listener.Close()
 		}
 		for connection := range s.sessions {
 			connection.close()
@@ -262,7 +262,7 @@ func (s *Server) accept() {
 		peer, ok := conn.RemoteAddr().(*net.TCPAddr)
 		if s.closed || len(s.sessions) >= maxConnections || !ok || !peer.IP.IsLoopback() {
 			s.mu.Unlock()
-			conn.Close()
+			_ = conn.Close()
 			continue
 		}
 		ctx, cancel := context.WithCancel(s.ctx)
@@ -291,11 +291,11 @@ func (s *Server) accept() {
 
 func (c *session) close() {
 	c.cancel()
-	c.conn.Close()
+	_ = c.conn.Close()
 }
 
 func (c *session) serve() {
-	c.conn.SetDeadline(time.Now().Add(handshakeTimeout))
+	_ = c.conn.SetDeadline(time.Now().Add(handshakeTimeout))
 	if err := c.authenticate(); err != nil {
 		return
 	}
@@ -305,7 +305,7 @@ func (c *session) serve() {
 	}
 	host, port, err := readAddress(c.conn, header[3])
 	if err != nil {
-		c.reply(8, nil)
+		_ = c.reply(8, nil)
 		return
 	}
 	switch header[1] {
@@ -314,7 +314,7 @@ func (c *session) serve() {
 	case 3:
 		c.associate(host, port)
 	default:
-		c.reply(7, nil)
+		_ = c.reply(7, nil)
 	}
 }
 
@@ -332,7 +332,7 @@ func (c *session) authenticate() error {
 		found = found || method == 2
 	}
 	if !found {
-		writeAll(c.conn, []byte{5, 255})
+		_ = writeAll(c.conn, []byte{5, 255})
 		return errors.New("username/password authentication required")
 	}
 	if err := writeAll(c.conn, []byte{5, 2}); err != nil {
@@ -372,7 +372,7 @@ func (c *session) authenticate() error {
 	}
 	c.server.mu.Unlock()
 	if !valid {
-		writeAll(c.conn, []byte{1, 1})
+		_ = writeAll(c.conn, []byte{1, 1})
 		return errors.New("authentication denied")
 	}
 	return writeAll(c.conn, []byte{1, 0})
@@ -553,34 +553,34 @@ func (c *session) reserveBeforeSuccess() error {
 
 func (c *session) connect(host string, port int) {
 	if err := c.reserveBeforeSuccess(); err != nil {
-		c.reply(2, nil)
+		_ = c.reply(2, nil)
 		return
 	}
 	ctx, cancel := context.WithTimeout(c.ctx, dialTimeout)
 	defer cancel()
 	address, err := resolveDestination(ctx, host, port)
 	if err != nil {
-		c.reply(2, nil)
+		_ = c.reply(2, nil)
 		return
 	}
 	remote, err := c.server.dial(ctx, "tcp", address)
 	if err != nil {
-		c.reply(5, nil)
+		_ = c.reply(5, nil)
 		return
 	}
-	defer remote.Close()
+	defer func() { _ = remote.Close() }()
 	if err := c.reply(0, remote.LocalAddr()); err != nil {
 		return
 	}
-	c.conn.SetDeadline(time.Time{})
-	stop := context.AfterFunc(c.ctx, func() { remote.Close() })
+	_ = c.conn.SetDeadline(time.Time{})
+	stop := context.AfterFunc(c.ctx, func() { _ = remote.Close() })
 	defer stop()
 	results := make(chan error, 2)
 	go func() { results <- c.copyChunks(remote, c.conn, devicebandwidth.Upload) }()
 	go func() { results <- c.copyChunks(c.conn, remote, devicebandwidth.Download) }()
 	if err := <-results; err != nil {
 		c.close()
-		remote.Close()
+		_ = remote.Close()
 	}
 	<-results
 }
@@ -599,7 +599,7 @@ func (c *session) copyChunks(destination, source net.Conn, direction devicebandw
 				err = c.ctx.Err()
 			}
 			if err == nil {
-				destination.SetWriteDeadline(time.Now().Add(writeTimeout))
+				_ = destination.SetWriteDeadline(time.Now().Add(writeTimeout))
 				err = writeAll(destination, buffer[:n])
 			}
 			release()

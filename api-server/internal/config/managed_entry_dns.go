@@ -99,7 +99,7 @@ func normalizeEntryDNSBaseDomain(raw string) (string, error) {
 		}
 		for i := 0; i < len(label); i++ {
 			ch := label[i]
-			if !((ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9') || ch == '-') {
+			if (ch < 'a' || ch > 'z') && (ch < '0' || ch > '9') && ch != '-' {
 				return "", ErrManagedEntryDNSBaseDomain
 			}
 		}

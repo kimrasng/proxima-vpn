@@ -80,7 +80,7 @@ func (h *NodeAgentHandler) Register(c *fiber.Ctx) error {
 			"error": "failed to start registration",
 		})
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	var nodeID string
 	err = tx.QueryRow(ctx,
@@ -664,18 +664,6 @@ type statsRequest struct {
 // unreadable multiplier falls back to: overcharging on a failed lookup would
 // silently eat quota the user never spent.
 const defaultTrafficMultiplier = 1.0
-
-// trafficMultiplier is read once per report rather than per device, since every
-// device in the batch is on the same node.
-func (h *NodeAgentHandler) trafficMultiplier(ctx context.Context, nodeID string) float64 {
-	var multiplier float64
-	if err := h.db.QueryRow(ctx,
-		`SELECT traffic_multiplier FROM nodes WHERE id = $1`, nodeID,
-	).Scan(&multiplier); err != nil || multiplier <= 0 {
-		return defaultTrafficMultiplier
-	}
-	return multiplier
-}
 
 func chargedBytes(total int64, multiplier float64) int64 {
 	if multiplier == defaultTrafficMultiplier {

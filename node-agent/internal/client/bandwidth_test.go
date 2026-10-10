@@ -23,7 +23,7 @@ func TestBandwidthPermitSendsAuthenticatedIdentityAndIndependentDirection(t *tes
 		if req.DeviceUUID != "device" || req.Direction != devicebandwidth.Download || req.Bytes != 32768 {
 			t.Errorf("wrong budget request: %+v", req)
 		}
-		w.Write([]byte(`{"allowed":false,"retry_after_ms":75}`))
+		_, _ = w.Write([]byte(`{"allowed":false,"retry_after_ms":75}`))
 	}))
 	defer srv.Close()
 	c := NewAPIClient(&config.AgentConfig{ServerURL: srv.URL, NodeID: "node", APIKey: "secret"})
@@ -35,7 +35,7 @@ func TestBandwidthPermitSendsAuthenticatedIdentityAndIndependentDirection(t *tes
 
 func TestBandwidthPermitErrorsDoNotBecomeUnlimitedAndNeverRedirectCredentials(t *testing.T) {
 	hits := 0
-	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { hits++; w.Write([]byte(`{"allowed":true}`)) }))
+	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { hits++; _, _ = w.Write([]byte(`{"allowed":true}`)) }))
 	defer target.Close()
 	for _, code := range []int{302, 403, 503} {
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -56,7 +56,7 @@ func TestBandwidthPermitErrorsDoNotBecomeUnlimitedAndNeverRedirectCredentials(t 
 
 func TestBandwidthPermitRejectsMalformedResponse(t *testing.T) {
 	for _, body := range []string{`{}`, `{"allowed":false,"retry_after_ms":-1}`, `{"allowed":false,"retry_after_ms":1001}`, `broken`} {
-		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.Write([]byte(body)) }))
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte(body)) }))
 		c := NewAPIClient(&config.AgentConfig{ServerURL: srv.URL, NodeID: "node", APIKey: "secret"})
 		if res, err := c.RequestBandwidthPermit(context.Background(), "device", devicebandwidth.Upload, 100); err == nil || res.Allowed {
 			t.Errorf("malformed response granted %q", body)

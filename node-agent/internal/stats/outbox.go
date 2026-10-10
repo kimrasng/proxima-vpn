@@ -81,10 +81,6 @@ func openOutbox(dir string) (*outbox, error) {
 	return o, nil
 }
 
-func (o *outbox) full() bool {
-	return len(o.files) >= maxBatches || o.bytes >= maxOutboxBytes
-}
-
 func newBatch(traffic []client.TrafficStat) (batch, error) {
 	id := make([]byte, 16)
 	if _, err := rand.Read(id); err != nil {
@@ -118,17 +114,17 @@ func (o *outbox) append(b batch) error {
 		return err
 	}
 	tmp := f.Name()
-	defer os.Remove(tmp)
+	defer func() { _ = os.Remove(tmp) }()
 	if err := f.Chmod(0o600); err != nil {
-		f.Close()
+		_ = f.Close()
 		return err
 	}
 	if _, err := f.Write(data); err != nil {
-		f.Close()
+		_ = f.Close()
 		return err
 	}
 	if err := f.Sync(); err != nil {
-		f.Close()
+		_ = f.Close()
 		return err
 	}
 	if err := f.Close(); err != nil {
@@ -188,6 +184,6 @@ func syncDir(path string) error {
 	if err != nil {
 		return err
 	}
-	defer d.Close()
+	defer func() { _ = d.Close() }()
 	return d.Sync()
 }

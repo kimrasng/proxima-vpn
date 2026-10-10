@@ -88,7 +88,7 @@ func TestResolveSubscriptionFormatPriority(t *testing.T) {
 			t.Fatal(err)
 		}
 		body, _ := io.ReadAll(resp.Body)
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		if string(body) != tc.want {
 			t.Errorf("query=%q ua=%q override=%q: got %q, want %q", tc.query, tc.ua, tc.override, body, tc.want)
 		}
@@ -117,7 +117,7 @@ func TestSetSubscriptionHeaders(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 	h := resp.Header
 	if got := h.Get("Subscription-Userinfo"); got != "upload=0; download=5368709120; total=107374182400; expire=1893456000" {
 		t.Errorf("Subscription-Userinfo = %q", got)

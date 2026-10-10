@@ -42,7 +42,7 @@ func AcknowledgeUUIDEviction(ctx context.Context, db *pgxpool.Pool, deviceUUID, 
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 	var currentEpoch, status string
 	var required bool
 	err = tx.QueryRow(ctx, `SELECT epoch::text,status,$2::uuid = ANY(required_node_ids)

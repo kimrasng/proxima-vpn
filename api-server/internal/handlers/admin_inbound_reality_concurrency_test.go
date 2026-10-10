@@ -16,7 +16,7 @@ func TestInboundRealityUpdateSerializesWithCanonicalWrite(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 	locked, err := services.LockRealityNode(ctx, tx, f.node)
 	if err != nil {
 		t.Fatal(err)

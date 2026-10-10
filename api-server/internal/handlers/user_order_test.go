@@ -106,7 +106,7 @@ func TestCreate_FreePromotionSettlesWithoutExternalProvider(t *testing.T) {
 	if response.StatusCode != fiber.StatusCreated {
 		t.Fatalf("status = %d, want %d", response.StatusCode, fiber.StatusCreated)
 	}
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 
 	var order orderResponse
 	if err := json.NewDecoder(response.Body).Decode(&order); err != nil {
@@ -178,7 +178,7 @@ func TestAdminCancel_ReleasesPromotionReservation(t *testing.T) {
 	if response.StatusCode != fiber.StatusOK {
 		t.Fatalf("status = %d, want %d", response.StatusCode, fiber.StatusOK)
 	}
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 
 	var status string
 	if err := pool.QueryRow(ctx, `SELECT status FROM promotion_redemptions WHERE order_id = $1`, orderID).Scan(&status); err != nil {
@@ -227,7 +227,7 @@ func TestCreate_ReadsPriceAfterConcurrentPlanEdit(t *testing.T) {
 			finished <- result{err: err}
 			return
 		}
-		defer res.Body.Close()
+		defer func() { _ = res.Body.Close() }()
 		var order orderResponse
 		err = json.NewDecoder(res.Body).Decode(&order)
 		finished <- result{res.StatusCode, order, err}

@@ -59,7 +59,7 @@ func TestManagedEntryWorkerReadyAndDeletedCAS(t *testing.T) {
 	if err != nil || a == nil {
 		t.Fatalf("acquire: %v", err)
 	}
-	defer a.Release(context.Background())
+	defer func() { _ = a.Release(context.Background()) }()
 	now := time.Date(2026, 9, 30, 12, 0, 0, 0, time.UTC)
 	// When provider success is persisted using the snapshot generation and action.
 	if err := a.Ready(t.Context(), netip.MustParseAddr("203.0.113.10"), "record-1", now); err != nil {
@@ -92,7 +92,7 @@ func TestManagedEntryWorkerReadyAndDeletedCAS(t *testing.T) {
 	if err != nil || b == nil {
 		t.Fatalf("reacquire: %v", err)
 	}
-	defer b.Release(context.Background())
+	defer func() { _ = b.Release(context.Background()) }()
 	if err := b.Deleted(t.Context(), now); err != nil {
 		t.Fatal(err)
 	}
@@ -122,7 +122,7 @@ func TestManagedEntryWorkerFailureAndActionCAS(t *testing.T) {
 	if err != nil || a == nil {
 		t.Fatalf("acquire: %v", err)
 	}
-	defer a.Release(context.Background())
+	defer func() { _ = a.Release(context.Background()) }()
 	now := time.Date(2026, 9, 30, 12, 0, 0, 0, time.UTC)
 	// When a durable conflict is recorded, its retry schedule can be disabled.
 	if err := a.Failed(t.Context(), models.ManagedDNSConflict, models.ManagedDNSOwnershipConflict, now, nil); err != nil {
@@ -165,7 +165,7 @@ func TestManagedEntryWorkerTransientPendingAndDeleting(t *testing.T) {
 			if err != nil || a == nil {
 				t.Fatalf("acquire: %v", err)
 			}
-			defer a.Release(context.Background())
+			defer func() { _ = a.Release(context.Background()) }()
 			// When persisting a transient failure without a Retry-After minimum.
 			if err := a.Transient(t.Context(), models.ManagedDNSProviderUnavailable, time.Date(2026, 9, 30, 12, 0, 0, 0, time.UTC), 0, 0); err != nil {
 				t.Fatal(err)
@@ -212,7 +212,7 @@ func TestManagedEntryWorkerTransientSurvivesStoreRecreation(t *testing.T) {
 	if err != nil || b == nil {
 		t.Fatalf("reacquire: %v", err)
 	}
-	defer b.Release(context.Background())
+	defer func() { _ = b.Release(context.Background()) }()
 	s := b.Snapshot()
 	if s.DNSStatus == nil || *s.DNSStatus != models.ManagedDNSReady || s.RetryCount != 1 || s.NextAttemptAt == nil || !s.NextAttemptAt.Equal(now.Add(7*time.Minute)) {
 		t.Fatalf("retry=%+v", s)

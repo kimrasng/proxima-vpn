@@ -48,7 +48,7 @@ func TestUUIDEvictionEndToEnd(t *testing.T) {
 		t.Fatal(err)
 	}
 	rdb := redis.NewClient(&redis.Options{Addr: redisAddr})
-	defer rdb.Close()
+	defer func() { _ = rdb.Close() }()
 	var redisVersion string
 	info, err := rdb.Info(ctx, "server").Result()
 	if err != nil {
@@ -178,7 +178,7 @@ func TestUUIDEvictionEndToEnd(t *testing.T) {
 	app.Get("/nodes/:id/revoked-devices", auth, h.RevokedDevices)
 	app.Post("/nodes/:id/revoked-devices/ack", auth, h.AcknowledgeRevocation)
 	app.Post("/nodes/:id/bandwidth/permit", auth, h.BandwidthPermit)
-	defer app.Shutdown()
+	defer func() { _ = app.Shutdown() }()
 	request := func(method, node, suffix, body string) []byte {
 		t.Helper()
 		req := httptest.NewRequest(method, "/nodes/"+node+suffix, strings.NewReader(body))
@@ -188,7 +188,7 @@ func TestUUIDEvictionEndToEnd(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer res.Body.Close()
+		defer func() { _ = res.Body.Close() }()
 		data, err := io.ReadAll(res.Body)
 		if err != nil || (res.StatusCode != 200 && res.StatusCode != 204) {
 			t.Fatalf("%s %s: status=%d body=%s err=%v", method, suffix, res.StatusCode, data, err)

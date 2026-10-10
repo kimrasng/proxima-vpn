@@ -66,7 +66,7 @@ func TestPlanRoutesRejectsInvalidSelectionBeforeDatabase(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer response.Body.Close()
+			defer func() { _ = response.Body.Close() }()
 			body, _ := io.ReadAll(response.Body)
 			if response.StatusCode != fiber.StatusBadRequest {
 				t.Fatalf("status=%d body=%s", response.StatusCode, body)
@@ -184,7 +184,7 @@ func TestPlanRoutesAndSetGroupsUseGroupBeforeChainLockOrderThroughHTTP(t *testin
 				results <- result{err: err}
 				return
 			}
-			defer response.Body.Close()
+			defer func() { _ = response.Body.Close() }()
 			responseBody, err := io.ReadAll(response.Body)
 			results <- result{status: response.StatusCode, body: responseBody, err: err}
 		}()

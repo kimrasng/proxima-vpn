@@ -50,7 +50,7 @@ func (s *DeviceBandwidthService) Permit(ctx context.Context, nodeID, deviceUUID,
 	if err != nil {
 		return DeviceBandwidthPermit{}, fmt.Errorf("begin bandwidth authorization: %w", err)
 	}
-	defer tx.Rollback(context.WithoutCancel(ctx))
+	defer func() { _ = tx.Rollback(context.WithoutCancel(ctx)) }()
 	finish := func(permit DeviceBandwidthPermit) (DeviceBandwidthPermit, error) {
 		if err := tx.Commit(ctx); err != nil {
 			return DeviceBandwidthPermit{}, fmt.Errorf("finish bandwidth authorization: %w", err)
@@ -115,7 +115,7 @@ func (s *DeviceBandwidthService) AdmitDevice(ctx context.Context, nodeID, device
 	if err != nil {
 		return false, fmt.Errorf("begin bandwidth authorization: %w", err)
 	}
-	defer tx.Rollback(context.WithoutCancel(ctx))
+	defer func() { _ = tx.Rollback(context.WithoutCancel(ctx)) }()
 	userID, _, maxConcurrent, eligible, err := s.authorizeDevice(ctx, tx, node, device)
 	if err != nil {
 		return false, err

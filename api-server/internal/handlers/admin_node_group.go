@@ -309,7 +309,7 @@ func (h *AdminNodeGroupHandler) SetNodes(c *fiber.Ctx) error {
 			"error": "failed to start transaction",
 		})
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	var lockedGroupID string
 	err = tx.QueryRow(ctx,

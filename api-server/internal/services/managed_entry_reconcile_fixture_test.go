@@ -42,7 +42,7 @@ func (p *reconcileProvider) serve(w http.ResponseWriter, r *http.Request) {
 	if method == r.Method && !lost {
 		w.Header().Set("Retry-After", p.retryAfter)
 		w.WriteHeader(status)
-		fmt.Fprint(w, `{"success":false,"errors":[{"code":1000}]}`)
+		_, _ = fmt.Fprint(w, `{"success":false,"errors":[{"code":1000}]}`)
 		return
 	}
 	if r.Method == http.MethodPost && p.started != nil {
@@ -60,8 +60,7 @@ func (p *reconcileProvider) serve(w http.ResponseWriter, r *http.Request) {
 				records = append(records, record)
 			}
 		}
-		result = records
-		fmt.Fprintf(w, `{"success":true,"result":%s,"result_info":{"page":1,"total_pages":1}}`, jsonValue(records))
+		_, _ = fmt.Fprintf(w, `{"success":true,"result":%s,"result_info":{"page":1,"total_pages":1}}`, jsonValue(records))
 		return
 	case http.MethodPost, http.MethodPut:
 		var record CloudflareDNSRecord
@@ -86,10 +85,10 @@ func (p *reconcileProvider) serve(w http.ResponseWriter, r *http.Request) {
 			p.faultMethod, p.faultStatus, p.lost = http.MethodGet, 503, false
 		}
 		w.WriteHeader(status)
-		fmt.Fprint(w, `{"success":false,"errors":[{"code":1000}]}`)
+		_, _ = fmt.Fprint(w, `{"success":false,"errors":[{"code":1000}]}`)
 		return
 	}
-	fmt.Fprintf(w, `{"success":true,"result":%s}`, jsonValue(result))
+	_, _ = fmt.Fprintf(w, `{"success":true,"result":%s}`, jsonValue(result))
 }
 
 func jsonValue(v any) string {

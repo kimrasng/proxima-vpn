@@ -495,7 +495,7 @@ func (h *AdminNodeHandler) ListNodes(c *fiber.Ctx) error {
 			&n.OSFamily, &n.Role, &n.PublishDirect, &n.MaxConcurrentConns, &n.FirewallPreset, &n.FirewallPorts,
 			&n.InboundProtocol, &n.InboundPort, &n.InboundEnabled,
 		}
-		if err := rows.Scan(append(targets, n.nodeEndpointFields.scanTargets()...)...); err != nil {
+		if err := rows.Scan(append(targets, n.scanTargets()...)...); err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 				"error": "failed to scan node",
 			})
@@ -611,7 +611,7 @@ func (h *AdminNodeHandler) GetNode(c *fiber.Ctx) error {
 		&n.ShapingOK, &n.ShapingTiers, &n.ShapingError, &n.TrafficMultiplier, &n.ShapingMode,
 		&n.OSFamily, &n.Role, &n.PublishDirect, &n.MaxConcurrentConns, &n.FirewallPreset, &n.FirewallPorts,
 	}
-	err := row.Scan(append(targets, n.nodeEndpointFields.scanTargets()...)...)
+	err := row.Scan(append(targets, n.scanTargets()...)...)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "node not found"})
@@ -1318,7 +1318,7 @@ func (h *AdminNodeHandler) UpdateNode(c *fiber.Ctx) error {
 		}
 	}
 	if err := tx.QueryRow(ctx, `SELECT nodes.id`+nodeEndpointSelection+` WHERE nodes.id = $1`, id).
-		Scan(append([]any{&n.ID}, n.nodeEndpointFields.scanTargets()...)...); err != nil {
+		Scan(append([]any{&n.ID}, n.scanTargets()...)...); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to update node"})
 	}
 

@@ -71,7 +71,7 @@ func createOrderApp(t *testing.T, pool *pgxpool.Pool, userID string, body []byte
 	if err != nil {
 		t.Fatalf("create order request: %v", err)
 	}
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 
 	var order orderResponse
 	if response.StatusCode == fiber.StatusCreated {
@@ -107,7 +107,7 @@ func startCheckoutApp(t *testing.T, pool *pgxpool.Pool, userID, orderID string, 
 	if err != nil {
 		t.Fatalf("start checkout request: %v", err)
 	}
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 
 	return response.StatusCode
 }

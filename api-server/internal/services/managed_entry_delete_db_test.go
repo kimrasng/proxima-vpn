@@ -124,7 +124,7 @@ func TestManagedEntryConcurrentRefreshAllocatesOneHostname(t *testing.T) {
 			done <- err
 			return
 		}
-		defer tx.Rollback(context.Background())
+		defer func() { _ = tx.Rollback(context.Background()) }()
 		second, err := LockRealityNode(t.Context(), tx, node)
 		if err == nil {
 			err = EnsureManagedEntryDNSIntent(t.Context(), tx, second, entryConfig)

@@ -24,7 +24,7 @@ func TestRevocationWatchdogClosesIdleSessionDuringStalledFetch(t *testing.T) {
 	if err := server.Start(ctx, "127.0.0.1:0"); err != nil {
 		t.Fatal(err)
 	}
-	defer server.Close()
+	defer func() { _ = server.Close() }()
 	firstFetched := make(chan struct{})
 	secondFetched := make(chan struct{})
 	go revokedUUIDPollLoop(ctx, func(ctx context.Context) (client.RevocationSnapshot, error) {
@@ -48,25 +48,25 @@ func TestRevocationWatchdogClosesIdleSessionDuringStalledFetch(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		conn.SetDeadline(time.Now().Add(500 * time.Millisecond))
-		conn.Write([]byte{5, 1, 2})
+		_ = conn.SetDeadline(time.Now().Add(500 * time.Millisecond))
+		_, _ = conn.Write([]byte{5, 1, 2})
 		var response [2]byte
 		if _, err = io.ReadFull(conn, response[:]); err == nil && response == [2]byte{5, 2} {
-			conn.Write([]byte{1, 8, 'd', 'e', 'v', 'i', 'c', 'e', '-', 'a', 6, 's', 'e', 'c', 'r', 'e', 't'})
+			_, _ = conn.Write([]byte{1, 8, 'd', 'e', 'v', 'i', 'c', 'e', '-', 'a', 6, 's', 'e', 'c', 'r', 'e', 't'})
 			if _, err = io.ReadFull(conn, response[:]); err == nil && response == [2]byte{1, 0} {
 				break
 			}
 		}
-		conn.Close()
+		_ = conn.Close()
 		conn = nil
 		time.Sleep(10 * time.Millisecond)
 	}
 	if conn == nil {
 		t.Fatalf("authentication never succeeded: %v", err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	<-secondFetched
-	conn.SetReadDeadline(time.Now().Add(6 * time.Second))
+	_ = conn.SetReadDeadline(time.Now().Add(6 * time.Second))
 	var b [1]byte
 	if _, err := conn.Read(b[:]); err == nil {
 		t.Fatal("idle session unexpectedly sent data")

@@ -216,7 +216,7 @@ func TestGetSubscriptionDistinguishesMissingSubscriptionFromDatabaseFailureThrou
 	if err != nil {
 		t.Fatalf("database failure subscription request: %v", err)
 	}
-	defer failureResponse.Body.Close()
+	defer func() { _ = failureResponse.Body.Close() }()
 	if failureResponse.StatusCode != fiber.StatusInternalServerError {
 		t.Fatalf("database failure status = %d, want 500", failureResponse.StatusCode)
 	}

@@ -33,21 +33,21 @@ func TestAccountSubscriptionSharesOneUUIDWithoutClientIdentity(t *testing.T) {
 	if _, err := pool.Exec(ctx, `INSERT INTO node_groups (id, name) VALUES ($1, $2)`, group, group); err != nil {
 		t.Fatal(err)
 	}
-	defer pool.Exec(ctx, `DELETE FROM node_groups WHERE id = $1`, group)
+	defer func() { _, _ = pool.Exec(ctx, `DELETE FROM node_groups WHERE id = $1`, group) }()
 	if _, err := pool.Exec(ctx, `INSERT INTO plans (id, name, duration_days, max_devices, node_group_id) VALUES ($1, 'account sub test', 30, 1, $2)`, plan, group); err != nil {
 		t.Fatal(err)
 	}
-	defer pool.Exec(ctx, `DELETE FROM plans WHERE id = $1`, plan)
+	defer func() { _, _ = pool.Exec(ctx, `DELETE FROM plans WHERE id = $1`, plan) }()
 	if _, err := pool.Exec(ctx, `INSERT INTO users (id, email, password_hash, sub_token, plan_id, status) VALUES ($1, $2, '', $3, $4, 'active')`, user, user+"@example.test", token, plan); err != nil {
 		t.Fatal(err)
 	}
-	defer pool.Exec(ctx, `DELETE FROM users WHERE id = $1`, user)
+	defer func() { _, _ = pool.Exec(ctx, `DELETE FROM users WHERE id = $1`, user) }()
 
 	app := fiber.New()
 	handler := NewSubscriptionHandler(pool, 3600)
 	app.Get("/sub/:sub_token/:device_id", handler.GetSubscription)
 	app.Get("/sub/:sub_token", handler.GetAccountSubscription)
-	defer app.Shutdown()
+	defer func() { _ = app.Shutdown() }()
 	type result struct {
 		status      int
 		contentType string
@@ -64,8 +64,8 @@ func TestAccountSubscriptionSharesOneUUIDWithoutClientIdentity(t *testing.T) {
 			t.Error(err)
 			return result{}
 		}
-		io.Copy(io.Discard, resp.Body)
-		resp.Body.Close()
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
 		return result{resp.StatusCode, resp.Header.Get("Content-Type"), resp.Header.Get("Subscription-Userinfo")}
 	}
 	request := func(path string, headers map[string]string) int {

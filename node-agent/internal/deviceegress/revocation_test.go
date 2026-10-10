@@ -16,8 +16,8 @@ func authDenied(t *testing.T, s *deviceegress.Server, uuid, password string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer c.Close()
-	c.SetDeadline(time.Now().Add(time.Second))
+	defer func() { _ = c.Close() }()
+	_ = c.SetDeadline(time.Now().Add(time.Second))
 	if _, err := c.Write([]byte{5, 1, 2}); err != nil {
 		t.Fatal(err)
 	}
@@ -80,8 +80,8 @@ func TestRevocationClosesUDPAssociationAndPreservesOther(t *testing.T) {
 	s.ReconcileRevokedUUIDs([]string{"device-a"})
 	mustClose(t, first)
 	// UDP control closure tears down the local socket and its remote datagrams.
-	udpA.SetReadDeadline(time.Now().Add(150 * time.Millisecond))
-	udpA.WriteToUDP(udpFrame(8443, []byte("denied")), relayA)
+	_ = udpA.SetReadDeadline(time.Now().Add(150 * time.Millisecond))
+	_, _ = udpA.WriteToUDP(udpFrame(8443, []byte("denied")), relayA)
 	var data [64]byte
 	if n, _, err := udpA.ReadFromUDP(data[:]); err == nil {
 		t.Fatalf("revoked association returned %d bytes", n)

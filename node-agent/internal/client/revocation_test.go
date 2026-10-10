@@ -17,7 +17,7 @@ func TestGetRevokedDevicesAuthenticatedSnapshotAndFailure(t *testing.T) {
 		}
 		if calls == 1 {
 			w.Header().Set("Content-Type", "application/json")
-			w.Write([]byte(`{"revoked_uuids":["00000000-0000-0000-0000-000000000002"]}`))
+			_, _ = w.Write([]byte(`{"revoked_uuids":["00000000-0000-0000-0000-000000000002"]}`))
 			return
 		}
 		w.WriteHeader(http.StatusServiceUnavailable)
@@ -36,7 +36,7 @@ func TestGetRevokedDevicesAuthenticatedSnapshotAndFailure(t *testing.T) {
 
 func TestGetRevokedDevicesRejectsMalformedSnapshot(t *testing.T) {
 	for _, payload := range []string{`{}`, `{"revoked_uuids":null}`, `{"revoked_uuids":["bad"]}`} {
-		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.Write([]byte(payload)) }))
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte(payload)) }))
 		c := NewAPIClient(&config.AgentConfig{ServerURL: srv.URL, NodeID: "00000000-0000-0000-0000-000000000001", APIKey: "nodekey"})
 		if _, err := c.GetRevokedDevices(context.Background()); err == nil {
 			t.Errorf("accepted %s", payload)

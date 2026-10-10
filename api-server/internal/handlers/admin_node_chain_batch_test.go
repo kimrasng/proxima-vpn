@@ -35,7 +35,7 @@ func TestBatchNodeChainsRejectsInvalidRequestBeforeDatabase(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer response.Body.Close()
+			defer func() { _ = response.Body.Close() }()
 			body, _ := io.ReadAll(response.Body)
 			if response.StatusCode != fiber.StatusBadRequest {
 				t.Fatalf("status=%d body=%s", response.StatusCode, body)

@@ -22,7 +22,7 @@ func planHTTP(t *testing.T, app *fiber.App, method, path, body string, status in
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 	data, err := io.ReadAll(res.Body)
 	if err != nil {
 		t.Fatal(err)

@@ -157,7 +157,7 @@ func (h *AdminInboundHandler) Create(c *fiber.Ctx) error {
 	if err != nil {
 		return inboundRealityError(c, err, "create")
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	// A node serves one protocol. Xray takes a single config per node, and
 	// mixing protocols let a speed-limited user reach an uncapped inbound.
@@ -279,7 +279,7 @@ func (h *AdminInboundHandler) Update(c *fiber.Ctx) error {
 	if err != nil {
 		return inboundRealityError(c, err, "update")
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	// Same one-protocol-per-node rule as Create: switching this inbound's
 	// protocol must not leave its node serving two.
@@ -434,7 +434,7 @@ func (h *AdminInboundHandler) Delete(c *fiber.Ctx) error {
 	if err != nil {
 		return inboundRealityError(c, err, "delete")
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	// RETURNING captures the node while the row exists; the event targets the node.
 	var nodeID, protocol, tag string
@@ -485,7 +485,7 @@ func (h *AdminInboundHandler) Toggle(c *fiber.Ctx) error {
 	if err != nil {
 		return inboundRealityError(c, err, "toggle")
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	var ib inboundResponse
 	var settingsRaw json.RawMessage

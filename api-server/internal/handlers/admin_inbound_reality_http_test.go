@@ -48,7 +48,7 @@ func (f inboundRealityFixture) request(method, path, body string) (int, string) 
 	if err != nil {
 		f.t.Fatal(err)
 	}
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 	payload, err := io.ReadAll(response.Body)
 	if err != nil {
 		f.t.Fatal(err)
@@ -205,14 +205,14 @@ func TestInboundRealityCreateReturnsSafeErrorWhenDatabaseUnavailable(t *testing.
 	pool.Close()
 	app := fiber.New()
 	app.Post("/nodes/:nodeId/inbounds", NewAdminInboundHandler(pool).Create)
-	defer app.Shutdown()
+	defer func() { _ = app.Shutdown() }()
 	r := httptest.NewRequest("POST", "/nodes/"+crypto.NewUUID()+"/inbounds", strings.NewReader(`{"protocol":"vless_reality","port":443,"tag":"test"}`))
 	r.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
 	response, err := app.Test(r)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 	if response.StatusCode != 500 {
 		t.Fatalf("database failure = %d", response.StatusCode)
 	}
