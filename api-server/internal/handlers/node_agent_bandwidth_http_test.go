@@ -5,14 +5,17 @@ import (
 	"encoding/json"
 	"io"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/proximavpn/proxima-vpn/api-server/internal/config"
 	"github.com/proximavpn/proxima-vpn/api-server/internal/server"
+	"github.com/proximavpn/proxima-vpn/api-server/internal/services"
 	"github.com/proximavpn/proxima-vpn/pkg/crypto"
 	"github.com/proximavpn/proxima-vpn/pkg/devicebandwidth"
+	"github.com/redis/go-redis/v9"
 )
 
 func TestNodeBandwidthPermitRouteRequiresNodeAPIKey(t *testing.T) {
@@ -31,11 +34,25 @@ func TestNodeBandwidthPermitRouteRequiresNodeAPIKey(t *testing.T) {
 	}
 }
 
-// Uses the established disposable TEST_DATABASE_URL fixture. Redis is deliberately
-// absent: unlimited eligible devices can pass, but positive limits must fail closed.
+// Uses the established disposable TEST_DATABASE_URL fixture plus TEST_REDIS_ADDR.
+// Every eligible permit reserves an account UUID slot (and, for positive rates,
+// consumes a bucket) in Redis, as production does. fixture.app has no Redis and
+// is used only to prove that eligible permits fail closed without it.
 func TestNodeBandwidthPermitAuthenticatedHTTPAuthorization(t *testing.T) {
 	fixture := newExitRulesHTTPFixture(t)
 	ctx := context.Background()
+	redisAddr := os.Getenv("TEST_REDIS_ADDR")
+	if redisAddr == "" {
+		t.Skip("TEST_REDIS_ADDR not set; skipping Redis-backed bandwidth permit test")
+	}
+	rdb := redis.NewClient(&redis.Options{Addr: redisAddr})
+	t.Cleanup(func() { _ = rdb.Close() })
+	if err := rdb.Ping(ctx).Err(); err != nil {
+		t.Fatalf("connect test Redis: %v", err)
+	}
+	redisApp := server.NewServer(&config.Config{}, fixture.pool, rdb, nil, nil).App()
+	t.Cleanup(func() { _ = redisApp.Shutdown() })
+	noRedisApp := fixture.app
 	suffix := crypto.NewUUID()
 	exitID := fixture.seedNode("bandwidth-exit-"+suffix, "exit", "203.0.113.50")
 	otherExit := fixture.seedNode("bandwidth-other-exit-"+suffix, "both", "203.0.113.51")
@@ -69,13 +86,19 @@ func TestNodeBandwidthPermitAuthenticatedHTTPAuthorization(t *testing.T) {
 	).Scan(&deviceID); err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(func() {
+		slots := services.AccountUUIDSlotKey(userID)
+		_ = rdb.Del(context.Background(), slots, slots+":sequence", slots+":reservations", slots+":reserved_at",
+			"device_bandwidth:"+deviceUUID+":upload").Err()
+	})
 
+	app := redisApp
 	requestPermit := func(nodeID, key, body string, status int, allowed bool) {
 		t.Helper()
 		request := httptest.NewRequest(fiber.MethodPost, "/api/v1/nodes/"+nodeID+"/bandwidth/permit", strings.NewReader(body))
 		request.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
 		request.Header.Set("X-Node-Key", key)
-		response, err := fixture.app.Test(request)
+		response, err := app.Test(request)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -130,6 +153,10 @@ func TestNodeBandwidthPermitAuthenticatedHTTPAuthorization(t *testing.T) {
 	if _, err := fixture.pool.Exec(ctx, `UPDATE plans SET speed_limit=1 WHERE id=$1`, planID); err != nil {
 		t.Fatal(err)
 	}
+	requestPermit(exitID, "test", body, fiber.StatusOK, true) // Fresh 1 Mbps bucket grants its 65535-byte burst.
+
+	// Without Redis, eligible permits must fail closed, even if the node claims no limit.
+	app = noRedisApp
 	requestPermit(exitID, "test", body, fiber.StatusServiceUnavailable, false)
 	requestPermit(exitID, "test", `{"device_uuid":"`+deviceUUID+`","direction":"upload","bytes":1,"speed_limit":0}`, fiber.StatusServiceUnavailable, false)
 }
