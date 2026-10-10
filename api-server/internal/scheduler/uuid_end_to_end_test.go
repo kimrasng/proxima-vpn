@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/proximavpn/proxima-vpn/api-server/internal/database"
 	"github.com/proximavpn/proxima-vpn/api-server/internal/handlers"
@@ -20,30 +21,43 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-// This test requires a disposable database: the eviction snapshot covers every
-// serving Exit in the database, not just the nodes belonging to this account.
+// The eviction snapshot covers every serving Exit in the database, not just the
+// nodes belonging to this account, so the test needs a database no other test
+// writes to. It creates and drops its own rather than requiring
+// TEST_DATABASE_URL to be fresh: CI's shared service database is migrated
+// before tests run and other packages insert Exit nodes into it.
 func TestUUIDEvictionEndToEnd(t *testing.T) {
 	dsn, redisAddr := os.Getenv("TEST_DATABASE_URL"), os.Getenv("TEST_REDIS_ADDR")
 	if dsn == "" || redisAddr == "" {
-		t.Skip("TEST_DATABASE_URL and TEST_REDIS_ADDR required (disposable PostgreSQL 17+ and Redis 7)")
+		t.Skip("TEST_DATABASE_URL and TEST_REDIS_ADDR required (PostgreSQL 16+ role with CREATEDB, and Redis 7)")
 	}
 	ctx := context.Background()
-	db, err := pgxpool.New(ctx, dsn)
+	admin, err := pgxpool.New(ctx, dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer admin.Close()
+	// 16 is the major version CI, docker-compose and production run; the
+	// eviction SQL uses nothing newer.
+	var pgVersion int
+	if err := admin.QueryRow(ctx, `SELECT current_setting('server_version_num')::int`).Scan(&pgVersion); err != nil || pgVersion < 160000 {
+		t.Fatalf("PostgreSQL 16+ required: version=%d err=%v", pgVersion, err)
+	}
+	dbName := pgx.Identifier{"uuid_e2e_" + strings.ReplaceAll(crypto.NewUUID(), "-", "")}.Sanitize()
+	if _, err := admin.Exec(ctx, `CREATE DATABASE `+dbName); err != nil {
+		t.Fatalf("create isolated database (TEST_DATABASE_URL role needs CREATEDB): %v", err)
+	}
+	defer func() { _, _ = admin.Exec(ctx, `DROP DATABASE IF EXISTS `+dbName+` WITH (FORCE)`) }()
+	cfg, err := pgxpool.ParseConfig(dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg.ConnConfig.Database = strings.Trim(dbName, `"`)
+	db, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	var pgVersion int
-	if err := db.QueryRow(ctx, `SELECT current_setting('server_version_num')::int`).Scan(&pgVersion); err != nil || pgVersion < 170000 {
-		t.Fatalf("PostgreSQL 17+ required: version=%d err=%v", pgVersion, err)
-	}
-	var existing int
-	if err := db.QueryRow(ctx, `SELECT count(*) FROM pg_catalog.pg_tables WHERE schemaname=current_schema() AND tablename='nodes'`).Scan(&existing); err != nil {
-		t.Fatal(err)
-	}
-	if existing != 0 {
-		t.Fatal("TEST_DATABASE_URL must point to a fresh isolated database (nodes table already exists)")
-	}
 	if err := database.Migrate(ctx, db); err != nil {
 		t.Fatal(err)
 	}
@@ -68,16 +82,7 @@ func TestUUIDEvictionEndToEnd(t *testing.T) {
 	exits := []string{crypto.NewUUID(), crypto.NewUUID()}
 	key := "uuid-e2e-" + crypto.NewUUID()
 	defer func() {
-		// Reverse-order cleanup preserves FK dependencies, including acknowledgments.
-		_, _ = db.Exec(ctx, `DELETE FROM uuid_evictions WHERE device_uuid=$1`, latest)
-		_, _ = db.Exec(ctx, `DELETE FROM devices WHERE user_id=$1`, user)
-		_, _ = db.Exec(ctx, `DELETE FROM users WHERE id=$1`, user)
-		_, _ = db.Exec(ctx, `DELETE FROM plans WHERE id=$1`, plan)
-		_, _ = db.Exec(ctx, `DELETE FROM node_group_nodes WHERE node_group_id=$1`, group)
-		for _, id := range exits {
-			_, _ = db.Exec(ctx, `DELETE FROM nodes WHERE id=$1`, id)
-		}
-		_, _ = db.Exec(ctx, `DELETE FROM node_groups WHERE id=$1`, group)
+		// PostgreSQL rows go with the dropped database; Redis is shared.
 		keys := []string{"account:" + user + ":online_uuids"}
 		for _, id := range exits {
 			keys = append(keys, "node:"+id+":online", "node:"+id+":online_ips", "node:"+id+":online_report")
