@@ -90,8 +90,9 @@ func TestAccountSubscriptionSharesOneUUIDWithoutClientIdentity(t *testing.T) {
 		return ids
 	}
 
-	// Concurrent first fetches from different apps (no x-hwid, varied headers)
-	// must not fail and must converge on exactly one account UUID.
+	// Concurrent first fetches from different apps that send no x-hwid must
+	// not fail and must converge on exactly one account UUID. A valid x-hwid
+	// selects a per-installation slot instead (TestAccountSubscriptionHWIDSlots).
 	var wg sync.WaitGroup
 	for i := 0; i < 8; i++ {
 		wg.Add(1)
@@ -99,7 +100,7 @@ func TestAccountSubscriptionSharesOneUUIDWithoutClientIdentity(t *testing.T) {
 			defer wg.Done()
 			headers := map[string]string{"User-Agent": "v2rayNG/1.9.16"}
 			if i%2 == 0 {
-				headers["x-hwid"] = crypto.NewUUID() // ignored by design
+				headers["User-Agent"] = "Happ/1.63.1"
 			}
 			if status := request("/sub/"+token, headers); status != 200 {
 				t.Errorf("first fetch status %d", status)
@@ -111,8 +112,8 @@ func TestAccountSubscriptionSharesOneUUIDWithoutClientIdentity(t *testing.T) {
 	if len(first) != 1 {
 		t.Fatalf("account devices after concurrent first fetch: %d", len(first))
 	}
-	// Later refreshes, with or without headers, reuse the same UUID.
-	for _, headers := range []map[string]string{nil, {"x-hwid": "abcdefghij"}, {"User-Agent": "Happ/1.63.1"}} {
+	// Later refreshes without client identity, from any app, reuse the same UUID.
+	for _, headers := range []map[string]string{nil, {"User-Agent": "Happ/1.63.1"}} {
 		if status := request("/sub/"+token, headers); status != 200 {
 			t.Errorf("refresh status %d", status)
 		}
@@ -160,5 +161,89 @@ func TestAccountSubscriptionSharesOneUUIDWithoutClientIdentity(t *testing.T) {
 	}
 	if status := request("/sub/"+token, nil); status != 403 {
 		t.Errorf("expired account status %d", status)
+	}
+}
+
+// A failed device write must answer 500 and leave no device behind, on both
+// the shared (no x-hwid) and the slot path. The handler runs on its own pool
+// with a short lock_timeout while another transaction holds an EXCLUSIVE lock
+// on devices: reads still pass, so the handler gets as far as its device write,
+// which then fails.
+func TestAccountSubscriptionDeviceWriteFailure(t *testing.T) {
+	f := newSubscriptionHTTPFixture(t, chainTestDB(t))
+	ctx := context.Background()
+	accountPath := f.path[:strings.LastIndex(f.path, "/")]
+	subToken := strings.TrimPrefix(accountPath, "/sub/")
+	accountDevices := func() int {
+		t.Helper()
+		var n int
+		if err := f.pool.QueryRow(ctx, `SELECT COUNT(*) FROM devices
+ WHERE user_id = (SELECT id FROM users WHERE sub_token = $1)`, subToken).Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		return n
+	}
+	// Start without devices so the shared path has to create one.
+	if _, err := f.pool.Exec(ctx, `DELETE FROM devices WHERE user_id = (SELECT id FROM users WHERE sub_token = $1)`, subToken); err != nil {
+		t.Fatal(err)
+	}
+
+	config, err := pgxpool.ParseConfig(os.Getenv("TEST_DATABASE_URL"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	config.ConnConfig.RuntimeParams["lock_timeout"] = "200ms"
+	failingPool, err := pgxpool.NewWithConfig(ctx, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(failingPool.Close)
+	app := fiber.New()
+	app.Get("/sub/:sub_token", NewSubscriptionHandler(failingPool, 3600).GetAccountSubscription)
+	t.Cleanup(func() { _ = app.Shutdown() })
+	fetch := func(hwid string) (int, string) {
+		t.Helper()
+		req := httptest.NewRequest(fiber.MethodGet, accountPath, nil)
+		req.Header.Set(fiber.HeaderUserAgent, "v2rayNG/1.9.16")
+		if hwid != "" {
+			req.Header.Set("x-hwid", hwid)
+		}
+		resp, err := app.Test(req, 5_000)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _ = resp.Body.Close() }()
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return resp.StatusCode, strings.TrimSpace(string(body))
+	}
+
+	lockTx, err := f.pool.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = lockTx.Rollback(ctx) }()
+	if _, err := lockTx.Exec(ctx, `LOCK TABLE devices IN EXCLUSIVE MODE`); err != nil {
+		t.Fatalf("lock devices: %v", err)
+	}
+	for _, hwid := range []string{"", crypto.NewUUID()} {
+		if status, body := fetch(hwid); status != fiber.StatusInternalServerError || body != `{"error":"failed to resolve subscription"}` {
+			t.Errorf("device write failure (x-hwid %q): status %d body %s, want 500", hwid, status, body)
+		}
+	}
+	if err := lockTx.Rollback(ctx); err != nil {
+		t.Fatalf("release devices lock: %v", err)
+	}
+	if n := accountDevices(); n != 0 {
+		t.Fatalf("failed requests left %d devices", n)
+	}
+	// Once writes succeed again the shared device is created as usual.
+	if status, body := fetch(""); status != fiber.StatusOK {
+		t.Fatalf("fetch after recovery: status %d body %s", status, body)
+	}
+	if n := accountDevices(); n != 1 {
+		t.Fatalf("devices after recovery: %d, want 1", n)
 	}
 }
