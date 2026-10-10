@@ -125,7 +125,9 @@ func TestSubscriptionReality_explicitEntryUsesManagedHostname(t *testing.T) {
 	if _, err := f.pool.Exec(t.Context(), `UPDATE node_chains SET relay_pool_id=NULL, entry_node_id=$2 WHERE id=$1`, f.chainID, f.relayID); err != nil {
 		t.Fatal(err)
 	}
-	managed := "live-entry.example.test"
+	// Unique per run: managed_entry_dns.hostname is unique and its rows outlive the
+	// fixture's nodes, so a fixed name collides when the suite reruns on one DB.
+	managed := "live-" + f.relayID + ".example.test"
 	if _, err := f.pool.Exec(t.Context(), `INSERT INTO managed_entry_dns (owner_node_id, node_id, hostname, desired_action) VALUES ($1,$1,$2,'present')`, f.relayID, managed); err != nil {
 		t.Fatal(err)
 	}

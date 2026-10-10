@@ -130,7 +130,10 @@ func TestGrantPlan_ChangeCarriesRemainderAndResetsUsage(t *testing.T) {
 	if result.TrafficUsed != 0 {
 		t.Errorf("TrafficUsed = %d, want 0 (a plan change clears usage)", result.TrafficUsed)
 	}
-	if result.PlanStartedAt.Before(before) {
+	// PlanStartedAt comes from the database's NOW(), "before" from this process's
+	// clock; a containerised Postgres can trail the host by a millisecond or two.
+	// The old term started 10 days ago, so a 1s allowance still proves re-anchoring.
+	if result.PlanStartedAt.Before(before.Add(-time.Second)) {
 		t.Errorf("PlanStartedAt = %v, want re-anchored to now (>= %v)", result.PlanStartedAt, before)
 	}
 	// Carried remainder ~5 days, new duration 60 days: expect ~65 days from now.

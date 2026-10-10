@@ -70,7 +70,9 @@ func TestCreate_FreePromotionSettlesWithoutExternalProvider(t *testing.T) {
 	ctx := context.Background()
 	suffix := fmt.Sprintf("%d", os.Getpid())
 	userID, planID, _ := seedFreeOrderData(t, pool, ctx, suffix)
-	code := "FREE-" + suffix
+	// The pid alone repeats under -count and across reruns, and cleanup cannot
+	// delete a code still referenced by the settled order, so make it unique.
+	code := fmt.Sprintf("FREE-%s-%d", suffix, time.Now().UnixNano())
 	now := time.Now()
 	if _, err := pool.Exec(ctx,
 		`INSERT INTO promotion_codes
