@@ -148,8 +148,11 @@ func TestDeviceEgressGenerateConfigAndDigest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if before.StructureHash == after.StructureHash || before.Hash == after.Hash {
-		t.Error("limited device removal failed to require a full config reload")
+	// Evicting a device changes the full config (agents must apply it) but not
+	// the structure: its outbound, rule and user are removed live, so live
+	// sessions of every other device on the node survive.
+	if before.StructureHash != after.StructureHash || before.Hash == after.Hash || before.UsersHash == after.UsersHash {
+		t.Error("limited device removal must be a users-only change")
 	}
 	if _, err := pool.Exec(ctx, `UPDATE devices SET evicted_until = NOW() + INTERVAL '10 minutes' WHERE xray_uuid = $1`, unlimitedID); err != nil {
 		t.Fatalf("evict unlimited device: %v", err)
@@ -158,8 +161,8 @@ func TestDeviceEgressGenerateConfigAndDigest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if after.StructureHash == withoutUnlimited.StructureHash {
-		t.Error("unlimited VLESS device removal did not change structure hash")
+	if after.StructureHash != withoutUnlimited.StructureHash || after.UsersHash == withoutUnlimited.UsersHash {
+		t.Error("unlimited VLESS device removal must be a users-only change")
 	}
 }
 

@@ -10,6 +10,7 @@ import (
 	"sort"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/proximavpn/proxima-vpn/pkg/devicebandwidth"
 	"github.com/proximavpn/proxima-vpn/pkg/speedtier"
 )
 
@@ -225,10 +226,16 @@ func (s *XrayConfigService) GenerateDigest(ctx context.Context, nodeID string) (
 	}, nil
 }
 
-// stripClients re-renders a config with every inbound's client list emptied.
+// stripClients re-renders a config with every inbound's client list emptied
+// and the per-device egress topology removed. A device's SOCKS outbound and its
+// exact user rule exist only because that device is admitted, so the agent
+// installs them live with the user; Hash and UsersHash still cover them.
 func stripClients(cfg []byte) ([]byte, error) {
 	var full map[string]json.RawMessage
 	if err := json.Unmarshal(cfg, &full); err != nil {
+		return nil, err
+	}
+	if err := devicebandwidth.StripDeviceTopology(full); err != nil {
 		return nil, err
 	}
 
@@ -454,8 +461,11 @@ func (s *XrayConfigService) generate(ctx context.Context, nodeID string) ([]byte
 		Log:   xrayLog{LogLevel: "warning"},
 		Stats: struct{}{},
 		API: xrayAPI{
-			Tag:      "api",
-			Services: []string{"StatsService", "HandlerService"},
+			Tag: "api",
+			// RoutingService lets the agent replace routing rules in place when
+			// a device is admitted or revoked, alongside HandlerService's live
+			// user and outbound edits, so admissions never restart Xray.
+			Services: []string{"StatsService", "HandlerService", "RoutingService"},
 		},
 		Policy: xrayPolicy{
 			Levels: policyLevels,

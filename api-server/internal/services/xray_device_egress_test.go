@@ -268,7 +268,11 @@ func TestDeviceEgressRejectsMissingControlledIdentity(t *testing.T) {
 	}
 }
 
-func TestDeviceEgressLimitedDeviceChangesRemainStructuralAfterStripClients(t *testing.T) {
+// Per-device egress outbounds and their exact user rules are admitted live with
+// the device, so adding, removing or replacing devices leaves the structure
+// hash unchanged; only full Hash/UsersHash move. Everything else - controlled
+// inbounds, their deny fallback, freedom/blackhole - stays structural.
+func TestDeviceEgressDeviceChangesAreUserScopedAfterStripClients(t *testing.T) {
 	structure := func(limited, unlimited []string) []byte {
 		out, _ := withEgress(t, egressFixture(t, limited, unlimited))
 		stripped, err := stripClients(out)
@@ -278,20 +282,28 @@ func TestDeviceEgressLimitedDeviceChangesRemainStructuralAfterStripClients(t *te
 		return stripped
 	}
 	base := structure([]string{egressDeviceA}, nil)
-	addedLimited := structure([]string{egressDeviceA, egressDeviceB}, nil)
-	removedLimited := structure(nil, nil)
-	replacedLimited := structure([]string{egressDeviceB}, nil)
-	addedUnlimited := structure([]string{egressDeviceA}, []string{egressUnlimited})
-	for name, config := range map[string][]byte{"add limited": addedLimited, "remove limited": removedLimited, "replace limited": replacedLimited, "add unlimited": addedUnlimited} {
-		if sha256.Sum256(base) == sha256.Sum256(config) {
-			t.Errorf("%s device did not change structure hash input", name)
+	for name, config := range map[string][]byte{
+		"add limited":     structure([]string{egressDeviceA, egressDeviceB}, nil),
+		"remove limited":  structure(nil, nil),
+		"replace limited": structure([]string{egressDeviceB}, nil),
+		"add unlimited":   structure([]string{egressDeviceA}, []string{egressUnlimited}),
+	} {
+		if sha256.Sum256(base) != sha256.Sum256(config) {
+			t.Errorf("%s device changed the structure hash input; admissions would restart Xray", name)
 		}
 	}
 	var cfg xrayConfig
 	if err := json.Unmarshal(base, &cfg); err != nil {
 		t.Fatal(err)
 	}
-	assertDeviceEgressDeclarations(t, cfg, []string{egressDeviceA}, []string{"vless-reality", speedtier.Tag(25)})
+	for _, outbound := range cfg.Outbounds {
+		if devicebandwidth.IsDeviceOutboundTag(outbound.Tag) {
+			t.Errorf("structure still carries device outbound %q", outbound.Tag)
+		}
+	}
+	if len(cfg.Routing.Rules) == 0 || cfg.Routing.Rules[len(cfg.Routing.Rules)-1].OutboundTag != "block" {
+		t.Errorf("structure lost the deny fallback: %+v", cfg.Routing)
+	}
 	if len(vlessUsersOf(cfg.Inbounds)) != 0 {
 		t.Error("stripClients did not remove inbound clients")
 	}
