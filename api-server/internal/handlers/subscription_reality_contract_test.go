@@ -30,8 +30,10 @@ func TestRealityProjection_directMultipleListenersAndSecondRelayPort(t *testing.
 }
 
 func TestRealityProjection_speedTierUsesGeneratedPort(t *testing.T) {
-	// Given a speed-limited direct node with a shared listener on a different port.
+	// Given a speed-limited direct node with a shared listener on a different port,
+	// whose agent has acknowledged per-device egress (required for limited plans).
 	node := exitNode()
+	node.DeviceBandwidthReady = true
 	node.RealityPorts = []int{3443}
 	node.GeneratedRealityPorts = []int{3443, 20050}
 	// When the limited plan is projected.
