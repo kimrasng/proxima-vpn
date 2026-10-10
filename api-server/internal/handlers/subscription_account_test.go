@@ -90,8 +90,9 @@ func TestAccountSubscriptionSharesOneUUIDWithoutClientIdentity(t *testing.T) {
 		return ids
 	}
 
-	// Concurrent first fetches from different apps (no x-hwid, varied headers)
-	// must not fail and must converge on exactly one account UUID.
+	// Concurrent first fetches from different apps that send no x-hwid must
+	// not fail and must converge on exactly one account UUID. A valid x-hwid
+	// selects a per-installation slot instead (TestAccountSubscriptionHWIDSlots).
 	var wg sync.WaitGroup
 	for i := 0; i < 8; i++ {
 		wg.Add(1)
@@ -99,7 +100,7 @@ func TestAccountSubscriptionSharesOneUUIDWithoutClientIdentity(t *testing.T) {
 			defer wg.Done()
 			headers := map[string]string{"User-Agent": "v2rayNG/1.9.16"}
 			if i%2 == 0 {
-				headers["x-hwid"] = crypto.NewUUID() // ignored by design
+				headers["User-Agent"] = "Happ/1.63.1"
 			}
 			if status := request("/sub/"+token, headers); status != 200 {
 				t.Errorf("first fetch status %d", status)
@@ -111,8 +112,8 @@ func TestAccountSubscriptionSharesOneUUIDWithoutClientIdentity(t *testing.T) {
 	if len(first) != 1 {
 		t.Fatalf("account devices after concurrent first fetch: %d", len(first))
 	}
-	// Later refreshes, with or without headers, reuse the same UUID.
-	for _, headers := range []map[string]string{nil, {"x-hwid": "abcdefghij"}, {"User-Agent": "Happ/1.63.1"}} {
+	// Later refreshes without client identity, from any app, reuse the same UUID.
+	for _, headers := range []map[string]string{nil, {"User-Agent": "Happ/1.63.1"}} {
 		if status := request("/sub/"+token, headers); status != 200 {
 			t.Errorf("refresh status %d", status)
 		}
