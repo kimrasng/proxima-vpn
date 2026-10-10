@@ -33,12 +33,12 @@ func TestUUIDEvictionAcknowledgments(t *testing.T) {
 		if _, err := db.Exec(ctx, `INSERT INTO nodes(id,name,ip,role,api_key,status) VALUES($1,'eviction-test','203.0.113.7','exit','key','online')`, node); err != nil {
 			t.Fatal(err)
 		}
-		defer db.Exec(ctx, `DELETE FROM nodes WHERE id=$1`, node)
+		defer func() { _, _ = db.Exec(ctx, `DELETE FROM nodes WHERE id=$1`, node) }()
 	}
 	if _, err := db.Exec(ctx, `INSERT INTO uuid_evictions(device_uuid,epoch,required_node_ids) VALUES($1,$2,ARRAY[$3,$4]::uuid[])`, device, epoch, n1, n2); err != nil {
 		t.Fatal(err)
 	}
-	defer db.Exec(ctx, `DELETE FROM uuid_evictions WHERE device_uuid=$1`, device)
+	defer func() { _, _ = db.Exec(ctx, `DELETE FROM uuid_evictions WHERE device_uuid=$1`, device) }()
 	h := &NodeAgentHandler{db: db}
 	app := fiber.New()
 	app.Get("/nodes/:id/revoked-devices", func(c *fiber.Ctx) error { c.Locals("node_id", c.Params("id")); return h.RevokedDevices(c) })
@@ -48,7 +48,7 @@ func TestUUIDEvictionAcknowledgments(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 	var snapshot struct {
 		Revoked     []string `json:"revoked_uuids"`
 		Revocations []struct {
@@ -76,7 +76,7 @@ func TestUUIDEvictionAcknowledgments(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer response.Body.Close()
+		defer func() { _ = response.Body.Close() }()
 		return response.StatusCode
 	}
 	if got := post(foreign, epoch); got != 401 {

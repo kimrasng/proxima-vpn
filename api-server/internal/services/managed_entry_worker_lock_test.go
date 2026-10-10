@@ -19,7 +19,7 @@ func TestManagedEntryWorkerSessionLockConflictsAndReleases(t *testing.T) {
 	if err != nil || a == nil {
 		t.Fatalf("first acquire: %v", err)
 	}
-	defer a.Release(context.Background())
+	defer func() { _ = a.Release(context.Background()) }()
 	// When a second session competes, while another owner is independent.
 	b, err := store.TryAcquire(t.Context(), first)
 	if err != nil || b != nil {
@@ -29,7 +29,7 @@ func TestManagedEntryWorkerSessionLockConflictsAndReleases(t *testing.T) {
 	if err != nil || c == nil {
 		t.Fatalf("other owner: %v", err)
 	}
-	defer c.Release(context.Background())
+	defer func() { _ = c.Release(context.Background()) }()
 	// Then releasing the owner returns its lock independently of the caller's cancellation.
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
@@ -43,7 +43,7 @@ func TestManagedEntryWorkerSessionLockConflictsAndReleases(t *testing.T) {
 	if err != nil || d == nil {
 		t.Fatalf("reacquire: %v", err)
 	}
-	defer d.Release(context.Background())
+	defer func() { _ = d.Release(context.Background()) }()
 	// When explicit deletion targets that owner, its transaction lock must wait.
 	tx := phs028ServiceTx(t, pool)
 	deadline, stop := context.WithTimeout(t.Context(), 100*time.Millisecond)
@@ -68,7 +68,7 @@ func TestManagedEntryWorkerSnapshotIncludesNullableAndDurableFields(t *testing.T
 	if err != nil || a == nil {
 		t.Fatalf("acquire: %v", err)
 	}
-	defer a.Release(context.Background())
+	defer func() { _ = a.Release(context.Background()) }()
 	s := a.Snapshot()
 	// Then all provider inputs and durable history are captured together.
 	if s.ID == "" || s.OwnerNodeID != node || s.NodeID == nil || *s.NodeID != node || s.Hostname == nil || s.CloudflareZoneID == nil || s.OwnershipMarker == nil || s.ProviderRecordID == nil || *s.ProviderRecordID != "provider-1" || s.DesiredIPv4 == nil || s.ObservedIPv4 == nil || s.ObservedAt == nil || s.DNSStatus == nil || *s.DNSStatus != "ready" || s.DesiredAction != "present" || s.ErrorCode != nil || s.Generation != 1 || s.RetryCount != 3 || s.CleanupRequestedAt == nil || s.NextAttemptAt == nil {
@@ -106,5 +106,5 @@ func TestManagedEntryWorkerReleaseDiscardsBrokenSession(t *testing.T) {
 	if err != nil || b == nil {
 		t.Fatalf("reacquire after failed unlock: %v", err)
 	}
-	defer b.Release(context.Background())
+	defer func() { _ = b.Release(context.Background()) }()
 }

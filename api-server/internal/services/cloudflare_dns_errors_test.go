@@ -39,7 +39,7 @@ func TestCloudflareDNSError_whenUpstreamFails(t *testing.T) {
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Retry-After", tt.retry)
 				w.WriteHeader(tt.status)
-				fmt.Fprint(w, tt.body)
+				_, _ = fmt.Fprint(w, tt.body)
 			}))
 			defer srv.Close()
 			c := NewCloudflareDNSClient("token-secret")

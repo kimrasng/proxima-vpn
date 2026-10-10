@@ -57,7 +57,7 @@ func (h *AdminNodeHandler) SetRealityTarget(c *fiber.Ctx) error {
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to update node"})
 	}
-	defer tx.Rollback(context.WithoutCancel(ctx))
+	defer func() { _ = tx.Rollback(context.WithoutCancel(ctx)) }()
 	locked, err := services.LockRealityNode(ctx, tx, id)
 	if err != nil {
 		return nodeSNIErrorResponse(c, err)

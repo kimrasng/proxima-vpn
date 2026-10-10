@@ -30,7 +30,7 @@ func captureFor(t *testing.T, fingerprint string, headers map[string]string) che
 	if err != nil {
 		t.Fatalf("capture request: %v", err)
 	}
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 
 	return captured
 }

@@ -20,8 +20,8 @@ func TestReserveAccountUUIDSlotAcrossExits(t *testing.T) {
 	defer cancel()
 	firstExit := redis.NewClient(&redis.Options{Addr: addr})
 	secondExit := redis.NewClient(&redis.Options{Addr: addr})
-	defer firstExit.Close()
-	defer secondExit.Close()
+	defer func() { _ = firstExit.Close() }()
+	defer func() { _ = secondExit.Close() }()
 	if err := firstExit.Ping(ctx).Err(); err != nil {
 		t.Skipf("Redis unavailable: %v", err)
 	}

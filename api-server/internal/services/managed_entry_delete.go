@@ -38,7 +38,7 @@ func DeleteNodeWithManagedDNS(ctx context.Context, pool *pgxpool.Pool, nodeID st
 	if err != nil {
 		return "", fmt.Errorf("begin node deletion: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 	if err := LockManagedEntryDNSOwner(ctx, tx, nodeID); err != nil {
 		return "", err
 	}

@@ -23,7 +23,7 @@ func TestCloudflareDNSListExact_whenMultiplePages(t *testing.T) {
 		}
 		pages = append(pages, q.Get("page"))
 		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprintf(w, `{"success":true,"errors":[],"messages":[],"result":[{"id":"id%s","name":"vpn.example.com","type":"A","content":"192.0.2.%s","ttl":300,"proxied":false,"comment":"owned"}],"result_info":{"page":%s,"per_page":1,"count":1,"total_count":2,"total_pages":2}}`, q.Get("page"), q.Get("page"), q.Get("page"))
+		_, _ = fmt.Fprintf(w, `{"success":true,"errors":[],"messages":[],"result":[{"id":"id%s","name":"vpn.example.com","type":"A","content":"192.0.2.%s","ttl":300,"proxied":false,"comment":"owned"}],"result_info":{"page":%s,"per_page":1,"count":1,"total_count":2,"total_pages":2}}`, q.Get("page"), q.Get("page"), q.Get("page"))
 	}))
 	defer srv.Close()
 	c := NewCloudflareDNSClient("secret")
@@ -48,7 +48,7 @@ func TestCloudflareDNSListExact_whenMultiplePages(t *testing.T) {
 func TestCloudflareDNSListExact_whenNoRecords(t *testing.T) {
 	// Given
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, `{"success":true,"errors":[],"messages":[],"result":[],"result_info":{"page":1,"per_page":100,"count":0,"total_count":0,"total_pages":0}}`)
+		_, _ = fmt.Fprint(w, `{"success":true,"errors":[],"messages":[],"result":[],"result_info":{"page":1,"per_page":100,"count":0,"total_count":0,"total_pages":0}}`)
 	}))
 	defer srv.Close()
 	c := NewCloudflareDNSClient("secret")
@@ -75,7 +75,7 @@ func TestCloudflareDNSListExactAllTypes_whenForeignOnLaterPage(t *testing.T) {
 		if q.Get("page") == "2" {
 			typ = "CNAME"
 		}
-		fmt.Fprintf(w, `{"success":true,"result":[{"id":"id%s","name":"vpn.example.com","type":"%s"}],"result_info":{"page":%s,"total_pages":2}}`, q.Get("page"), typ, q.Get("page"))
+		_, _ = fmt.Fprintf(w, `{"success":true,"result":[{"id":"id%s","name":"vpn.example.com","type":"%s"}],"result_info":{"page":%s,"total_pages":2}}`, q.Get("page"), typ, q.Get("page"))
 	}))
 	defer srv.Close()
 	c := NewCloudflareDNSClient("secret")
@@ -93,7 +93,7 @@ func TestCloudflareDNSListExactAllTypes_whenForeignOnLaterPage(t *testing.T) {
 func TestCloudflareDNSListExactAllTypes_normalizesProviderNames(t *testing.T) {
 	// Given an exact-name result with DNS case and root-dot spelling.
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, `{"success":true,"result":[{"id":"foreign","name":"VPN.Example.COM.","type":"NS"}],"result_info":{"page":1,"total_pages":1}}`)
+		_, _ = fmt.Fprint(w, `{"success":true,"result":[{"id":"foreign","name":"VPN.Example.COM.","type":"NS"}],"result_info":{"page":1,"total_pages":1}}`)
 	}))
 	defer srv.Close()
 	c := NewCloudflareDNSClient("secret")
@@ -143,7 +143,7 @@ func TestCloudflareDNSWrites_whenCreatingUpdatingAndDeleting(t *testing.T) {
 						t.Errorf("wrong full record body: %+v", body)
 					}
 				}
-				fmt.Fprint(w, `{"success":true,"errors":[],"messages":[],"result":{"id":"record","name":"vpn.example.com","type":"A","content":"192.0.2.1","ttl":300,"proxied":false,"comment":"owned"}}`)
+				_, _ = fmt.Fprint(w, `{"success":true,"errors":[],"messages":[],"result":{"id":"record","name":"vpn.example.com","type":"A","content":"192.0.2.1","ttl":300,"proxied":false,"comment":"owned"}}`)
 			}))
 			defer srv.Close()
 			c := NewCloudflareDNSClient("secret")

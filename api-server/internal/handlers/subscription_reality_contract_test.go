@@ -48,7 +48,7 @@ func (f subscriptionHTTPFixture) rawLinks(t *testing.T) []*url.URL {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 	if response.StatusCode != fiber.StatusOK {
 		t.Fatalf("raw status: %d", response.StatusCode)
 	}
@@ -208,7 +208,7 @@ func TestSubscriptionReality_formatsShareCanonicalSNI(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer response.Body.Close()
+		defer func() { _ = response.Body.Close() }()
 		body, err := io.ReadAll(response.Body)
 		if err != nil {
 			t.Fatal(err)

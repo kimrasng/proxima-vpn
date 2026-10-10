@@ -122,7 +122,7 @@ func TestSetNodesRejectsInvalidMembershipForReferencedRelayPoolThroughHTTP(t *te
 			if err != nil {
 				t.Fatalf("set nodes request: %v", err)
 			}
-			defer response.Body.Close()
+			defer func() { _ = response.Body.Close() }()
 			body, err := io.ReadAll(response.Body)
 			if err != nil {
 				t.Fatalf("read set nodes response: %v", err)
@@ -174,7 +174,7 @@ func TestUpdateNodeRejectsDemotingMemberOfReferencedRelayPoolThroughHTTP(t *test
 	if err != nil {
 		t.Fatalf("update node role: %v", err)
 	}
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 	body, err := io.ReadAll(response.Body)
 	if err != nil {
 		t.Fatalf("read update role response: %v", err)

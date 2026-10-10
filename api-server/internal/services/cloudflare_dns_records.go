@@ -44,7 +44,7 @@ func (c *CloudflareDNSClient) listExact(ctx context.Context, zoneID, hostname st
 		if err != nil {
 			return nil, err
 		}
-		if envelope.ResultInfo == nil || envelope.ResultInfo.Page != page || (envelope.ResultInfo.TotalPages < page && !(page == 1 && envelope.ResultInfo.TotalPages == 0)) {
+		if envelope.ResultInfo == nil || envelope.ResultInfo.Page != page || (envelope.ResultInfo.TotalPages < page && (page != 1 || envelope.ResultInfo.TotalPages != 0)) {
 			return nil, &CloudflareDNSError{Operation: "list", Status: http.StatusOK, Kind: CloudflareDNSTransient}
 		}
 		var batch []CloudflareDNSRecord

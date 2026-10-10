@@ -27,13 +27,13 @@ func TestUUIDSlotReconciliationPreAdmissionAndIdle(t *testing.T) {
 		t.Fatal(err)
 	}
 	rdb := redis.NewClient(&redis.Options{Addr: addr})
-	defer rdb.Close()
+	defer func() { _ = rdb.Close() }()
 	user, device, n1, n2 := uuid.NewString(), uuid.NewString(), uuid.NewString(), uuid.NewString()
 	for _, node := range []string{n1, n2} {
 		if _, err := db.Exec(ctx, `INSERT INTO nodes(id,name,ip,role,status,api_key,last_seen) VALUES($1,'slot-test','203.0.113.1','exit','online','key',NOW())`, node); err != nil {
 			t.Fatal(err)
 		}
-		defer db.Exec(ctx, `DELETE FROM nodes WHERE id=$1`, node)
+		defer func() { _, _ = db.Exec(ctx, `DELETE FROM nodes WHERE id=$1`, node) }()
 	}
 	defer rdb.Del(ctx, AccountUUIDSlotKey(user), AccountUUIDSlotKey(user)+":reservations", AccountUUIDSlotKey(user)+":reserved_at", AccountUUIDSlotKey(user)+":sequence", AccountUUIDSlotKey(user)+":absence:"+device)
 	for _, node := range []string{n1, n2} {

@@ -16,7 +16,7 @@ func TestOnlineReportEmptyClearsImmediatelyAndNodeSwitchKeepsStart(t *testing.T)
 	}
 	ctx := context.Background()
 	rdb := redis.NewClient(&redis.Options{Addr: addr})
-	defer rdb.Close()
+	defer func() { _ = rdb.Close() }()
 	if err := rdb.Ping(ctx).Err(); err != nil {
 		t.Skipf("redis unavailable: %v", err)
 	}

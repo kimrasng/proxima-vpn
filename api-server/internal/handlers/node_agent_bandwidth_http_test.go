@@ -25,7 +25,7 @@ func TestNodeBandwidthPermitRouteRequiresNodeAPIKey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 	if response.StatusCode != fiber.StatusUnauthorized {
 		t.Fatalf("unauthenticated permit status = %d, want 401", response.StatusCode)
 	}
@@ -79,7 +79,7 @@ func TestNodeBandwidthPermitAuthenticatedHTTPAuthorization(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer response.Body.Close()
+		defer func() { _ = response.Body.Close() }()
 		data, _ := io.ReadAll(response.Body)
 		if response.StatusCode != status {
 			t.Fatalf("permit status = %d, want %d; body=%s", response.StatusCode, status, data)

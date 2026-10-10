@@ -11,7 +11,7 @@ import (
 	"github.com/proximavpn/proxima-vpn/api-server/internal/services"
 )
 
-var ErrIncompleteEvictionFleet = errors.New("Exit fleet is not ready for verified eviction")
+var ErrIncompleteEvictionFleet = errors.New("exit fleet is not ready for verified eviction")
 var ErrPendingEviction = errors.New("another UUID eviction is pending")
 
 // beginUUIDEviction writes the policy and a nonempty required Exit snapshot in
@@ -25,7 +25,7 @@ func beginUUIDEviction(ctx context.Context, db *pgxpool.Pool, userID, target str
 	if err != nil {
 		return "", err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 	var owner string
 	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtext($1))`, userID); err != nil {
 		return "", err

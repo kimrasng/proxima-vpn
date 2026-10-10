@@ -82,7 +82,7 @@ func (c *CloudflareDNSClient) request(ctx context.Context, operation, method, pa
 	if err != nil {
 		return cloudflareDNSEnvelope{}, &CloudflareDNSError{Operation: operation, Kind: CloudflareDNSTransient}
 	}
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 
 	apiErr := &CloudflareDNSError{Operation: operation, Status: response.StatusCode, Kind: CloudflareDNSDurable}
 	if response.StatusCode == http.StatusRequestTimeout || response.StatusCode == http.StatusTooManyRequests || response.StatusCode >= 500 {

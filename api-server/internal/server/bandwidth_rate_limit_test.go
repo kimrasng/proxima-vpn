@@ -41,7 +41,7 @@ func TestBandwidthPermitLimiterExemptionRequiresAuthenticatedExactRoute(t *testi
 		if err := json.NewDecoder(res.Body).Decode(&got); err != nil {
 			t.Fatal(err)
 		}
-		res.Body.Close()
+		_ = res.Body.Close()
 		if got != tc.want {
 			t.Errorf("%s %s got%v", tc.method, tc.path, got)
 		}
@@ -69,7 +69,7 @@ func testInvalidNodeKeysThrottled(t *testing.T, method, suffix string) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		res.Body.Close()
+		_ = res.Body.Close()
 		if i < 100 && res.StatusCode != 401 {
 			t.Fatalf("request%d status%d", i, res.StatusCode)
 		}

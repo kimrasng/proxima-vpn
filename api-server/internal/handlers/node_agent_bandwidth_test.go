@@ -29,7 +29,7 @@ func TestNodeBandwidthPermitRejectsMissingOrSpoofedNodeIdentity(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer response.Body.Close()
+			defer func() { _ = response.Body.Close() }()
 			if response.StatusCode != fiber.StatusUnauthorized {
 				t.Errorf("status = %d, want 401", response.StatusCode)
 			}
@@ -66,7 +66,7 @@ func TestNodeBandwidthPermitValidationAndFailClosed(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer response.Body.Close()
+			defer func() { _ = response.Body.Close() }()
 			body, _ := io.ReadAll(response.Body)
 			if response.StatusCode != tc.status {
 				t.Fatalf("status = %d, want %d; body=%s", response.StatusCode, tc.status, body)

@@ -33,12 +33,12 @@ func TestRevokedDevicesNodeScopedSnapshot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Exec(ctx, `DELETE FROM nodes WHERE id=$1`, node)
+	defer func() { _, _ = db.Exec(ctx, `DELETE FROM nodes WHERE id=$1`, node) }()
 	_, err = db.Exec(ctx, `INSERT INTO node_groups(id,name) VALUES($1,'revocation-group')`, grp)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Exec(ctx, `DELETE FROM node_groups WHERE id=$1`, grp)
+	defer func() { _, _ = db.Exec(ctx, `DELETE FROM node_groups WHERE id=$1`, grp) }()
 	_, err = db.Exec(ctx, `INSERT INTO node_group_nodes(node_group_id,node_id) VALUES($1,$2)`, grp, node)
 	if err != nil {
 		t.Fatal(err)
@@ -47,12 +47,12 @@ func TestRevokedDevicesNodeScopedSnapshot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Exec(ctx, `DELETE FROM plans WHERE id=$1`, plan)
+	defer func() { _, _ = db.Exec(ctx, `DELETE FROM plans WHERE id=$1`, plan) }()
 	_, err = db.Exec(ctx, `INSERT INTO users(id,email,password_hash,sub_token,plan_id,status) VALUES($1,$2,'x',$3,$4,'active')`, user, user+"@invalid.test", crypto.NewUUID(), plan)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Exec(ctx, `DELETE FROM users WHERE id=$1`, user)
+	defer func() { _, _ = db.Exec(ctx, `DELETE FROM users WHERE id=$1`, user) }()
 	_, err = db.Exec(ctx, `INSERT INTO devices(user_id,xray_uuid,evicted_until) VALUES($1,$2,NOW()+INTERVAL '10 minutes'),($1,$3,NULL)`, user, device, other)
 	if err != nil {
 		t.Fatal(err)
@@ -70,7 +70,7 @@ func TestRevokedDevicesNodeScopedSnapshot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 	var got struct {
 		RevokedUUIDs []string `json:"revoked_uuids"`
 	}

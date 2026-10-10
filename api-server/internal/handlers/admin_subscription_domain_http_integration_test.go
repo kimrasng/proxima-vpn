@@ -49,7 +49,7 @@ func TestAdminSubscriptionDomain_rejectsMalformedCreateBody(t *testing.T) {
 	if err != nil {
 		t.Fatalf("malformed create request: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Then: parsing rejects it before any database mutation.
 	if resp.StatusCode != fiber.StatusBadRequest {

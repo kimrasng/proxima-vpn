@@ -122,7 +122,7 @@ func (h *AdminSubscriptionDomainHandler) Create(c *fiber.Ctx) error {
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to prepare domain creation"})
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	var d domainResponse
 	err = tx.QueryRow(ctx,
@@ -207,7 +207,7 @@ func (h *AdminSubscriptionDomainHandler) Update(c *fiber.Ctx) error {
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to prepare domain update"})
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	var d domainResponse
 	err = tx.QueryRow(ctx, query, args...).Scan(

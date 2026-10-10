@@ -26,13 +26,13 @@ func TestUUIDSlotReconciliationReleasesDisconnectedAfterTwoFreshEpochs(t *testin
 		t.Fatal(err)
 	}
 	rdb := redis.NewClient(&redis.Options{Addr: addr})
-	defer rdb.Close()
+	defer func() { _ = rdb.Close() }()
 	user, device, node, gen := uuid.NewString(), uuid.NewString(), uuid.NewString(), uuid.NewString()
 	_, err = db.Exec(ctx, `INSERT INTO nodes(id,name,ip,role,status,api_key,last_seen) VALUES($1,'slot-release','203.0.113.2','exit','online','key',NOW())`, node)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Exec(ctx, `DELETE FROM nodes WHERE id=$1`, node)
+	defer func() { _, _ = db.Exec(ctx, `DELETE FROM nodes WHERE id=$1`, node) }()
 	key := AccountUUIDSlotKey(user)
 	defer rdb.Del(ctx, key, key+":sequence", key+":reservations", key+":reserved_at", key+":absence:"+device, "node:"+node+":admitted", "node:"+node+":admitted:fence", "node:"+node+":admitted:epoch")
 	if err := BeginExitReportGeneration(ctx, rdb, node, gen); err != nil {

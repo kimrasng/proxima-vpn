@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"net/netip"
 	"time"
 
@@ -50,7 +51,7 @@ func (a *ManagedEntryDNSAttempt) Transient(ctx context.Context, code models.Mana
 		a.snapshot.DesiredIPv4 != nil && a.snapshot.ObservedIPv4 != nil && *a.snapshot.DesiredIPv4 == *a.snapshot.ObservedIPv4 {
 		status = models.ManagedDNSReady
 	}
-	if a.snapshot.RetryCount >= 2147483647 {
+	if a.snapshot.RetryCount == math.MaxInt32 {
 		return errors.New("managed entry DNS retry count exhausted")
 	}
 	next := now.Add(ManagedEntryDNSBackoff(a.snapshot.RetryCount, retryAfter, jitterUnit))

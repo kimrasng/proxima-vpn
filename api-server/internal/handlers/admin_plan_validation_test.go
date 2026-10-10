@@ -61,7 +61,7 @@ func TestAdminPlanRejectsInvalidInput(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				defer res.Body.Close()
+				defer func() { _ = res.Body.Close() }()
 				data, _ := io.ReadAll(res.Body)
 				if res.StatusCode != 400 || !strings.Contains(string(data), tc.want) {
 					t.Fatalf("status=%d body=%s; want 400 containing %q", res.StatusCode, data, tc.want)
@@ -82,7 +82,7 @@ func TestAdminPlanUpdateRejectsNullRequiredFieldsAndEmptyPatch(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer res.Body.Close()
+			defer func() { _ = res.Body.Close() }()
 			if res.StatusCode != 400 {
 				t.Fatalf("status=%d; want 400", res.StatusCode)
 			}
@@ -153,7 +153,7 @@ func TestAdminPlanUpdateClearsLimitsAndPreservesOmittedFields(t *testing.T) {
 		}
 		var plan planResponse
 		err = json.NewDecoder(res.Body).Decode(&plan)
-		res.Body.Close()
+		_ = res.Body.Close()
 		if err != nil || res.StatusCode != 200 {
 			t.Fatalf("status=%d decode=%v", res.StatusCode, err)
 		}

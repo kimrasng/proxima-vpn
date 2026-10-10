@@ -212,7 +212,7 @@ func testBandwidthDelayedDowngrade(t *testing.T, transfer bool) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer transferTx.Rollback(context.Background())
+	defer func() { _ = transferTx.Rollback(context.Background()) }()
 	if _, err := transferTx.Exec(ctx, updateSQL, updateArgs...); err != nil {
 		t.Fatal(err)
 	}

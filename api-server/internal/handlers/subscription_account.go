@@ -57,7 +57,7 @@ func (h *SubscriptionHandler) getAccountSubscription(c *fiber.Ctx, formatOverrid
 	if err != nil {
 		return accountSubscriptionError(c)
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	// Row lock serialises concurrent first fetches so exactly one device is
 	// created for a new account regardless of how many clients race at once.
