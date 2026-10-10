@@ -21,7 +21,7 @@
 </div>
 
 > [!IMPORTANT]
-> Proxima는 VPN에 접속하는 클라이언트 앱이 아니라, VPN 서비스를 **운영하는 사람**을 위한 패널입니다. 본인이 소유하거나 관리 권한이 있는 서버에서, 거주 지역의 법률과 서비스 약관을 지켜 사용하세요.
+> 이 저장소는 VPN에 접속하는 클라이언트 앱이 아니라, VPN 서비스를 **운영하는 사람**을 위한 패널입니다. 본인이 소유하거나 관리 권한이 있는 서버에서, 거주 지역의 법률과 서비스 약관을 지켜 사용하세요.
 
 ## ✨ 한눈에 보기
 
@@ -377,11 +377,26 @@ ss -tlnp | grep -E ':(8080|2053)'
 
 ## 👥 메인테이너
 
-| | 이름 | 역할 | 연락처 |
+| | 이름 | 역할 | 링크 |
 |:---:|---|---|---|
-| <img src="https://github.com/kimrasng.png?size=96" width="48" alt="kimrasng"> | **Dohyun Kim** · [@kimrasng](https://github.com/kimrasng) | 메인테이너 | <dohyun.kim@solix.kr> |
-| <img src="https://github.com/h053698.png?size=96" width="48" alt="h053698"> | **Yuchan Han** · [@h053698](https://github.com/h053698) | 공동 메인테이너 | <yuchan.han@solixsolutions.us> |
+| <img src="https://github.com/kimrasng.png?size=96" width="48" alt="kimrasng"> | **Dohyun Kim** | 메인테이너 | [@kimrasng](https://github.com/kimrasng) · [LinkedIn](https://www.linkedin.com/in/dohyun1223/) · [dohyun.kim@solix.kr](mailto:dohyun.kim@solix.kr) |
+| <img src="https://github.com/h053698.png?size=96" width="48" alt="h053698"> | **Yuchan Han** | 공동 메인테이너 | [@h053698](https://github.com/h053698) · [LinkedIn](https://www.linkedin.com/in/yuchan-han/) · [yuchan.han@solixsolutions.us](mailto:yuchan.han@solixsolutions.us) |
 
 ## 📄 라이선스
 
 MIT
+
+---
+
+<div align="center">
+
+<a href="https://solixsolutions.us/en/proxima">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/solix-wordmark-dark.svg">
+    <img src="docs/assets/solix-wordmark-light.svg" alt="Solix Corporation" width="200">
+  </picture>
+</a>
+
+**Solix Corporation** 프로젝트입니다. Proxima에 대한 자세한 소개는 **[solixsolutions.us/en/proxima](https://solixsolutions.us/en/proxima)** 에서 볼 수 있습니다.
+
+</div>

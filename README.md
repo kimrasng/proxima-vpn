@@ -22,7 +22,7 @@ Entry → exit node chains · six VPN protocols · one subscription URL that ada
 </div>
 
 > [!IMPORTANT]
-> Proxima is not a VPN client. It is the panel an **operator** uses to run VPN infrastructure: nodes, routes, users, plans and billing. Only deploy it on servers you own or are authorized to manage, and comply with the laws and terms of service that apply to you.
+> This repository is not a VPN client. It is the panel an **operator** uses to run VPN infrastructure: nodes, routes, users, plans and billing. Only deploy it on servers you own or are authorized to manage, and comply with the laws and terms of service that apply to you.
 
 ## ✨ Highlights
 
@@ -531,11 +531,26 @@ More cases are in [docs/troubleshooting.md](docs/troubleshooting.md).
 
 ## 👥 Maintainers
 
-| | Name | Role | Contact |
+| | Name | Role | Links |
 |:---:|---|---|---|
-| <img src="https://github.com/kimrasng.png?size=96" width="48" alt="kimrasng"> | **Dohyun Kim** · [@kimrasng](https://github.com/kimrasng) | Maintainer | <dohyun.kim@solix.kr> |
-| <img src="https://github.com/h053698.png?size=96" width="48" alt="h053698"> | **Yuchan Han** · [@h053698](https://github.com/h053698) | Co-maintainer | <yuchan.han@solixsolutions.us> |
+| <img src="https://github.com/kimrasng.png?size=96" width="48" alt="kimrasng"> | **Dohyun Kim** | Maintainer | [@kimrasng](https://github.com/kimrasng) · [LinkedIn](https://www.linkedin.com/in/dohyun1223/) · [dohyun.kim@solix.kr](mailto:dohyun.kim@solix.kr) |
+| <img src="https://github.com/h053698.png?size=96" width="48" alt="h053698"> | **Yuchan Han** | Co-maintainer | [@h053698](https://github.com/h053698) · [LinkedIn](https://www.linkedin.com/in/yuchan-han/) · [yuchan.han@solixsolutions.us](mailto:yuchan.han@solixsolutions.us) |
 
 ## 📄 License
 
 MIT
+
+---
+
+<div align="center">
+
+<a href="https://solixsolutions.us/en/proxima">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/solix-wordmark-dark.svg">
+    <img src="docs/assets/solix-wordmark-light.svg" alt="Solix Corporation" width="200">
+  </picture>
+</a>
+
+A project by **Solix Corporation**. Learn more about Proxima at **[solixsolutions.us/en/proxima](https://solixsolutions.us/en/proxima)**.
+
+</div>
