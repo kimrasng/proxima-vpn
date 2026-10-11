@@ -680,6 +680,11 @@ log "testing subscription formats"
 
 sub_fetch() { curl -sf "$BASE_URL/sub/$SUB_TOKEN/$DEVICE_ID?format=$1"; }
 
+# Subscriptions only list a node once its heartbeat acknowledges the current
+# config; until then the panel answers 503 + Retry-After, as real clients see.
+# The speed-limit section just restarted Xray, so wait for that ack.
+wait_for "subscription serves the re-acknowledged node" 60 sub_fetch clash
+
 # --- Clash: must be valid YAML and carry every protocol as a typed proxy ---
 sub_fetch clash > "$WORKDIR/sub_clash.yaml"
 EXPECT_TYPES="vless" ; [[ "$LEGACY_PROTOCOLS" == "1" ]] && EXPECT_TYPES="vless,vmess,trojan,ss,wireguard"
