@@ -591,17 +591,27 @@ LOGGED_ROWS=$(curl -sf "$BASE_URL/api/v1/admin/stats/traffic-history" \
 log "PASS: traffic_logs has $LOGGED_ROWS aggregated row(s)"
 
 # ---------------------------------------------------------------------------
-# 14b. Speed limits. Setting speed_limit on a plan is supposed to move its
-#      users onto a dedicated inbound that the agent rate-limits with tc. Every
-#      part of that was previously unverified: the shaper's own tests mock the
-#      tc binary, so nothing proved a rule reached the kernel, let alone that
-#      throughput obeyed it. Worse, tc reports "Operation not permitted" on
-#      stderr while exiting 0, so a node lacking CAP_NET_ADMIN served limited
-#      users at full speed and reported success.
+# 14c. Speed limits. A plan's speed_limit is enforced per device by the agent's
+#      local device egress (a token bucket in front of every device's SOCKS
+#      outbound, shaping_mode "device_global_v1"); shared tc tiers are gone and
+#      the agent clears any it inherits. The tier inbound is still generated so
+#      saved subscriptions keep working. Asserting on configuration alone has
+#      already let a broken limiter ship once, so measure throughput: a capped
+#      download must take as long as the cap implies, and lifting the cap must
+#      make it fast again.
 # ---------------------------------------------------------------------------
-log "testing speed limits (tc shaping)"
+log "testing speed limits (local per-device egress)"
 
 SHAPE_MBPS=8
+BULK_BYTES=3000000
+head -c "$BULK_BYTES" /dev/urandom > "$WORKDIR/www/bulk.bin"
+
+# Prints "<bytes> <seconds>" for one download through the given SOCKS port.
+bulk_download() {
+  curl -s -o /dev/null --max-time 30 -x "socks5h://127.0.0.1:$1" \
+    -w '%{size_download} %{time_total}' "http://${E2E_TARGET_HOST}:9090/bulk.bin" || true
+}
+
 curl -sf -X PUT "$BASE_URL/api/v1/admin/plans/$PLAN_ID" \
   -H "Authorization: Bearer $ADMIN_TOKEN" -H 'Content-Type: application/json' \
   -d "{\"speed_limit\":$SHAPE_MBPS}" > /dev/null || fail "could not set a speed limit on the plan"
@@ -611,58 +621,52 @@ TIER_TAG="vless-reality-limit-$SHAPE_MBPS"
 
 # The tier inbound is synthesised at config-generation time, not stored in the
 # inbounds table, which is why it coexists with one-inbound-per-node.
+TIER_JSON=""
 for _ in $(seq 1 30); do
-  if curl -sf "$BASE_URL/api/v1/nodes/$NODE_ID/config" -H "X-Node-Key: $NODE_KEY" \
-       | jq -e --arg t "$TIER_TAG" '.inbounds[] | select(.tag == $t)' > /dev/null 2>&1; then
-    break
-  fi
+  TIER_JSON=$(curl -sf "$BASE_URL/api/v1/nodes/$NODE_ID/config" -H "X-Node-Key: $NODE_KEY" \
+    | jq -c --arg t "$TIER_TAG" '.inbounds[] | select(.tag == $t)' 2>/dev/null || true)
+  [[ -n "$TIER_JSON" ]] && break
   sleep 1
 done
-
-TIER_JSON=$(curl -sf "$BASE_URL/api/v1/nodes/$NODE_ID/config" -H "X-Node-Key: $NODE_KEY" \
-  | jq -c --arg t "$TIER_TAG" '.inbounds[] | select(.tag == $t)')
 [[ -n "$TIER_JSON" ]] || fail "no $TIER_TAG inbound was generated for a ${SHAPE_MBPS}Mbps plan"
 assert_eq "the speed tier listens on its derived port" "$TIER_PORT" "$(echo "$TIER_JSON" | jq -r .port)"
 
-# The agent shapes the default-route interface, the same one it resolves itself.
-SHAPE_IFACE=$(ip route show default 2>/dev/null | awk '/default/ {print $5; exit}')
-[[ -n "$SHAPE_IFACE" ]] || fail "no default route interface; the agent could not have shaped either"
+# The tier inbound is structural, so its listener appearing means the agent has
+# restarted onto the limited generation; rates are installed before that start.
+wait_for "agent applied the ${SHAPE_MBPS}Mbps generation" 60 bash -c "ss -tln | grep -q ':$TIER_PORT '"
 
-# Wait for the agent to restart onto the new structure and install the rules.
-for _ in $(seq 1 40); do
-  tc class show dev "$SHAPE_IFACE" 2>/dev/null | grep -q "${SHAPE_MBPS}Mbit" && break
-  sleep 2
-done
+# 8 Mbps is 1,000,000 bytes/s with a 100 KB burst, so 3 MB cannot finish in
+# under ~2.9s. Allow 2s; an unlimited loopback transfer takes milliseconds.
+read -r GOT SECS <<< "$(bulk_download 1080)"
+assert_eq "the capped download completed" "$BULK_BYTES" "${GOT:-0}"
+awk -v s="${SECS:-0}" 'BEGIN { exit !(s >= 2.0) }' \
+  || fail "3 MB at ${SHAPE_MBPS}Mbps took ${SECS}s; the per-device limit is not enforced"
+log "PASS: ${SHAPE_MBPS}Mbps cap enforced (3 MB in ${SECS}s)"
 
-TIER_CLASS=$(tc class show dev "$SHAPE_IFACE" 2>/dev/null | grep "${SHAPE_MBPS}Mbit" | head -1)
-[[ -n "$TIER_CLASS" ]] || fail "no tc class caps at ${SHAPE_MBPS}Mbit on $SHAPE_IFACE; shaping never reached the kernel"
-log "PASS: tc installed a ${SHAPE_MBPS}Mbit class on $SHAPE_IFACE"
-
-FILTER_COUNT=$(tc filter show dev "$SHAPE_IFACE" 2>/dev/null | grep -c "match" || true)
-[[ "$FILTER_COUNT" -gt 0 ]] || fail "tc has no filters; the tier class would never receive traffic"
-log "PASS: tc has $FILTER_COUNT filter match(es) directing tier traffic"
-
-# tc prints "Operation not permitted" to stderr and still exits 0, so the agent
-# has to report the outcome or a node serving limited users at full rate looks
-# healthy. Read it back the way an operator would.
-# The count arrives on the next heartbeat, which is a separate 30s cycle from
-# the config poll that installed the rules, so wait for it rather than reading
-# whatever the previous heartbeat left.
-SHAPING_TIERS=0
+NODE_JSON=""
 for _ in $(seq 1 30); do
-  NODE_JSON=$(curl -sf "$BASE_URL/api/v1/admin/nodes/$NODE_ID" -H "Authorization: Bearer $ADMIN_TOKEN")
-  SHAPING_TIERS=$(echo "$NODE_JSON" | jq -r '.shaping_tiers // 0')
-  [[ "$SHAPING_TIERS" -ge 1 ]] && break
+  NODE_JSON=$(curl -sf "$BASE_URL/api/v1/admin/nodes/$NODE_ID" -H "Authorization: Bearer $ADMIN_TOKEN" || true)
+  [[ "$(echo "$NODE_JSON" | jq -r '.shaping_ok')" == "true" && "$(echo "$NODE_JSON" | jq -r '.shaping_mode')" == "device_global_v1" ]] && break
   sleep 2
 done
 assert_eq "the node reports shaping as applied" "true" "$(echo "$NODE_JSON" | jq -r '.shaping_ok')"
-[[ "$SHAPING_TIERS" -ge 1 ]] || fail "node reports $SHAPING_TIERS shaped tiers after 60s, expected at least 1"
-log "PASS: node reports shaping_ok with $SHAPING_TIERS tier(s)"
+assert_eq "the node reports per-device shaping" "device_global_v1" "$(echo "$NODE_JSON" | jq -r '.shaping_mode')"
 
 curl -sf -X PUT "$BASE_URL/api/v1/admin/plans/$PLAN_ID" \
   -H "Authorization: Bearer $ADMIN_TOKEN" -H 'Content-Type: application/json' \
   -d '{"speed_limit":0}' > /dev/null || fail "could not clear the speed limit"
-log "PASS: speed limit cleared"
+wait_for "agent applied the unlimited generation" 60 bash -c "! ss -tln | grep -q ':$TIER_PORT '"
+
+# Retry briefly: the first request can race Xray finishing its restart.
+SECS=""
+for _ in $(seq 1 5); do
+  read -r GOT SECS <<< "$(bulk_download 1080)"
+  [[ "${GOT:-0}" == "$BULK_BYTES" ]] && awk -v s="$SECS" 'BEGIN { exit !(s < 1.5) }' && break
+  sleep 2
+done
+[[ "${GOT:-0}" == "$BULK_BYTES" ]] && awk -v s="${SECS:-99}" 'BEGIN { exit !(s < 1.5) }' \
+  || fail "3 MB still took ${SECS:-?}s after the limit was cleared; the cap was not lifted"
+log "PASS: speed limit cleared and lifted (3 MB in ${SECS}s)"
 
 # ---------------------------------------------------------------------------
 # 15. Subscription formats. Every client app format the panel advertises is
