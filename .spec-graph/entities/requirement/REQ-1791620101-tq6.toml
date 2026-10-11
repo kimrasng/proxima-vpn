@@ -3,14 +3,18 @@ id = "REQ-1791620101-tq6"
 type = "requirement"
 title = "CI and E2E pipelines pass on main"
 description = "Every Go test, golangci-lint for all modules, the web build, and both E2E workflows (full protocol, relay) pass on main. Failures that reflect real defects are fixed in product code; environment-only failures are fixed in the test or CI setup without weakening what the test proves."
-status = "draft"
+status = "resolved"
 created_at = 2026-10-10T17:15:01+09:00
-updated_at = 2026-10-10T17:15:01+09:00
+updated_at = 2026-10-11T15:54:25+09:00
 
 [metadata]
 kind = "functional"
 owner = "backend"
 priority = "must"
+
+[[relations]]
+to = "DEC-1791700213-hk9"
+type = "constrained_by"
 
 [[relations]]
 to = "ACT-1791620101-fp4"

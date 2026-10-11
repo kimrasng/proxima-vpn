@@ -1,0 +1,24 @@
+schema = 1
+id = "TSK-1791701590-mzx"
+type = "task"
+title = "Bring the Playwright browser suite back to green and restore its push/PR trigger"
+description = "browser-e2e.yml (workflow_dispatch) fails 23 of 143 specs against the redesigned admin UI: plan-routes (8, Manage routes button), node-endpoints (7, Edit Reality SNI dialog), managed chains and node-chains (5, Edit link and Disable), admin CRUD (Duration (days) became Duration amount plus unit), admin-subscription-domains list equality, and the user-dashboard announcement dialog exposing two Close buttons."
+status = "draft"
+created_at = 2026-10-11T15:53:10+09:00
+updated_at = 2026-10-11T15:53:10+09:00
+
+[metadata]
+acceptance = ["browser-e2e.yml passes on main.", "browser-e2e.yml runs on push and pull_request to main again."]
+instructions = ["Run browser-e2e.yml and triage each of the 23 failing specs: decide whether the spec or the UI is wrong.", "Update specs that target removed UI (e.g. 'Duration (days)' is now 'Duration amount' plus a unit select); fix the UI where the behaviour regressed.", "Once the suite is green, restore push/pull_request triggers on browser-e2e.yml."]
+must_not = ["Do not delete failing specs to make the suite pass.", "Do not put the browser suite back inside the e2e data-plane job."]
+order = 99.0
+qa = [{command = "gh workflow run browser-e2e.yml --ref main", evidence = "", expected = "success"}]
+references = [".github/workflows/browser-e2e.yml", "web/e2e/plan-routes.admin.spec.ts", "web/e2e/node-endpoints.admin.spec.ts", "web/e2e/managed-chain-lifecycle.admin.spec.ts", "web/e2e/admin.spec.ts"]
+
+[[relations]]
+to = "PHS-1791620103-0r8"
+type = "belongs_to"
+
+[[relations]]
+to = "DEC-1791700213-hk9"
+type = "covers"

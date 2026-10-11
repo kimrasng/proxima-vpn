@@ -1,0 +1,12 @@
+schema = 1
+id = "ACT-1791630523-m4x"
+type = "criterion"
+title = "Adding a device keeps the Xray PID and the new device connects"
+status = "draft"
+created_at = 2026-10-10T20:08:43+09:00
+updated_at = 2026-10-10T20:08:43+09:00
+
+[metadata]
+given = "A running Exit with an admitted device"
+then = "The Xray PID is unchanged, the new device reaches the target through its device egress, and the first device keeps working"
+when = "A second device is added and the agent applies the new config"

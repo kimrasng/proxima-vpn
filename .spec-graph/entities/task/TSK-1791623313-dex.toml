@@ -1,0 +1,28 @@
+schema = 1
+id = "TSK-1791623313-dex"
+type = "task"
+title = "Propagate account subscription error responses instead of returning nil"
+description = "resolveHWIDDevice and createAccountDevice return (\"\", nil) on error because c.JSON returns nil, so the caller commits and renders with an empty device ID, masking 403/500 as 400."
+status = "resolved"
+created_at = 2026-10-10T18:08:33+09:00
+updated_at = 2026-10-11T15:52:45+09:00
+
+[metadata]
+acceptance = ["Past the cap the response is 403 hwid registration cap reached.", "No error path commits or renders a subscription."]
+instructions = ["Return a non-nil sentinel error together with the written response so the caller aborts before Commit.", "Make the caller roll back and return without calling getSubscriptionForDevice.", "Update TestAccountSubscriptionHWIDSlots to assert 403 past the cap."]
+must_not = ["Do not change successful slot or legacy device behaviour."]
+order = 7.0
+qa = [{command = "cd api-server && go test -p 1 -race -count=20 -run TestAccountSubscription ./internal/handlers/", evidence = "api-server/internal/handlers/subscription_account.go", expected = "exit 0 -> CI 38119051163 on 56c1feb backend=success"}]
+references = ["api-server/internal/handlers/subscription_account.go"]
+
+[[relations]]
+to = "PHS-1791620103-egt"
+type = "belongs_to"
+
+[[relations]]
+to = "REQ-1791623313-wwy"
+type = "covers"
+
+[[relations]]
+to = "REQ-1791623313-wwy"
+type = "delivers"

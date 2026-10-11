@@ -1,0 +1,28 @@
+schema = 1
+id = "TSK-1791630524-e4f"
+type = "task"
+title = "Apply device egress outbounds and routing rules live without restarting Xray"
+description = "The full-protocol E2E fails because adding a device restarts Xray: device egress outbounds and rules are part of the structure hash. Make them live-updatable."
+status = "resolved"
+created_at = 2026-10-10T20:08:44+09:00
+updated_at = 2026-10-11T15:52:46+09:00
+
+[metadata]
+acceptance = ["Full-protocol E2E passes including xray was NOT restarted to admit the new user.", "Relay E2E still passes."]
+instructions = ["Treat device-egress outbounds and their user rules as user-scoped in both the server ConfigDigest StructureHash and the agent sameLocalStructure.", "Add hand-encoded gRPC calls for HandlerService AddOutbound/RemoveOutbound and RoutingService AddRule/RemoveRule with a per-device ruleTag.", "Extend syncUsers to add outbound, rule and user in order and remove them in reverse; on any failure fall back to restart.", "Keep the deny fallback rule last; insert per-device rules before it.", "Unit-test the protobuf encoders and the structure comparison; keep the E2E no-restart assertion unchanged."]
+must_not = ["Do not weaken or remove the no-restart E2E assertion.", "Do not bypass device egress for new users."]
+order = 8.0
+qa = [{command = "cd node-agent && go test ./...", evidence = "node-agent/cmd/live_topology.go", expected = "exit 0 -> E2E 38119051093 on 56c1feb e2e=success, xray was NOT restarted to admit the new user"}, {command = "gh run view <e2e run> conclusion", evidence = "node-agent/cmd/live_topology.go", expected = "success -> E2E 38119051093 on 56c1feb e2e=success, xray was NOT restarted to admit the new user"}]
+references = ["node-agent/cmd/main.go", "node-agent/cmd/device_egress.go", "node-agent/internal/xray/handler.go", "api-server/internal/services/xray_config.go", "api-server/internal/services/xray_device_egress.go"]
+
+[[relations]]
+to = "PHS-1791620103-egt"
+type = "belongs_to"
+
+[[relations]]
+to = "REQ-1791630523-24s"
+type = "covers"
+
+[[relations]]
+to = "REQ-1791630523-24s"
+type = "delivers"

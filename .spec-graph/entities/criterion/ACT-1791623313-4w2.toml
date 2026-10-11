@@ -1,0 +1,12 @@
+schema = 1
+id = "ACT-1791623313-4w2"
+type = "criterion"
+title = "HWID cap returns 403 and DB errors return 500"
+status = "draft"
+created_at = 2026-10-10T18:08:33+09:00
+updated_at = 2026-10-10T18:08:33+09:00
+
+[metadata]
+given = "An account at its hwid_registration_cap or a failing device query"
+then = "The response is 403 hwid registration cap reached or 500 failed to resolve subscription, and no partial transaction is committed"
+when = "A subscription request needs a new HWID slot or hits the failure"

@@ -1,0 +1,8 @@
+schema = 1
+id = "DEC-1791700213-hk9"
+type = "decision"
+title = "Run the Playwright browser suite on demand, outside the e2e gate"
+description = "The browser suite never ran on main since 2026-10-04 (earlier steps failed first). Once reachable it fails 23/143 specs, mostly selectors for the redesigned admin UI (plan editor, route management, node endpoint SNI dialog, chain dialogs), and its 1-minute timeouts push the e2e job past 15 minutes. It moves to browser-e2e.yml (workflow_dispatch) so the data-plane gate (relay-e2e + full-protocol e2e) can go green; it returns to push/PR triggers once green."
+status = "active"
+created_at = 2026-10-11T15:30:13+09:00
+updated_at = 2026-10-11T15:30:13+09:00

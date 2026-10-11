@@ -1,0 +1,21 @@
+schema = 1
+id = "REQ-1791630523-24s"
+type = "requirement"
+title = "Admitting a new device does not restart Xray or drop existing sessions"
+description = "When a new device UUID is added to an Exit, its per-device SOCKS egress outbound and its user routing rule are installed live through Xray gRPC (HandlerService.AddOutbound and RoutingService.AddRule) together with the VLESS user (AlterInbound), so existing connections on the node are not interrupted. Removal is symmetric. Xray restarts only for genuine structural changes."
+status = "resolved"
+created_at = 2026-10-10T20:08:43+09:00
+updated_at = 2026-10-11T15:54:25+09:00
+
+[metadata]
+kind = "functional"
+owner = "node-agent"
+priority = "must"
+
+[[relations]]
+to = "DEC-1791630524-k32"
+type = "constrained_by"
+
+[[relations]]
+to = "ACT-1791630523-m4x"
+type = "has_criterion"

@@ -1,0 +1,17 @@
+schema = 1
+id = "REQ-1791623313-wwy"
+type = "requirement"
+title = "Account subscription returns its intended error responses"
+description = "Error paths while resolving the account subscription device (HWID registration cap, database failures) return their own status and body and never fall through to commit and render with an empty device ID."
+status = "resolved"
+created_at = 2026-10-10T18:08:33+09:00
+updated_at = 2026-10-11T15:54:25+09:00
+
+[metadata]
+kind = "functional"
+owner = "backend"
+priority = "must"
+
+[[relations]]
+to = "ACT-1791623313-4w2"
+type = "has_criterion"

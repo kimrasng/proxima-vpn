@@ -3,9 +3,9 @@ id = "REQ-1791620101-hzh"
 type = "requirement"
 title = "Authenticated node bandwidth permit requests succeed when the budget service is available"
 description = "POST of a bandwidth permit by an authenticated node returns 200 with a permit when Redis and the device budget are available, and 503 only when they truly are not."
-status = "draft"
+status = "resolved"
 created_at = 2026-10-10T17:15:01+09:00
-updated_at = 2026-10-10T17:15:01+09:00
+updated_at = 2026-10-11T15:54:25+09:00
 
 [metadata]
 kind = "functional"
