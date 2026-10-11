@@ -122,9 +122,9 @@ jobs:
           mkdir -p /tmp/e2e-logs
           bash scripts/e2e_full_test.sh
 
-      # The browser (Playwright) suite lives in browser-e2e.yml. It is run on
-      # demand until its specs catch up with the redesigned admin UI, so it
-      # cannot hold this data-plane gate red or time it out.
+      # The browser (Playwright) suite runs in browser-e2e.yml, a separate
+      # workflow, so a browser failure cannot hold this data-plane gate red or
+      # time it out.
 
       - name: Dump api-server log on failure
         if: failure()

@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { chain, endpoint, mockTopology, openCreate } from "./managed-chain-fixtures";
+import { chain, chooseLinkAction, endpoint, mockTopology, openCreate } from "./managed-chain-fixtures";
 
 test.use({ storageState: { cookies: [], origins: [] } });
 test.beforeEach(async ({ page }) => { await mockTopology(page); });
@@ -20,11 +20,11 @@ test("legacy pools remain ordered, visible, editable and toggleable", async ({ p
   const rows = page.locator("tbody tr");
   await expect(rows.nth(0)).toContainText("Old pool");
   await expect(rows.nth(1)).toContainText("Existing link");
-  await rows.nth(0).getByRole("button", { name: "Disable", exact: true }).click();
+  await chooseLinkAction(page, rows.nth(0), "Disable");
   await expect(rows.nth(0)).toContainText("Disabled");
-  await rows.nth(0).getByRole("button", { name: "Enable", exact: true }).click();
+  await chooseLinkAction(page, rows.nth(0), "Enable");
   await expect(rows.nth(0)).toContainText("Enabled");
-  await rows.nth(0).getByRole("button", { name: "Edit link" }).click();
+  await chooseLinkAction(page, rows.nth(0), "Edit link");
   const form = page.getByRole("dialog");
   // When changing only supported legacy fields.
   await expect(form.getByText(/This existing link uses legacy relay pool Old pool/)).toBeVisible();
@@ -43,7 +43,7 @@ test("deletion removes only the link and leaves managed entry available", async 
   await page.route(endpoint, (route) => route.fulfill({ json: deleted ? [] : [chain] }));
   await page.route(`${endpoint}/chain`, (route) => { deleted = true; return route.fulfill({ json: {} }); });
   await page.goto("/admin/node-chains");
-  await page.getByRole("button", { name: "Edit link" }).click();
+  await chooseLinkAction(page, page.locator("tbody tr").first(), "Edit link");
   // When confirming deletion.
   await page.getByRole("dialog").getByRole("button", { name: "Delete link", exact: true }).click();
   await page.getByRole("button", { name: "Confirm deletion", exact: true }).click();

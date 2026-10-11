@@ -18,7 +18,9 @@ const routesEndpoint = `${planEndpoint}/routes`;
 
 async function openRoutes(page: Page) {
   await page.goto("/admin/plans");
-  await page.getByRole("row", { name: /Route plan/ }).getByRole("button", { name: /Manage routes|admin\.routeManagement\.manage/ }).click();
+  // Plans are cards whose actions live in one menu named after the plan.
+  await page.getByRole("button", { name: "Actions: Route plan", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Manage routes", exact: true }).click();
   const panel = page.locator("#plan-routes");
   await expect(panel.getByRole("row", { name: /Existing link/ })).toBeVisible();
   return panel;
@@ -47,9 +49,12 @@ test("shows saved routes, endpoint path, separate health and unenforced per-devi
   await expect(row).toContainText("stale.example.test:22001 → Exit:8443");
   await expect(panel.getByRole("row", { name: /Second route/ }).getByRole("checkbox")).not.toBeChecked();
   await expect(applyButton(page)).toBeDisabled();
-  await expect(panel).toContainText(/per.device|perDeviceWarning/i);
-  await expect(panel).toContainText(/subscription|availabilityWarning/i);
   await expect(panel).toContainText(/shared|sharedTierSpeed/i);
+  // Availability and per-device caveats live in the "Route guidance" popover.
+  await panel.getByRole("button", { name: "Route guidance", exact: true }).click();
+  const guidance = page.getByRole("dialog", { name: "Route guidance" });
+  await expect(guidance).toContainText(/per.device|perDeviceWarning/i);
+  await expect(guidance).toContainText(/subscription|availabilityWarning/i);
 });
 
 test("applies only route IDs, preserves draft, and rebases an isolated group before plan save", async ({ page }) => {

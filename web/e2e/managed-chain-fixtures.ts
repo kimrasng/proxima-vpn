@@ -1,4 +1,4 @@
-import { expect, type Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 import type { Node, NodeChain } from "../src/api/types";
 import { mockSession } from "./subscription-domain-fixtures";
 
@@ -19,6 +19,13 @@ export const chain: NodeChain = {
   exit_port: 8443, transport: "tcp", mode: "relay", priority: 7, enabled: true, health: "", group_ids: [],
 };
 export const endpoint = "**/api/v1/admin/node-chains";
+
+// Link rows keep Edit / Manage plans / Enable-Disable in one "Actions" menu
+// (352564e), so a test opens the menu of that row and picks the item.
+export async function chooseLinkAction(page: Page, row: Locator, action: string) {
+  await row.getByRole("button", { name: /^Actions: / }).click();
+  await page.getByRole("menuitem", { name: action, exact: true }).click();
+}
 
 export async function mockTopology(page: Page) {
   await mockSession(page, "admin");

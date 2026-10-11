@@ -314,7 +314,8 @@ test.describe("mocked user dashboard and purchase journey", () => {
     const dialog = page.getByRole("dialog");
     await expect(dialog.getByText("Newest active", { exact: true })).toBeVisible();
     await expect(dialog.getByText("Read this final line in the dialog.", { exact: true })).toBeVisible();
-    await dialog.getByRole("button", { name: en.user.announcements.close, exact: true }).click();
+    // The dismiss icon and the footer button share the "Close" name; use the footer one.
+    await dialog.getByRole("button", { name: en.user.announcements.close, exact: true }).last().click();
     await expect(page.getByRole("dialog")).toHaveCount(0);
     await page.getByRole("button", { name: en.user.dashboard.refresh, exact: true }).click();
     await expect(page.getByRole("button", { name: "Newest active", exact: true })).toBeVisible();

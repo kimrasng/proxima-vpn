@@ -1,13 +1,25 @@
 name: Browser E2E (admin panel + user portal)
 
-# Playwright suite against a real api-server. Split out of e2e.yml so the
-# data-plane gate stays meaningful while these specs are brought back in line
-# with the redesigned admin UI (plan editor, route management, node endpoints
-# and chain dialogs). Run it on demand; once it is green again it can move back
-# to push/pull_request triggers.
+# Playwright suite against a real api-server. It runs as its own workflow, not
+# inside e2e.yml's data-plane job: the two fail for unrelated reasons and a slow
+# browser failure must not time out the protocol tests.
 
 on:
   workflow_dispatch: {}
+  pull_request:
+    branches: [main]
+    paths:
+      - 'web/**'
+      - 'api-server/**'
+      - 'pkg/**'
+      - '.github/workflows/browser-e2e.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'web/**'
+      - 'api-server/**'
+      - 'pkg/**'
+      - '.github/workflows/browser-e2e.yml'
 
 jobs:
   browser-e2e:

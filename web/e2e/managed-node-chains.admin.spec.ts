@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { chain, endpoint, entry, exit, mockTopology, openCreate } from "./managed-chain-fixtures";
+import { chain, chooseLinkAction, endpoint, entry, exit, mockTopology, openCreate } from "./managed-chain-fixtures";
 
 test.use({ storageState: { cookies: [], origins: [] } });
 test.beforeEach(async ({ page }) => { await mockTopology(page); });
@@ -50,7 +50,7 @@ for (const missing of [false, true]) {
     const payloads: unknown[] = [];
     await page.route(`${endpoint}/chain`, (route) => { payloads.push(route.request().postDataJSON()); return route.fulfill({ json: chain }); });
     await page.goto("/admin/node-chains");
-    await page.getByRole("button", { name: "Edit link", exact: true }).click();
+    await chooseLinkAction(page, page.locator("tbody tr").first(), "Edit link");
     const form = page.getByRole("dialog");
     await expect(form.getByText("stale.example.test", { exact: true })).toHaveCount(0);
     if (!missing) await expect(form.getByText("managed.entry.example.test", { exact: true })).toBeVisible();

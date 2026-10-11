@@ -14,8 +14,10 @@ test("plan policy advertises per-device directional ceilings without claiming de
  await page.route("**/api/v1/admin/node-chains",r=>r.fulfill({json:[chain]}));
  await page.route("**/api/v1/admin/nodes",r=>r.fulfill({json:[entry,{...exit,shaping_mode:"device_global_v1",shaping_ok:true}]}));
  await page.goto("/admin/plans");
- await page.getByRole("button",{name:"Manage routes",exact:true}).click();
+ await page.getByRole("button",{name:"Actions: Device plan",exact:true}).click();
+ await page.getByRole("menuitem",{name:"Manage routes",exact:true}).click();
  await expect(page.locator("#plan-routes")).toContainText("Per device: upload and download each up to 100 Mbps");
- await expect(page.getByText(/Requires a current agent and acknowledged configuration/)).toBeVisible();
+ await page.locator("#plan-routes").getByRole("button",{name:"Route guidance",exact:true}).click();
+ await expect(page.getByRole("dialog",{name:"Route guidance"}).getByText(/Requires a current agent and acknowledged configuration/)).toBeVisible();
  await expect(page.getByText("Per-device bandwidth enforcement is not implemented.",{exact:false})).toHaveCount(0);
 });

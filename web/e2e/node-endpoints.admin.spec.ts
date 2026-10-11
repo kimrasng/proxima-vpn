@@ -2,6 +2,8 @@ import { test, expect, type Page } from "@playwright/test";
 import { mockSession } from "./subscription-domain-fixtures";
 
 const endpoint = "**/api/v1/admin/nodes";
+// The SNI editor saves through its own atomic endpoint, not the general node PUT.
+const realityTarget = `${endpoint}/exit-fixture/reality-target`;
 const node = {
   id: "exit-fixture", name: "Exit fixture", country: "US", region: "Test", ip: "192.0.2.1",
   port: 443, status: "online", role: "both", publish_direct: true, traffic_multiplier: 1,
@@ -96,12 +98,12 @@ test.describe("PHS-030 node endpoints", () => {
       let saved = false;
       let mutations = 0;
       await page.route(endpoint, (route) => route.fulfill({ json: [{ ...node, ...(saved ? { reality_client_sni: "new.example.test", reality_sni_status: "valid", reality_sni_error_code: null } : {}) }] }));
-      await page.route(`${endpoint}/${node.id}`, async (route) => {
+      await page.route(realityTarget, async (route) => {
         expect(route.request().method()).toBe("PUT");
-        expect(route.request().postDataJSON()).toEqual({ reality_client_sni: "NEW.example.test" });
+        expect(route.request().postDataJSON()).toEqual({ hostname: "NEW.example.test" });
         mutations++;
         saved = true;
-        await route.fulfill({ json: node });
+        await route.fulfill({ json: { reality_client_sni: "new.example.test" } });
       });
       const form = await openEditor(page);
       // When saving the explicit operator input.
@@ -124,7 +126,7 @@ test.describe("PHS-030 node endpoints", () => {
   for (const status of [400, 409, 500]) {
     test(`retains input after HTTP ${status}`, async ({ page }) => {
       // Given an API rejection.
-      await page.route(`${endpoint}/${node.id}`, (route) => route.fulfill({ status, json: { error: status === 409 ? "Reality SNI is incompatible with node listeners" : "invalid reality_client_sni" } }));
+      await page.route(realityTarget, (route) => route.fulfill({ status, json: { error: status === 409 ? "Reality SNI is incompatible with node listeners" : "invalid reality_client_sni" } }));
       const form = await openEditor(page);
       const input = form.getByRole("textbox", { name: "Reality client SNI", exact: true });
       await input.fill("candidate.example.test");
@@ -141,7 +143,7 @@ test.describe("PHS-030 node endpoints", () => {
   test("does not silently trim surrounding whitespace", async ({ page }) => {
     // Given prohibited surrounding whitespace.
     let mutations = 0;
-    await page.route(`${endpoint}/${node.id}`, (route) => { mutations++; return route.fulfill({ json: node }); });
+    await page.route(realityTarget, (route) => { mutations++; return route.fulfill({ json: node }); });
     const form = await openEditor(page);
     const input = form.getByRole("textbox", { name: "Reality client SNI", exact: true });
     await input.fill(" candidate.example.test ");
@@ -158,10 +160,10 @@ test.describe("PHS-030 node endpoints", () => {
     let mutations = 0;
     let release = () => {};
     const responseReady = new Promise<void>((resolve) => { release = resolve; });
-    await page.route(`${endpoint}/${node.id}`, async (route) => {
+    await page.route(realityTarget, async (route) => {
       mutations++;
       await responseReady;
-      await route.fulfill({ json: node });
+      await route.fulfill({ json: { reality_client_sni: node.reality_client_sni } });
     });
     const form = await openEditor(page);
     // When saving and attempting to dismiss before the response.

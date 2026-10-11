@@ -193,7 +193,7 @@ test.describe("PHS-027 public filtering integration", () => {
       const domains: unknown = await response.json();
       expect(domains).toEqual([{
         id: ids[0], domain: `public-${suffix}.example.test`, display_order: 0, is_default: false,
-        created_at: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z$/),
+        created_at: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/),
       }]);
       await page.addInitScript((token) => {
         localStorage.clear();

@@ -368,7 +368,8 @@ test.describe("admin CRUD", () => {
     // admin_plan.go's validation) - the UI must send them for the create to
     // succeed at all. They're number inputs, and the form pre-fills them, so
     // set them explicitly rather than relying on the defaults.
-    await page.getByRole("spinbutton", { name: "Duration (days)" }).fill("30");
+    // Duration is an amount plus a day/week/month unit; the unit defaults to days.
+    await page.getByRole("spinbutton", { name: "Duration amount" }).fill("30");
     await page.getByRole("spinbutton", { name: "Max Devices" }).fill("3");
 
     // Node group is a select; pick the one just created.
