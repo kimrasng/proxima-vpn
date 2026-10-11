@@ -1006,6 +1006,9 @@ func applyConfigDigest(ctx context.Context, apiClient *client.APIClient, runner 
 		return
 	}
 	incremental := !state.restartBlocked && usersOnlyChange(state, digest) && sameLocalStructure(state.Config(), newConfig)
+	// The runtime config Xray is serving now, captured before WriteConfig
+	// replaces it, so a live edit applies exactly the difference.
+	prevRuntime := runner.RuntimeConfig()
 	state.setShaping(false, 0, "applying device egress generation")
 	if err := runner.WriteConfig(newConfig); err != nil {
 		log.Printf("write new config failed; stopping xray rather than serving obsolete policy: %v", err)
@@ -1014,7 +1017,7 @@ func applyConfigDigest(ctx context.Context, apiClient *client.APIClient, runner 
 		_ = runner.Stop()
 		return
 	}
-	if incremental && syncUsers(ctx, statsClient, state, digest) {
+	if incremental && statsClient != nil && syncDeviceTopology(ctx, statsClient, prevRuntime, runner.RuntimeConfig()) && syncUsers(ctx, statsClient, state, digest) {
 		state.setConfig(newConfig, digest.StructureHash)
 		applyShaping(newConfig, state)
 		return

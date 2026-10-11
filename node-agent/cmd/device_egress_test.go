@@ -169,9 +169,21 @@ func TestDeviceEgressCapabilityRequiresLiveListenerAndAppliedMetadata(t *testing
 	}
 }
 
-func TestDeviceEgressTopologyCannotTakeIncrementalUserPath(t *testing.T) {
-	if sameLocalStructure([]byte(limitedDeviceConfig), []byte(strings.ReplaceAll(limitedDeviceConfig, "uuid-a", "uuid-b"))) {
-		t.Fatal("different per-device topology considered users-only")
+func TestDeviceEgressTopologyIsUserScoped(t *testing.T) {
+	// Swapping one device for another changes only per-device outbounds and
+	// exact user rules, which the agent applies live over gRPC.
+	if !sameLocalStructure([]byte(limitedDeviceConfig), []byte(strings.ReplaceAll(limitedDeviceConfig, "uuid-a", "uuid-b"))) {
+		t.Fatal("device swap treated as structural; admissions would restart Xray")
+	}
+	// A device rule carrying any other condition is no longer user-scoped.
+	widened := strings.Replace(limitedDeviceConfig, `"user":["uuid-a@proxima"]`, `"user":["uuid-a@proxima"],"network":"udp"`, 1)
+	if sameLocalStructure([]byte(limitedDeviceConfig), []byte(widened)) {
+		t.Fatal("device rule with an extra condition considered users-only")
+	}
+	// Non-device rules stay structural.
+	denied := strings.Replace(limitedDeviceConfig, `"rules":[`, `"rules":[{"type":"field","inboundTag":["vless-in"],"outboundTag":"block"},`, 1)
+	if sameLocalStructure([]byte(limitedDeviceConfig), []byte(denied)) {
+		t.Fatal("new deny rule considered users-only")
 	}
 	var canonical map[string]json.RawMessage
 	if err := json.Unmarshal([]byte(limitedDeviceConfig), &canonical); err != nil {

@@ -53,6 +53,10 @@ type XrayRunner struct {
 	// canonicalConfig never contains node-local SOCKS passwords.
 	configMu        sync.Mutex
 	canonicalConfig []byte
+	// runtimeConfig is the materialized config last written to disk (it does
+	// contain node-local SOCKS passwords). Live device admission builds its
+	// gRPC outbounds and rules from it so they match what Xray would load.
+	runtimeConfig   []byte
 	configTransform func([]byte) ([]byte, error)
 	restoreGuard    func([]byte) error
 }
@@ -266,7 +270,15 @@ func (r *XrayRunner) WriteConfig(data []byte) error {
 		return err
 	}
 	r.canonicalConfig = append([]byte(nil), data...)
+	r.runtimeConfig = append([]byte(nil), runtime...)
 	return nil
+}
+
+// RuntimeConfig returns a copy of the materialized config last written.
+func (r *XrayRunner) RuntimeConfig() []byte {
+	r.configMu.Lock()
+	defer r.configMu.Unlock()
+	return append([]byte(nil), r.runtimeConfig...)
 }
 
 func (r *XrayRunner) secureConfigFiles() error {
@@ -338,6 +350,7 @@ func (r *XrayRunner) RestoreConfig() ([]byte, error) {
 		return nil, fmt.Errorf("restore xray config: %w", err)
 	}
 	r.canonicalConfig = append([]byte(nil), prev...)
+	r.runtimeConfig = append([]byte(nil), runtime...)
 	return prev, nil
 }
 

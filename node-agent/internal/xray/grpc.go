@@ -42,6 +42,12 @@ func (statsCodec) Marshal(v any) ([]byte, error) {
 		return buf, nil
 	case *alterInboundRequest:
 		return marshalAlterInboundRequest(req), nil
+	case *addOutboundRequest:
+		return marshalAddOutboundRequest(req), nil
+	case *removeOutboundRequest:
+		return marshalRemoveOutboundRequest(req), nil
+	case *addRuleRequest:
+		return marshalAddRuleRequest(req), nil
 	case *onlineIPListRequest:
 		var buf []byte
 		if req.Name != "" {
@@ -55,9 +61,10 @@ func (statsCodec) Marshal(v any) ([]byte, error) {
 }
 
 func (statsCodec) Unmarshal(data []byte, v any) error {
-	// AlterInboundResponse is an empty protobuf message, so an empty body is
-	// the expected success case rather than a decode failure.
-	if _, ok := v.(*alterInboundResponse); ok {
+	// AlterInbound, AddOutbound, RemoveOutbound and AddRule all answer with an
+	// empty protobuf message, so an empty body is the expected success case.
+	switch v.(type) {
+	case *alterInboundResponse, *emptyResponse:
 		return nil
 	}
 

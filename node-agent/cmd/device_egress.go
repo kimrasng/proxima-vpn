@@ -318,6 +318,12 @@ func sameLocalStructure(a, b []byte) bool {
 		if err := json.Unmarshal(data, &cfg); err != nil {
 			return nil, err
 		}
+		// Device outbounds and their exact user rules are applied live over
+		// gRPC (syncDeviceTopology), the same contract the panel's
+		// StructureHash uses.
+		if err := devicebandwidth.StripDeviceTopology(cfg); err != nil {
+			return nil, err
+		}
 		if raw := cfg["inbounds"]; raw != nil {
 			var inbounds []map[string]json.RawMessage
 			if err := json.Unmarshal(raw, &inbounds); err != nil {
