@@ -174,7 +174,7 @@ func createNodeChainInTx(ctx context.Context, tx pgx.Tx, req createNodeChainRequ
 	var exitName, exitRole, exitStatus string
 	var exitPort int
 	err = tx.QueryRow(ctx,
-		`SELECT name, port, role, status FROM nodes WHERE id = $1`, req.ExitNodeID,
+		`SELECT name, node_listening_port(id), role, status FROM nodes WHERE id = $1`, req.ExitNodeID,
 	).Scan(&exitName, &exitPort, &exitRole, &exitStatus)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nodeChainResponse{}, fiber.NewError(404, "exit node not found")

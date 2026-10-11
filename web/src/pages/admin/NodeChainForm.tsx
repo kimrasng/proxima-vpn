@@ -4,6 +4,7 @@ import { Alert, Box, Button, Checkbox, ExpandableSection, FormField, Icon, Input
 import { createNodeChain, deleteNodeChain, setNodeChainGroups, updateNodeChain } from "../../api/admin";
 import type { ChainTransport, Node, NodeChain, NodeGroup } from "../../api/types";
 import { adminError } from "../../utils/adminError";
+import { listeningPort } from "../../utils/nodePorts";
 import { NodeEndpointState } from "../../components/NodeEndpointState";
 import "./nodeChainForm.css";
 
@@ -39,7 +40,7 @@ export default function NodeChainForm({ chain, entries, groups, exits, onClose, 
   const legacyPool = Boolean(chain?.relay_pool_id);
   const entryHost = legacyPool ? host : (selectedEntry?.entry_hostname ?? "");
   const port = Number(entryPort || 0);
-  const destinationPort = Number(exitPort || selectedExit?.port || 0);
+  const destinationPort = Number(exitPort || (selectedExit ? listeningPort(selectedExit) : 0));
   const rank = Number(priority);
   const valid = (Boolean(chain) && !legacyPool || entryHost.trim().length > 0) && (chain?.relay_pool_id || entryId !== "") && exitId !== "" && entryId !== exitId &&
     Number.isInteger(port) && port >= 0 && port <= 65535 &&
@@ -127,7 +128,7 @@ export default function NodeChainForm({ chain, entries, groups, exits, onClose, 
                 <FormField stretch label={t("admin.nodeChains.exit")}>
                   <Select disabled={Boolean(chain)} selectedOption={selectedExit ? { value: exitId, label: selectedExit.name } : null}
                     placeholder={t("admin.nodeChains.chooseExit")}
-                    options={exits.filter((node) => node.id !== entryId).map((node) => ({ value: node.id, label: node.name, description: `${node.ip}:${node.port} · ${node.status}` }))}
+                    options={exits.filter((node) => node.id !== entryId).map((node) => ({ value: node.id, label: node.name, description: `${node.ip}:${listeningPort(node)} · ${node.status}` }))}
                     onChange={({ detail }) => setExitId(detail.selectedOption.value ?? "")} />
                 </FormField>
                 {selectedExit && <Box variant="small" color="text-body-secondary">
@@ -153,7 +154,7 @@ export default function NodeChainForm({ chain, entries, groups, exits, onClose, 
                   : selectedEntry ? <NodeEndpointState node={selectedEntry} kind="dns" /> : <Box color="text-body-secondary">—</Box>}
               </FormField>
               <FormField stretch label={t("admin.nodeChains.exitPort")} constraintText={t("admin.nodeChains.exitPortHint")}>
-                <Input disabled={Boolean(chain)} value={exitPort || (selectedExit ? String(selectedExit.port) : "")} type="number" onChange={({ detail }) => setExitPort(detail.value)} />
+                <Input disabled={Boolean(chain)} value={exitPort || (selectedExit ? String(listeningPort(selectedExit)) : "")} type="number" onChange={({ detail }) => setExitPort(detail.value)} />
               </FormField>
             </div>
             {chain && <Checkbox checked={enabled} onChange={({ detail }) => setEnabled(detail.checked)}>{t("admin.nodeChains.enabled")}</Checkbox>}

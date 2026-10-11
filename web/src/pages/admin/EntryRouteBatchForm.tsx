@@ -4,6 +4,7 @@ import { Alert, Box, Button, FormField, Input, Modal, Multiselect, Select, Space
 import { createNodeChainBatch } from "../../api/admin";
 import type { ChainTransport, Node, NodeChain, Plan } from "../../api/types";
 import { adminError } from "../../utils/adminError";
+import { listeningPort } from "../../utils/nodePorts";
 import { NodeEndpointState } from "../../components/NodeEndpointState";
 
 type RouteRow = { exitId: string; name: string; entryPort: string; exitPort: string; transport: ChainTransport };
@@ -69,7 +70,7 @@ export default function EntryRouteBatchForm({ entry, exits, plans, onClose, onSa
             setRows(detail.selectedOptions.map((option) => {
               const existing = rows.find((row) => row.exitId === option.value);
               const node = candidates.find((candidate) => candidate.id === option.value)!;
-              return existing ?? { exitId: node.id, name: `${entry.name} → ${node.name}`, entryPort: "", exitPort: String(node.port), transport: "tcp" };
+              return existing ?? { exitId: node.id, name: `${entry.name} → ${node.name}`, entryPort: "", exitPort: String(listeningPort(node)), transport: "tcp" };
             }));
             setPreview(null);
           }} />

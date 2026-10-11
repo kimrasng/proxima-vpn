@@ -1,4 +1,4 @@
-import type { NodeFirewallPreset, NodePortSpec } from "../api/types";
+import type { Node, NodeFirewallPreset, NodePortSpec } from "../api/types";
 
 /**
  * Mirrors pkg/nodeprov. The server is authoritative and re-resolves everything
@@ -26,6 +26,13 @@ export function isValidPort(port: number): boolean {
 
 export function isValidSpec(spec: NodePortSpec): boolean {
   return isValidPort(spec.start) && isValidPort(spec.end) && spec.end >= spec.start;
+}
+
+// The port a node's Xray actually serves: its enabled inbound, else the legacy
+// registration port. Mirrors node_listening_port() on the server, so a route
+// form never pre-fills a port nothing listens on.
+export function listeningPort(node: Pick<Node, "port" | "inbound_port" | "inbound_enabled">): number {
+  return node.inbound_port && node.inbound_enabled !== false ? node.inbound_port : node.port;
 }
 
 function presetExtras(preset: NodeFirewallPreset): NodePortSpec[] {
