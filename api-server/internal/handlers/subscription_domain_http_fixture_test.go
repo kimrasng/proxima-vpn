@@ -45,7 +45,10 @@ func (f subscriptionDomainFixture) request(method, path, body string) (int, []by
 	f.t.Helper()
 	req := httptest.NewRequest(method, path, bytes.NewBufferString(body))
 	req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
-	resp, err := f.app.Test(req)
+	// Fiber's default 1s Test timeout is shorter than a real DNS lookup plus
+	// DB writes under -race on a loaded CI runner; the handler's own timeouts
+	// are what bound it, so do not let the harness cut it off first.
+	resp, err := f.app.Test(req, 15_000)
 	if err != nil {
 		f.t.Fatalf("%s %s: %v", method, path, err)
 	}

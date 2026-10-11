@@ -1,0 +1,106 @@
+name: Browser E2E (admin panel + user portal)
+
+# Playwright suite against a real api-server. Split out of e2e.yml so the
+# data-plane gate stays meaningful while these specs are brought back in line
+# with the redesigned admin UI (plan editor, route management, node endpoints
+# and chain dialogs). Run it on demand; once it is green again it can move back
+# to push/pull_request triggers.
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  browser-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: vpnuser
+          POSTGRES_PASSWORD: vpnpass
+          POSTGRES_DB: vpnpanel
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U vpnuser -d vpnpanel"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+
+    env:
+      DATABASE_URL: postgres://vpnuser:vpnpass@localhost:5432/vpnpanel
+      REDIS_URL: redis://localhost:6379
+      JWT_SECRET: e2e-test-secret-not-for-production-use
+      PANEL_URL: http://localhost:2053
+      ADMIN_EMAIL: admin@e2e.test
+      ADMIN_PASSWORD: E2ETestAdminPass123!
+      SWAGGER_ENABLED: "false"
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version: '1.25'
+          cache-dependency-path: |
+            api-server/go.sum
+            pkg/go.sum
+
+      - name: Build api-server
+        run: cd api-server && go build -o /tmp/api-server ./cmd
+
+      - name: Start api-server
+        run: |
+          nohup /tmp/api-server > /tmp/api-server.log 2>&1 &
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:2053/health > /dev/null && exit 0
+            sleep 1
+          done
+          echo "api-server did not become healthy in time"
+          cat /tmp/api-server.log
+          exit 1
+
+      # vite preview proxies /api and /sub to the api-server, mirroring what
+      # nginx does in production.
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install web dependencies
+        run: cd web && npm ci
+
+      - name: Install Playwright browser
+        run: cd web && npx playwright install --with-deps chromium
+
+      - name: Build web
+        run: cd web && npm run build
+
+      - name: Run browser e2e
+        env:
+          E2E_BASE_URL: http://localhost:8080
+          E2E_ADMIN_EMAIL: admin@e2e.test
+          E2E_ADMIN_PASSWORD: E2ETestAdminPass123!
+          VITE_API_PROXY_TARGET: http://localhost:2053
+        run: cd web && npm run test:e2e
+
+      - name: Dump api-server log on failure
+        if: failure()
+        run: cat /tmp/api-server.log || true
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: browser-e2e-logs
+          path: |
+            /tmp/api-server.log
+            web/playwright-report/**
+            web/test-results/**
+          if-no-files-found: ignore
+          retention-days: 7
