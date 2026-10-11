@@ -18,7 +18,7 @@ STUB = Path(__file__).with_name("stub.py")
 
 
 class InstallerTest(unittest.TestCase):
-    def run_install(self, role="relay", manager="apt-get", firewall="ufw", args=(), env=None, existing_xray=False, curlrc=None):
+    def run_install(self, role="relay", manager="apt-get", firewall="ufw", args=(), env=None, existing_xray=False, curlrc=None, init="systemd"):
         with tempfile.TemporaryDirectory(prefix="installer-test-") as temp:
             root = Path(temp).resolve()
             tools = root / "tools"
@@ -29,12 +29,14 @@ class InstallerTest(unittest.TestCase):
                 real = shutil.which(command)
                 self.assertIsNotNone(real, "Test prerequisite not found: " + command)
                 (tools / command).symlink_to(real)
-            for command in (manager, "uname", "hostname", "curl", "unzip", "systemctl", "mktemp", firewall):
+            init_tools = {"systemd": ("systemctl",), "openrc": ("rc-service", "rc-update"), None: ()}[init]
+            for command in (manager, "uname", "hostname", "curl", "unzip", "mktemp", firewall, *init_tools):
                 if command:
                     target = tools / command
                     shutil.copyfile(STUB, target)
                     target.chmod(0o755)
             (root / "etc/systemd/system").mkdir(parents=True)
+            (root / "etc/init.d").mkdir(parents=True)
             (root / "tmp").mkdir()
             if curlrc is not None:
                 (root / ".curlrc").write_text(curlrc)
@@ -47,7 +49,7 @@ class InstallerTest(unittest.TestCase):
             # installer is never run against host paths or with sudo/root.
             script = (REPO / "scripts/install.sh").read_text()
             script = script.replace("[[ $EUID -ne 0 ]]", "[[ 0 -ne 0 ]]")
-            for prefix in ("/usr/local/bin", "/etc/node-agent", "/var/log/proxima", "/etc/systemd/system"):
+            for prefix in ("/usr/local/bin", "/etc/node-agent", "/var/log/proxima", "/etc/systemd/system", "/etc/init.d"):
                 script = script.replace(prefix, str(root) + prefix)
             target = root / "install.sh"
             target.write_text(script)
@@ -77,7 +79,7 @@ class InstallerTest(unittest.TestCase):
     def assert_no_vpn(self, commands, files, existing=False):
         self.assertFalse(any("XTLS/Xray-core" in arg for command in commands for arg in command))
         self.assertFalse(any(command[0] == "unzip" for command in commands))
-        self.assertFalse(any("unzip" in command[1:] for command in commands if command[0] in ("apt-get", "yum", "dnf")))
+        self.assertFalse(any("unzip" in command[1:] for command in commands if command[0] in ("apt-get", "yum", "dnf", "apk")))
         self.assertEqual("usr/local/bin/xray" in files, existing)
 
     def test_relay_common_dependencies_and_systemd_without_vpn_for_each_package_manager(self):
@@ -272,6 +274,43 @@ class InstallerTest(unittest.TestCase):
         self.assert_success(result)
         self.assert_no_vpn(commands, files)
         self.assertTrue(any("proximavpn/proxima-vpn/releases/latest/download/node-agent-linux-amd64" in command[-1] for command in commands))
+
+    def test_alpine_installs_with_apk_and_a_respawning_openrc_service(self):
+        for role in ("relay", "exit"):
+            with self.subTest(role=role):
+                result, commands, files = self.run_install(role, manager="apk", init="openrc", firewall="")
+                self.assert_success(result)
+                packages = next(command for command in commands if command[:2] == ["apk", "add"])
+                for package in ("curl", "ca-certificates", "jq", "openrc", "nftables", "iproute2", "procps-ng", "coreutils"):
+                    self.assertIn(package, packages)
+                self.assertNotIn("systemd", packages)
+                service = files["etc/init.d/node-agent"]
+                self.assertTrue(service.startswith("#!/sbin/openrc-run\n"))
+                # The sandbox rewrites absolute install paths, so match the suffix.
+                self.assertRegex(service, r'\ncommand="[^"]*/usr/local/bin/node-agent"\n')
+                self.assertIn('command_args="run"', service)
+                self.assertIn('supervisor="supervise-daemon"', service)
+                # Self-update exits the agent and depends on an unbounded respawn.
+                self.assertIn("respawn_max=0", service)
+                self.assertIn('rc_ulimit="-n 65535"', service)
+                self.assertNotIn("etc/systemd/system/node-agent.service", files)
+                self.assertIn(["rc-update", "add", "node-agent", "default"], commands)
+                self.assertIn(["rc-service", "node-agent", "restart"], commands)
+                self.assertFalse(any(command[0] == "systemctl" for command in commands))
+                self.assertIn("rc-service node-agent status", result.stdout)
+                self.assertNotIn("bash <(", result.stdout)
+                if role == "exit":
+                    self.assertIn(["apk", "add", "--no-cache", "-q", "unzip"], commands)
+                    self.assertIn("usr/local/bin/xray", files)
+                else:
+                    self.assert_no_vpn(commands, files)
+
+    def test_missing_service_manager_fails_before_the_token_is_spent(self):
+        result, commands, files = self.run_install(manager="apk", init=None, firewall="")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Neither systemd nor OpenRC", result.stdout)
+        self.assertFalse(any(command[0] == "node-agent" for command in commands), "registration consumed the one-time token")
+        self.assertNotIn("usr/local/bin/node-agent", files)
 
 
 if __name__ == "__main__":

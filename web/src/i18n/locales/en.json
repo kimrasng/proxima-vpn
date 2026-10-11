@@ -531,7 +531,7 @@
         "osHint": {
           "debian": "Uses apt-get and ufw",
           "rhel": "Uses dnf or yum and firewalld",
-          "alpine": "Uses apk"
+          "alpine": "Uses apk and OpenRC"
         },
         "stepIdentity": "Server role and name",
         "stepIdentityHint": "Choose what this server does, then enter its name and location.",

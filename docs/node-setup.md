@@ -117,6 +117,16 @@ systemctl restart node-agent
 systemctl stop node-agent
 ```
 
+On Alpine the agent is an OpenRC service supervised by `supervise-daemon`
+(restarted 5 seconds after any exit, including after a self-update):
+
+```bash
+rc-service node-agent status
+tail -f /var/log/proxima/node-agent.log
+rc-service node-agent restart
+rc-service node-agent stop
+```
+
 Configuration lives at `/etc/node-agent/config.json`.
 
 ## Updating the Node Agent

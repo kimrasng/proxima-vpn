@@ -23,7 +23,7 @@ not use sudo for these tests.
 
 Coverage includes:
 
-- Relay common dependencies on apt/yum/dnf, registration, authenticated role
+- Relay common dependencies on apt/yum/dnf/apk, registration, authenticated role
   lookup, agent systemd setup, and absence of Xray downloads or unzip installation.
 - Exit/both Xray installation only after role confirmation, version floor,
   pinned versions, and arm64 downloads.
@@ -33,6 +33,13 @@ Coverage includes:
 - Legacy command arguments and firewall defaults, custom TCP ports/ranges,
   ufw/firewalld syntax, absent firewall warnings, and invalid port rejection.
 - Preservation of existing Xray on a relay and the node-agent download fallback.
+- Alpine: apk dependencies (including `coreutils` for `sort -V`), an OpenRC
+  service under `supervise-daemon` with unbounded respawn, and failing before
+  registration (which spends the one-time token) when no service manager exists.
+
+The Alpine path was also exercised once against a real `alpine:3.20` container
+(apk, busybox, OpenRC; only panel calls faked): install, start, respawn after a
+kill, Xray download for an exit role, and uninstall.
 
 Role is not persisted in the current agent config: only `node_id`, `api_key`, and
 `server_url` are. The installer registers first and then uses those credentials

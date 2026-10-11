@@ -531,7 +531,7 @@
         "osHint": {
           "debian": "使用 apt-get 与 ufw",
           "rhel": "使用 dnf 或 yum 与 firewalld",
-          "alpine": "使用 apk"
+          "alpine": "使用 apk 和 OpenRC"
         },
         "stepIdentity": "服务器用途与名称",
         "stepIdentityHint": "先选择这台服务器的用途，再填写名称和位置。",

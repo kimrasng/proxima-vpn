@@ -219,7 +219,7 @@ func (h *AdminNodeHandler) GenerateToken(c *fiber.Ctx) error {
 
 	return c.JSON(generateTokenResponse{
 		Token:          token,
-		InstallCommand: h.buildInstallCommand(token, name, req.Country, req.Region, port, ports),
+		InstallCommand: h.buildInstallCommand(osFamily, token, name, req.Country, req.Region, port, ports),
 		NodeID:         nodeID,
 		FirewallPorts:  ports,
 	})
@@ -228,10 +228,19 @@ func (h *AdminNodeHandler) GenerateToken(c *fiber.Ctx) error {
 // buildInstallCommand renders the one-liner an operator pastes onto the node.
 // Operator-supplied values are single-quoted and embedded quotes escaped: these
 // reach a shell, so unquoted input would be a command injection.
-func (h *AdminNodeHandler) buildInstallCommand(token, name, country, region string, port int, ports string) string {
+//
+// Alpine ships neither bash nor process substitution (its login shell is
+// busybox ash), so there the script is downloaded to a file and run with a bash
+// installed first; every other family keeps the bash <(curl ...) form.
+func (h *AdminNodeHandler) buildInstallCommand(osFamily nodeprov.OSFamily, token, name, country, region string, port int, ports string) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "bash <(curl -s %s/scripts/install.sh) --server %s --token %s",
-		h.panelURL, h.panelURL, token)
+	if osFamily == nodeprov.OSAlpine {
+		fmt.Fprintf(&b, "apk add --no-cache -q bash curl && curl -fsSL %s/scripts/install.sh -o /tmp/proxima-install.sh && bash /tmp/proxima-install.sh --server %s --token %s",
+			h.panelURL, h.panelURL, token)
+	} else {
+		fmt.Fprintf(&b, "bash <(curl -s %s/scripts/install.sh) --server %s --token %s",
+			h.panelURL, h.panelURL, token)
+	}
 	fmt.Fprintf(&b, " --port %d", port)
 	if ports != "" {
 		fmt.Fprintf(&b, " --ports %s", ports)

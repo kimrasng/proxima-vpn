@@ -38,10 +38,19 @@ else
 fi
 
 log_info "Stopping node-agent service..."
-systemctl stop node-agent 2>/dev/null || true
-systemctl disable node-agent 2>/dev/null || true
-rm -f /etc/systemd/system/node-agent.service
-systemctl daemon-reload
+# OpenRC (Alpine) and systemd installs are both handled; each step is skipped
+# when its service manager or unit is absent.
+if [[ -f /etc/init.d/node-agent ]] && command -v rc-service &>/dev/null; then
+    rc-service node-agent stop 2>/dev/null || true
+    rc-update del node-agent default 2>/dev/null || true
+    rm -f /etc/init.d/node-agent
+fi
+if command -v systemctl &>/dev/null; then
+    systemctl stop node-agent 2>/dev/null || true
+    systemctl disable node-agent 2>/dev/null || true
+    rm -f /etc/systemd/system/node-agent.service
+    systemctl daemon-reload
+fi
 
 log_info "Removing binaries..."
 rm -f /usr/local/bin/node-agent

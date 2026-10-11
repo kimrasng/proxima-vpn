@@ -232,7 +232,7 @@ All services restart `unless-stopped` and rotate JSON logs at 10 MB × 3. The AP
 | nftables `proxima_relay` table, atomic replace | — | ✅ |
 | ufw / firewalld ports opened by the installer | ✅ | ✅ |
 
-The installer detects **apt (Debian/Ubuntu)** or **dnf/yum (RHEL family)** and runs on **amd64 and arm64**. It pulls `curl`, `jq`, `nftables`, `iproute2` and Xray-core, then registers the systemd unit. The provisioning wizard also lists Alpine, but `install.sh` has no apk path yet.
+The installer detects **apt (Debian/Ubuntu)**, **dnf/yum (RHEL family)** or **apk (Alpine)** and runs on **amd64 and arm64**. It pulls `curl`, `jq`, `nftables`, `iproute2` and Xray-core, then registers the agent as a systemd unit, or on Alpine as an OpenRC service supervised by `supervise-daemon`. Alpine has no bash by default, so the wizard's Alpine install command installs bash and runs a downloaded copy of the script instead of `bash <(curl ...)`.
 
 ### Data model at a glance
 

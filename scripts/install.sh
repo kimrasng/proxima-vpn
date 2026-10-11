@@ -153,8 +153,25 @@ elif command -v yum &>/dev/null; then
 elif command -v dnf &>/dev/null; then
     PACKAGE_MANAGER="dnf"
     dnf install -y -q curl ca-certificates jq systemd nftables iproute procps-ng >/dev/null 2>&1
+elif command -v apk &>/dev/null; then
+    PACKAGE_MANAGER="apk"
+    # Alpine runs OpenRC instead of systemd and ships busybox tools; coreutils
+    # provides the `sort -V` the Xray version floor below relies on.
+    apk add --no-cache -q curl ca-certificates jq openrc nftables iproute2 procps-ng coreutils >/dev/null 2>&1
 else
-    log_warn "Could not detect package manager. Ensure curl, CA certificates, jq, systemd, nftables, iproute2 (ip/tc), and procps (sysctl) are installed."
+    log_warn "Could not detect package manager. Ensure curl, CA certificates, jq, systemd or OpenRC, nftables, iproute2 (ip/tc), and procps (sysctl) are installed."
+fi
+
+# --- Detect service manager ---
+# Decided before registration: the registration token is single-use, so a host
+# that cannot run the agent as a service must fail before it is consumed.
+if command -v systemctl &>/dev/null; then
+    INIT_SYSTEM="systemd"
+elif command -v rc-service &>/dev/null && command -v rc-update &>/dev/null; then
+    INIT_SYSTEM="openrc"
+else
+    log_error "Neither systemd nor OpenRC was found; cannot install the node-agent service"
+    exit 1
 fi
 
 # --- Download node-agent binary ---
@@ -249,6 +266,7 @@ if [[ "$ROLE" != "relay" ]]; then
         apt-get) apt-get install -y -qq unzip >/dev/null 2>&1 ;;
         yum)     yum install -y -q unzip >/dev/null 2>&1 ;;
         dnf)     dnf install -y -q unzip >/dev/null 2>&1 ;;
+        apk)     apk add --no-cache -q unzip >/dev/null 2>&1 ;;
         *)       log_warn "Ensure unzip is installed for Xray-core installation." ;;
     esac
     # The panel reads per-user online IPs through GetStatsOnlineIpList, which older
@@ -317,8 +335,40 @@ else
     log_warn "No active ufw or firewalld found; open ${PORTS}/tcp manually if a firewall is in use"
 fi
 
-# --- Create systemd service ---
-cat > /etc/systemd/system/node-agent.service <<EOF
+# --- Create and start the node-agent service ---
+if [[ "$INIT_SYSTEM" == "openrc" ]]; then
+    # supervise-daemon restarts the agent like systemd's Restart=always. The agent
+    # exits on SIGTERM after a self-update and relies on being respawned, so never
+    # stop respawning (the default caps it at 10 restarts for the service's life).
+    cat > /etc/init.d/node-agent <<'EOF'
+#!/sbin/openrc-run
+
+name="node-agent"
+description="Proxima VPN Node Agent"
+command="/usr/local/bin/node-agent"
+command_args="run"
+supervisor="supervise-daemon"
+respawn_delay=5
+respawn_max=0
+rc_ulimit="-n 65535"
+output_log="/var/log/proxima/node-agent.log"
+error_log="/var/log/proxima/node-agent.log"
+
+depend() {
+    need net
+    after firewall
+}
+EOF
+    chmod 0755 /etc/init.d/node-agent
+    rc-update add node-agent default >/dev/null 2>&1
+    # restart also starts a stopped service, and reloads the binary on a reinstall.
+    rc-service node-agent restart
+    SERVICE_STATUS=$(rc-service --quiet node-agent status && echo "active" || echo "inactive")
+    STATUS_COMMANDS=("rc-service node-agent status" "tail -f /var/log/proxima/node-agent.log")
+    # Alpine's ash cannot run bash <(...), so the uninstall hint downloads first.
+    UNINSTALL_HINT="curl -fsSL ${SERVER}/scripts/uninstall.sh -o /tmp/proxima-uninstall.sh && bash /tmp/proxima-uninstall.sh"
+else
+    cat > /etc/systemd/system/node-agent.service <<EOF
 [Unit]
 Description=Proxima VPN Node Agent
 After=network.target
@@ -336,22 +386,25 @@ StandardError=journal
 [Install]
 WantedBy=multi-user.target
 EOF
-
-# --- Enable and start service ---
-systemctl daemon-reload
-systemctl enable node-agent >/dev/null 2>&1
-systemctl start node-agent
+    systemctl daemon-reload
+    systemctl enable node-agent >/dev/null 2>&1
+    systemctl start node-agent
+    SERVICE_STATUS=$(systemctl is-active node-agent)
+    STATUS_COMMANDS=("systemctl status node-agent" "journalctl -u node-agent -f")
+    UNINSTALL_HINT="bash <(curl -s ${SERVER}/scripts/uninstall.sh)"
+fi
 
 echo ""
 echo "=== Installation Complete ==="
-echo "  Status:  $(systemctl is-active node-agent)"
+echo "  Status:  ${SERVICE_STATUS}"
 echo "  Config:  /etc/node-agent/config.json"
 echo ""
 echo "  Commands:"
-echo "    systemctl status node-agent"
-echo "    journalctl -u node-agent -f"
+for status_command in "${STATUS_COMMANDS[@]}"; do
+    echo "    ${status_command}"
+done
 echo "    node-agent --help"
 echo ""
 echo "  Uninstall:"
-echo "    bash <(curl -s ${SERVER}/scripts/uninstall.sh)"
+echo "    ${UNINSTALL_HINT}"
 echo "=============================="

@@ -152,3 +152,22 @@ jobs:
           echo "all API calls are versioned"
       - name: Build
         run: cd web && npm run build
+
+  # The installer runs as root on operators' servers, so it is exercised two ways:
+  # stubbed unit tests for every package manager and failure path, and once
+  # against a real Alpine container, since busybox and OpenRC are what a stub
+  # cannot reproduce (an earlier version failed there with "already starting").
+  installer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Shell syntax
+        run: bash -n scripts/install.sh && bash -n scripts/uninstall.sh
+      - name: Installer unit tests
+        run: python3 -m unittest discover -s tests/installer -v
+      - name: Install on real Alpine (apk + OpenRC)
+        run: |
+          docker run --rm -v "$PWD":/src:ro alpine:3.20 sh /src/tests/installer/alpine_container_check.sh | tee /tmp/alpine.log
+          for want in "status: started" "respawned" "service removed"; do
+            grep -q "$want" /tmp/alpine.log || { echo "::error::Alpine install check did not report: $want"; exit 1; }
+          done

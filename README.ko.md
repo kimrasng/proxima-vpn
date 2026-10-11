@@ -284,15 +284,18 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 
 ## 🛰 노드 추가
 
-관리자 콘솔의 **노드 생성** 마법사가 운영체제(Debian/Ubuntu, RHEL 계열, Alpine), 역할, 서비스 포트, 방화벽 프리셋을 묻고 설치 명령을 만들어 줍니다. 단, 현재 `install.sh`는 apt와 dnf/yum만 지원하고 Alpine(apk)은 아직 지원하지 않습니다. 설치 스크립트가 하는 일은 다음과 같습니다.
+관리자 콘솔의 **노드 생성** 마법사가 운영체제(Debian/Ubuntu, RHEL 계열, Alpine), 역할, 서비스 포트, 방화벽 프리셋을 묻고 설치 명령을 만들어 줍니다. `install.sh`는 apt, dnf/yum, apk(Alpine)를 지원합니다. Alpine에는 기본으로 bash가 없어서, Alpine용 설치 명령은 bash를 먼저 설치하고 내려받은 스크립트를 실행합니다. 설치 스크립트가 하는 일은 다음과 같습니다.
 
 - 의존 패키지(`curl`, `jq`, `nftables`, `iproute2` 등)와 Xray-core 설치
-- `node-agent` systemd 서비스 등록과 패널 등록
+- `node-agent` 서비스 등록(Alpine은 OpenRC, 그 외는 systemd)과 패널 등록
 - `ufw` 또는 `firewalld`가 켜져 있으면 필요한 포트를 엽니다. 둘 다 없으면 직접 열라는 안내만 출력합니다.
 
 ```bash
 systemctl status node-agent
 journalctl -u node-agent --no-pager -n 50
+# Alpine(OpenRC)
+rc-service node-agent status
+tail -n 50 /var/log/proxima/node-agent.log
 ```
 
 자세한 내용은 [노드 추가 안내](docs/node-setup.md)를 보세요.

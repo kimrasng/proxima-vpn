@@ -24,7 +24,7 @@ def sandbox_path(value):
     return path
 
 
-if name in ("apt-get", "yum", "dnf"):
+if name in ("apt-get", "yum", "dnf", "apk"):
     pass
 elif name == "uname":
     print("Linux" if args == ["-s"] else os.environ.get("INSTALL_TEST_ARCH", "x86_64"))
@@ -78,6 +78,9 @@ elif name == "mktemp":
 elif name == "systemctl":
     if args == ["is-active", "node-agent"]:
         print("active")
+elif name in ("rc-service", "rc-update"):
+    # `rc-service --quiet node-agent status` reports through its exit code.
+    pass
 elif name == "ufw":
     if args == ["status"]:
         print("Status: active")

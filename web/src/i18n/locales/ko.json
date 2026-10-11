@@ -531,7 +531,7 @@
         "osHint": {
           "debian": "apt-get 및 ufw 사용",
           "rhel": "dnf 또는 yum 및 firewalld 사용",
-          "alpine": "apk 사용"
+          "alpine": "apk, OpenRC 사용"
         },
         "stepIdentity": "서버 역할과 이름",
         "stepIdentityHint": "먼저 이 서버의 쓰임새를 선택하고 이름과 위치를 적으세요.",
