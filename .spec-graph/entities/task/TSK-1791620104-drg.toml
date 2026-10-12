@@ -3,16 +3,16 @@ id = "TSK-1791620104-drg"
 type = "task"
 title = "Make Alpine installable or stop offering it"
 description = "The wizard offers Alpine but install.sh has no apk or OpenRC path."
-status = "draft"
+status = "resolved"
 created_at = 2026-10-10T17:15:04+09:00
-updated_at = 2026-10-10T17:15:04+09:00
+updated_at = 2026-10-12T09:02:45+09:00
 
 [metadata]
 acceptance = ["Every wizard OS family installs end to end."]
 instructions = ["Implement an apk + OpenRC install path in scripts/install.sh with matching uninstall/update, or remove Alpine from the wizard if not feasible.", "Extend tests/installer."]
 must_not = ["Do not break apt or dnf/yum paths."]
 order = 2.0
-qa = [{command = "python3 -m pytest tests/installer -q", evidence = "", expected = "exit 0"}]
+qa = [{command = "python3 -m pytest tests/installer -q", evidence = "tests/installer/alpine_container_check.sh", expected = "exit 0 -> apk + OpenRC install verified in a real alpine:3.20 container and in CI"}]
 references = ["scripts/install.sh", "tests/installer", "web/src/components/NodeProvisionWizard.tsx"]
 
 [[relations]]
@@ -22,3 +22,7 @@ type = "belongs_to"
 [[relations]]
 to = "REQ-1791620101-bbs"
 type = "covers"
+
+[[relations]]
+to = "REQ-1791620101-bbs"
+type = "delivers"
