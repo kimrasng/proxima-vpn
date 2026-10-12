@@ -68,7 +68,9 @@ cleanup() {
 }
 trap cleanup EXIT
 assert() { printf '{"kind":"assertion","name":"%s","status":"pass"}\n' "$1" >>"$work/assertions.jsonl"; }
-policy() { "${compose[@]}" exec -T "$1" nft list table inet proxima_relay; }
+# Stateless (-s): the Entry's per-route counters change with traffic and are
+# reset by every heartbeat, and policy comparisons are about rules only.
+policy() { "${compose[@]}" exec -T "$1" nft -s list table inet proxima_relay; }
 wait_policy() {
   local service=$1 pattern=$2 expectation=$3
   for ((attempt=1;attempt<=45;attempt++)); do
@@ -108,6 +110,8 @@ if "${compose[@]}" exec -T relay busybox pidof xray >/dev/null 2>&1; then exit 1
 assert entry_forward_only
 E2E_MODE=positive "${compose[@]}" run --rm -T client >/dev/null
 for name in tcp_a tcp_b udp_a udp_b; do assert "$name"; done
+E2E_ACTION=traffic "${compose[@]}" run --rm -T control >/dev/null
+assert route_traffic
 echo 'Positive TCP/UDP probes passed; checking bracketed denials'
 E2E_MODE=negative "${compose[@]}" run --rm -T client >/dev/null
 for name in unused_port swapped_port_a swapped_port_b cross_credentials_a cross_credentials_b \
@@ -152,4 +156,4 @@ mkdir -p "$(dirname "$output")"
 [[ ! -e "$output" && ! -L "$output" ]] || exit 2
 mv "$work" "$output"
 work=$(mktemp -d)
-echo "PASS: 25 assertions; sanitized evidence: $output"
+echo "PASS: 26 assertions; sanitized evidence: $output"

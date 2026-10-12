@@ -708,9 +708,19 @@ func heartbeatLoop(ctx context.Context, apiClient *client.APIClient, runner *xra
 				policyStatus := policy.Status()
 				status.PolicyFingerprint = policyStatus.Fingerprint
 				status.PolicyError = policyStatus.Error
+				// Whatever was drained still goes out; a counter read
+				// failure only costs this interval's per-route figures.
+				var trafficErr error
+				if status.RouteTraffic, trafficErr = policy.DrainTraffic(); trafficErr != nil {
+					log.Printf("route traffic: %v", trafficErr)
+				}
 			}
 			if err := apiClient.SendHeartbeat(ctx, m.CPU, m.Memory, m.Disk, m.LoadAvg, m.NetworkIn, m.NetworkOut, status); err != nil {
 				log.Printf("heartbeat: %v", err)
+				if policy != nil {
+					// Keep the forwarded bytes for the next heartbeat.
+					policy.ReturnTraffic(status.RouteTraffic)
+				}
 			}
 		}
 	}

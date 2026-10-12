@@ -99,6 +99,10 @@ type HeartbeatPayload struct {
 	// status. Absent from older agents, which the panel reads as unknown.
 	PolicyFingerprint string `json:"policy_fingerprint,omitempty"`
 	PolicyError       string `json:"policy_error,omitempty"`
+	// Bytes each relay route forwarded since the previous heartbeat, read
+	// from the Entry's nftables counters. Omitted when nothing moved and by
+	// older agents.
+	RouteTraffic []nodeprov.RouteTraffic `json:"route_traffic,omitempty"`
 }
 
 type NodeStatus struct {
@@ -111,6 +115,7 @@ type NodeStatus struct {
 	ShapingError      string
 	PolicyFingerprint string
 	PolicyError       string
+	RouteTraffic      []nodeprov.RouteTraffic
 }
 
 // Register registers this node with the main server.
@@ -268,6 +273,7 @@ func (c *APIClient) SendHeartbeat(ctx context.Context, cpu, memory, disk, loadAv
 
 		PolicyFingerprint: status.PolicyFingerprint,
 		PolicyError:       status.PolicyError,
+		RouteTraffic:      status.RouteTraffic,
 	}
 
 	body, err := json.Marshal(payload)

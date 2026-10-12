@@ -12,11 +12,14 @@ package relay
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"log"
+	"math"
 	"net/netip"
 	"os/exec"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -74,6 +77,23 @@ var runScript = func(script string) error {
 	return nil
 }
 
+// resetCounters reads and zeroes every named counter in the table in one
+// kernel transaction, so no forwarded byte is counted twice or skipped between
+// the read and the reset. Overridable in tests.
+var resetCounters = func() ([]byte, error) {
+	cmd := exec.Command("nft", "-j", "reset", "counters", "table", "inet", tableName)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		if problem := strings.TrimSpace(stderr.String()); problem != "" {
+			return nil, fmt.Errorf("nft reset counters: %w: %s", err, problem)
+		}
+		return nil, fmt.Errorf("nft reset counters: %w", err)
+	}
+	return stdout.Bytes(), nil
+}
+
 // Manager owns the relay nftables table and the forwarding sysctl.
 type Manager struct {
 	mu      sync.Mutex
@@ -81,7 +101,20 @@ type Manager struct {
 	// status is the outcome of the last policy reconciliation, reported in
 	// the heartbeat so the panel can show whether each route is in force.
 	status PolicyStatus
+	// counted is whether the installed table carries per-route counters.
+	counted bool
+	// carried holds bytes read out of counters that have not been handed to
+	// DrainTraffic yet. Replacing the table zeroes its counters, so they are
+	// read into here first instead of being lost with the old table.
+	carried map[routeCounterKey]routeCounts
 }
+
+type routeCounterKey struct {
+	port      int
+	transport nodeprov.Transport
+}
+
+type routeCounts struct{ up, down int64 }
 
 // PolicyStatus is what the agent tells the panel about its forwarding policy.
 // Fingerprint names the policy actually installed (nodeprov.PolicyFingerprint)
@@ -139,10 +172,23 @@ func Render(role nodeprov.Role, rules []nodeprov.RelayRule, exitRules []nodeprov
 	nodeprov.SortRules(sorted)
 
 	tcp, udp := dnatMapEntries(sorted)
+	tcpPorts, udpPorts := counterPorts(sorted)
 
 	var b strings.Builder
 	fmt.Fprintf(&b, "table inet %s {\n", tableName)
 	if role.Forwards() {
+		// One named counter per route, protocol and direction. Named counters
+		// can be read and zeroed atomically (nft reset counters), which is what
+		// lets the agent report deltas without a race against new packets.
+		for _, set := range []struct {
+			transport nodeprov.Transport
+			ports     []int
+		}{{nodeprov.TransportTCP, tcpPorts}, {nodeprov.TransportUDP, udpPorts}} {
+			for _, port := range set.ports {
+				fmt.Fprintf(&b, "\tcounter %s { }\n", counterName("up", set.transport, port))
+				fmt.Fprintf(&b, "\tcounter %s { }\n", counterName("dn", set.transport, port))
+			}
+		}
 		fmt.Fprintf(&b, "\tchain prerouting {\n")
 		fmt.Fprintf(&b, "\t\ttype nat hook prerouting priority dstnat; policy accept;\n")
 		if tcp != "" {
@@ -169,6 +215,27 @@ func Render(role nodeprov.Role, rules []nodeprov.RelayRule, exitRules []nodeprov
 		// relay into an open router.
 		fmt.Fprintf(&b, "\tchain forward {\n")
 		fmt.Fprintf(&b, "\t\ttype filter hook forward priority filter; policy accept;\n")
+		// Count before any verdict. The conntrack original destination port
+		// is the entry port the client dialled for both directions of a
+		// rewritten flow, so one lookup attributes uploads and replies to the
+		// same route. These rules have no verdict and a port missing from the
+		// map simply does not match, so counting can never change forwarding.
+		for _, set := range []struct {
+			transport nodeprov.Transport
+			ports     []int
+		}{{nodeprov.TransportTCP, tcpPorts}, {nodeprov.TransportUDP, udpPorts}} {
+			if len(set.ports) == 0 {
+				continue
+			}
+			for _, direction := range []struct{ name, ct string }{{"up", "original"}, {"dn", "reply"}} {
+				entries := make([]string, len(set.ports))
+				for i, port := range set.ports {
+					entries[i] = fmt.Sprintf("%d : %q", port, counterName(direction.name, set.transport, port))
+				}
+				fmt.Fprintf(&b, "\t\tct status dnat meta l4proto %s ct direction %s counter name ct original proto-dst map { %s }\n",
+					set.transport, direction.ct, strings.Join(entries, ", "))
+			}
+		}
 		fmt.Fprintf(&b, "\t\tct state established,related accept\n")
 		for _, ip := range exitIPs(sorted) {
 			fmt.Fprintf(&b, "\t\tip daddr %s accept\n", ip)
@@ -251,6 +318,26 @@ func dnatMapEntries(rules []nodeprov.RelayRule) (tcp, udp string) {
 	return strings.Join(tcpParts, ", "), strings.Join(udpParts, ", ")
 }
 
+// counterPorts lists the entry ports that get a counter for each protocol; a
+// tcp_udp rule is counted separately per protocol.
+func counterPorts(rules []nodeprov.RelayRule) (tcp, udp []int) {
+	for _, r := range rules {
+		if r.Transport.Covers(nodeprov.TransportTCP) {
+			tcp = append(tcp, r.EntryPort)
+		}
+		if r.Transport.Covers(nodeprov.TransportUDP) {
+			udp = append(udp, r.EntryPort)
+		}
+	}
+	return tcp, udp
+}
+
+// counterName is the nftables object name of one route counter. direction is
+// "up" (client to Exit) or "dn" (replies).
+func counterName(direction string, transport nodeprov.Transport, port int) string {
+	return fmt.Sprintf("route_%s_%s_%d", direction, transport, port)
+}
+
 // exitIPs lists each distinct exit address once, in first-seen order so the
 // rendered text stays stable for an unchanged rule set.
 func exitIPs(rules []nodeprov.RelayRule) []string {
@@ -289,6 +376,13 @@ func (m *Manager) Apply(role nodeprov.Role, rules []nodeprov.RelayRule, exitRule
 		return nil
 	}
 
+	// Replacing the table zeroes every counter in it, including those of
+	// routes that stay. Read them out first. A table left by a previous agent
+	// process is read too, so a restart does not drop its last interval.
+	if m.counted || (m.applied == "" && role.Forwards()) {
+		_ = m.harvestLocked(m.counted) // logged inside; never blocks policy
+	}
+
 	// A direct-mode Exit with no relay-only listeners has nothing to filter:
 	// the rendered input chain is empty and accepts everything. Requiring
 	// nftables there only breaks unprivileged hosts (e.g. NAT containers
@@ -305,6 +399,7 @@ func (m *Manager) Apply(role nodeprov.Role, rules []nodeprov.RelayRule, exitRule
 			log.Printf("node policy: direct Exit needs no nftables table; skipping (%v)", err)
 		}
 		m.applied = script
+		m.counted = false
 		m.status = PolicyStatus{Fingerprint: fingerprint}
 		return nil
 	}
@@ -321,6 +416,7 @@ func (m *Manager) Apply(role nodeprov.Role, rules []nodeprov.RelayRule, exitRule
 	}
 
 	m.applied = script
+	m.counted = role.Forwards() && len(rules) > 0
 	m.status = PolicyStatus{Fingerprint: fingerprint}
 	return nil
 }
@@ -337,12 +433,137 @@ func (m *Manager) Clear() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	if m.counted {
+		_ = m.harvestLocked(true) // logged inside; never blocks Clear
+	}
 	script := fmt.Sprintf("table inet %s\ndelete table inet %s\n", tableName, tableName)
 	if err := runScript(script); err != nil {
 		return err
 	}
 	m.applied = ""
+	m.counted = false
 	return nil
+}
+
+// DrainTraffic returns the bytes each route forwarded since the previous
+// drain and forgets them. The caller owns the result: if it cannot deliver
+// it, it must hand it back with ReturnTraffic or the bytes are lost.
+//
+// Delivery is at least once. A report the control plane stored but whose
+// response never arrived is returned and sent again, counting that interval
+// twice; for a diagnostic per-route figure that beats silently dropping it.
+func (m *Manager) DrainTraffic() ([]nodeprov.RouteTraffic, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	var err error
+	if m.counted {
+		err = m.harvestLocked(false)
+	}
+	out := make([]nodeprov.RouteTraffic, 0, len(m.carried))
+	for key, counts := range m.carried {
+		if counts.up == 0 && counts.down == 0 {
+			continue
+		}
+		out = append(out, nodeprov.RouteTraffic{EntryPort: key.port, Transport: key.transport, UpBytes: counts.up, DownBytes: counts.down})
+	}
+	m.carried = nil
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].EntryPort != out[j].EntryPort {
+			return out[i].EntryPort < out[j].EntryPort
+		}
+		return out[i].Transport < out[j].Transport
+	})
+	return out, err
+}
+
+// ReturnTraffic puts back a drained report that could not be delivered, so
+// the next drain sends it again.
+func (m *Manager) ReturnTraffic(traffic []nodeprov.RouteTraffic) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, t := range traffic {
+		m.carryLocked(routeCounterKey{t.EntryPort, t.Transport}, routeCounts{t.UpBytes, t.DownBytes})
+	}
+}
+
+// harvestLocked reads and zeroes the installed counters into carried. A
+// failure loses only that interval's figures and never blocks forwarding
+// policy, so it is logged when the caller expected counters to be there.
+func (m *Manager) harvestLocked(logFailure bool) error {
+	data, err := resetCounters()
+	if err == nil {
+		var counts map[routeCounterKey]routeCounts
+		if counts, err = parseRouteCounters(data); err == nil {
+			for key, c := range counts {
+				m.carryLocked(key, c)
+			}
+			return nil
+		}
+	}
+	if logFailure {
+		log.Printf("route traffic: %v", err)
+	}
+	return err
+}
+
+func (m *Manager) carryLocked(key routeCounterKey, c routeCounts) {
+	if m.carried == nil {
+		m.carried = make(map[routeCounterKey]routeCounts)
+	}
+	cur := m.carried[key]
+	m.carried[key] = routeCounts{saturatingAdd(cur.up, c.up), saturatingAdd(cur.down, c.down)}
+}
+
+func saturatingAdd(a, b int64) int64 {
+	if b > 0 && a > math.MaxInt64-b {
+		return math.MaxInt64
+	}
+	return a + b
+}
+
+// parseRouteCounters extracts route counters from `nft -j` output. Objects
+// this package did not name are ignored.
+func parseRouteCounters(data []byte) (map[routeCounterKey]routeCounts, error) {
+	var doc struct {
+		Nftables []struct {
+			Counter *struct {
+				Name  string `json:"name"`
+				Table string `json:"table"`
+				Bytes int64  `json:"bytes"`
+			} `json:"counter"`
+		} `json:"nftables"`
+	}
+	if err := json.Unmarshal(data, &doc); err != nil {
+		return nil, fmt.Errorf("parse nft counters: %w", err)
+	}
+	out := make(map[routeCounterKey]routeCounts)
+	for _, item := range doc.Nftables {
+		if item.Counter == nil || item.Counter.Table != tableName || item.Counter.Bytes <= 0 {
+			continue
+		}
+		parts := strings.Split(item.Counter.Name, "_")
+		if len(parts) != 4 || parts[0] != "route" {
+			continue
+		}
+		port, err := strconv.Atoi(parts[3])
+		transport := nodeprov.Transport(parts[2])
+		if err != nil || nodeprov.ValidatePort(port) != nil || (transport != nodeprov.TransportTCP && transport != nodeprov.TransportUDP) {
+			continue
+		}
+		key := routeCounterKey{port, transport}
+		cur := out[key]
+		switch parts[1] {
+		case "up":
+			cur.up = saturatingAdd(cur.up, item.Counter.Bytes)
+		case "dn":
+			cur.down = saturatingAdd(cur.down, item.Counter.Bytes)
+		default:
+			continue
+		}
+		out[key] = cur
+	}
+	return out, nil
 }
 
 // enableForwarding turns on IP forwarding, without which the kernel drops the

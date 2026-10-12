@@ -151,6 +151,10 @@
       "direct": "直连",
       "configuration": "配置检查",
       "enabledLabel": "配置启用状态",
+      "trafficColumn": "转发量 (24小时)",
+      "trafficTotal": "{{total}}",
+      "trafficSplit": "↑ {{up}} · ↓ {{down}}",
+      "trafficNotCounted": "不统计 (直连)",
       "applyColumn": "服务器应用",
       "applyStates": {
         "applied": "已应用",

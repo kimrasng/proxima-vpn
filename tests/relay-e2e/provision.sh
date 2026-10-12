@@ -152,6 +152,22 @@ apply_status() {
   echo "routes never reported applied (last: ${states:-none})" >&2
   exit 1
 }
+# The positive probes pushed real tunnel traffic through the Entry. Its
+# nftables route counters reach the panel in the next heartbeat, so both
+# explicit routes must show forwarded bytes in each direction.
+route_traffic() {
+  source "$state"
+  local chains totals
+  for attempt in {1..40}; do
+    chains=$(curl -fsS "${api}/api/v1/admin/node-chains" -H "Authorization: Bearer ${ADMIN_TOKEN}")
+    totals=$(jq -r --arg a "$CHAIN_A" --arg b "$CHAIN_B" \
+      '[.[] | select(.id == $a or .id == $b) | select((.traffic.up_bytes // 0) > 0 and (.traffic.down_bytes // 0) > 0)] | length' <<<"$chains")
+    [[ "$totals" == 2 ]] && { echo 'Both explicit routes report forwarded bytes in both directions'; return; }
+    sleep 1
+  done
+  echo "routes never reported forwarded traffic (${totals:-0}/2 routes)" >&2
+  exit 1
+}
 legacy() {
   source "$state"
   local pool
@@ -185,7 +201,7 @@ INSERT INTO node_group_nodes(node_group_id,node_id) VALUES (:'pool',:'entry');
 SQL
 }
 case "$E2E_ACTION" in
-  provision) provision ;; subscription) subscription ;; apply) apply_status ;; legacy) legacy ;;
+  provision) provision ;; subscription) subscription ;; apply) apply_status ;; traffic) route_traffic ;; legacy) legacy ;;
   fault) fault ;; restore) restore ;;
   *) exit 1 ;;
 esac

@@ -13,6 +13,7 @@ import (
 	"github.com/proximavpn/proxima-vpn/api-server/internal/metrics"
 	"github.com/proximavpn/proxima-vpn/api-server/internal/services"
 	"github.com/proximavpn/proxima-vpn/pkg/crypto"
+	"github.com/proximavpn/proxima-vpn/pkg/nodeprov"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -358,6 +359,8 @@ type heartbeatRequest struct {
 	// those keep whatever was stored (NULL), which the panel shows as unknown.
 	PolicyFingerprint string `json:"policy_fingerprint"`
 	PolicyError       string `json:"policy_error"`
+	// Per-route forwarded bytes since the previous heartbeat (Entries only).
+	RouteTraffic []nodeprov.RouteTraffic `json:"route_traffic"`
 }
 
 func (h *NodeAgentHandler) Heartbeat(c *fiber.Ctx) error {
@@ -415,6 +418,16 @@ func (h *NodeAgentHandler) Heartbeat(c *fiber.Ctx) error {
 
 	metrics.NodeCPUUsage.WithLabelValues(nodeID).Set(req.CPUUsage)
 	metrics.NodeMemoryUsage.WithLabelValues(nodeID).Set(req.MemoryUsage)
+
+	// Per-route traffic is diagnostic. Failing the heartbeat over it would
+	// make the agent retry while the node already counts as online, and
+	// replaying the same deltas would double them, so a storage error is
+	// only logged.
+	if len(req.RouteTraffic) > 0 {
+		if err := services.RecordRouteTraffic(context.Background(), h.db, nodeID, req.RouteTraffic); err != nil {
+			log.Printf("node %s: %v", nodeID, err)
+		}
+	}
 
 	return c.JSON(fiber.Map{"status": "ok"})
 }

@@ -50,6 +50,10 @@ type nodeChainResponse struct {
 	// forwarding policy. Only filled by List; direct routes have no relay
 	// policy and report not_applicable.
 	Apply *services.RouteApplyStatus `json:"apply,omitempty"`
+	// Traffic is what Entries forwarded for this route over the last
+	// services.RouteTrafficWindowHours, from their kernel counters. Only
+	// filled by List, and only for relayed routes.
+	Traffic *services.RouteTrafficSummary `json:"traffic,omitempty"`
 }
 
 const chainSelect = `
@@ -109,6 +113,17 @@ func (h *AdminNodeChainHandler) List(c *fiber.Ctx) error {
 	if err := h.attachRouteApply(c.UserContext(), chains); err != nil {
 		// Apply status is diagnostic; the route list itself must still load.
 		log.Printf("node chains: route apply status unavailable: %v", err)
+	}
+	if traffic, err := services.RecentRouteTraffic(c.UserContext(), h.db); err != nil {
+		log.Printf("node chains: route traffic unavailable: %v", err)
+	} else {
+		for i := range chains {
+			if chains[i].EntryNodeID == nil && chains[i].RelayPoolID == nil {
+				continue // a direct route has no Entry to count it
+			}
+			summary := traffic[chains[i].ID]
+			chains[i].Traffic = &summary
+		}
 	}
 	return c.JSON(chains)
 }

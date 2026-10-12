@@ -97,3 +97,16 @@ test("routes from an API without apply status read as not reported", async ({ pa
   await page.goto("/admin/node-chains");
   await expect(page.getByRole("row", { name: /Existing link/ }).getByRole("button", { name: "Applied on servers: Not reported", exact: true })).toBeVisible();
 });
+
+test("relayed routes show what their Entry forwarded; direct routes say they are not counted", async ({ page }) => {
+  await page.route("**/api/v1/admin/node-chains", (route) => route.fulfill({ json: [
+    { ...chain, group_ids: ["access"], traffic: { up_bytes: 2 * 1024 * 1024, down_bytes: 8 * 1024 * 1024 } },
+    { ...chain, id: "direct", name: "Direct link", entry_node_id: undefined, entry_node_name: undefined, entry_port: undefined, entry_host: "", group_ids: ["access"] },
+  ] }));
+  await page.goto("/admin/node-chains");
+  await expect(page.getByRole("columnheader", { name: "Forwarded (24h)" })).toBeVisible();
+  const relayed = page.getByRole("row", { name: /Existing link/ });
+  await expect(relayed).toContainText("10.0 MB");
+  await expect(relayed).toContainText("↑ 2.0 MB · ↓ 8.0 MB");
+  await expect(page.getByRole("row", { name: /Direct link/ })).toContainText("Not counted (direct)");
+});

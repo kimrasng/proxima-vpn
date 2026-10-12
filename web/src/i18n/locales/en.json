@@ -151,6 +151,10 @@
       "direct": "Direct connection",
       "configuration": "Configuration checks",
       "enabledLabel": "Configuration enabled",
+      "trafficColumn": "Forwarded (24h)",
+      "trafficTotal": "{{total}}",
+      "trafficSplit": "↑ {{up}} · ↓ {{down}}",
+      "trafficNotCounted": "Not counted (direct)",
       "applyColumn": "Applied on servers",
       "applyStates": {
         "applied": "Applied",

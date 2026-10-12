@@ -6,6 +6,7 @@ import { listNodeChains, listNodeGroups, listNodes, listPlans, updateNodeChain }
 import type { Node, NodeChain, NodeGroup, Plan } from "../../api/types";
 import { adminError } from "../../utils/adminError";
 import { routeConfigurationIssues } from "../../utils/routeConfiguration";
+import { formatBytes } from "../../utils/format";
 import { NodeEndpointState } from "../../components/NodeEndpointState";
 import NodeChainForm from "./NodeChainForm";
 import EntryRouteBatchForm from "./EntryRouteBatchForm";
@@ -150,6 +151,15 @@ export default function NodeChains() {
                 <StatusIndicator type={indicator[state]}>{t(`admin.routeManagement.applyStates.${state}`)}</StatusIndicator>
               </Button>
             </Popover>;
+          } },
+          { id: "traffic", header: t("admin.routeManagement.trafficColumn"), cell: (item) => {
+            if (!item.traffic) return <Box color="text-body-secondary">{t("admin.routeManagement.trafficNotCounted")}</Box>;
+            return <SpaceBetween size="xxxs">
+              <Box>{t("admin.routeManagement.trafficTotal", { total: formatBytes(item.traffic.up_bytes + item.traffic.down_bytes) })}</Box>
+              <Box variant="small" color="text-body-secondary">
+                {t("admin.routeManagement.trafficSplit", { up: formatBytes(item.traffic.up_bytes), down: formatBytes(item.traffic.down_bytes) })}
+              </Box>
+            </SpaceBetween>;
           } },
           { id: "actions", header: t("admin.nodeChains.actions"), cell: (item) => <ButtonDropdown
             variant="inline-icon" ariaLabel={`${t("admin.nodeChains.actions")}: ${item.name}`} expandToViewport

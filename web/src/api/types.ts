@@ -116,6 +116,14 @@ export interface NodeChain {
   // Whether every node carrying this route reports the current forwarding
   // policy. Only the route list fills it.
   apply?: RouteApplyStatus;
+  // Wire bytes the route's Entries forwarded over the last 24 hours, from
+  // their kernel counters. Only the route list fills it, for relayed routes.
+  traffic?: RouteTrafficSummary;
+}
+
+export interface RouteTrafficSummary {
+  up_bytes: number;
+  down_bytes: number;
 }
 
 export type RouteApplyState = "applied" | "pending" | "failed" | "unknown" | "not_applicable";

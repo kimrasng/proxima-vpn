@@ -151,6 +151,10 @@
       "direct": "직접 연결",
       "configuration": "설정 점검",
       "enabledLabel": "설정 활성화",
+      "trafficColumn": "전달량 (24시간)",
+      "trafficTotal": "{{total}}",
+      "trafficSplit": "↑ {{up}} · ↓ {{down}}",
+      "trafficNotCounted": "집계 안 함 (직접 연결)",
       "applyColumn": "서버 적용",
       "applyStates": {
         "applied": "적용됨",
