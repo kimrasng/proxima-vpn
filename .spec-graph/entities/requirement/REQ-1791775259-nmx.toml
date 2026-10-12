@@ -1,0 +1,15 @@
+schema = 1
+id = "REQ-1791775259-nmx"
+type = "requirement"
+title = "New tunnel connections must not wait on Exit protocol sniffing"
+description = "The load benchmark measured ~215 ms to first response for every new connection whose first bytes are neither HTTP nor TLS (and for server-speaks-first protocols), because Exit inbounds enable Xray sniffing with destOverride [http, tls]. HTTP/HTTPS openings take 3-7 ms."
+status = "draft"
+created_at = 2026-10-12T12:20:59+09:00
+updated_at = 2026-10-12T12:20:59+09:00
+
+[metadata]
+acceptance = ["tests/relay-e2e/load.sh reports opaque_first_response_ms p50 within a few ms of first_response_ms, or the remaining delay is a documented, approved trade-off."]
+
+[[relations]]
+to = "REQ-1791620102-t01"
+type = "depends_on"

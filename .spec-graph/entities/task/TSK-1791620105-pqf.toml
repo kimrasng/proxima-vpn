@@ -3,16 +3,16 @@ id = "TSK-1791620105-pqf"
 type = "task"
 title = "Add a reproducible Entry to Exit load benchmark"
 description = "Entry and Exit forwarding has no load validation."
-status = "draft"
+status = "resolved"
 created_at = 2026-10-10T17:15:05+09:00
-updated_at = 2026-10-10T17:15:05+09:00
+updated_at = 2026-10-12T12:29:47+09:00
 
 [metadata]
 acceptance = ["Benchmark runs with one command and results are documented."]
 instructions = ["Build a containerized client to Entry to Exit topology reusing tests/relay-e2e.", "Measure TCP and UDP throughput, latency and concurrency.", "Record results in docs/design."]
 must_not = ["Do not run against production nodes without approval."]
 order = 3.0
-qa = [{command = "bash tests/relay-e2e/load.sh", evidence = "", expected = "exit 0"}]
+qa = [{command = "bash tests/relay-e2e/load.sh", evidence = "docs/design/entry-exit-load-benchmark.md", expected = "exit 0; TCP ~1.8 Gbps single stream, 3.5-5.5 Gbps aggregate, UDP 0% loss at 1000 pps (single Docker host)"}]
 references = ["tests/relay-e2e"]
 
 [[relations]]
@@ -22,3 +22,7 @@ type = "belongs_to"
 [[relations]]
 to = "REQ-1791620102-t01"
 type = "covers"
+
+[[relations]]
+to = "REQ-1791620102-t01"
+type = "delivers"

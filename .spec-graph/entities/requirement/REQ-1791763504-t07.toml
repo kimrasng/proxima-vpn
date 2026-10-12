@@ -3,9 +3,9 @@ id = "REQ-1791763504-t07"
 type = "requirement"
 title = "The real-backend Entry to Exit link flow is exercised in CI"
 description = "The browser suite creates, toggles, edits and deletes a real Entry to Exit link against a running api-server, without depending on a live Cloudflare account."
-status = "draft"
+status = "resolved"
 created_at = 2026-10-12T09:05:04+09:00
-updated_at = 2026-10-12T09:05:04+09:00
+updated_at = 2026-10-12T12:29:59+09:00
 
 [metadata]
 kind = "non_functional"

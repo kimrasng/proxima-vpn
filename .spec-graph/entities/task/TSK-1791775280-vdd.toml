@@ -1,0 +1,24 @@
+schema = 1
+id = "TSK-1791775280-vdd"
+type = "task"
+title = "Investigate and fix the Exit sniffing delay on opaque first bytes"
+description = "Exit inbounds enable Xray sniffing (destOverride http, tls), which holds every new connection whose first bytes are neither HTTP nor TLS for ~215 ms before dialling out. Find why sniffing is on and propose a safe change."
+status = "draft"
+created_at = 2026-10-12T12:21:20+09:00
+updated_at = 2026-10-12T12:21:20+09:00
+
+[metadata]
+acceptance = ["tests/relay-e2e/load.sh reports opaque_first_response_ms p50 within a few ms of first_response_ms, or the remaining delay is a documented, user-approved trade-off."]
+instructions = ["Trace every consumer of the sniffed domain in api-server/internal/services/xray_config.go and node-agent (routing rules, device egress, domain blocking, stats).", "Measure candidate settings (routeOnly, metadataOnly, narrowed destOverride, removal) with tests/relay-e2e/load.sh.", "Present the options and their behavioural trade-offs to the user before changing generated inbound config."]
+must_not = ["Do not change inbound sniffing on production nodes without approval."]
+order = 1.0
+qa = [{command = "bash tests/relay-e2e/load.sh", evidence = "", expected = "opaque first response close to HTTP first response"}]
+references = ["docs/design/entry-exit-load-benchmark.md", "api-server/internal/services/xray_config.go", "tests/relay-e2e/loadgen/main.go"]
+
+[[relations]]
+to = "PHS-1791620103-avd"
+type = "belongs_to"
+
+[[relations]]
+to = "REQ-1791775259-nmx"
+type = "covers"
