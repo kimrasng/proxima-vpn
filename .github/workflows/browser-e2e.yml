@@ -65,7 +65,30 @@ jobs:
       - name: Build api-server
         run: cd api-server && go build -o /tmp/api-server ./cmd
 
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      # Managed Entry DNS runs against an in-memory Cloudflare stub so relays get
+      # an Entry hostname (node-chains.spec.ts) without the real API or token.
+      - name: Start Cloudflare DNS stub
+        run: |
+          nohup node web/e2e/cloudflare-stub.mjs 18090 > /tmp/cloudflare-stub.log 2>&1 &
+          for i in $(seq 1 15); do
+            curl -s -o /dev/null http://127.0.0.1:18090/ && exit 0
+            sleep 1
+          done
+          cat /tmp/cloudflare-stub.log
+          exit 1
+
       - name: Start api-server
+        env:
+          CLOUDFLARE_API_TOKEN: e2e-stub-token-not-a-real-credential
+          CLOUDFLARE_ZONE_ID: 0123456789abcdef0123456789abcdef
+          ENTRY_DNS_BASE_DOMAIN: entry.e2e.test
+          CLOUDFLARE_API_BASE_URL: http://127.0.0.1:18090/client/v4
         run: |
           nohup /tmp/api-server > /tmp/api-server.log 2>&1 &
           for i in $(seq 1 30); do
@@ -78,12 +101,6 @@ jobs:
 
       # vite preview proxies /api and /sub to the api-server, mirroring what
       # nginx does in production.
-      - uses: actions/setup-node@v7
-        with:
-          node-version: '20'
-          cache: npm
-          cache-dependency-path: web/package-lock.json
-
       - name: Install web dependencies
         run: cd web && npm ci
 
@@ -112,6 +129,7 @@ jobs:
           name: browser-e2e-logs
           path: |
             /tmp/api-server.log
+            /tmp/cloudflare-stub.log
             web/playwright-report/**
             web/test-results/**
           if-no-files-found: ignore

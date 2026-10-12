@@ -63,6 +63,15 @@ func NewCloudflareDNSClient(token string) *CloudflareDNSClient {
 	}
 }
 
+// WithBaseURL points the client at another Cloudflare-compatible API, such as
+// a local stub in end-to-end tests. Callers validate the URL first.
+func (c *CloudflareDNSClient) WithBaseURL(baseURL string) *CloudflareDNSClient {
+	if baseURL != "" {
+		c.baseURL = baseURL
+	}
+	return c
+}
+
 func (c *CloudflareDNSClient) request(ctx context.Context, operation, method, path string, body []byte) (cloudflareDNSEnvelope, error) {
 	requestCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()

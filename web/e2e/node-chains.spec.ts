@@ -2,6 +2,13 @@ import { test, expect } from "@playwright/test";
 import { chooseLinkAction } from "./managed-chain-fixtures";
 
 test("administrator connects an entry node to an exit and manages its link", async ({ page, request }) => {
+  // This is the one real-backend admin spec and it makes ~40 API calls. The
+  // api-server allows 100 requests per minute per IP and the specs before it
+  // share that budget, so wait for a fresh window instead of risking a 429
+  // mid-flow (the UI then renders without the data it just created). The
+  // limiter uses a fixed window, so a 60s pause always starts a new one.
+  test.setTimeout(150_000);
+  await page.waitForTimeout(60_000);
   const unique = Math.random().toString(36).slice(2, 10);
   const token = await page.goto("/admin/dashboard").then(async () => page.evaluate(() => localStorage.getItem("proxima_admin_token")));
   expect(token).toBeTruthy();
@@ -32,11 +39,11 @@ test("administrator connects an entry node to an exit and manages its link", asy
     const entryResponse = await request.get(api(`nodes/${relay}`), { headers });
     expect(entryResponse.ok()).toBeTruthy();
     const managedEntry: { entry_hostname: string | null } = await entryResponse.json();
-    // Relays only get a managed Entry hostname when the panel has Cloudflare DNS
-    // configured (token, zone, base domain). CI does not, and faking it would
-    // start a reconciler calling the real Cloudflare API with a dummy token; the
-    // mocked managed-node-chains / managed-chain-lifecycle specs cover this UI.
-    test.skip(!managedEntry.entry_hostname, "panel has no managed Entry DNS configured");
+    // Relays only get a managed Entry hostname when the panel has managed Entry
+    // DNS configured. browser-e2e.yml points it at e2e/cloudflare-stub.mjs; a
+    // local run without that configuration skips rather than fails.
+    test.skip(!managedEntry.entry_hostname && !process.env.CI, "panel has no managed Entry DNS configured");
+    expect(managedEntry.entry_hostname, "CI must configure managed Entry DNS (cloudflare-stub.mjs)").toBeTruthy();
     const entryHostname = managedEntry.entry_hostname!;
     await page.addInitScript(() => localStorage.setItem("i18nextLng", "en"));
     await page.goto("/admin/nodes");
@@ -69,7 +76,10 @@ test("administrator connects an entry node to an exit and manages its link", asy
     const row = page.getByRole("row", { name: new RegExp(`ui-chain-${unique}`) });
     await expect(row).toContainText(entryHostname);
     await expect(row).toContainText(`ui-relay-${unique}`);
-    await expect(row).toContainText(`ui-access-${unique}`);
+    // The list shows the plans a route serves, not raw group names; the
+    // group chosen in the dialog must be the one stored on the route.
+    const chains: { name: string; group_ids: string[] }[] = await (await request.get(api("node-chains"), { headers })).json();
+    expect(chains.find((chain) => chain.name === `ui-chain-${unique}`)?.group_ids).toEqual([access]);
     await page.goto("/admin/nodes");
     await expect(page.getByRole("tab", { name: "All servers" })).toBeVisible();
     await expect(page.getByRole("row", { name: new RegExp(`ui-relay-${unique}`) })).toBeVisible();

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/url"
 	"strconv"
 	"strings"
 )
@@ -31,9 +32,13 @@ func (Secret) MarshalYAML() (interface{}, error) {
 // ManagedEntryDNSConfig contains non-secret zone settings from YAML or env.
 // Token is populated only by the environment, never by YAML or serialized config.
 type ManagedEntryDNSConfig struct {
-	ZoneID        string `yaml:"zone_id" json:"zone_id"`
-	BaseDomain    string `yaml:"base_domain" json:"base_domain"`
-	Token         Secret `yaml:"-" json:"-"`
+	ZoneID     string `yaml:"zone_id" json:"zone_id"`
+	BaseDomain string `yaml:"base_domain" json:"base_domain"`
+	Token      Secret `yaml:"-" json:"-"`
+	// APIBaseURL replaces the Cloudflare API endpoint, for tests that run a
+	// local stub. Environment-only and restricted to loopback http(s), so a
+	// stray setting can never send the token to another host.
+	APIBaseURL    string `yaml:"-" json:"-"`
 	active        bool
 	validationErr error
 }
@@ -79,7 +84,32 @@ func (c *ManagedEntryDNSConfig) resolve() {
 		return
 	}
 	c.BaseDomain = base
+	if c.APIBaseURL != "" {
+		if err := validateLoopbackAPIBaseURL(c.APIBaseURL); err != nil {
+			c.validationErr = err
+			return
+		}
+	}
 	c.active = true
+}
+
+// ErrManagedEntryDNSAPIBaseURL rejects a Cloudflare API override that is not a
+// loopback http(s) URL.
+var ErrManagedEntryDNSAPIBaseURL = errors.New("CLOUDFLARE_API_BASE_URL must be an http(s) URL on a loopback address")
+
+func validateLoopbackAPIBaseURL(raw string) error {
+	parsed, err := url.Parse(raw)
+	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.User != nil {
+		return ErrManagedEntryDNSAPIBaseURL
+	}
+	host := parsed.Hostname()
+	if host == "localhost" {
+		return nil
+	}
+	if ip := net.ParseIP(host); ip != nil && ip.IsLoopback() {
+		return nil
+	}
+	return ErrManagedEntryDNSAPIBaseURL
 }
 
 // normalizeEntryDNSBaseDomain mirrors Reality's ASCII hostname rules without

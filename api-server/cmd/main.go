@@ -92,7 +92,10 @@ func main() {
 	if err := cfg.ManagedEntryDNS.ValidationError(); err != nil {
 		log.Printf("[ManagedEntryDNS] inactive: %v", err)
 	} else if cfg.ManagedEntryDNS.Active() {
-		client := services.NewCloudflareDNSClient(cfg.ManagedEntryDNS.CloudflareToken())
+		client := services.NewCloudflareDNSClient(cfg.ManagedEntryDNS.CloudflareToken()).WithBaseURL(cfg.ManagedEntryDNS.APIBaseURL)
+		if cfg.ManagedEntryDNS.APIBaseURL != "" {
+			log.Printf("[ManagedEntryDNS] using Cloudflare API override %s (test stub)", cfg.ManagedEntryDNS.APIBaseURL)
+		}
 		store := services.NewManagedEntryDNSWorkerStore(db)
 		reconciler := services.NewManagedEntryDNSReconciler(services.ManagedEntryDNSReconcileDependencies{
 			Store: store, Client: client,

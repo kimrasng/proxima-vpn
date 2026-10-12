@@ -13,6 +13,7 @@ func clearManagedDNSEnv(t *testing.T) {
 	t.Setenv("CLOUDFLARE_API_TOKEN", "")
 	t.Setenv("CLOUDFLARE_ZONE_ID", "")
 	t.Setenv("ENTRY_DNS_BASE_DOMAIN", "")
+	t.Setenv("CLOUDFLARE_API_BASE_URL", "")
 }
 
 func TestLoad_ManagedEntryDNSInactive_whenAllInputsAbsent(t *testing.T) {
@@ -146,5 +147,43 @@ func TestLoad_ManagedEntryDNSInactive_whenYAMLHasOnlyZoneAndBase(t *testing.T) {
 	// Then
 	if cfg.ManagedEntryDNS.Active() || cfg.ManagedEntryDNS.CloudflareToken() != "" || cfg.ManagedEntryDNS.ValidationError() == nil {
 		t.Error("YAML zone and base without an environment token must stay inactive")
+	}
+}
+
+// The Cloudflare API override exists for local test stubs. It must never be
+// able to send the token anywhere but this host.
+func TestLoad_ManagedEntryDNSAPIBaseURLIsLoopbackOnly(t *testing.T) {
+	for _, tt := range []struct {
+		url    string
+		active bool
+	}{
+		{"http://127.0.0.1:18090/client/v4", true},
+		{"http://localhost:18090", true},
+		{"https://[::1]:18090", true},
+		{"https://api.cloudflare.com/client/v4", false},
+		{"http://10.0.0.5:18090", false},
+		{"http://user:pass@127.0.0.1:18090", false},
+		{"ftp://127.0.0.1", false},
+		{"127.0.0.1:18090", false},
+	} {
+		t.Run(tt.url, func(t *testing.T) {
+			// Given
+			clearManagedDNSEnv(t)
+			t.Setenv("CLOUDFLARE_API_TOKEN", "private-token")
+			t.Setenv("CLOUDFLARE_ZONE_ID", testZoneID)
+			t.Setenv("ENTRY_DNS_BASE_DOMAIN", "example.com")
+			t.Setenv("CLOUDFLARE_API_BASE_URL", tt.url)
+
+			// When
+			cfg := loadConfig(t, filepath.Join(t.TempDir(), "missing.yaml"))
+
+			// Then
+			if cfg.ManagedEntryDNS.Active() != tt.active {
+				t.Fatalf("active = %v, want %v (err %v)", cfg.ManagedEntryDNS.Active(), tt.active, cfg.ManagedEntryDNS.ValidationError())
+			}
+			if tt.active && cfg.ManagedEntryDNS.APIBaseURL != tt.url {
+				t.Errorf("APIBaseURL = %q", cfg.ManagedEntryDNS.APIBaseURL)
+			}
+		})
 	}
 }

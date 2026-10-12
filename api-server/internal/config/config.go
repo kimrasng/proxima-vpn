@@ -221,6 +221,9 @@ func applyEnvOverrides(cfg *Config) {
 	if v := os.Getenv("ENTRY_DNS_BASE_DOMAIN"); v != "" {
 		cfg.ManagedEntryDNS.BaseDomain = v
 	}
+	if v := os.Getenv("CLOUDFLARE_API_BASE_URL"); v != "" {
+		cfg.ManagedEntryDNS.APIBaseURL = v
+	}
 	if v := os.Getenv("DATABASE_URL"); v != "" {
 		cfg.Database.URL = v
 	}
