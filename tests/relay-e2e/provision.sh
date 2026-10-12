@@ -136,6 +136,22 @@ subscription() {
   done
   [[ "$UUID_A" != "$UUID_B" ]] || exit 1
 }
+# Both explicit routes must reach "applied": the Entry and each Exit report, in
+# their heartbeats, the fingerprint of the nftables policy they installed, and
+# the panel only calls a route applied when every participant matches.
+apply_status() {
+  source "$state"
+  local chains states
+  for attempt in {1..60}; do
+    chains=$(curl -fsS "${api}/api/v1/admin/node-chains" -H "Authorization: Bearer ${ADMIN_TOKEN}")
+    states=$(jq -r --arg a "$CHAIN_A" --arg b "$CHAIN_B" \
+      '[.[] | select(.id == $a or .id == $b) | .apply.state] | sort | join(",")' <<<"$chains")
+    [[ "$states" == applied,applied ]] && { echo 'Both explicit routes report applied on Entry and Exit'; return; }
+    sleep 1
+  done
+  echo "routes never reported applied (last: ${states:-none})" >&2
+  exit 1
+}
 legacy() {
   source "$state"
   local pool
@@ -169,7 +185,7 @@ INSERT INTO node_group_nodes(node_group_id,node_id) VALUES (:'pool',:'entry');
 SQL
 }
 case "$E2E_ACTION" in
-  provision) provision ;; subscription) subscription ;; legacy) legacy ;;
+  provision) provision ;; subscription) subscription ;; apply) apply_status ;; legacy) legacy ;;
   fault) fault ;; restore) restore ;;
   *) exit 1 ;;
 esac

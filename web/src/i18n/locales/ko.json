@@ -151,7 +151,21 @@
       "direct": "직접 연결",
       "configuration": "설정 점검",
       "enabledLabel": "설정 활성화",
-      "applyUnverified": "적용 확인 정보 없음",
+      "applyColumn": "서버 적용",
+      "applyStates": {
+        "applied": "적용됨",
+        "pending": "서버 반영 대기",
+        "failed": "적용 실패",
+        "unknown": "보고 없음",
+        "not_applicable": "해당 없음"
+      },
+      "applyHint": {
+        "applied": "Entry와 Exit가 모두 현재 전달 규칙으로 동작 중입니다.",
+        "pending": "아직 이전 전달 규칙으로 동작하는 서버가 있습니다. 보통 30초 안에 반영됩니다.",
+        "failed": "전달 규칙을 적용하지 못한 서버가 있습니다. 트래픽은 마지막으로 정상 적용된 규칙을 따릅니다.",
+        "unknown": "전달 규칙을 보고하지 않은 서버가 있습니다. 보통 에이전트가 구버전이라서입니다. 에이전트를 업데이트하세요.",
+        "not_applicable": "직접 연결과 비활성 경로는 전달 규칙을 설치하지 않습니다."
+      },
       "managePlans": "플랜 경로 관리",
       "batchTitle": "{{name}} — 다중 출구 연결",
       "chooseExits": "연결할 출구 서버",

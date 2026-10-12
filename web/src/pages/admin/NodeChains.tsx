@@ -124,17 +124,30 @@ export default function NodeChains() {
             const issues = routeConfigurationIssues(item, nodes).filter(
               (issue) => issue !== "disabled" && issue !== "unassigned",
             );
+            if (!issues.length) return <StatusIndicator type="success">{t("admin.routeManagement.issueCount", { count: 0 })}</StatusIndicator>;
             return <Popover
               triggerType="custom"
               position="top"
               header={t("admin.routeManagement.configuration")}
               content={<SpaceBetween size="xxs">
-                {issues.length ? issues.map((issue) => <StatusIndicator key={issue} type="warning">{t(`admin.routeManagement.issues.${issue}`)}</StatusIndicator>)
-                  : <StatusIndicator type="pending">{t("admin.routeManagement.applyUnverified")}</StatusIndicator>}
+                {issues.map((issue) => <StatusIndicator key={issue} type="warning">{t(`admin.routeManagement.issues.${issue}`)}</StatusIndicator>)}
               </SpaceBetween>}
             >
               <Button variant="inline-link" ariaLabel={t("admin.routeManagement.issueDetails", { count: issues.length })}>
-                {issues.length ? t("admin.routeManagement.issueCount", { count: issues.length }) : t("admin.routeManagement.applyUnverified")}
+                {t("admin.routeManagement.issueCount", { count: issues.length })}
+              </Button>
+            </Popover>;
+          } },
+          { id: "apply", header: t("admin.routeManagement.applyColumn"), cell: (item) => {
+            const state = item.apply?.state ?? "unknown";
+            const indicator = { applied: "success", pending: "pending", failed: "error", unknown: "warning", not_applicable: "stopped" } as const;
+            return <Popover triggerType="custom" position="top" header={t("admin.routeManagement.applyColumn")}
+              content={<SpaceBetween size="xxs">
+                <Box>{t(`admin.routeManagement.applyHint.${state}`)}</Box>
+                {item.apply?.error && <Box variant="code">{item.apply.error}</Box>}
+              </SpaceBetween>}>
+              <Button variant="inline-link" ariaLabel={`${t("admin.routeManagement.applyColumn")}: ${t(`admin.routeManagement.applyStates.${state}`)}`}>
+                <StatusIndicator type={indicator[state]}>{t(`admin.routeManagement.applyStates.${state}`)}</StatusIndicator>
               </Button>
             </Popover>;
           } },

@@ -16,7 +16,9 @@ devices, HTTP/UDP markers, and non-default Reality SNI
 `decoy.relay-e2e.test`. The harness waits for subscription publication (which
 requires a fresh config-hash acknowledgement by the running Exit agent), then
 compares each subscription's host, port, UUID, public key, short ID, and SNI
-against its generated Exit config without retaining these values. Entry forwards
+against its generated Exit config without retaining these values. It then waits
+until the admin route list reports both routes `applied`, i.e. the Entry and
+both Exits reported the nftables policy fingerprint the panel expects. Entry forwards
 TCP only: it has no Xray process or Exit/client credential volume. UDP markers
 travel through Xray SOCKS5 UDP ASSOCIATE over VLESS TCP, not native UDP DNAT.
 

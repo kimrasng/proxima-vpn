@@ -19,7 +19,23 @@ type policyApplier interface {
 	Apply(nodeprov.Role, []nodeprov.RelayRule, []nodeprov.ExitRule) error
 }
 
+// policyFailureRecorder is implemented by appliers that report their status;
+// a fetch failure never reaches Apply, so it has to be recorded separately.
+type policyFailureRecorder interface {
+	RecordFailure(error)
+}
+
 func applyRolePolicy(ctx context.Context, role nodeprov.Role, source policySource, applier policyApplier) error {
+	err := fetchAndApplyPolicy(ctx, role, source, applier)
+	if err != nil {
+		if recorder, ok := applier.(policyFailureRecorder); ok {
+			recorder.RecordFailure(err)
+		}
+	}
+	return err
+}
+
+func fetchAndApplyPolicy(ctx context.Context, role nodeprov.Role, source policySource, applier policyApplier) error {
 	if !role.Valid() {
 		return fmt.Errorf("unknown role %q", role)
 	}

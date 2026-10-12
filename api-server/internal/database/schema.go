@@ -1005,6 +1005,7 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) (migrateErr error) {
 	migrations = append(migrations, hwidSchemaMigrations...)
 	migrations = append(migrations, uuidEvictionSchema)
 	migrations = append(migrations, directChainPortMigrations...)
+	migrations = append(migrations, nodePolicySchema...)
 
 	for _, m := range migrations {
 		if _, err := conn.Exec(ctx, m); err != nil {

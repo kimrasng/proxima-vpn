@@ -66,9 +66,34 @@ test("port conflicts keep form values and discard outdated preview", async ({ pa
 });
 
 test("direct routes are visible without pretending application was acknowledged", async ({ page }) => {
-  await page.route("**/api/v1/admin/node-chains", (route) => route.fulfill({ json: [{ ...chain, entry_node_id: undefined, entry_node_name: undefined, entry_port: undefined, entry_host: "", group_ids: ["access"], health: "unknown" }] }));
+  await page.route("**/api/v1/admin/node-chains", (route) => route.fulfill({ json: [{ ...chain, entry_node_id: undefined, entry_node_name: undefined, entry_port: undefined, entry_host: "", group_ids: ["access"], health: "unknown", apply: { state: "not_applicable" } }] }));
   await page.route("**/api/v1/admin/nodes", (route) => route.fulfill({ json: [entry, { ...exit, publish_direct: true, reality_sni_status: "valid" }] }));
   await page.goto("/admin/node-chains");
-  await expect(page.getByRole("row", { name: /Existing link/ })).toContainText("Direct connection");
-  await expect(page.getByText("Application acknowledgment unavailable")).toBeVisible();
+  const row = page.getByRole("row", { name: /Existing link/ });
+  await expect(row).toContainText("Direct connection");
+  // A direct route installs no forwarding rule, so it never claims to be applied.
+  await expect(row.getByRole("button", { name: "Applied on servers: Not needed", exact: true })).toBeVisible();
+  await expect(row).not.toContainText(/^Applied$/);
+});
+
+for (const [state, label, error] of [
+  ["applied", "Applied", ""],
+  ["pending", "Waiting for servers", ""],
+  ["failed", "Apply failed", "nft -f: refused"],
+  ["unknown", "Not reported", ""],
+] as const) {
+  test(`relayed route shows the server-reported apply state ${state}`, async ({ page }) => {
+    await page.route("**/api/v1/admin/node-chains", (route) => route.fulfill({ json: [{ ...chain, group_ids: ["access"], apply: { state, ...(error ? { error } : {}) } }] }));
+    await page.goto("/admin/node-chains");
+    const cell = page.getByRole("row", { name: /Existing link/ }).getByRole("button", { name: `Applied on servers: ${label}`, exact: true });
+    await expect(cell).toBeVisible();
+    await cell.click();
+    if (error) await expect(page.getByText(error, { exact: true })).toBeVisible();
+  });
+}
+
+test("routes from an API without apply status read as not reported", async ({ page }) => {
+  await page.route("**/api/v1/admin/node-chains", (route) => route.fulfill({ json: [{ ...chain, group_ids: ["access"] }] }));
+  await page.goto("/admin/node-chains");
+  await expect(page.getByRole("row", { name: /Existing link/ }).getByRole("button", { name: "Applied on servers: Not reported", exact: true })).toBeVisible();
 });

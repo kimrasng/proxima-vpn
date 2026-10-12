@@ -3,6 +3,8 @@ package handlers
 import (
 	"context"
 	"errors"
+	"fmt"
+	"log"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -44,6 +46,10 @@ type nodeChainResponse struct {
 	ProbeRTTMs    *int       `json:"probe_rtt_ms,omitempty"`
 	GroupIDs      []string   `json:"group_ids"`
 	CreatedAt     time.Time  `json:"created_at"`
+	// Apply is whether every node carrying this route reports the current
+	// forwarding policy. Only filled by List; direct routes have no relay
+	// policy and report not_applicable.
+	Apply *services.RouteApplyStatus `json:"apply,omitempty"`
 }
 
 const chainSelect = `
@@ -98,8 +104,65 @@ func (h *AdminNodeChainHandler) List(c *fiber.Ctx) error {
 			"error": "failed to read node chains",
 		})
 	}
+	rows.Close()
 
+	if err := h.attachRouteApply(c.UserContext(), chains); err != nil {
+		// Apply status is diagnostic; the route list itself must still load.
+		log.Printf("node chains: route apply status unavailable: %v", err)
+	}
 	return c.JSON(chains)
+}
+
+// attachRouteApply fills each relayed chain's apply status from the policy
+// fingerprints its Entry (or legacy pool members) and its Exit last reported.
+func (h *AdminNodeChainHandler) attachRouteApply(ctx context.Context, chains []nodeChainResponse) error {
+	states, err := services.NodePolicyStates(ctx, h.db)
+	if err != nil {
+		return err
+	}
+	poolMembers := map[string][]string{}
+	rows, err := h.db.Query(ctx, `SELECT node_group_id::text, node_id::text FROM node_group_nodes
+		WHERE node_group_id IN (SELECT relay_pool_id FROM node_chains WHERE relay_pool_id IS NOT NULL)`)
+	if err != nil {
+		return fmt.Errorf("read relay pool members: %w", err)
+	}
+	for rows.Next() {
+		var pool, node string
+		if err := rows.Scan(&pool, &node); err != nil {
+			rows.Close()
+			return fmt.Errorf("scan relay pool member: %w", err)
+		}
+		poolMembers[pool] = append(poolMembers[pool], node)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("read relay pool members: %w", err)
+	}
+	for i := range chains {
+		ch := &chains[i]
+		if ch.EntryNodeID == nil && ch.RelayPoolID == nil || ch.Mode != "l4_dnat" {
+			ch.Apply = &services.RouteApplyStatus{State: services.RouteApplyNotUsed}
+			continue
+		}
+		if !ch.Enabled {
+			// A disabled route is intentionally absent from every policy.
+			ch.Apply = &services.RouteApplyStatus{State: services.RouteApplyNotUsed}
+			continue
+		}
+		var entries []string
+		if ch.EntryNodeID != nil {
+			entries = []string{*ch.EntryNodeID}
+		} else {
+			entries = poolMembers[*ch.RelayPoolID]
+		}
+		participants := []services.NodePolicyState{states[ch.ExitNodeID]}
+		for _, entry := range entries {
+			participants = append(participants, states[entry])
+		}
+		status := services.CombineRouteApply(participants...)
+		ch.Apply = &status
+	}
+	return nil
 }
 
 // Delete removes a chain, freeing its entry port.

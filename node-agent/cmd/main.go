@@ -294,7 +294,7 @@ func runCmd() *cobra.Command {
 
 			go activeUUIDReportLoop(ctx, apiClient, egressServer)
 			go revokedUUIDPollLoop(ctx, apiClient.GetRevokedDevices, apiClient.AcknowledgeRevocation, egressServer)
-			go heartbeatLoop(ctx, apiClient, runner, xrayVersion, state)
+			go heartbeatLoop(ctx, apiClient, runner, xrayVersion, state, policyManager)
 			go superviseLoop(ctx, runner, state)
 			go configPollLoop(ctx, apiClient, runner, statsClient, state)
 			go inboundsPollLoop(ctx, apiClient)
@@ -590,7 +590,7 @@ func (s *nodeState) UsersSnapshot() map[userKey]xray.VLESSUser {
 func runRelay(ctx context.Context, cfg *config.AgentConfig, apiClient *client.APIClient, policyManager *relay.Manager) error {
 	log.Println("node role is relay: forwarding only, tunnel services not started")
 
-	go heartbeatLoop(ctx, apiClient, nil, nil, nil)
+	go heartbeatLoop(ctx, apiClient, nil, nil, nil, policyManager)
 	go policyPollLoop(ctx, nodeprov.RoleRelay, apiClient, policyManager)
 	go updateCheckLoop(ctx, updater.NewUpdater(version, "", cfg.ServerURL, cfg.NodeID, cfg.APIKey))
 
@@ -681,7 +681,7 @@ const heartbeatInterval = 10 * time.Second
 // heartbeatLoop reports this node's health. runner and state are nil on a relay,
 // which runs no Xray and shapes nothing: there is no process to report on, so the
 // status it sends says so rather than inventing a reading.
-func heartbeatLoop(ctx context.Context, apiClient *client.APIClient, runner *xray.XrayRunner, xrayVersion *versionHolder, state *nodeState) {
+func heartbeatLoop(ctx context.Context, apiClient *client.APIClient, runner *xray.XrayRunner, xrayVersion *versionHolder, state *nodeState, policy *relay.Manager) {
 	ticker := time.NewTicker(heartbeatInterval)
 	defer ticker.Stop()
 
@@ -703,6 +703,11 @@ func heartbeatLoop(ctx context.Context, apiClient *client.APIClient, runner *xra
 			if runner != nil {
 				status.XrayVersion = xrayVersion.Get()
 				status.XrayRunning = runner.IsRunning()
+			}
+			if policy != nil {
+				policyStatus := policy.Status()
+				status.PolicyFingerprint = policyStatus.Fingerprint
+				status.PolicyError = policyStatus.Error
 			}
 			if err := apiClient.SendHeartbeat(ctx, m.CPU, m.Memory, m.Disk, m.LoadAvg, m.NetworkIn, m.NetworkOut, status); err != nil {
 				log.Printf("heartbeat: %v", err)

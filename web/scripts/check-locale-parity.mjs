@@ -101,6 +101,8 @@ const requiredDynamicKeys = {
   "admin.dashboard.alert.*": ["node_offline", "node_xray_down", "node_shaping_failed", "node_cpu", "node_memory", "node_disk", "pending_requests"],
   "admin.dashboard.issue.*": ["offline", "xray_down", "shaping_failed", "cpu", "memory", "disk"],
   "admin.routeManagement.serverWarnings.*": ["vless_reality_only", "payload_rate_not_wire_rate"],
+  "admin.routeManagement.applyStates.*": ["applied", "pending", "failed", "unknown", "not_applicable"],
+  "admin.routeManagement.applyHint.*": ["applied", "pending", "failed", "unknown", "not_applicable"],
   "admin.orders.status.*": ["pending", "paid", "cancelled", "expired"],
   "user.plan.order.status.*": ["pending", "paid", "cancelled", "expired"],
   "admin.userDetail.window.*": ["today", "week", "month"],

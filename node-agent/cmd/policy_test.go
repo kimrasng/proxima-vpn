@@ -108,3 +108,23 @@ func TestApplyRolePolicyFetchesOnlyRulesRequiredByRole(t *testing.T) {
 		})
 	}
 }
+
+type recordingPolicyApplier struct {
+	fakePolicyApplier
+	failures []error
+}
+
+func (applier *recordingPolicyApplier) RecordFailure(err error) {
+	applier.failures = append(applier.failures, err)
+}
+
+func TestApplyRolePolicyRecordsFetchFailuresForTheHeartbeat(t *testing.T) {
+	source := &fakePolicySource{relayErr: errors.New("control plane unavailable")}
+	applier := &recordingPolicyApplier{}
+	if err := applyRolePolicy(context.Background(), nodeprov.RoleRelay, source, applier); err == nil {
+		t.Fatal("fetch failure not returned")
+	}
+	if applier.calls != 0 || len(applier.failures) != 1 {
+		t.Fatalf("apply calls %d, recorded failures %d; want 0 and 1", applier.calls, len(applier.failures))
+	}
+}

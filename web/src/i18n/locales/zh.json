@@ -151,7 +151,21 @@
       "direct": "直连",
       "configuration": "配置检查",
       "enabledLabel": "配置启用状态",
-      "applyUnverified": "缺少应用确认信息",
+      "applyColumn": "服务器应用",
+      "applyStates": {
+        "applied": "已应用",
+        "pending": "等待服务器生效",
+        "failed": "应用失败",
+        "unknown": "未上报",
+        "not_applicable": "无需应用"
+      },
+      "applyHint": {
+        "applied": "Entry 与 Exit 均已运行当前转发规则。",
+        "pending": "仍有服务器运行旧的转发规则,通常约 30 秒内生效。",
+        "failed": "有服务器未能应用转发规则,流量仍按最后一次成功的规则转发。",
+        "unknown": "有服务器未上报转发规则,通常是代理版本较旧。请更新代理。",
+        "not_applicable": "直连和已停用的线路不安装转发规则。"
+      },
       "managePlans": "管理套餐路径",
       "batchTitle": "{{name}} — 批量连接出口",
       "chooseExits": "要连接的出口服务器",

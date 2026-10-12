@@ -93,16 +93,24 @@ type HeartbeatPayload struct {
 	ShapingOK    bool   `json:"shaping_ok"`
 	ShapingTiers int    `json:"shaping_tiers"`
 	ShapingError string `json:"shaping_error,omitempty"`
+	// The forwarding policy (nftables relay/exit rules) actually installed,
+	// as nodeprov.PolicyFingerprint, and the last reconciliation error. The
+	// panel compares the fingerprint with its own to show per-route apply
+	// status. Absent from older agents, which the panel reads as unknown.
+	PolicyFingerprint string `json:"policy_fingerprint,omitempty"`
+	PolicyError       string `json:"policy_error,omitempty"`
 }
 
 type NodeStatus struct {
-	ShapingMode  string
-	XrayVersion  string
-	ConfigHash   string
-	XrayRunning  bool
-	ShapingOK    bool
-	ShapingTiers int
-	ShapingError string
+	ShapingMode       string
+	XrayVersion       string
+	ConfigHash        string
+	XrayRunning       bool
+	ShapingOK         bool
+	ShapingTiers      int
+	ShapingError      string
+	PolicyFingerprint string
+	PolicyError       string
 }
 
 // Register registers this node with the main server.
@@ -257,6 +265,9 @@ func (c *APIClient) SendHeartbeat(ctx context.Context, cpu, memory, disk, loadAv
 		ShapingOK:    status.ShapingOK,
 		ShapingTiers: status.ShapingTiers,
 		ShapingError: status.ShapingError,
+
+		PolicyFingerprint: status.PolicyFingerprint,
+		PolicyError:       status.PolicyError,
 	}
 
 	body, err := json.Marshal(payload)

@@ -113,6 +113,16 @@ export interface NodeChain {
   enabled: boolean;
   health: string;
   group_ids: string[];
+  // Whether every node carrying this route reports the current forwarding
+  // policy. Only the route list fills it.
+  apply?: RouteApplyStatus;
+}
+
+export type RouteApplyState = "applied" | "pending" | "failed" | "unknown" | "not_applicable";
+
+export interface RouteApplyStatus {
+  state: RouteApplyState;
+  error?: string;
 }
 
 export interface CreateNodeChainRequest {

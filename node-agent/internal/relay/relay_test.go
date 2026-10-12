@@ -467,3 +467,65 @@ var errRefused = errRefusedType{}
 type errRefusedType struct{}
 
 func (errRefusedType) Error() string { return "nft refused the ruleset" }
+
+// The heartbeat reports what is installed, so a failed replacement must keep
+// the last good fingerprint while surfacing the error, and the next success
+// must clear the error.
+func TestApplyStatusTracksInstalledPolicyAcrossFailures(t *testing.T) {
+	originalScript, originalCmd := runScript, runCmd
+	t.Cleanup(func() { runScript, runCmd = originalScript, originalCmd })
+	runCmd = func(string, ...string) error { return nil }
+	fail := false
+	runScript = func(string) error {
+		if fail {
+			return errRefused
+		}
+		return nil
+	}
+
+	rulesA := []nodeprov.RelayRule{{EntryPort: 5993, Transport: nodeprov.TransportTCP, ExitIP: "203.0.113.10", ExitPort: 443}}
+	rulesB := []nodeprov.RelayRule{{EntryPort: 5223, Transport: nodeprov.TransportUDP, ExitIP: "203.0.113.12", ExitPort: 8443}}
+	fpA := nodeprov.PolicyFingerprint(nodeprov.RoleRelay, rulesA, nil)
+
+	m := NewManager()
+	if got := m.Status(); got != (PolicyStatus{}) {
+		t.Fatalf("fresh manager status = %+v, want empty", got)
+	}
+	if err := m.Apply(nodeprov.RoleRelay, rulesA, nil); err != nil {
+		t.Fatal(err)
+	}
+	if got := m.Status(); got != (PolicyStatus{Fingerprint: fpA}) {
+		t.Fatalf("after apply A: %+v", got)
+	}
+
+	fail = true
+	if err := m.Apply(nodeprov.RoleRelay, rulesB, nil); err == nil {
+		t.Fatal("failed apply reported success")
+	}
+	if got := m.Status(); got.Fingerprint != fpA || got.Error == "" {
+		t.Fatalf("after failed apply B: %+v, want fingerprint A kept and an error", got)
+	}
+
+	// A fetch failure never reaches Apply but must still surface.
+	fail = false
+	m.RecordFailure(errRefused)
+	if got := m.Status(); got.Fingerprint != fpA || got.Error != errRefused.Error() {
+		t.Fatalf("after recorded fetch failure: %+v", got)
+	}
+
+	// Re-applying the installed policy is a no-op that still clears the error.
+	if err := m.Apply(nodeprov.RoleRelay, rulesA, nil); err != nil {
+		t.Fatal(err)
+	}
+	if got := m.Status(); got != (PolicyStatus{Fingerprint: fpA}) {
+		t.Fatalf("after successful reconcile: %+v", got)
+	}
+
+	// An invalid rule set is rejected before nft runs and keeps the last good state.
+	if err := m.Apply(nodeprov.RoleRelay, []nodeprov.RelayRule{{EntryPort: 0, Transport: nodeprov.TransportTCP, ExitIP: "203.0.113.10", ExitPort: 443}}, nil); err == nil {
+		t.Fatal("invalid rule accepted")
+	}
+	if got := m.Status(); got.Fingerprint != fpA || got.Error == "" {
+		t.Fatalf("after invalid rules: %+v", got)
+	}
+}

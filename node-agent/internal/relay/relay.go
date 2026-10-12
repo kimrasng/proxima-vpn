@@ -78,6 +78,34 @@ var runScript = func(script string) error {
 type Manager struct {
 	mu      sync.Mutex
 	applied string
+	// status is the outcome of the last policy reconciliation, reported in
+	// the heartbeat so the panel can show whether each route is in force.
+	status PolicyStatus
+}
+
+// PolicyStatus is what the agent tells the panel about its forwarding policy.
+// Fingerprint names the policy actually installed (nodeprov.PolicyFingerprint)
+// and only changes when an apply succeeds; Error describes the most recent
+// failed attempt and clears on the next success, so a failure never erases the
+// record of what is still running.
+type PolicyStatus struct {
+	Fingerprint string
+	Error       string
+}
+
+// Status returns the last reconciliation outcome.
+func (m *Manager) Status() PolicyStatus {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.status
+}
+
+// RecordFailure notes a reconciliation that failed before Apply ran (for
+// example the rules could not be fetched), keeping the installed fingerprint.
+func (m *Manager) RecordFailure(err error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.status.Error = err.Error()
 }
 
 func NewManager() *Manager { return &Manager{} }
@@ -248,13 +276,16 @@ func exitIPs(rules []nodeprov.RelayRule) []string {
 func (m *Manager) Apply(role nodeprov.Role, rules []nodeprov.RelayRule, exitRules []nodeprov.ExitRule) error {
 	script, err := Render(role, rules, exitRules)
 	if err != nil {
+		m.RecordFailure(err)
 		return err
 	}
+	fingerprint := nodeprov.PolicyFingerprint(role, rules, exitRules)
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	if script == m.applied {
+		m.status = PolicyStatus{Fingerprint: fingerprint}
 		return nil
 	}
 
@@ -274,19 +305,23 @@ func (m *Manager) Apply(role nodeprov.Role, rules []nodeprov.RelayRule, exitRule
 			log.Printf("node policy: direct Exit needs no nftables table; skipping (%v)", err)
 		}
 		m.applied = script
+		m.status = PolicyStatus{Fingerprint: fingerprint}
 		return nil
 	}
 
 	if role.Forwards() && len(rules) > 0 {
 		if err := enableForwarding(); err != nil {
+			m.status.Error = err.Error()
 			return err
 		}
 	}
 	if err := runScript(script); err != nil {
+		m.status.Error = err.Error()
 		return err
 	}
 
 	m.applied = script
+	m.status = PolicyStatus{Fingerprint: fingerprint}
 	return nil
 }
 

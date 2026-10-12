@@ -94,6 +94,8 @@ done
 "${compose[@]}" exec -T exit-b busybox pidof xray >/dev/null
 E2E_ACTION=subscription "${compose[@]}" run --rm -T control >/dev/null
 assert agents_ack
+E2E_ACTION=apply "${compose[@]}" run --rm -T control >/dev/null
+assert routes_applied
 assert profile_a
 assert profile_b
 entry_policy=$(policy relay)
@@ -150,4 +152,4 @@ mkdir -p "$(dirname "$output")"
 [[ ! -e "$output" && ! -L "$output" ]] || exit 2
 mv "$work" "$output"
 work=$(mktemp -d)
-echo "PASS: 24 assertions; sanitized evidence: $output"
+echo "PASS: 25 assertions; sanitized evidence: $output"

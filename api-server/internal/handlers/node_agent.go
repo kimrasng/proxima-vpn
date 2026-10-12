@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log"
 	"math"
 
@@ -14,7 +13,6 @@ import (
 	"github.com/proximavpn/proxima-vpn/api-server/internal/metrics"
 	"github.com/proximavpn/proxima-vpn/api-server/internal/services"
 	"github.com/proximavpn/proxima-vpn/pkg/crypto"
-	"github.com/proximavpn/proxima-vpn/pkg/nodeprov"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -355,6 +353,11 @@ type heartbeatRequest struct {
 	ShapingOK    bool   `json:"shaping_ok"`
 	ShapingTiers int    `json:"shaping_tiers"`
 	ShapingError string `json:"shaping_error"`
+	// The forwarding policy the agent has installed and its last
+	// reconciliation error. Empty from agents that predate policy reporting;
+	// those keep whatever was stored (NULL), which the panel shows as unknown.
+	PolicyFingerprint string `json:"policy_fingerprint"`
+	PolicyError       string `json:"policy_error"`
 }
 
 func (h *NodeAgentHandler) Heartbeat(c *fiber.Ctx) error {
@@ -375,6 +378,9 @@ func (h *NodeAgentHandler) Heartbeat(c *fiber.Ctx) error {
 		     xray_version = COALESCE(NULLIF($7, ''), xray_version),
 		     config_hash = $8, xray_running = $9,
 		     shaping_ok = $10, shaping_tiers = $11, shaping_error = $12, shaping_mode = $14,
+		     policy_fingerprint = COALESCE(NULLIF($15, ''), policy_fingerprint),
+		     policy_error = CASE WHEN $15 = '' AND $16 = '' THEN policy_error ELSE NULLIF($16, '') END,
+		     policy_reported_at = CASE WHEN $15 = '' AND $16 = '' THEN policy_reported_at ELSE NOW() END,
 		     -- Only on the offline -> online edge: stamping every heartbeat
 		     -- would make the age of the current state always read as seconds.
 		     status_changed_at = CASE
@@ -385,6 +391,7 @@ func (h *NodeAgentHandler) Heartbeat(c *fiber.Ctx) error {
 		req.NetworkIn, req.NetworkOut, req.XrayVersion,
 		req.ConfigHash, req.XrayRunning,
 		req.ShapingOK, req.ShapingTiers, req.ShapingError, nodeID, req.ShapingMode,
+		req.PolicyFingerprint, req.PolicyError,
 	)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -736,53 +743,9 @@ func (h *NodeAgentHandler) Stats(c *fiber.Ctx) error {
 // Hysteria2 and WireGuard alike.
 func (h *NodeAgentHandler) GetRelayRules(c *fiber.Ctx) error {
 	nodeID := c.Locals("node_id").(string)
-
-	rows, err := h.db.Query(
-		context.Background(),
-		`SELECT c.entry_port, c.transport, host(e.ip), c.exit_port
-		 FROM node_chains c
-		 JOIN nodes relay_node ON relay_node.id = $1
-		 JOIN nodes e ON e.id = c.exit_node_id
-		 WHERE relay_node.role IN ('relay', 'both')
-		   AND (c.entry_node_id = relay_node.id OR (c.entry_node_id IS NULL AND EXISTS (
-		     SELECT 1 FROM node_group_nodes ngn
-		     WHERE ngn.node_group_id = c.relay_pool_id AND ngn.node_id = relay_node.id
-		   )))
-		   AND c.enabled = true
-		   AND c.mode = 'l4_dnat'
-		 ORDER BY c.entry_port, c.transport`,
-		nodeID,
-	)
+	rules, err := services.RelayRulesForNode(c.UserContext(), h.db, nodeID)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "failed to fetch relay rules",
-		})
+		return policyRulesError(c, err, "relay")
 	}
-	defer rows.Close()
-
-	rules := make([]nodeprov.RelayRule, 0)
-	for rows.Next() {
-		var r nodeprov.RelayRule
-		if err := rows.Scan(&r.EntryPort, &r.Transport, &r.ExitIP, &r.ExitPort); err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"error": "failed to scan relay rule",
-			})
-		}
-		// A malformed row would otherwise reach nftables as a broken rule and
-		// take the whole ruleset down with it, dropping every other chain on
-		// this relay.
-		if err := r.Validate(); err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"error": fmt.Sprintf("invalid relay rule: %v", err),
-			})
-		}
-		rules = append(rules, r)
-	}
-	if err := rows.Err(); err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "failed to read relay rules",
-		})
-	}
-
 	return c.JSON(rules)
 }

@@ -151,7 +151,21 @@
       "direct": "Direct connection",
       "configuration": "Configuration checks",
       "enabledLabel": "Configuration enabled",
-      "applyUnverified": "Application acknowledgment unavailable",
+      "applyColumn": "Applied on servers",
+      "applyStates": {
+        "applied": "Applied",
+        "pending": "Waiting for servers",
+        "failed": "Apply failed",
+        "unknown": "Not reported",
+        "not_applicable": "Not needed"
+      },
+      "applyHint": {
+        "applied": "The Entry and Exit both run the current forwarding rules.",
+        "pending": "A server still runs older forwarding rules. It updates within about 30 seconds.",
+        "failed": "A server could not apply the forwarding rules. Traffic follows its last working rules.",
+        "unknown": "A server has not reported its forwarding rules, usually because its agent is older. Update the agent.",
+        "not_applicable": "Direct and disabled routes install no forwarding rules."
+      },
       "managePlans": "Manage plan routes",
       "batchTitle": "{{name}} — Connect multiple Exits",
       "chooseExits": "Exit servers to connect",

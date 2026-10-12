@@ -4,7 +4,7 @@
 const fs = require('node:fs');
 
 const required = [
-  'topology', 'profile_a', 'profile_b', 'agents_ack', 'entry_forward_only',
+  'topology', 'profile_a', 'profile_b', 'agents_ack', 'routes_applied', 'entry_forward_only',
   'tcp_a', 'tcp_b', 'udp_a', 'udp_b', 'unused_port', 'swapped_port_a',
   'swapped_port_b', 'cross_credentials_a', 'cross_credentials_b',
   'uuid_swap_a', 'uuid_swap_b', 'direct_a', 'direct_b',
