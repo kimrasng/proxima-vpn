@@ -106,5 +106,12 @@ case "$E2E_MODE" in
   lkg)
     healthy A 1101; healthy B 1102
     ;;
+  load)
+    # Benchmark both routes through real tunnels: the healthy controls prove
+    # each SOCKS listener reaches its own Exit before any number is taken.
+    healthy A 1101; healthy B 1102
+    loadgen bench -socks route-a=127.0.0.1:1101,route-b=127.0.0.1:1102 \
+      -tcp 198.51.100.10:9092 -udp 198.51.100.10:9093 ${E2E_LOAD_ARGS:-} >/client-out/load.json
+    ;;
   *) exit 1 ;;
 esac

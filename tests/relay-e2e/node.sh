@@ -9,6 +9,8 @@ if [[ "${E2E_ROLE}" == exit-* ]]; then
   printf '%s\n' "${E2E_MARKER}" > /www/index.html
   busybox httpd -f -p 127.0.0.1:9090 -h /www &
   udp-probe server 127.0.0.1:9091 "${E2E_MARKER}" &
+  # Load benchmark sink (TCP) and echo (UDP); see tests/relay-e2e/load.sh.
+  loadgen serve 127.0.0.1:9092 127.0.0.1:9093 &
   openssl req -x509 -newkey rsa:2048 -nodes -days 1 \
     -subj '/CN=decoy.relay-e2e.test' \
     -keyout /tmp/decoy.key -out /tmp/decoy.crt >/dev/null 2>&1

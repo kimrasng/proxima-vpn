@@ -33,4 +33,5 @@ COPY . .
 RUN install -m 755 tests/relay-e2e/xray-wrapper.sh /usr/local/bin/xray
 RUN go build -o /usr/local/bin/proxima-api ./api-server/cmd \
     && go build -tags relaye2e -o /usr/local/bin/node-agent ./node-agent/cmd \
-    && GO111MODULE=off go build -o /usr/local/bin/udp-probe ./tests/relay-e2e/udp-probe
+    && GO111MODULE=off go build -o /usr/local/bin/udp-probe ./tests/relay-e2e/udp-probe \
+    && GO111MODULE=off go build -o /usr/local/bin/loadgen ./tests/relay-e2e/loadgen

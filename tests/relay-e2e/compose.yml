@@ -140,11 +140,13 @@ services:
     command: ["bash", "/src/tests/relay-e2e/client.sh"]
     environment:
       E2E_MODE: ${E2E_MODE:-relayed}
+      E2E_LOAD_ARGS: ${E2E_LOAD_ARGS:-}
       RELAY_FRONT_IP: ${RELAY_FRONT_IP}
       EXIT_A_BACK_IP: ${EXIT_A_BACK_IP}
       EXIT_B_BACK_IP: ${EXIT_B_BACK_IP}
     volumes:
       - e2e-client:/state:ro
+      - e2e-client-out:/client-out
     networks:
       front:
         ipv4_address: ${CLIENT_FRONT_IP}
@@ -157,6 +159,7 @@ volumes:
   e2e-exit-a:
   e2e-exit-b:
   e2e-client:
+  e2e-client-out:
 
 networks:
   control: {}

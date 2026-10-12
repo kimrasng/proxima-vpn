@@ -16,14 +16,14 @@ for index in "${!args[@]}"; do
           finalRules: ([{
             action: "allow",
             ip: ["127.0.0.1/32"],
-             port: "9090,9091"
+             port: "9090-9093"
           }] + (.settings.finalRules // []))
         })
       else . end
     )
   ' "${args[$index]}" > "$patched"
   args[$index]=$patched
-  echo "relay E2E: applied test-only freedom allow for 127.0.0.1:9090" >&2
+  echo "relay E2E: applied test-only freedom allow for 127.0.0.1:9090-9093" >&2
   break
 done
 

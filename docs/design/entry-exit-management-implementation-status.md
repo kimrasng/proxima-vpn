@@ -10,20 +10,26 @@ This records an implementation increment against `entry-exit-plan-management-app
 - Entry port maps include legacy and direct routes and expose navigation from server inventory/details.
 - Multi-Exit creation previews exact port assignments before atomic backend creation. The current chain schema still requires registered endpoints and a managed Entry hostname; it does not yet persist pre-registration or hostname-less route drafts.
 - Saved-plan route assignment has its own panel, preserves unrelated draft edits and isolates changes when groups are shared.
-- Configuration checks, enabled state and lack of policy acknowledgments are explicitly distinct.
+- Configuration checks, enabled state and policy apply status are shown as separate columns.
 - Shared-tier shaping and unsupported per-device caps are explicitly called out.
 
 ## Update: per-device bandwidth implementation
 
 The previously missing device limiter now has a centralized Redis permit API, authenticated node-local SOCKS egress, deterministic Xray identity routing, runtime password materialization, and limited-subscription capability gates. See `per-device-bandwidth-contract.md` for the confirmed payload-rate contract, failure behavior and deployment constraints. This does not mark the other outstanding UI/readiness/metrics work complete.
 
+## Update: route apply status, per-route traffic and load benchmark
+
+- Agents report the fingerprint of the nftables policy they installed (`nodeprov.PolicyFingerprint`) and their last reconciliation error in every heartbeat. The panel computes the expected fingerprint from the same rule queries, so each route shows applied / waiting / failed / not reported / not needed for its Entry (or legacy pool members) and Exit.
+- Entries count forwarded bytes per route, protocol and direction with named nftables counters, read and zeroed atomically each heartbeat. The API attributes them to the chain the Entry carries, keeps hourly buckets for 30 days, and the route list shows the last 24 hours. Counts are wire bytes and run 1–2 % above tunnel payload.
+- `tests/relay-e2e/load.sh` benchmarks the containerized Entry → Exit path; results and limits are in `entry-exit-load-benchmark.md`. relay-e2e asserts both apply status and per-route traffic on the real topology.
+
 ## Not implemented / not advertised as complete
 
-- Production deployment, fleet load/latency capacity and live-host throughput validation.
+- Production deployment, fleet load/latency capacity and live-host throughput validation (the load benchmark is single-host only).
 - Pre-registration or hostname-less route draft persistence.
 - Authoritative subscriber-output preview shared with actual raw/Clash/Sing-box serialization.
-- Per-route policy-generation acknowledgments and safe publication gate based on applied configuration.
-- Per-route forwarding metrics and Entry capacity/congestion attribution.
+- A publication gate based on applied configuration (apply status is shown, not enforced).
+- Entry capacity/congestion attribution.
 - Same-port automatic load balancing or failover (out of scope).
 
 ## Historical limitation and chosen solution

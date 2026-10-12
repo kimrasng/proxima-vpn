@@ -40,6 +40,15 @@ invalid nft transaction must leave the table intact too.
 No public DNS, Cloudflare API, ACME or internet target participates at runtime.
 The Reality decoy is a local self-signed OpenSSL server. Building the isolated
 image **does** download the pinned Xray release and base/package images. A
-test-image-only Xray wrapper permits only loopback marker ports 9090/9091 in
+test-image-only Xray wrapper permits only loopback fixture ports 9090-9093 in
 the Exit freedom outbound; production config is not changed. All Compose
 resources and the uniquely tagged test image are removed on exit.
+
+## Load benchmark
+
+`bash tests/relay-e2e/load.sh [--output FILE]` builds the same topology (shared
+setup in `topology.sh`) and measures TCP/UDP throughput, connection setup and
+round-trip latency, concurrent streams, and the Entry's per-route counters
+against the tunnel payload, using `loadgen` behind the test-only fixture
+address on ports 9092/9093. Extra arguments go to `loadgen bench` (see its
+flags). Results and their limits: `docs/design/entry-exit-load-benchmark.md`.

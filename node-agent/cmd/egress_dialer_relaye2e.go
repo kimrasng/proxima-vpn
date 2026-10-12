@@ -15,7 +15,7 @@ import (
 // maps it, for the marker ports alone, to the Exit's loopback fixtures.
 const relayE2EFixtureHost = "198.51.100.10"
 
-var relayE2EFixturePorts = map[string]bool{"9090": true, "9091": true}
+var relayE2EFixturePorts = map[string]bool{"9090": true, "9091": true, "9092": true, "9093": true}
 
 func egressDialer() deviceegress.DialFunc {
 	base := &net.Dialer{Timeout: 10 * time.Second}
