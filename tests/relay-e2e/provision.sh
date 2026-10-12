@@ -168,6 +168,25 @@ route_traffic() {
   echo "routes never reported forwarded traffic (${totals:-0}/2 routes)" >&2
   exit 1
 }
+# Load benchmark: print each route's counted traffic once two consecutive
+# reads agree, i.e. the Entry has reported everything the load forwarded.
+load_traffic() {
+  source "$state"
+  local chains previous=""
+  for attempt in {1..60}; do
+    chains=$(curl -fsS "${api}/api/v1/admin/node-chains" -H "Authorization: Bearer ${ADMIN_TOKEN}")
+    current=$(jq -c --arg a "$CHAIN_A" --arg b "$CHAIN_B" \
+      '{"route-a": (.[] | select(.id == $a) | .traffic), "route-b": (.[] | select(.id == $b) | .traffic)}' <<<"$chains")
+    if [[ -n "$previous" && "$current" == "$previous" && "$current" != *null* ]]; then
+      jq . <<<"$current"
+      return
+    fi
+    previous=$current
+    sleep 11
+  done
+  echo 'route traffic never settled after the load' >&2
+  exit 1
+}
 legacy() {
   source "$state"
   local pool
@@ -201,7 +220,7 @@ INSERT INTO node_group_nodes(node_group_id,node_id) VALUES (:'pool',:'entry');
 SQL
 }
 case "$E2E_ACTION" in
-  provision) provision ;; subscription) subscription ;; apply) apply_status ;; traffic) route_traffic ;; legacy) legacy ;;
+  provision) provision ;; subscription) subscription ;; apply) apply_status ;; traffic) route_traffic ;; load_traffic) load_traffic ;; legacy) legacy ;;
   fault) fault ;; restore) restore ;;
   *) exit 1 ;;
 esac
