@@ -65,7 +65,7 @@ func ObserveClientAddresses(ctx context.Context, db *pgxpool.Pool, rdb *redis.Cl
 
 	entries := map[string]bool{}
 	reports := []nodeprov.RelayFlowReport{}
-	connections := []nodeprov.TunnelConnection{}
+	connections := []exitConnection{}
 	complete := true
 	reportIDs := []string{}
 	exits := 0
@@ -105,14 +105,14 @@ func ObserveClientAddresses(ctx context.Context, db *pgxpool.Pool, rdb *redis.Cl
 		reportIDs = append(reportIDs, "exit:"+p.id+":"+reportID)
 		for _, c := range report.Connections {
 			if owned[c.UUID] {
-				connections = append(connections, c)
+				connections = append(connections, exitConnection{exitID: p.id, connection: c})
 			}
 		}
 	}
 	if exits == 0 {
 		return ClientAddressObservation{}, fmt.Errorf("no Exit transport observers")
 	}
-	observation, err := JoinClientAddresses(connections, entries, reports)
+	observation, err := joinClientAddresses(connections, entries, reports)
 	if err != nil {
 		return ClientAddressObservation{}, err
 	}

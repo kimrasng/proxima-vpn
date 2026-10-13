@@ -8,6 +8,13 @@ import (
 	"github.com/proximavpn/proxima-vpn/pkg/nodeprov"
 )
 
+// ObservedAddressTransport is one exact authenticated Exit transport whose
+// original client address was resolved unambiguously.
+type ObservedAddressTransport struct {
+	ExitID     string
+	Connection nodeprov.TunnelConnection
+}
+
 // ClientAddressObservation joins authenticated Exit transports with the
 // Entry's pre-NAT address observations. It is a set of network addresses, not
 // a set of physical devices. Unknown relay attribution makes it incomplete.
@@ -20,13 +27,39 @@ type ClientAddressObservation struct {
 	// First authenticated transport time per address. A missing/ambiguous
 	// attribution never supplies a guessed start for eviction selection.
 	Starts map[string]int64
+	// Transports maps a client address to the exact Exit transports that
+	// resolved to it. Only unambiguously attributed transports are present:
+	// a direct peer, or an Entry peer with exactly one relay flow candidate.
+	Transports map[string][]ObservedAddressTransport
+}
+
+// exitConnection is an Exit transport tagged with the Exit that reported it.
+type exitConnection struct {
+	exitID     string
+	connection nodeprov.TunnelConnection
 }
 
 // JoinClientAddresses requires the caller to supply the known Entry peer
 // addresses for this Exit from authoritative topology, and only fresh reports.
 // Never infer "direct" merely because a relay flow is missing: an Entry peer
 // always requires one unambiguous original source address.
+//
+// The connections carry no Exit identity here, so Transports is left empty;
+// use joinClientAddresses to obtain exact transport ownership.
 func JoinClientAddresses(connections []nodeprov.TunnelConnection, entryPeers map[string]bool, reports []nodeprov.RelayFlowReport) (ClientAddressObservation, error) {
+	tagged := make([]exitConnection, 0, len(connections))
+	for _, connection := range connections {
+		tagged = append(tagged, exitConnection{connection: connection})
+	}
+	out, err := joinClientAddresses(tagged, entryPeers, reports)
+	if err != nil {
+		return ClientAddressObservation{}, err
+	}
+	out.Transports = nil
+	return out, nil
+}
+
+func joinClientAddresses(connections []exitConnection, entryPeers map[string]bool, reports []nodeprov.RelayFlowReport) (ClientAddressObservation, error) {
 	type tuple struct {
 		peer, exit         string
 		peerPort, exitPort int
@@ -48,20 +81,28 @@ func JoinClientAddresses(connections []nodeprov.TunnelConnection, entryPeers map
 		}
 	}
 	addresses := make(map[string]bool)
-	out := ClientAddressObservation{Complete: true, Addresses: []string{}, Starts: map[string]int64{}}
-	record := func(address string, acceptedAt int64) {
+	out := ClientAddressObservation{
+		Complete:   true,
+		Addresses:  []string{},
+		Starts:     map[string]int64{},
+		Transports: map[string][]ObservedAddressTransport{},
+	}
+	record := func(address string, tagged exitConnection) {
 		addresses[address] = true
+		acceptedAt := tagged.connection.AcceptedAt
 		if previous, exists := out.Starts[address]; !exists || acceptedAt < previous {
 			out.Starts[address] = acceptedAt
 		}
+		out.Transports[address] = append(out.Transports[address], ObservedAddressTransport{ExitID: tagged.exitID, Connection: tagged.connection})
 	}
-	for _, connection := range connections {
+	for _, tagged := range connections {
+		connection := tagged.connection
 		if err := connection.Validate(); err != nil {
 			return ClientAddressObservation{}, fmt.Errorf("invalid Exit transport: %w", err)
 		}
 		peer := netip.MustParseAddr(connection.PeerIP).Unmap().String()
 		if !entryPeers[peer] {
-			record(peer, connection.AcceptedAt)
+			record(peer, tagged)
 			continue
 		}
 		key := tuple{peer, netip.MustParseAddr(connection.LocalIP).Unmap().String(), connection.PeerPort, connection.LocalPort}
@@ -71,7 +112,7 @@ func JoinClientAddresses(connections []nodeprov.TunnelConnection, entryPeers map
 			continue
 		}
 		for address := range candidates {
-			record(address, connection.AcceptedAt)
+			record(address, tagged)
 		}
 	}
 	for address := range addresses {
