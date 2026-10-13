@@ -365,3 +365,109 @@ func TestDeviceEgressRejectsUnsafeSourceRouting(t *testing.T) {
 		}
 	}
 }
+
+func deniedDeviceConfig(t *testing.T, other bool) []byte {
+	t.Helper()
+	var cfg map[string]json.RawMessage
+	_ = json.Unmarshal(sourceDeviceConfig(t, false), &cfg)
+	cfg["outbounds"] = json.RawMessage(`[{"tag":"direct","protocol":"freedom"},{"tag":"block","protocol":"blackhole"}]`)
+	cfg["routing"] = json.RawMessage(`{"rules":[{"type":"field","user":["uuid-a@proxima"],"outboundTag":"block","ruleTag":"device-deny"},{"type":"field","inboundTag":["vless-reality-limit-10"],"outboundTag":"block"}]}`)
+	if other {
+		var original map[string]json.RawMessage
+		_ = json.Unmarshal(sourceDeviceConfig(t, false), &original)
+		var outbounds []json.RawMessage
+		_ = json.Unmarshal(original["outbounds"], &outbounds)
+		var denied []json.RawMessage
+		_ = json.Unmarshal(cfg["outbounds"], &denied)
+		denied = append(denied, json.RawMessage(strings.ReplaceAll(string(outbounds[1]), "uuid-a", "uuid-b")))
+		cfg["outbounds"], _ = json.Marshal(denied)
+		cfg["inbounds"] = json.RawMessage(strings.Replace(string(cfg["inbounds"]), `"clients":[`, `"clients":[{"id":"uuid-b","email":"uuid-b@proxima"},`, 1))
+		cfg["routing"] = json.RawMessage(strings.Replace(string(cfg["routing"]), `"rules":[`, `"rules":[{"type":"field","user":["uuid-b@proxima"],"source":["192.0.2.1/32"],"outboundTag":"device-egress-uuid-b~0123456789abcdef"},{"type":"field","user":["uuid-b@proxima"],"outboundTag":"block"},`, 1))
+	}
+	data, err := json.Marshal(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return data
+}
+
+func TestDeviceEgressExplicitDenyRevokesLastSource(t *testing.T) {
+	var credentials []devicebandwidth.Credential
+	var rates map[string]int
+	e := newDeviceEgress(func(c []devicebandwidth.Credential) error { credentials = c; return nil })
+	e.setRates = func(r map[string]int) { rates = r }
+	denied := deniedDeviceConfig(t, true)
+	// Admit A alongside B, then remove A's final source while retaining its identity.
+	before := append([]byte(nil), denied...)
+	var cfg map[string]json.RawMessage
+	_ = json.Unmarshal(before, &cfg)
+	var original map[string]json.RawMessage
+	_ = json.Unmarshal(sourceDeviceConfig(t, false), &original)
+	var outbounds, aOutbounds []json.RawMessage
+	_ = json.Unmarshal(cfg["outbounds"], &outbounds)
+	_ = json.Unmarshal(original["outbounds"], &aOutbounds)
+	outbounds = append(outbounds, aOutbounds[1])
+	cfg["outbounds"], _ = json.Marshal(outbounds)
+	cfg["routing"] = json.RawMessage(strings.Replace(string(cfg["routing"]), `"rules":[`, `"rules":[{"type":"field","user":["uuid-a@proxima"],"source":["192.0.2.1/32"],"outboundTag":"device-egress-uuid-a~0123456789abcdef"},`, 1))
+	before, _ = json.Marshal(cfg)
+	if _, err := e.TransformConfig(before); err != nil {
+		t.Fatal(err)
+	}
+	bTag := "device-egress-uuid-b~0123456789abcdef"
+	bPassword := e.passwords[bTag]
+	if _, err := e.TransformConfig(denied); err != nil {
+		t.Fatal(err)
+	}
+	if len(credentials) != 1 || credentials[0].UUID != "uuid-b" || credentials[0].Password != bPassword || len(e.passwords) != 1 {
+		t.Fatalf("last-source revocation changed remaining credentials: %+v", credentials)
+	}
+	if len(rates) != 1 || rates["uuid-b"] != 10 {
+		t.Fatalf("remaining UUID rate lost: %v", rates)
+	}
+	if len(e.authorized) != 2 || len(e.managed) != 1 {
+		t.Fatal("denied identity not authorized or incorrectly managed")
+	}
+	if err := e.CanRestore(before); err == nil {
+		t.Fatal("rollback resurrected removed last source")
+	}
+	if _, err := e.TransformConfig(deniedDeviceConfig(t, false)); err != nil {
+		t.Fatal(err)
+	}
+	if len(credentials) != 0 || len(rates) != 0 || len(e.passwords) != 0 {
+		t.Fatal("deny-only generation retained local credentials or rates")
+	}
+}
+
+func TestDeviceEgressExplicitDenyMustBeExactAndFirst(t *testing.T) {
+	canonical := string(deniedDeviceConfig(t, false))
+	for name, bad := range map[string]string{
+		"no explicit deny":     strings.Replace(canonical, `"user":["uuid-a@proxima"]`, `"user":["uuid-b@proxima"]`, 1),
+		"no fallback":          strings.ReplaceAll(canonical, `"inboundTag":["vless-reality-limit-10"]`, `"inboundTag":["other"]`),
+		"undeclared blackhole": strings.ReplaceAll(canonical, `"protocol":"blackhole"`, `"protocol":"freedom"`),
+		"wrong email":          strings.Replace(canonical, `"email":"uuid-a@proxima"`, `"email":"wrong@proxima"`, 1),
+		"multiple users":       strings.Replace(canonical, `"user":["uuid-a@proxima"]`, `"user":["uuid-a@proxima","uuid-b@proxima"]`, 1),
+		"earlier direct":       strings.Replace(canonical, `"rules":[`, `"rules":[{"type":"field","outboundTag":"direct"},`, 1),
+		"earlier source":       strings.Replace(canonical, `"rules":[`, `"rules":[{"type":"field","user":["uuid-a@proxima"],"source":["192.0.2.1/32"],"outboundTag":"block"},`, 1),
+		"conditional fallback": strings.Replace(canonical, `"inboundTag":["vless-reality-limit-10"]`, `"inboundTag":["vless-reality-limit-10"],"network":"tcp"`, 1),
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := parseDeviceConfig([]byte(bad)); err == nil {
+				t.Fatal("unsafe denied declaration accepted")
+			}
+		})
+	}
+	for _, field := range []string{`"source":["192.0.2.1/32"]`, `"inboundTag":["vless-reality-limit-10"]`, `"network":"tcp"`, `"domain":["example.org"]`, `"source":[]`} {
+		t.Run(field, func(t *testing.T) {
+			bad := strings.Replace(canonical, `"user":["uuid-a@proxima"]`, `"user":["uuid-a@proxima"],`+field, 1)
+			if _, err := parseDeviceConfig([]byte(bad)); err == nil {
+				t.Fatal("conditional denied declaration accepted")
+			}
+		})
+	}
+	// Unlimited controlled inbounds must not silently accept missing egress either.
+	bad := strings.ReplaceAll(canonical, "vless-reality-limit-10", "vless-in")
+	bad = strings.Replace(bad, `"user":["uuid-a@proxima"]`, `"user":["other@proxima"]`, 1)
+	if _, err := parseDeviceConfig([]byte(bad)); err == nil {
+		t.Fatal("unlimited controlled inbound accepted missing explicit deny")
+	}
+}

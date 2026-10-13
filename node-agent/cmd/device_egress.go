@@ -138,6 +138,19 @@ func parseDeviceConfig(data []byte) (*deviceConfig, error) {
 	}
 	for _, inbound := range inbounds {
 		limitMbps, limited := speedtier.ParseLimitTag(inbound.Tag)
+		controlled := limited || len(cfg.devices) > 0
+		for _, raw := range routing.Rules {
+			var rule struct {
+				InboundTag  []string `json:"inboundTag"`
+				OutboundTag string   `json:"outboundTag"`
+			}
+			if err := decodeDeviceRule(raw, &rule); err != nil {
+				return nil, err
+			}
+			if containsString(rule.InboundTag, inbound.Tag) && denyTags[rule.OutboundTag] {
+				controlled = true
+			}
+		}
 		for _, user := range inbound.Settings.Clients {
 			identity := user.ID
 			if identity == "" {
@@ -147,7 +160,16 @@ func parseDeviceConfig(data []byte) (*deviceConfig, error) {
 			// protocol must not resurrect a revoked credential either.
 			cfg.identities[inbound.Protocol+"\x00"+inbound.Tag+"\x00"+identity+"\x00"+user.Email] = struct{}{}
 			managed := managedIDs[user.ID]
-			if (limited || len(cfg.devices) > 0 && inbound.Protocol == "vless") && (inbound.Protocol != "vless" || !managed) {
+			if inbound.Protocol == "vless" && !managed {
+				denied, err := explicitlyDeniedDevice(routing.Rules, inbound.Tag, user.ID, user.Email, denyTags)
+				if err != nil {
+					return nil, err
+				}
+				if denied {
+					continue // Authorized inbound identity, but no local credential or rate.
+				}
+			}
+			if (limited || controlled && inbound.Protocol == "vless") && (inbound.Protocol != "vless" || !managed) {
 				return nil, fmt.Errorf("controlled inbound %q has no device egress", inbound.Tag)
 			}
 			if inbound.Protocol != "vless" || !managed {
@@ -261,6 +283,62 @@ func parseLocalDeviceTag(tag string) (id, sourceKey string, valid bool) {
 		}
 	}
 	return id, sourceKey, true
+}
+
+// explicitlyDeniedDevice allows an inbound credential to survive removal of
+// its last source. Only a first-match, exact user deny is a declaration; an
+// inbound catchall alone must never authorize missing device egress.
+func explicitlyDeniedDevice(rules []map[string]json.RawMessage, inbound, id, email string, denyTags map[string]bool) (bool, error) {
+	if id == "" || email != id+"@proxima" {
+		return false, nil
+	}
+	for i, raw := range rules {
+		var rule struct {
+			Type        string   `json:"type"`
+			User        []string `json:"user"`
+			InboundTag  []string `json:"inboundTag"`
+			OutboundTag string   `json:"outboundTag"`
+		}
+		if err := decodeDeviceRule(raw, &rule); err != nil {
+			return false, err
+		}
+		if len(rule.User) > 0 && !containsString(rule.User, email) || len(rule.InboundTag) > 0 && !containsString(rule.InboundTag, inbound) {
+			continue
+		}
+		if rule.Type != "field" || len(rule.User) != 1 || rule.User[0] != email || !denyTags[rule.OutboundTag] {
+			return false, nil
+		}
+		for key := range raw {
+			switch key {
+			case "type", "user", "outboundTag", "ruleTag":
+			default:
+				return false, nil
+			}
+		}
+		// Keep the controlled inbound's unconditional fail-closed fallback.
+		for _, fallback := range rules[i+1:] {
+			rule.User, rule.InboundTag, rule.Type, rule.OutboundTag = nil, nil, "", ""
+			if err := decodeDeviceRule(fallback, &rule); err != nil {
+				return false, err
+			}
+			if len(rule.User) > 0 || !containsString(rule.InboundTag, inbound) {
+				continue
+			}
+			if rule.Type != "field" || len(rule.InboundTag) != 1 || !denyTags[rule.OutboundTag] {
+				break
+			}
+			for key := range fallback {
+				switch key {
+				case "type", "inboundTag", "outboundTag", "ruleTag":
+				default:
+					return false, fmt.Errorf("controlled inbound %q lacks unconditional deny fallback", inbound)
+				}
+			}
+			return true, nil
+		}
+		return false, fmt.Errorf("controlled inbound %q lacks unconditional deny fallback", inbound)
+	}
+	return false, nil
 }
 
 func decodeDeviceRule(raw map[string]json.RawMessage, rule any) error {

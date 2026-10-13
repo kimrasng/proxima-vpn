@@ -23,7 +23,24 @@ func IsDeviceRule(rule map[string]json.RawMessage) bool {
 	var outbound string
 	_ = json.Unmarshal(rule["outboundTag"], &outbound)
 	if !IsDeviceOutboundTag(outbound) {
-		return false
+		// Explicit per-credential deny remains live-managed when its tag and
+		// exact authenticated user agree. Structural inbound fallback stays.
+		var tag string
+		var users []string
+		_ = json.Unmarshal(rule["ruleTag"], &tag)
+		if outbound != "block" || !strings.HasPrefix(tag, "client-address-deny-") || json.Unmarshal(rule["user"], &users) != nil || len(users) != 1 {
+			return false
+		}
+		id := strings.TrimPrefix(tag, "client-address-deny-")
+		if id == "" || users[0] != DeviceUser(id) {
+			return false
+		}
+		for key := range rule {
+			if key != "type" && key != "ruleTag" && key != "user" && key != "outboundTag" {
+				return false
+			}
+		}
+		return true
 	}
 	var users []string
 	if err := json.Unmarshal(rule["user"], &users); err != nil || len(users) != 1 {

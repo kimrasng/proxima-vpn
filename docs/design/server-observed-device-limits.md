@@ -93,9 +93,21 @@ container with all capabilities dropped. Selective enforcement remains open.
   unambiguous evidence. Account-wide starts survive Exit switches and partial
   reports; confirmed absence resets them. The administrator endpoint exposes
   the proposal with `enforced: false`.
+- The real-Xray selective egress test now covers removing one source and the
+  final source: targeted existing streams close, removed sources cannot
+  reconnect, survivors continue, and the same Xray PID remains running.
+- API canonical address allowlists retain all controlled-inbound deny
+  fallbacks and emit explicit credential deny when the list becomes empty.
+  This builder is still not automatically applied to production config.
+- Atomic account-wide observed-address reservations prevent concurrent
+  Exits from admitting N+1 addresses. Reservations deliberately have no TTL:
+  lost observations are not evidence that live connections closed. Confirmed
+  absence/release and production admission integration remain open.
+- A policy proposal retains older address cohorts up to the cap; equal start
+  times at the cutoff suspend selection instead of choosing arbitrarily.
 - These primitives are **not yet an integrated enforcement path**. Initial
   source admission, relayed source-to-egress association, automatic policy
-  construction, reconnect denial and multi-client real-Xray closure E2E remain.
+  construction and fleet policy acknowledgement remain open.
 - Same-account multi-address direct/relayed enforcement E2E remains open.
 
 Do not enable or advertise these unfinished paths as enforcing device limits.

@@ -5,6 +5,25 @@ import (
 	"testing"
 )
 
+func TestExplicitAddressDenyIsLiveManagedNotStructuralFallback(t *testing.T) {
+	for _, data := range []struct {
+		raw  string
+		want bool
+	}{
+		{`{"type":"field","user":["uuid@proxima"],"outboundTag":"block","ruleTag":"client-address-deny-uuid"}`, true},
+		{`{"type":"field","inboundTag":["vless-in"],"outboundTag":"block"}`, false},
+		{`{"type":"field","user":["other@proxima"],"outboundTag":"block","ruleTag":"client-address-deny-uuid"}`, false},
+	} {
+		var rule map[string]json.RawMessage
+		if err := json.Unmarshal([]byte(data.raw), &rule); err != nil {
+			t.Fatal(err)
+		}
+		if got := IsDeviceRule(rule); got != data.want {
+			t.Fatalf("rule=%s got=%v", data.raw, got)
+		}
+	}
+}
+
 func TestAddressQualifiedRuleIsLiveTopologyOnlyWithExactSource(t *testing.T) {
 	for _, test := range []struct {
 		source string
