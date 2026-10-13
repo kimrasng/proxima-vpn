@@ -1,5 +1,10 @@
 # Server-observed concurrent client limits
 
+> Superseded policy direction: the user clarified that concurrency means
+> authenticated tunnel session count, not distinct client IPs. See
+> `tunnel-session-concurrency.md`. Address-cohort primitives below remain
+> experimental and are not enabled as the session limiter.
+
 Status: PHS4 implementation in progress. **Enforcement of multiple clients
 sharing an account UUID is not implemented yet.** The existing UUID admission
 and eviction paths count credentials, not physical devices.

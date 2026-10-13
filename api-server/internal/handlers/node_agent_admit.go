@@ -20,6 +20,11 @@ func (h *NodeAgentHandler) AdmitDevice(c *fiber.Ctx) error {
 	var req struct {
 		DeviceUUID    string `json:"device_uuid"`
 		SourceAddress string `json:"source_address"`
+		RelayPeer     *struct {
+			IP        string `json:"ip"`
+			Port      int    `json:"port"`
+			LocalPort int    `json:"local_port"`
+		} `json:"relay_peer"`
 	}
 	if err := json.Unmarshal(c.Body(), &req); err != nil {
 		return c.SendStatus(400)
@@ -32,7 +37,12 @@ func (h *NodeAgentHandler) AdmitDevice(c *fiber.Ctx) error {
 	defer cancel()
 	service := services.NewDeviceBandwidthService(h.db, h.redis)
 	var allowed bool
-	if req.SourceAddress != "" {
+	if req.RelayPeer != nil && req.SourceAddress != "" {
+		return c.Status(400).JSON(fiber.Map{"error": "ambiguous admission source"})
+	}
+	if req.RelayPeer != nil {
+		allowed, err = service.AdmitProvenRelaySource(ctx, nodeID, device.String(), req.RelayPeer.IP, req.RelayPeer.Port, req.RelayPeer.LocalPort)
+	} else if req.SourceAddress != "" {
 		allowed, err = service.AdmitSourceDevice(ctx, nodeID, device.String(), req.SourceAddress)
 	} else {
 		allowed, err = service.AdmitDevice(ctx, nodeID, device.String())
@@ -43,7 +53,7 @@ func (h *NodeAgentHandler) AdmitDevice(c *fiber.Ctx) error {
 	c.Set("Cache-Control", "no-store")
 	if !allowed {
 		message := "online UUID limit reached"
-		if req.SourceAddress != "" {
+		if req.SourceAddress != "" || req.RelayPeer != nil {
 			message = "online address limit reached"
 		}
 		return c.Status(409).JSON(fiber.Map{"error": message})

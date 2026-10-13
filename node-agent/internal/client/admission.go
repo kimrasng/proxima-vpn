@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"github.com/google/uuid"
 	"net/http"
+	"net/netip"
 	"time"
 )
 
@@ -30,16 +31,32 @@ func (c *APIClient) AdmitDevice(ctx context.Context, deviceUUID string) error {
 }
 
 func (c *APIClient) admit(ctx context.Context, deviceUUID, source string) error {
+	payload := map[string]any{}
+	if source != "" {
+		payload["source_address"] = source
+	}
+	return c.admitPayload(ctx, deviceUUID, payload, source != "")
+}
+
+// AdmitRelayPeer sends an observed Exit transport tuple; the server resolves
+// its original source from eligible Entry reports rather than trusting a
+// caller-provided original address.
+func (c *APIClient) AdmitRelayPeer(ctx context.Context, deviceUUID, peerIP string, peerPort, localPort int) error {
+	ip, err := netip.ParseAddr(peerIP)
+	if err != nil || ip.Zone() != "" || ip.IsUnspecified() || ip.IsMulticast() || peerPort < 1 || peerPort > 65535 || localPort < 1 || localPort > 65535 {
+		return errors.New("invalid relay admission tuple")
+	}
+	return c.admitPayload(ctx, deviceUUID, map[string]any{"relay_peer": map[string]any{"ip": ip.Unmap().String(), "port": peerPort, "local_port": localPort}}, true)
+}
+
+func (c *APIClient) admitPayload(ctx context.Context, deviceUUID string, payload map[string]any, addressAdmission bool) error {
 	device, err := uuid.Parse(deviceUUID)
 	if err != nil {
 		return fmt.Errorf("invalid UUID admission")
 	}
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
-	payload := map[string]string{"device_uuid": device.String()}
-	if source != "" {
-		payload["source_address"] = source
-	}
+	payload["device_uuid"] = device.String()
 	body, _ := json.Marshal(payload)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/api/v1/nodes/%s/devices/admit", c.serverURL, c.nodeID), bytes.NewReader(body))
 	if err != nil {
@@ -58,7 +75,7 @@ func (c *APIClient) admit(ctx context.Context, deviceUUID, source string) error 
 		return nil
 	}
 	if resp.StatusCode == http.StatusConflict {
-		if source != "" {
+		if addressAdmission {
 			return ErrAddressCapacity
 		}
 		return ErrUUIDCapacity

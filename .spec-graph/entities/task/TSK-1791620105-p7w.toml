@@ -5,11 +5,11 @@ title = "Enforce concurrent device caps from server-observed sessions"
 description = "Real apps do not send x-hwid, so concurrency must be measured from Exit observations."
 status = "active"
 created_at = 2026-10-10T17:15:05+09:00
-updated_at = 2026-10-13T11:55:23+09:00
+updated_at = 2026-10-13T14:57:07+09:00
 
 [metadata]
-acceptance = ["N+1 concurrent client addresses on one account, without x-hwid, through direct and relayed routes, are detected and the newest is blocked."]
-instructions = ["Remove every use of x-hwid; the account URL serves the account UUID to every client.", "Entry: record per relayed connection the original client address (nftables map keyed by masqueraded flow) and report it.", "Exit: index live tunnel connections by UUID from Xray's access log and report (UUID, peer address, port) per connection.", "API: join Exit connections with Entry flows to get account-wide distinct client addresses; enforce the plan cap by blocking the newest address.", "Add end-to-end tests through direct and relayed routes."]
+acceptance = ["N+1 authenticated tunnel sessions on one account are detected and enforced, including sessions sharing one IP and UUID."]
+instructions = ["Ignore x-hwid entirely; it is absent from the system model.", "Count authenticated live tunnel connections across Exit nodes, not distinct addresses, physical devices or UUIDs.", "Separate transports on the same UUID/IP consume separate slots; destination streams within a transport do not.", "Preserve incomplete-observation gates and verify N+1 tunnel session enforcement through direct and relayed routes."]
 must_not = ["Do not require x-hwid."]
 order = 1.0
 qa = [{command = "cd api-server && TEST_DATABASE_URL=$TEST_DATABASE_URL TEST_REDIS_ADDR=$TEST_REDIS_ADDR go test -p 1 ./...", evidence = "", expected = "exit 0"}]
@@ -20,5 +20,5 @@ to = "PHS-1791620103-avd"
 type = "belongs_to"
 
 [[relations]]
-to = "REQ-1791620102-300"
+to = "REQ-1791870953-qx5"
 type = "covers"

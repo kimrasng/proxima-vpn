@@ -1,17 +1,20 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net"
+	"net/netip"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -233,6 +236,249 @@ func TestSourceEgressLive(t *testing.T) {
 	}
 	if _, err := os.Stat(fmt.Sprintf("/proc/%d", pid)); err != nil {
 		t.Fatalf("original Xray PID died after last-source removal: %v", err)
+	}
+}
+
+// TestDeniedSourceLearningLive proves that the initial explicit UUID deny still
+// emits authenticated source evidence, which can bootstrap a live source route.
+// Run with the same disposable-container opt-in and pinned Xray as above.
+func TestDeniedSourceLearningLive(t *testing.T) {
+	if os.Getenv("PROXIMA_SOURCE_EGRESS_LIVE") != "1" {
+		t.Skip("requires opt-in disposable container: PROXIMA_SOURCE_EGRESS_LIVE=1")
+	}
+	if runtime.GOOS != "linux" {
+		t.Fatal("run in a disposable Linux container with distinct loopback sources")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	binary := os.Getenv("PROXIMA_SOURCE_EGRESS_XRAY")
+	if binary == "" {
+		binary = "/usr/local/bin/xray"
+	}
+	version, err := exec.CommandContext(ctx, binary, "version").CombinedOutput()
+	if err != nil || !strings.HasPrefix(string(version), "Xray 26.7.28 ") {
+		t.Fatalf("requires Xray 26.7.28: %s (%v)", version, err)
+	}
+	const uuid = "8f1c7e0a-1b2c-4d3e-9f40-112233445566"
+	const source = "127.0.0.2"
+	sink, err := net.Listen("tcp4", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = sink.Close() }()
+	var sinkBytes atomic.Int64
+	go func() {
+		for {
+			conn, err := sink.Accept()
+			if err != nil {
+				return
+			}
+			go func() {
+				defer func() { _ = conn.Close() }()
+				_ = conn.SetDeadline(time.Now().Add(60 * time.Second))
+				var buf [1024]byte
+				for {
+					n, err := conn.Read(buf[:])
+					if n > 0 {
+						sinkBytes.Add(int64(n))
+						if _, writeErr := conn.Write(buf[:n]); writeErr != nil {
+							return
+						}
+					}
+					if err != nil {
+						return
+					}
+				}
+			}()
+		}
+	}()
+	admitted := make(chan string, 4)
+	server := deviceegress.NewWithDialer(func(_ context.Context, id string, _ devicebandwidth.Direction, _ int) (devicebandwidth.PermitResponse, error) {
+		return devicebandwidth.PermitResponse{Allowed: id == uuid}, nil
+	}, func(ctx context.Context, network, address string) (net.Conn, error) {
+		if address != "93.184.216.34:80" {
+			return nil, fmt.Errorf("unexpected destination %s", address)
+		}
+		return (&net.Dialer{Timeout: 3 * time.Second}).DialContext(ctx, network, sink.Addr().String())
+	})
+	server.SetSourceAdmitter(func(_ context.Context, id, peerSource string) error {
+		if id != uuid || peerSource != source {
+			return fmt.Errorf("unexpected authenticated source cohort %s/%s", id, peerSource)
+		}
+		select {
+		case admitted <- peerSource:
+		default:
+		}
+		return nil
+	})
+	if err := server.Start(ctx, devicebandwidth.ListenAddress); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = server.Close() }()
+	egress := newDeviceEgress(server.SetCredentials)
+	apiPort, ingressPort := sourceEgressLivePort(t), sourceEgressLivePort(t)
+	canonical := func(allowed bool) []byte {
+		outbounds := []any{map[string]any{"tag": "block", "protocol": "blackhole"}}
+		rules := []any{map[string]any{"type": "field", "inboundTag": []string{"api"}, "outboundTag": "api"}}
+		if allowed {
+			tag := devicebandwidth.OutboundPrefix + uuid + "~" + strings.Repeat("2", 32)
+			outbounds = append(outbounds, map[string]any{"tag": tag, "protocol": "socks", "settings": map[string]any{"servers": []any{map[string]any{"address": "127.0.0.1", "port": devicebandwidth.Port, "users": []any{map[string]any{"user": uuid, "pass": deviceEgressPlaceholder}}}}}})
+			rules = append(rules, map[string]any{"type": "field", "user": []string{uuid + "@proxima"}, "inboundTag": []string{"vless-in"}, "source": []string{source + "/32"}, "outboundTag": tag})
+		}
+		// Initial topology has an explicit UUID deny and no device egress.
+		rules = append(rules, map[string]any{"type": "field", "user": []string{uuid + "@proxima"}, "outboundTag": "block"}, map[string]any{"type": "field", "inboundTag": []string{"vless-in"}, "outboundTag": "block"})
+		cfg := map[string]any{
+			"log": map[string]any{"loglevel": "warning", "access": ""},
+			"api": map[string]any{"tag": "api", "services": []string{"HandlerService", "RoutingService"}},
+			"inbounds": []any{
+				map[string]any{"tag": "api", "listen": "127.0.0.1", "port": apiPort, "protocol": "dokodemo-door", "settings": map[string]any{"address": "127.0.0.1"}},
+				map[string]any{"tag": "vless-in", "listen": "127.0.0.1", "port": ingressPort, "protocol": "vless", "settings": map[string]any{"decryption": "none", "clients": []any{map[string]any{"id": uuid, "email": uuid + "@proxima"}}}, "streamSettings": map[string]any{"network": "tcp", "security": "none"}},
+			},
+			"outbounds": outbounds, "routing": map[string]any{"rules": rules},
+		}
+		data, err := json.Marshal(cfg)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return data
+	}
+	before, err := egress.TransformConfig(canonical(false))
+	if err != nil {
+		t.Fatal(err)
+	}
+	config := filepath.Join(t.TempDir(), "xray.json")
+	if err := os.WriteFile(config, before, 0600); err != nil {
+		t.Fatal(err)
+	}
+	index := xray.NewAccessIndex()
+	lines := make(chan string, 32)
+	process := exec.CommandContext(ctx, binary, "run", "-config", config)
+	stdout, err := process.StdoutPipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	process.Stderr = process.Stdout
+	if err := process.Start(); err != nil {
+		t.Fatal(err)
+	}
+	pid := process.Process.Pid
+	var logs strings.Builder
+	scanned := make(chan error, 1)
+	go func() {
+		scanner := bufio.NewScanner(stdout)
+		for scanner.Scan() {
+			line := scanner.Text()
+			logs.WriteString(line + "\n")
+			index.Observe(line, time.Now())
+			select {
+			case lines <- line:
+			default:
+			}
+		}
+		scanned <- scanner.Err()
+	}()
+	defer func() {
+		_ = process.Process.Kill()
+		select {
+		case err := <-scanned:
+			if err != nil {
+				t.Errorf("scan Xray output: %v", err)
+			}
+			if t.Failed() {
+				t.Logf("Xray log:\n%s", logs.String())
+			}
+		case <-time.After(3 * time.Second):
+			t.Error("Xray output scanner did not finish")
+		}
+		_ = process.Wait()
+	}()
+	apiAddr := fmt.Sprintf("127.0.0.1:%d", apiPort)
+	readyCtx, stopReady := context.WithTimeout(ctx, 8*time.Second)
+	defer stopReady()
+	ticker := time.NewTicker(50 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		conn, err := net.DialTimeout("tcp4", apiAddr, 100*time.Millisecond)
+		if err == nil {
+			_ = conn.Close()
+			break
+		}
+		select {
+		case <-readyCtx.Done():
+			t.Fatal("Xray API did not start")
+		case <-ticker.C:
+		}
+	}
+	ingress := fmt.Sprintf("127.0.0.1:%d", ingressPort)
+	denied := sourceEgressLiveConnect(t, ingress, source, uuid)
+	peer := denied.LocalAddr().(*net.TCPAddr).AddrPort()
+	if peer.Addr() != netip.MustParseAddr(source) {
+		t.Fatalf("unexpected bound source: %s", peer)
+	}
+	if _, err := io.WriteString(denied, "denied-must-not-reach-sink"); err != nil {
+		t.Fatal(err)
+	}
+	var one [1]byte
+	if _, err := denied.Read(one[:]); err == nil {
+		t.Fatal("denied connection forwarded traffic")
+	} else if timeout, ok := err.(net.Error); ok && timeout.Timeout() {
+		t.Fatalf("denied connection was not promptly closed: %v", err)
+	}
+	learningCtx, stopLearning := context.WithTimeout(ctx, 5*time.Second)
+	defer stopLearning()
+	for {
+		select {
+		case line := <-lines:
+			if !strings.Contains(line, "from "+peer.String()+" accepted ") || !strings.Contains(line, "[vless-in -> block]") || !strings.Contains(line, "email: "+uuid+"@proxima") {
+				continue
+			}
+			owner, known, complete := index.Lookup(peer)
+			if !known || !complete || owner.UUID != uuid || owner.Peer != peer || owner.AcceptedAt.IsZero() {
+				t.Fatalf("denied access log did not learn exact authenticated peer: %+v known=%v complete=%v", owner, known, complete)
+			}
+			t.Logf("denied authenticated source evidence: %s", line)
+		case <-learningCtx.Done():
+			t.Fatal("denied authenticated access log with exact source and block route not observed")
+		}
+		break
+	}
+	if got := sinkBytes.Load(); got != 0 {
+		t.Fatalf("denied payload reached echo sink: %d bytes", got)
+	}
+	select {
+	case got := <-admitted:
+		t.Fatalf("denied connection reached source admission: %s", got)
+	default:
+	}
+	client, err := xray.NewStatsClient(apiAddr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = client.Close() }()
+	after, err := egress.TransformConfig(canonical(true))
+	if err != nil {
+		t.Fatal(err)
+	}
+	rpcCtx, stopRPC := context.WithTimeout(ctx, 8*time.Second)
+	defer stopRPC()
+	if !syncDeviceTopology(rpcCtx, client, before, after) {
+		t.Fatal("deny-to-source live sync failed (restart is not allowed)")
+	}
+	fresh := sourceEgressLiveConnect(t, ingress, source, uuid)
+	sourceEgressLiveEcho(t, fresh, "learned-source-fresh-retry")
+	select {
+	case got := <-admitted:
+		if got != source {
+			t.Fatalf("unexpected admitted source: %s", got)
+		}
+	case <-rpcCtx.Done():
+		t.Fatal("fresh retry did not invoke authenticated source callback")
+	}
+	if process.Process.Pid != pid {
+		t.Fatal("Xray PID changed")
+	}
+	if _, err := os.Stat(fmt.Sprintf("/proc/%d", pid)); err != nil {
+		t.Fatalf("original Xray PID no longer alive: %v", err)
 	}
 }
 
