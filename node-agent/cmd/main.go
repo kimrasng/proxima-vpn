@@ -214,6 +214,9 @@ func runCmd() *cobra.Command {
 			limiter := newLocalBandwidth()
 			egressServer := deviceegress.NewWithDialer(limiter.Permit, egressDialer())
 			egressServer.SetAdmitter(apiClient.AdmitDevice)
+			egressServer.SetSourceAdmitter(apiClient.AdmitSource)
+			// Session-token admission remains deliberately unwired. The current
+			// SOCKS server observes destination streams, not Xray transport ends.
 			// No SOCKS authentication until an authoritative revocation snapshot
 			// has been fetched; stale state cannot preserve idle associations.
 			egressServer.RevocationUnavailable()
@@ -703,6 +706,11 @@ func heartbeatLoop(ctx context.Context, apiClient *client.APIClient, runner *xra
 			if runner != nil {
 				status.XrayVersion = xrayVersion.Get()
 				status.XrayRunning = runner.IsRunning()
+				report, reportErr := runner.TunnelReport()
+				status.TunnelReport = &report
+				if reportErr != nil {
+					log.Printf("tunnel observation: %v", reportErr)
+				}
 			}
 			if policy != nil {
 				policyStatus := policy.Status()
@@ -710,16 +718,29 @@ func heartbeatLoop(ctx context.Context, apiClient *client.APIClient, runner *xra
 				status.PolicyError = policyStatus.Error
 				// Whatever was drained still goes out; a counter read
 				// failure only costs this interval's per-route figures.
+				if flows, flowErr := policy.Flows(); flowErr == nil {
+					status.RelayFlows = &nodeprov.RelayFlowReport{Known: true, Flows: flows}
+				} else {
+					status.RelayFlows = &nodeprov.RelayFlowReport{Known: false}
+					log.Printf("relay flow observation: %v", flowErr)
+				}
 				var trafficErr error
 				if status.RouteTraffic, trafficErr = policy.DrainTraffic(); trafficErr != nil {
 					log.Printf("route traffic: %v", trafficErr)
 				}
 			}
-			if err := apiClient.SendHeartbeat(ctx, m.CPU, m.Memory, m.Disk, m.LoadAvg, m.NetworkIn, m.NetworkOut, status); err != nil {
-				log.Printf("heartbeat: %v", err)
+			closures, heartbeatErr := apiClient.SendHeartbeatWithClosures(ctx, m.CPU, m.Memory, m.Disk, m.LoadAvg, m.NetworkIn, m.NetworkOut, status)
+			if heartbeatErr != nil {
+				log.Printf("heartbeat: %v", heartbeatErr)
 				if policy != nil {
 					// Keep the forwarded bytes for the next heartbeat.
 					policy.ReturnTraffic(status.RouteTraffic)
+				}
+			} else if runner != nil {
+				for _, closure := range closures {
+					if err := runner.CloseObservedTransport(closure); err != nil {
+						log.Printf("transport closure %s not confirmed: %v", closure.ID, err)
+					}
 				}
 			}
 		}

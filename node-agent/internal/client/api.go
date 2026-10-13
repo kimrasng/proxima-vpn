@@ -102,7 +102,9 @@ type HeartbeatPayload struct {
 	// Bytes each relay route forwarded since the previous heartbeat, read
 	// from the Entry's nftables counters. Omitted when nothing moved and by
 	// older agents.
-	RouteTraffic []nodeprov.RouteTraffic `json:"route_traffic,omitempty"`
+	RouteTraffic []nodeprov.RouteTraffic   `json:"route_traffic,omitempty"`
+	RelayFlows   *nodeprov.RelayFlowReport `json:"relay_flows,omitempty"`
+	TunnelReport *nodeprov.TunnelReport    `json:"tunnel_report,omitempty"`
 }
 
 type NodeStatus struct {
@@ -116,6 +118,8 @@ type NodeStatus struct {
 	PolicyFingerprint string
 	PolicyError       string
 	RouteTraffic      []nodeprov.RouteTraffic
+	RelayFlows        *nodeprov.RelayFlowReport
+	TunnelReport      *nodeprov.TunnelReport
 }
 
 // Register registers this node with the main server.
@@ -256,6 +260,11 @@ func (c *APIClient) GetConfigDigest(ctx context.Context) (ConfigDigest, error) {
 
 // SendHeartbeat sends system metrics to the server.
 func (c *APIClient) SendHeartbeat(ctx context.Context, cpu, memory, disk, loadAvg, networkIn, networkOut float64, status NodeStatus) error {
+	_, err := c.SendHeartbeatWithClosures(ctx, cpu, memory, disk, loadAvg, networkIn, networkOut, status)
+	return err
+}
+
+func (c *APIClient) SendHeartbeatWithClosures(ctx context.Context, cpu, memory, disk, loadAvg, networkIn, networkOut float64, status NodeStatus) ([]nodeprov.TransportClosure, error) {
 	payload := HeartbeatPayload{
 		CPU:          cpu,
 		Memory:       memory,
@@ -274,33 +283,41 @@ func (c *APIClient) SendHeartbeat(ctx context.Context, cpu, memory, disk, loadAv
 		PolicyFingerprint: status.PolicyFingerprint,
 		PolicyError:       status.PolicyError,
 		RouteTraffic:      status.RouteTraffic,
+		RelayFlows:        status.RelayFlows,
+		TunnelReport:      status.TunnelReport,
 	}
 
 	body, err := json.Marshal(payload)
 	if err != nil {
-		return fmt.Errorf("marshal heartbeat: %w", err)
+		return nil, fmt.Errorf("marshal heartbeat: %w", err)
 	}
 
 	url := fmt.Sprintf("%s/api/v1/nodes/%s/heartbeat", c.serverURL, c.nodeID)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
-		return fmt.Errorf("create heartbeat request: %w", err)
+		return nil, fmt.Errorf("create heartbeat request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-Node-Key", c.apiKey)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("heartbeat request: %w", err)
+		return nil, fmt.Errorf("heartbeat request: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("heartbeat failed (status %d): %s", resp.StatusCode, string(respBody))
+		return nil, fmt.Errorf("heartbeat failed (status %d): %s", resp.StatusCode, string(respBody))
 	}
 
-	return nil
+	var reply struct {
+		Closures []nodeprov.TransportClosure `json:"transport_closures"`
+	}
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(&reply); err != nil {
+		return nil, fmt.Errorf("decode heartbeat response: %w", err)
+	}
+	return reply.Closures, nil
 }
 
 type InboundConfig struct {

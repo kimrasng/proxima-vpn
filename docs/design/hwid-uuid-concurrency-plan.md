@@ -1,5 +1,7 @@
 # Approved design proposal: Single subscription URL, HWID-issued UUIDs, and UUID concurrency
 
+> **Superseded (2026-10).** The server no longer reads `x-hwid` or any other client-supplied identity. Every client of an account uses the account UUID, and concurrent devices are counted from node-observed client addresses; see `server-observed-device-limits.md`. This document is kept as history.
+
 Status: Proposed for approval and planning registration. No implementation starts from this document alone.
 
 ## Product contract

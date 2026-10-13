@@ -3,7 +3,7 @@ import { defineConfig, devices } from "@playwright/test";
 // Synthetic data only: these tests never mutate a live admin deployment.
 export default defineConfig({
   testDir: "./e2e",
-  testMatch: /(?:route-management|route-filters|plan-routes|device-bandwidth|uuid-evictions|managed-node-chains|node-endpoints)\.admin\.spec\.ts/,
+  testMatch: /(?:route-management|route-filters|plan-routes|device-bandwidth|uuid-evictions|managed-node-chains|node-endpoints|client-addresses)\.admin\.spec\.ts/,
   workers: 1,
   timeout: 45_000,
   expect: { timeout: 10_000 },

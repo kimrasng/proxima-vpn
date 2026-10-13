@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/netip"
 	"slices"
 	"strconv"
 	"sync"
@@ -31,19 +32,30 @@ type PermitFunc func(context.Context, string, devicebandwidth.Direction, int) (d
 // runs first. It must honor context cancellation and the supplied IP address.
 type DialFunc func(context.Context, string, string) (net.Conn, error)
 
+// SessionEnterer reserves one slot for an authenticated session tunnel.
+type SessionEnterer func(context.Context, string, string) error
+
+// SessionLeaver releases the slot after the local tunnel has fully closed.
+type SessionLeaver func(context.Context, string, string) error
+
 // Server owns its listener and all authenticated TCP and UDP associations.
 // The server is single-use: Close prevents subsequent Start calls.
 type Server struct {
-	mu          sync.Mutex
-	admit       func(context.Context, string) error
-	permit      PermitFunc
-	dial        DialFunc
-	credentials map[string][32]byte
-	revoked     map[string]struct{}
+	mu           sync.Mutex
+	admit        func(context.Context, string) error
+	sourceAdmit  func(context.Context, string, string) error
+	sessionAdmit func(context.Context, string, string) error
+	sessionEnter SessionEnterer
+	sessionLeave SessionLeaver
+	permit       PermitFunc
+	dial         DialFunc
+	credentials  map[string]map[[32]byte]credentialBinding
+	revoked      map[string]struct{}
 	// The agent marks state unavailable before exposing the listener if bootstrap fails.
 	revocationKnown bool
 	devices         map[string]*deviceState
 	sessions        map[*session]struct{}
+	sessionSlots    map[sessionSlotKey]int // retained when a leave callback fails
 	listener        net.Listener
 	ctx             context.Context
 	cancel          context.CancelFunc
@@ -52,15 +64,24 @@ type Server struct {
 }
 
 type session struct {
-	server        *Server
-	conn          net.Conn
-	ctx           context.Context
-	cancel        context.CancelFunc
-	uuid          string
-	password      [32]byte
-	authenticated bool // protected by server.mu
-	admitted      bool // protected by server.mu; set only after a successful permit
-	device        *deviceState
+	server         *Server
+	conn           net.Conn
+	ctx            context.Context
+	cancel         context.CancelFunc
+	uuid           string
+	password       [32]byte
+	sourceAddress  string // Bound only by the server-configured credential.
+	sessionToken   string // Bound only by the server-configured credential.
+	sessionEntered bool   // protected by server.mu
+	sessionLeave   SessionLeaver
+	authenticated  bool // protected by server.mu
+	admitted       bool // protected by server.mu; set only after a successful permit
+	device         *deviceState
+}
+
+type sessionSlotKey struct {
+	uuid  string
+	token string
 }
 
 // At most one granted chunk (or one UDP datagram) per device and direction
@@ -94,6 +115,44 @@ func (s *Server) SetAdmitter(admit func(context.Context, string) error) {
 	s.admit = admit
 }
 
+// SetSourceAdmitter installs admission for credentials bound to a source address.
+// Source-bound credentials fail closed if this callback is not installed.
+func (s *Server) SetSourceAdmitter(admit func(context.Context, string, string) error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.sourceAdmit = admit
+}
+
+// SetSessionAdmitter installs admission for credentials bound to a session token.
+// Session-bound credentials fail closed if this callback is not installed.
+func (s *Server) SetSessionAdmitter(admit func(context.Context, string, string) error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.sessionAdmit = admit
+}
+
+// SetSessionEnterer installs bounded slot acquisition for session-bound credentials.
+// The callback must honor its context; failures deny the SOCKS request.
+func (s *Server) SetSessionEnterer(enter SessionEnterer) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.sessionEnter = enter
+}
+
+// SetSessionLeaver installs slot release after the local tunnel has closed.
+// The callback must honor its context and must not release on an unconfirmed
+// reservation (the server calls it only after SessionEnterer succeeds).
+func (s *Server) SetSessionLeaver(leave SessionLeaver) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.sessionLeave = leave
+}
+
+type credentialBinding struct {
+	sourceAddress string
+	sessionToken  string
+}
+
 func New(permit PermitFunc) *Server {
 	return NewWithDialer(permit, nil)
 }
@@ -104,7 +163,7 @@ func NewWithDialer(permit PermitFunc, dial DialFunc) *Server {
 	if dial == nil {
 		dial = (&net.Dialer{Timeout: dialTimeout}).DialContext
 	}
-	return &Server{permit: permit, dial: dial, credentials: make(map[string][32]byte), revoked: make(map[string]struct{}), revocationKnown: true, devices: make(map[string]*deviceState), sessions: make(map[*session]struct{})}
+	return &Server{permit: permit, dial: dial, credentials: make(map[string]map[[32]byte]credentialBinding), revoked: make(map[string]struct{}), revocationKnown: true, devices: make(map[string]*deviceState), sessions: make(map[*session]struct{}), sessionSlots: make(map[sessionSlotKey]int)}
 }
 
 // ReconcileRevokedUUIDs replaces the control plane's current revocation set.
@@ -159,17 +218,41 @@ func (s *Server) RevocationUnavailable() {
 }
 
 // SetCredentials atomically replaces the credential set. Invalid input leaves
-// the old set intact; changed and removed credentials revoke live associations.
+// the old set intact; removed UUID/password pairs revoke their live associations.
+// A UUID may have multiple distinct passwords, but exact duplicates are invalid.
 func (s *Server) SetCredentials(credentials []devicebandwidth.Credential) error {
-	next := make(map[string][32]byte, len(credentials))
+	next := make(map[string]map[[32]byte]credentialBinding, len(credentials))
 	for _, credential := range credentials {
 		if len(credential.UUID) == 0 || len(credential.UUID) > 255 || len(credential.Password) == 0 || len(credential.Password) > 255 {
 			return errors.New("SOCKS credentials must contain 1–255 byte usernames and passwords")
 		}
-		if _, exists := next[credential.UUID]; exists {
+		if credential.SourceAddress != "" {
+			address, err := netip.ParseAddr(credential.SourceAddress)
+			if err != nil || address.Zone() != "" || (!address.IsGlobalUnicast() && !address.IsLoopback() && !address.IsLinkLocalUnicast()) || address.Unmap().String() != credential.SourceAddress {
+				return fmt.Errorf("invalid device credential source address %q", credential.SourceAddress)
+			}
+		}
+		if credential.SessionToken != "" {
+			if len(credential.SessionToken) != 64 {
+				return errors.New("invalid device credential session token")
+			}
+			for i := 0; i < len(credential.SessionToken); i++ {
+				ch := credential.SessionToken[i]
+				if (ch < '0' || ch > '9') && (ch < 'a' || ch > 'f') {
+					return errors.New("invalid device credential session token")
+				}
+			}
+		}
+		password := sha256.Sum256([]byte(credential.Password))
+		passwords := next[credential.UUID]
+		if _, exists := passwords[password]; exists {
 			return fmt.Errorf("duplicate device credential %q", credential.UUID)
 		}
-		next[credential.UUID] = sha256.Sum256([]byte(credential.Password))
+		if passwords == nil {
+			passwords = make(map[[32]byte]credentialBinding)
+			next[credential.UUID] = passwords
+		}
+		passwords[password] = credentialBinding{credential.SourceAddress, credential.SessionToken}
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -181,12 +264,27 @@ func (s *Server) SetCredentials(credentials []devicebandwidth.Credential) error 
 		if !connection.authenticated {
 			continue
 		}
-		password, exists := next[connection.uuid]
-		if !exists || subtle.ConstantTimeCompare(password[:], connection.password[:]) != 1 {
+		allowed, binding := passwordBinding(next[connection.uuid], connection.password)
+		if !allowed || binding.sourceAddress != connection.sourceAddress || binding.sessionToken != connection.sessionToken {
 			connection.close()
 		}
 	}
 	return nil
+}
+
+// passwordBinding compares every hash without a hash-key lookup or early exit.
+// The binding comes only from the matching server-configured credential.
+func passwordBinding(passwords map[[32]byte]credentialBinding, actual [32]byte) (bool, credentialBinding) {
+	matches := 0
+	var binding credentialBinding
+	for expected, candidate := range passwords {
+		match := subtle.ConstantTimeCompare(actual[:], expected[:])
+		matches |= match
+		if match == 1 {
+			binding = candidate
+		}
+	}
+	return matches == 1, binding
 }
 
 // Start binds only a numeric loopback address and serves asynchronously.
@@ -274,6 +372,7 @@ func (s *Server) accept() {
 			defer s.wg.Done()
 			defer func() {
 				connection.close()
+				connection.leaveSessionSlot()
 				s.mu.Lock()
 				delete(s.sessions, connection)
 				if connection.device != nil {
@@ -292,6 +391,35 @@ func (s *Server) accept() {
 func (c *session) close() {
 	c.cancel()
 	_ = c.conn.Close()
+}
+
+// leaveSessionSlot runs only after serve has returned and close has closed the
+// control connection, which also ends any TCP stream or UDP association.
+func (c *session) leaveSessionSlot() {
+	c.server.mu.Lock()
+	if !c.sessionEntered {
+		c.server.mu.Unlock()
+		return
+	}
+	leave := c.sessionLeave
+	c.server.mu.Unlock()
+	if leave != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), dialTimeout)
+		err := leave(ctx, c.uuid, c.sessionToken)
+		cancel()
+		if err != nil {
+			return // Retain the local reservation record if release was not confirmed.
+		}
+	}
+	c.server.mu.Lock()
+	key := sessionSlotKey{uuid: c.uuid, token: c.sessionToken}
+	if c.server.sessionSlots[key] <= 1 {
+		delete(c.server.sessionSlots, key)
+	} else {
+		c.server.sessionSlots[key]--
+	}
+	c.sessionEntered = false
+	c.server.mu.Unlock()
 }
 
 func (c *session) serve() {
@@ -355,13 +483,14 @@ func (c *session) authenticate() error {
 	}
 	actual := sha256.Sum256(password)
 	c.server.mu.Lock()
-	expected, exists := c.server.credentials[string(username)]
-	matches := subtle.ConstantTimeCompare(actual[:], expected[:]) == 1
+	matches, binding := passwordBinding(c.server.credentials[string(username)], actual)
 	_, revoked := c.server.revoked[string(username)]
-	valid := exists && matches && !revoked && c.server.revocationKnown && c.ctx.Err() == nil
+	valid := matches && !revoked && c.server.revocationKnown && c.ctx.Err() == nil
 	if valid {
 		c.uuid = string(username)
 		c.password = actual
+		c.sourceAddress = binding.sourceAddress
+		c.sessionToken = binding.sessionToken
 		c.authenticated = true
 		c.device = c.server.devices[c.uuid]
 		if c.device == nil {
@@ -405,6 +534,18 @@ func (c *session) allow(ctx context.Context, direction devicebandwidth.Direction
 			if ctx.Err() != nil || c.ctx.Err() != nil || c.server.closed || !c.server.revocationKnown || revoked {
 				c.server.mu.Unlock()
 				return context.Canceled
+			}
+			if c.sessionToken != "" && c.server.sessionAdmit != nil {
+				c.server.mu.Unlock()
+				if err := c.server.sessionAdmit(ctx, c.uuid, c.sessionToken); err != nil {
+					return err
+				}
+				c.server.mu.Lock()
+				_, revoked = c.server.revoked[c.uuid]
+				if ctx.Err() != nil || c.ctx.Err() != nil || c.server.closed || !c.server.revocationKnown || revoked {
+					c.server.mu.Unlock()
+					return context.Canceled
+				}
 			}
 			c.admitted = true
 			c.server.mu.Unlock()
@@ -528,14 +669,53 @@ func resolveDestination(ctx context.Context, host string, port int) (string, err
 func (c *session) reserveBeforeSuccess() error {
 	c.server.mu.Lock()
 	admit := c.server.admit
+	sourceAdmit := c.server.sourceAdmit
+	sessionAdmit := c.server.sessionAdmit
+	sessionEnter := c.server.sessionEnter
+	sessionLeave := c.server.sessionLeave
 	c.server.mu.Unlock()
-	if admit == nil {
-		return nil
-	} // isolated legacy tests; production always installs an admitter
-	ctx, cancel := context.WithTimeout(c.ctx, dialTimeout)
-	defer cancel()
-	if err := admit(ctx, c.uuid); err != nil {
-		return err
+	if c.sessionToken != "" {
+		if sessionAdmit == nil {
+			return errors.New("session-bound credential requires a session admitter")
+		}
+		admit = func(ctx context.Context, uuid string) error {
+			return sessionAdmit(ctx, uuid, c.sessionToken)
+		}
+	} else if c.sourceAddress != "" {
+		if sourceAdmit == nil {
+			return errors.New("source-bound credential requires a source admitter")
+		}
+		admit = func(ctx context.Context, uuid string) error {
+			return sourceAdmit(ctx, uuid, c.sourceAddress)
+		}
+	}
+	if admit != nil { // isolated legacy tests may omit admission callbacks
+		ctx, cancel := context.WithTimeout(c.ctx, dialTimeout)
+		err := admit(ctx, c.uuid)
+		cancel()
+		if err != nil {
+			return err
+		}
+	}
+	if c.sessionToken != "" {
+		if sessionEnter == nil {
+			return errors.New("session-bound credential requires a session enterer")
+		}
+		if sessionLeave == nil {
+			return errors.New("session-bound credential requires a session leaver")
+		}
+		ctx, cancel := context.WithTimeout(c.ctx, dialTimeout)
+		err := sessionEnter(ctx, c.uuid, c.sessionToken)
+		cancel()
+		if err != nil {
+			return err
+		}
+		c.server.mu.Lock()
+		c.sessionEntered = true
+		c.sessionLeave = sessionLeave
+		key := sessionSlotKey{uuid: c.uuid, token: c.sessionToken}
+		c.server.sessionSlots[key]++
+		c.server.mu.Unlock()
 	}
 	if err := c.ctx.Err(); err != nil {
 		return err
@@ -546,7 +726,9 @@ func (c *session) reserveBeforeSuccess() error {
 		c.server.mu.Unlock()
 		return context.Canceled
 	}
-	c.admitted = true
+	if admit != nil {
+		c.admitted = true
+	}
 	c.server.mu.Unlock()
 	return nil
 }

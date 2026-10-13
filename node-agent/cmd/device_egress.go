@@ -6,6 +6,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"net/netip"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -23,23 +25,28 @@ type deviceEgress struct {
 	setCredentials func([]devicebandwidth.Credential) error
 	// setRates receives per-device plan speeds for local enforcement; nil
 	// means rates are unknown and metered traffic must be denied.
-	setRates   func(map[string]int)
-	passwords  map[string]string
-	authorized map[string]struct{}
-	managed    map[string]struct{}
-	ready      func() bool
-	count      int
+	setRates       func(map[string]int)
+	passwords      map[string]string
+	passwordTokens map[string]string
+	authorized     map[string]struct{}
+	managed        map[string]struct{}
+	ready          func() bool
+	count          int
 }
 
 func newDeviceEgress(setCredentials func([]devicebandwidth.Credential) error) *deviceEgress {
-	return &deviceEgress{setCredentials: setCredentials, passwords: make(map[string]string)}
+	return &deviceEgress{setCredentials: setCredentials, passwords: make(map[string]string), passwordTokens: make(map[string]string)}
 }
 
 type deviceConfig struct {
-	root       map[string]json.RawMessage
-	outbounds  []map[string]json.RawMessage
-	devices    map[string]int
-	identities map[string]struct{}
+	root                map[string]json.RawMessage
+	outbounds           []map[string]json.RawMessage
+	devices             map[string]int    // outbound tag -> index
+	deviceIDs           map[string]string // outbound tag -> device UUID
+	identities          map[string]struct{}
+	deviceSources       map[string]string
+	deviceSourcePorts   map[string]int // outbound tag -> exact source port (0 = source-only)
+	deviceSessionTokens map[string]string
 	// rates maps each managed device UUID to its plan speed in Mbps (0 =
 	// unlimited), taken from the limit tier of the inbound it belongs to.
 	rates map[string]int
@@ -57,7 +64,7 @@ type deviceSOCKSServer struct {
 // parseDeviceConfig rejects invalid declarations and missing exact routing.
 // Legacy unlimited configs without device declarations are left unchanged.
 func parseDeviceConfig(data []byte) (*deviceConfig, error) {
-	cfg := &deviceConfig{devices: make(map[string]int), identities: make(map[string]struct{}), rates: make(map[string]int)}
+	cfg := &deviceConfig{deviceSources: make(map[string]string), deviceSourcePorts: make(map[string]int), deviceSessionTokens: make(map[string]string), devices: make(map[string]int), deviceIDs: make(map[string]string), identities: make(map[string]struct{}), rates: make(map[string]int)}
 	if err := json.Unmarshal(data, &cfg.root); err != nil || cfg.root == nil {
 		return nil, fmt.Errorf("invalid xray configuration")
 	}
@@ -73,7 +80,10 @@ func parseDeviceConfig(data []byte) (*deviceConfig, error) {
 			continue
 		}
 		_ = json.Unmarshal(outbound["protocol"], &protocol)
-		id := strings.TrimPrefix(tag, devicebandwidth.OutboundPrefix)
+		id, _, valid := parseLocalDeviceTag(tag)
+		if !valid {
+			return nil, fmt.Errorf("invalid device egress tag %q", tag)
+		}
 		var settings struct {
 			Servers []deviceSOCKSServer `json:"servers"`
 		}
@@ -87,10 +97,11 @@ func parseDeviceConfig(data []byte) (*deviceConfig, error) {
 		if server.Address != "127.0.0.1" || server.Port != devicebandwidth.Port || len(server.Users) != 1 || server.Users[0].User != id || server.Users[0].Pass != deviceEgressPlaceholder {
 			return nil, fmt.Errorf("invalid device egress endpoint or credential for %q", id)
 		}
-		if _, duplicate := cfg.devices[id]; duplicate {
+		if _, duplicate := cfg.devices[tag]; duplicate {
 			return nil, fmt.Errorf("duplicate device egress for %q", id)
 		}
-		cfg.devices[id] = i
+		cfg.devices[tag] = i
+		cfg.deviceIDs[tag] = id
 	}
 	var inbounds []struct {
 		Tag      string `json:"tag"`
@@ -109,12 +120,7 @@ func parseDeviceConfig(data []byte) (*deviceConfig, error) {
 		}
 	}
 	var routing struct {
-		Rules []struct {
-			Type        string   `json:"type"`
-			User        []string `json:"user"`
-			InboundTag  []string `json:"inboundTag"`
-			OutboundTag string   `json:"outboundTag"`
-		} `json:"rules"`
+		Rules []map[string]json.RawMessage `json:"rules"`
 	}
 	if raw := cfg.root["routing"]; raw != nil {
 		if err := json.Unmarshal(raw, &routing); err != nil {
@@ -122,8 +128,34 @@ func parseDeviceConfig(data []byte) (*deviceConfig, error) {
 		}
 	}
 	matched := make(map[string]bool)
+	managedIDs := make(map[string]bool)
+	denyTags := make(map[string]bool)
+	for _, id := range cfg.deviceIDs {
+		managedIDs[id] = true
+	}
+	for _, outbound := range cfg.outbounds {
+		var tag, protocol string
+		_ = json.Unmarshal(outbound["tag"], &tag)
+		_ = json.Unmarshal(outbound["protocol"], &protocol)
+		if protocol == "blackhole" {
+			denyTags[tag] = true
+		}
+	}
 	for _, inbound := range inbounds {
 		limitMbps, limited := speedtier.ParseLimitTag(inbound.Tag)
+		controlled := limited || len(cfg.devices) > 0
+		for _, raw := range routing.Rules {
+			var rule struct {
+				InboundTag  []string `json:"inboundTag"`
+				OutboundTag string   `json:"outboundTag"`
+			}
+			if err := decodeDeviceRule(raw, &rule); err != nil {
+				return nil, err
+			}
+			if containsString(rule.InboundTag, inbound.Tag) && denyTags[rule.OutboundTag] {
+				controlled = true
+			}
+		}
 		for _, user := range inbound.Settings.Clients {
 			identity := user.ID
 			if identity == "" {
@@ -132,8 +164,17 @@ func parseDeviceConfig(data []byte) (*deviceConfig, error) {
 			// Include non-VLESS clients in rollback authorization: an older
 			// protocol must not resurrect a revoked credential either.
 			cfg.identities[inbound.Protocol+"\x00"+inbound.Tag+"\x00"+identity+"\x00"+user.Email] = struct{}{}
-			_, managed := cfg.devices[user.ID]
-			if (limited || len(cfg.devices) > 0 && inbound.Protocol == "vless") && (inbound.Protocol != "vless" || !managed) {
+			managed := managedIDs[user.ID]
+			if inbound.Protocol == "vless" && !managed {
+				denied, err := explicitlyDeniedDevice(routing.Rules, inbound.Tag, user.ID, user.Email, denyTags)
+				if err != nil {
+					return nil, err
+				}
+				if denied {
+					continue // Authorized inbound identity, but no local credential or rate.
+				}
+			}
+			if (limited || controlled && inbound.Protocol == "vless") && (inbound.Protocol != "vless" || !managed) {
 				return nil, fmt.Errorf("controlled inbound %q has no device egress", inbound.Tag)
 			}
 			if inbound.Protocol != "vless" || !managed {
@@ -142,24 +183,118 @@ func parseDeviceConfig(data []byte) (*deviceConfig, error) {
 			if user.Email != user.ID+"@proxima" {
 				return nil, fmt.Errorf("device %q has invalid authenticated email", user.ID)
 			}
-			// Xray uses the first matching rule. Reject any earlier broad
-			// inbound/user match that could silently route this client direct.
-			found := false
-			for _, rule := range routing.Rules {
-				userMatch := len(rule.User) == 0 || containsString(rule.User, user.Email)
-				inboundMatch := len(rule.InboundTag) == 0 || containsString(rule.InboundTag, inbound.Tag)
-				if !userMatch || !inboundMatch {
+			// Source-qualified routes must terminate in an unconditional deny,
+			// never a shared device or Freedom catchall for unknown sources.
+			sourceMode := false
+			for tag, id := range cfg.deviceIDs {
+				if id == user.ID && strings.Contains(tag, "~") {
+					sourceMode = true
+				}
+			}
+			found, denied := false, false
+			clientMatched := make(map[string]bool)
+			seenSources := make(map[netip.Prefix]map[int]bool)
+			for _, rawRule := range routing.Rules {
+				var rule struct {
+					Type         string   `json:"type"`
+					User         []string `json:"user"`
+					InboundTag   []string `json:"inboundTag"`
+					OutboundTag  string   `json:"outboundTag"`
+					Source       []string `json:"source"`
+					SourcePort   []string `json:"sourcePort"`
+					RuleTag      string   `json:"ruleTag"`
+					SessionToken string   `json:"sessionToken"`
+				}
+				if err := decodeDeviceRule(rawRule, &rule); err != nil {
+					return nil, err
+				}
+				if (len(rule.User) > 0 && !containsString(rule.User, user.Email)) || (len(rule.InboundTag) > 0 && !containsString(rule.InboundTag, inbound.Tag)) {
 					continue
 				}
-				if rule.Type == "field" && len(rule.User) == 1 && rule.User[0] == user.Email && rule.OutboundTag == devicebandwidth.OutboundPrefix+user.ID {
-					found = true
+				strict := rule.Type == "field"
+				for key := range rawRule {
+					switch key {
+					case "type", "user", "inboundTag", "outboundTag", "ruleTag", "source", "sourcePort", "sessionToken":
+					default:
+						strict = false
+					}
 				}
-				break
+				_, hasSource := rawRule["source"]
+				_, hasSourcePort := rawRule["sourcePort"]
+				_, hasSessionToken := rawRule["sessionToken"]
+				if sourceMode && strict && !hasSource && !hasSourcePort && !hasSessionToken && denyTags[rule.OutboundTag] {
+					denied = true
+					break
+				}
+				_, sourceKey, _ := parseLocalDeviceTag(rule.OutboundTag)
+				_, declared := cfg.devices[rule.OutboundTag]
+				if rule.SessionToken != "" {
+					token, err := hex.DecodeString(rule.SessionToken)
+					id, key, validTag := parseLocalDeviceTag(rule.OutboundTag)
+					if !sourceMode || !hasSource || !hasSourcePort || !validTag || id != user.ID || key != rule.SessionToken || len(rule.SessionToken) != 64 || err != nil || len(token) != 32 || hex.EncodeToString(token) != rule.SessionToken || (rule.RuleTag != "" && rule.RuleTag != "session-"+rule.SessionToken) {
+						return nil, fmt.Errorf("invalid session-qualified route")
+					}
+					if previous := cfg.deviceSessionTokens[rule.OutboundTag]; previous != "" && previous != rule.SessionToken {
+						return nil, fmt.Errorf("conflicting session token")
+					}
+					cfg.deviceSessionTokens[rule.OutboundTag] = rule.SessionToken
+				}
+				if id, sourceKey, valid := parseLocalDeviceTag(rule.OutboundTag); !strict || !valid || !declared || id != user.ID || len(rule.User) != 1 || rule.User[0] != user.Email || (rule.SessionToken != "" && sourceKey != rule.SessionToken) {
+					return nil, fmt.Errorf("device %q lacks first-match authenticated egress routing", user.ID)
+				}
+				if sourceMode {
+					if sourceKey == "" || len(rule.Source) != 1 {
+						return nil, fmt.Errorf("device %q requires exact source routing", user.ID)
+					}
+					prefix, err := netip.ParsePrefix(rule.Source[0])
+					if err != nil || prefix.Bits() != prefix.Addr().BitLen() || prefix.Addr().Is4In6() {
+						return nil, fmt.Errorf("device %q has invalid or shadowed source route", user.ID)
+					}
+					port := 0
+					if hasSourcePort {
+						if len(rule.SourcePort) != 1 {
+							return nil, fmt.Errorf("device %q requires one exact source port", user.ID)
+						}
+						port, err = strconv.Atoi(rule.SourcePort[0])
+						if err != nil || port < 1 || port > 65535 || strconv.Itoa(port) != rule.SourcePort[0] {
+							return nil, fmt.Errorf("device %q has invalid source port", user.ID)
+						}
+					}
+					if seenSources[prefix] == nil {
+						seenSources[prefix] = make(map[int]bool)
+					}
+					// A source-only rule overlaps every port for that address,
+					// regardless of its position in the first-match rule list.
+					if seenSources[prefix][port] || port == 0 && len(seenSources[prefix]) > 0 || port != 0 && seenSources[prefix][0] {
+						return nil, fmt.Errorf("device %q has invalid or shadowed source route", user.ID)
+					}
+					seenSources[prefix][port] = true
+					if previous := cfg.deviceSources[rule.OutboundTag]; previous != "" && previous != prefix.Addr().String() {
+						return nil, fmt.Errorf("source credential is bound to multiple addresses")
+					}
+					cfg.deviceSources[rule.OutboundTag] = prefix.Addr().String()
+					if previous := cfg.deviceSourcePorts[rule.OutboundTag]; previous != 0 && previous != port {
+						return nil, fmt.Errorf("source credential is bound to multiple ports")
+					}
+					cfg.deviceSourcePorts[rule.OutboundTag] = port
+				} else if hasSource || hasSourcePort {
+					return nil, fmt.Errorf("device %q requires unconditional legacy routing", user.ID)
+				}
+				found = true
+				matched[rule.OutboundTag] = true
+				clientMatched[rule.OutboundTag] = true
+				if !sourceMode {
+					break
+				}
 			}
-			if !found {
-				return nil, fmt.Errorf("device %q lacks first-match authenticated egress routing", user.ID)
+			if !found || sourceMode && !denied {
+				return nil, fmt.Errorf("device %q lacks authenticated egress routing or deny fallback", user.ID)
 			}
-			matched[user.ID] = true
+			for tag, id := range cfg.deviceIDs {
+				if id == user.ID && !clientMatched[tag] {
+					return nil, fmt.Errorf("device egress %q lacks routing on inbound %q", tag, inbound.Tag)
+				}
+			}
 			// A device listed on several inbounds takes the strictest tier.
 			if previous, seen := cfg.rates[user.ID]; !seen || (limitMbps > 0 && (previous == 0 || limitMbps < previous)) {
 				cfg.rates[user.ID] = limitMbps
@@ -172,6 +307,96 @@ func parseDeviceConfig(data []byte) (*deviceConfig, error) {
 		}
 	}
 	return cfg, nil
+}
+
+// parseLocalDeviceTag preserves legacy IDs while reserving ~ for a bounded
+// ASCII hex source key. The source key is not part of the SOCKS username.
+func parseLocalDeviceTag(tag string) (id, sourceKey string, valid bool) {
+	if !strings.HasPrefix(tag, devicebandwidth.OutboundPrefix) {
+		return "", "", false
+	}
+	id, sourceKey, qualified := strings.Cut(strings.TrimPrefix(tag, devicebandwidth.OutboundPrefix), "~")
+	if id == "" || len(id) > 255 {
+		return "", "", false
+	}
+	if qualified {
+		if len(sourceKey) < 16 || len(sourceKey) > 64 || len(sourceKey)%2 != 0 {
+			return "", "", false
+		}
+		for _, c := range sourceKey {
+			if (c < '0' || c > '9') && (c < 'a' || c > 'f') && (c < 'A' || c > 'F') {
+				return "", "", false
+			}
+		}
+	}
+	return id, sourceKey, true
+}
+
+// explicitlyDeniedDevice allows an inbound credential to survive removal of
+// its last source. Only a first-match, exact user deny is a declaration; an
+// inbound catchall alone must never authorize missing device egress.
+func explicitlyDeniedDevice(rules []map[string]json.RawMessage, inbound, id, email string, denyTags map[string]bool) (bool, error) {
+	if id == "" || email != id+"@proxima" {
+		return false, nil
+	}
+	for i, raw := range rules {
+		var rule struct {
+			Type        string   `json:"type"`
+			User        []string `json:"user"`
+			InboundTag  []string `json:"inboundTag"`
+			OutboundTag string   `json:"outboundTag"`
+		}
+		if err := decodeDeviceRule(raw, &rule); err != nil {
+			return false, err
+		}
+		if len(rule.User) > 0 && !containsString(rule.User, email) || len(rule.InboundTag) > 0 && !containsString(rule.InboundTag, inbound) {
+			continue
+		}
+		if rule.Type != "field" || len(rule.User) != 1 || rule.User[0] != email || !denyTags[rule.OutboundTag] {
+			return false, nil
+		}
+		for key := range raw {
+			switch key {
+			case "type", "user", "outboundTag", "ruleTag":
+			default:
+				return false, nil
+			}
+		}
+		// Keep the controlled inbound's unconditional fail-closed fallback.
+		for _, fallback := range rules[i+1:] {
+			rule.User, rule.InboundTag, rule.Type, rule.OutboundTag = nil, nil, "", ""
+			if err := decodeDeviceRule(fallback, &rule); err != nil {
+				return false, err
+			}
+			if len(rule.User) > 0 || !containsString(rule.InboundTag, inbound) {
+				continue
+			}
+			if rule.Type != "field" || len(rule.InboundTag) != 1 || !denyTags[rule.OutboundTag] {
+				break
+			}
+			for key := range fallback {
+				switch key {
+				case "type", "inboundTag", "outboundTag", "ruleTag":
+				default:
+					return false, fmt.Errorf("controlled inbound %q lacks unconditional deny fallback", inbound)
+				}
+			}
+			return true, nil
+		}
+		return false, fmt.Errorf("controlled inbound %q lacks unconditional deny fallback", inbound)
+	}
+	return false, nil
+}
+
+func decodeDeviceRule(raw map[string]json.RawMessage, rule any) error {
+	data, err := json.Marshal(raw)
+	if err == nil {
+		err = json.Unmarshal(data, rule)
+	}
+	if err != nil {
+		return fmt.Errorf("invalid xray routing rule: %w", err)
+	}
+	return nil
 }
 
 func containsString(values []string, want string) bool {
@@ -222,12 +447,13 @@ func (e *deviceEgress) TransformConfig(canonical []byte) ([]byte, error) {
 	for id := range e.passwords {
 		if _, keep := cfg.devices[id]; !keep {
 			delete(e.passwords, id)
+			delete(e.passwordTokens, id)
 		}
 	}
 	// Revoke first, before generating/admitting newly authorized credentials.
 	kept := make([]devicebandwidth.Credential, 0, len(e.passwords))
 	for id, password := range e.passwords {
-		kept = append(kept, devicebandwidth.Credential{UUID: id, Password: password})
+		kept = append(kept, devicebandwidth.Credential{UUID: cfg.deviceIDs[id], Password: password, SourceAddress: cfg.deviceSources[id], SessionToken: e.passwordTokens[id]})
 	}
 	if err := e.setCredentials(kept); err != nil {
 		e.count = 0
@@ -245,7 +471,14 @@ func (e *deviceEgress) TransformConfig(canonical []byte) ([]byte, error) {
 			password = hex.EncodeToString(secret[:])
 			e.passwords[id] = password
 		}
-		credentials = append(credentials, devicebandwidth.Credential{UUID: id, Password: password})
+		if sessionToken := cfg.deviceSessionTokens[id]; sessionToken != e.passwordTokens[id] {
+			if sessionToken == "" {
+				delete(e.passwordTokens, id)
+			} else {
+				e.passwordTokens[id] = sessionToken
+			}
+		}
+		credentials = append(credentials, devicebandwidth.Credential{UUID: cfg.deviceIDs[id], Password: password, SourceAddress: cfg.deviceSources[id], SessionToken: e.passwordTokens[id]})
 		// Replace only the credential field; retain any unrelated settings.
 		outbound := cfg.outbounds[index]
 		var settings map[string]json.RawMessage

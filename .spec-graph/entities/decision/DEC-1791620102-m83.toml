@@ -2,10 +2,10 @@ schema = 1
 id = "DEC-1791620102-m83"
 type = "decision"
 title = "Detect concurrent devices on the server instead of relying on client x-hwid"
-description = "Verified that real VPN clients do not send x-hwid. Concurrency is therefore measured from what Exit nodes observe for each account (online sessions and source addresses reported by the agent), and x-hwid, when present, is only an optional correlation hint. This supersedes the optional-HWID identity approach for enforcement purposes."
-status = "draft"
+description = "Concurrent devices are detected only from what the servers observe: per account, the distinct client addresses holding live tunnel connections across all Exits. Relayed connections are attributed to the original client address the Entry recorded. Client-supplied identity (x-hwid or any header) is never read, not even as a hint."
+status = "active"
 created_at = 2026-10-10T17:15:02+09:00
-updated_at = 2026-10-10T17:15:02+09:00
+updated_at = 2026-10-13T11:54:28+09:00
 
 [metadata]
 date = "2026-10-10"

@@ -7,6 +7,7 @@ config="/state/${E2E_ROLE}-agent.json"
 if [[ "${E2E_ROLE}" == exit-* ]]; then
   mkdir -p /www
   printf '%s\n' "${E2E_MARKER}" > /www/index.html
+  head -c 67108864 /dev/zero > /www/observation-payload
   busybox httpd -f -p 127.0.0.1:9090 -h /www &
   udp-probe server 127.0.0.1:9091 "${E2E_MARKER}" &
   # Load benchmark sink (TCP) and echo (UDP); see tests/relay-e2e/load.sh.

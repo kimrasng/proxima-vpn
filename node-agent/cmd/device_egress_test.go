@@ -235,3 +235,239 @@ func TestDeviceEgressFailedCredentialsCannotBeReportedReady(t *testing.T) {
 		t.Fatal("credential failure reported capability")
 	}
 }
+
+func sourceDeviceConfig(t *testing.T, two bool) []byte {
+	t.Helper()
+	var cfg map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(limitedDeviceConfig), &cfg); err != nil {
+		t.Fatal(err)
+	}
+	var outbounds []map[string]json.RawMessage
+	_ = json.Unmarshal(cfg["outbounds"], &outbounds)
+	device := outbounds[1]
+	outbounds = outbounds[:1]
+	rules := []map[string]any{}
+	keys := []string{"0123456789abcdef", "ABCDEF0123456789"}
+	sources := []string{"192.0.2.1/32", "2001:db8::1/128"}
+	for i, key := range keys {
+		if i == 1 && !two {
+			break
+		}
+		tag := "device-egress-uuid-a~" + key
+		copy := make(map[string]json.RawMessage)
+		for k, v := range device {
+			copy[k] = v
+		}
+		copy["tag"], _ = json.Marshal(tag)
+		outbounds = append(outbounds, copy)
+		rules = append(rules, map[string]any{"type": "field", "user": []string{"uuid-a@proxima"}, "source": []string{sources[i]}, "outboundTag": tag})
+	}
+	outbounds = append(outbounds, map[string]json.RawMessage{"tag": json.RawMessage(`"block"`), "protocol": json.RawMessage(`"blackhole"`)})
+	rules = append(rules, map[string]any{"type": "field", "user": []string{"uuid-a@proxima"}, "outboundTag": "block"})
+	cfg["outbounds"], _ = json.Marshal(outbounds)
+	cfg["routing"], _ = json.Marshal(map[string]any{"rules": rules})
+	cfg["inbounds"] = json.RawMessage(`[{"protocol":"vless","tag":"vless-reality-limit-10","settings":{"clients":[{"id":"uuid-a","email":"uuid-a@proxima"}]}}]`)
+	data, err := json.Marshal(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return data
+}
+
+func TestDeviceEgressSourceCredentialsStableAndIndependentlyRevoked(t *testing.T) {
+	var credentials []devicebandwidth.Credential
+	var rates map[string]int
+	e := newDeviceEgress(func(c []devicebandwidth.Credential) error { credentials = c; return nil })
+	e.setRates = func(r map[string]int) { rates = r }
+	canonical := sourceDeviceConfig(t, true)
+	original := append([]byte(nil), canonical...)
+	runtime, err := e.TransformConfig(canonical)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(credentials) != 2 || credentials[0].UUID != "uuid-a" || credentials[1].UUID != "uuid-a" || credentials[0].Password == credentials[1].Password {
+		t.Fatalf("unexpected credentials: %+v", credentials)
+	}
+	if len(rates) != 1 || rates["uuid-a"] != 10 {
+		t.Fatalf("rates not shared by UUID: %v", rates)
+	}
+	if !bytes.Equal(canonical, original) || bytes.Contains(runtime, []byte(deviceEgressPlaceholder)) {
+		t.Fatal("canonical modified or runtime not materialized")
+	}
+	passwords := make(map[string]string)
+	for tag, pass := range e.passwords {
+		passwords[tag] = pass
+	}
+	if _, err := e.TransformConfig(canonical); err != nil {
+		t.Fatal(err)
+	}
+	for tag, pass := range passwords {
+		if e.passwords[tag] != pass {
+			t.Fatal("unchanged tag password rotated")
+		}
+	}
+	if _, err := e.TransformConfig(sourceDeviceConfig(t, false)); err != nil {
+		t.Fatal(err)
+	}
+	remaining := "device-egress-uuid-a~0123456789abcdef"
+	if len(e.passwords) != 1 || e.passwords[remaining] != passwords[remaining] || len(credentials) != 1 || credentials[0].Password != passwords[remaining] {
+		t.Fatal("removing one tag changed or revoked the surviving credential")
+	}
+	if err := e.CanRestore(canonical); err == nil {
+		t.Fatal("rollback restored revoked source tag")
+	}
+}
+
+func TestDeviceEgressRejectsUnsafeSourceRouting(t *testing.T) {
+	canonical := string(sourceDeviceConfig(t, true))
+	for name, bad := range map[string]string{
+		"odd suffix":          strings.ReplaceAll(canonical, "~0123456789abcdef", "~0123456789abcdef0"),
+		"empty suffix":        strings.ReplaceAll(canonical, "~0123456789abcdef", "~"),
+		"short suffix":        strings.ReplaceAll(canonical, "~0123456789abcdef", "~0123456789abcde"),
+		"long suffix":         strings.ReplaceAll(canonical, "~0123456789abcdef", "~"+strings.Repeat("a", 65)),
+		"non hex":             strings.ReplaceAll(canonical, "~0123456789abcdef", "~0123456789abcdeg"),
+		"multiple separators": strings.ReplaceAll(canonical, "~0123456789abcdef", "~0123456789abcdef~"),
+		"unicode hex":         strings.ReplaceAll(canonical, "~0123456789abcdef", "~０123456789abcdef"),
+		"broad IPv4":          strings.ReplaceAll(canonical, "192.0.2.1/32", "192.0.2.0/24"),
+		"broad IPv6":          strings.ReplaceAll(canonical, "2001:db8::1/128", "2001:db8::/64"),
+		"bare address":        strings.ReplaceAll(canonical, "192.0.2.1/32", "192.0.2.1"),
+		"no deny":             strings.ReplaceAll(canonical, `"outboundTag":"block"`, `"outboundTag":"direct"`),
+		"conditional deny":    strings.ReplaceAll(canonical, `"outboundTag":"block"`, `"outboundTag":"block","network":"tcp"`),
+		"conditional source":  strings.ReplaceAll(canonical, `"source":["192.0.2.1/32"]`, `"source":["192.0.2.1/32"],"network":"tcp"`),
+		"shadowed source":     strings.ReplaceAll(canonical, "2001:db8::1/128", "192.0.2.1/32"),
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := parseDeviceConfig([]byte(bad)); err == nil {
+				t.Fatal("unsafe source config accepted")
+			}
+		})
+	}
+	// Even a valid legacy declaration cannot act as a shared catchall after
+	// source-qualified routes; unknown sources must be denied.
+	var mixed map[string]json.RawMessage
+	_ = json.Unmarshal([]byte(canonical), &mixed)
+	var outbounds []json.RawMessage
+	_ = json.Unmarshal(mixed["outbounds"], &outbounds)
+	var legacy map[string]json.RawMessage
+	_ = json.Unmarshal([]byte(limitedDeviceConfig), &legacy)
+	var legacyOutbounds []json.RawMessage
+	_ = json.Unmarshal(legacy["outbounds"], &legacyOutbounds)
+	outbounds = append(outbounds, legacyOutbounds[1])
+	mixed["outbounds"], _ = json.Marshal(outbounds)
+	mixed["routing"] = json.RawMessage(strings.ReplaceAll(string(mixed["routing"]), `"outboundTag":"block"`, `"outboundTag":"device-egress-uuid-a"`))
+	bad, _ := json.Marshal(mixed)
+	if _, err := parseDeviceConfig(bad); err == nil {
+		t.Fatal("shared legacy catchall bypass accepted")
+	}
+	for _, n := range []int{16, 32, 64} {
+		if _, _, ok := parseLocalDeviceTag("device-egress-uuid-a~" + strings.Repeat("f", n)); !ok {
+			t.Fatalf("valid %d-character ASCII hex key rejected", n)
+		}
+	}
+}
+
+func deniedDeviceConfig(t *testing.T, other bool) []byte {
+	t.Helper()
+	var cfg map[string]json.RawMessage
+	_ = json.Unmarshal(sourceDeviceConfig(t, false), &cfg)
+	cfg["outbounds"] = json.RawMessage(`[{"tag":"direct","protocol":"freedom"},{"tag":"block","protocol":"blackhole"}]`)
+	cfg["routing"] = json.RawMessage(`{"rules":[{"type":"field","user":["uuid-a@proxima"],"outboundTag":"block","ruleTag":"device-deny"},{"type":"field","inboundTag":["vless-reality-limit-10"],"outboundTag":"block"}]}`)
+	if other {
+		var original map[string]json.RawMessage
+		_ = json.Unmarshal(sourceDeviceConfig(t, false), &original)
+		var outbounds []json.RawMessage
+		_ = json.Unmarshal(original["outbounds"], &outbounds)
+		var denied []json.RawMessage
+		_ = json.Unmarshal(cfg["outbounds"], &denied)
+		denied = append(denied, json.RawMessage(strings.ReplaceAll(string(outbounds[1]), "uuid-a", "uuid-b")))
+		cfg["outbounds"], _ = json.Marshal(denied)
+		cfg["inbounds"] = json.RawMessage(strings.Replace(string(cfg["inbounds"]), `"clients":[`, `"clients":[{"id":"uuid-b","email":"uuid-b@proxima"},`, 1))
+		cfg["routing"] = json.RawMessage(strings.Replace(string(cfg["routing"]), `"rules":[`, `"rules":[{"type":"field","user":["uuid-b@proxima"],"source":["192.0.2.1/32"],"outboundTag":"device-egress-uuid-b~0123456789abcdef"},{"type":"field","user":["uuid-b@proxima"],"outboundTag":"block"},`, 1))
+	}
+	data, err := json.Marshal(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return data
+}
+
+func TestDeviceEgressExplicitDenyRevokesLastSource(t *testing.T) {
+	var credentials []devicebandwidth.Credential
+	var rates map[string]int
+	e := newDeviceEgress(func(c []devicebandwidth.Credential) error { credentials = c; return nil })
+	e.setRates = func(r map[string]int) { rates = r }
+	denied := deniedDeviceConfig(t, true)
+	// Admit A alongside B, then remove A's final source while retaining its identity.
+	before := append([]byte(nil), denied...)
+	var cfg map[string]json.RawMessage
+	_ = json.Unmarshal(before, &cfg)
+	var original map[string]json.RawMessage
+	_ = json.Unmarshal(sourceDeviceConfig(t, false), &original)
+	var outbounds, aOutbounds []json.RawMessage
+	_ = json.Unmarshal(cfg["outbounds"], &outbounds)
+	_ = json.Unmarshal(original["outbounds"], &aOutbounds)
+	outbounds = append(outbounds, aOutbounds[1])
+	cfg["outbounds"], _ = json.Marshal(outbounds)
+	cfg["routing"] = json.RawMessage(strings.Replace(string(cfg["routing"]), `"rules":[`, `"rules":[{"type":"field","user":["uuid-a@proxima"],"source":["192.0.2.1/32"],"outboundTag":"device-egress-uuid-a~0123456789abcdef"},`, 1))
+	before, _ = json.Marshal(cfg)
+	if _, err := e.TransformConfig(before); err != nil {
+		t.Fatal(err)
+	}
+	bTag := "device-egress-uuid-b~0123456789abcdef"
+	bPassword := e.passwords[bTag]
+	if _, err := e.TransformConfig(denied); err != nil {
+		t.Fatal(err)
+	}
+	if len(credentials) != 1 || credentials[0].UUID != "uuid-b" || credentials[0].Password != bPassword || len(e.passwords) != 1 {
+		t.Fatalf("last-source revocation changed remaining credentials: %+v", credentials)
+	}
+	if len(rates) != 1 || rates["uuid-b"] != 10 {
+		t.Fatalf("remaining UUID rate lost: %v", rates)
+	}
+	if len(e.authorized) != 2 || len(e.managed) != 1 {
+		t.Fatal("denied identity not authorized or incorrectly managed")
+	}
+	if err := e.CanRestore(before); err == nil {
+		t.Fatal("rollback resurrected removed last source")
+	}
+	if _, err := e.TransformConfig(deniedDeviceConfig(t, false)); err != nil {
+		t.Fatal(err)
+	}
+	if len(credentials) != 0 || len(rates) != 0 || len(e.passwords) != 0 {
+		t.Fatal("deny-only generation retained local credentials or rates")
+	}
+}
+
+func TestDeviceEgressExplicitDenyMustBeExactAndFirst(t *testing.T) {
+	canonical := string(deniedDeviceConfig(t, false))
+	for name, bad := range map[string]string{
+		"no explicit deny":     strings.Replace(canonical, `"user":["uuid-a@proxima"]`, `"user":["uuid-b@proxima"]`, 1),
+		"no fallback":          strings.ReplaceAll(canonical, `"inboundTag":["vless-reality-limit-10"]`, `"inboundTag":["other"]`),
+		"undeclared blackhole": strings.ReplaceAll(canonical, `"protocol":"blackhole"`, `"protocol":"freedom"`),
+		"wrong email":          strings.Replace(canonical, `"email":"uuid-a@proxima"`, `"email":"wrong@proxima"`, 1),
+		"multiple users":       strings.Replace(canonical, `"user":["uuid-a@proxima"]`, `"user":["uuid-a@proxima","uuid-b@proxima"]`, 1),
+		"earlier direct":       strings.Replace(canonical, `"rules":[`, `"rules":[{"type":"field","outboundTag":"direct"},`, 1),
+		"earlier source":       strings.Replace(canonical, `"rules":[`, `"rules":[{"type":"field","user":["uuid-a@proxima"],"source":["192.0.2.1/32"],"outboundTag":"block"},`, 1),
+		"conditional fallback": strings.Replace(canonical, `"inboundTag":["vless-reality-limit-10"]`, `"inboundTag":["vless-reality-limit-10"],"network":"tcp"`, 1),
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := parseDeviceConfig([]byte(bad)); err == nil {
+				t.Fatal("unsafe denied declaration accepted")
+			}
+		})
+	}
+	for _, field := range []string{`"source":["192.0.2.1/32"]`, `"inboundTag":["vless-reality-limit-10"]`, `"network":"tcp"`, `"domain":["example.org"]`, `"source":[]`} {
+		t.Run(field, func(t *testing.T) {
+			bad := strings.Replace(canonical, `"user":["uuid-a@proxima"]`, `"user":["uuid-a@proxima"],`+field, 1)
+			if _, err := parseDeviceConfig([]byte(bad)); err == nil {
+				t.Fatal("conditional denied declaration accepted")
+			}
+		})
+	}
+	// Unlimited controlled inbounds must not silently accept missing egress either.
+	bad := strings.ReplaceAll(canonical, "vless-reality-limit-10", "vless-in")
+	bad = strings.Replace(bad, `"user":["uuid-a@proxima"]`, `"user":["other@proxima"]`, 1)
+	if _, err := parseDeviceConfig([]byte(bad)); err == nil {
+		t.Fatal("unlimited controlled inbound accepted missing explicit deny")
+	}
+}

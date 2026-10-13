@@ -45,9 +45,17 @@ func TestBlockedWriteDoesNotAccumulateDeviceGrantsAcrossSessions(t *testing.T) {
 		}
 		return &blockedWriteConn{Conn: c, entered: entered, closed: make(chan struct{})}, nil
 	})
+	credentials := []devicebandwidth.Credential{
+		{UUID: "device-a", Password: "secret-a"},
+		{UUID: "device-a", Password: "second-secret"},
+		{UUID: "device-b", Password: "secret-b"},
+	}
+	if err := s.SetCredentials(credentials); err != nil {
+		t.Fatal(err)
+	}
 	connections := make([]net.Conn, 3)
-	for i, uuid := range []string{"device-a", "device-a", "device-b"} {
-		connections[i] = authenticate(t, s, uuid, "secret-"+uuid[len(uuid)-1:])
+	for i, credential := range credentials {
+		connections[i] = authenticate(t, s, credential.UUID, credential.Password)
 		if code, _ := request(t, connections[i], 1); code != 0 {
 			t.Fatalf("CONNECT: %d", code)
 		}

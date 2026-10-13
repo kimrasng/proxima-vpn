@@ -1,0 +1,26 @@
+schema = 1
+id = "REQ-1791870953-qx5"
+type = "requirement"
+title = "Concurrent authenticated tunnel sessions are limited per account"
+description = "Count distinct authenticated live tunnel connections across Exit nodes. Separate tunnel connections count separately even when they share the same source IP or account UUID; destination streams inside a tunnel do not count separately. x-hwid does not exist in the identity or admission model. This is a session cap, not a physical-device or distinct-address cap."
+status = "draft"
+created_at = 2026-10-13T14:55:53+09:00
+updated_at = 2026-10-13T14:55:53+09:00
+
+[metadata]
+kind = "functional"
+owner = "backend"
+priority = "must"
+
+[[relations]]
+to = "DEC-1791620102-m83"
+type = "constrained_by"
+
+[[relations]]
+to = "ACT-1791620102-rpt"
+type = "has_criterion"
+
+[[relations]]
+to = "REQ-1791620102-300"
+type = "supersedes"
+metadata = {reason = "User clarified concurrency means number of sessions, not distinct client addresses"}

@@ -1,7 +1,9 @@
 package database
 
-// HWID identities are keyed fingerprints, never raw client headers. NULL keeps
-// pre-existing, manually registered devices independent of this registration cap.
+// The hwid_* columns, setting and secret are no longer read or written: the
+// server does not use client-supplied identity (x-hwid) at all. They stay so
+// existing databases migrate forward without a destructive drop; retired_at
+// and last_online_transition_at remain in use.
 var hwidSchemaMigrations = []string{
 	`ALTER TABLE devices ADD COLUMN IF NOT EXISTS hwid_fingerprint TEXT`,
 	`ALTER TABLE devices ADD COLUMN IF NOT EXISTS first_subscription_at TIMESTAMPTZ`,

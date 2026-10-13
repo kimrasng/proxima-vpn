@@ -1316,6 +1316,27 @@
       }
     },
     "userDetail": {
+      "tunnelSessions": {
+        "title": "Authenticated tunnel sessions",
+        "hint": "Each authenticated tunnel counts as one session, even when tunnels share the same IP address or UUID. This is not a count of physical devices. Session limits are not enforced yet.",
+        "count": "Authenticated tunnel session count",
+        "limit": "Plan session limit",
+        "unlimited": "Unlimited",
+        "overLimitUnenforced": "Observed sessions exceed the plan limit. Automatic session enforcement is not enabled yet; this is a warning, not a confirmed block.",
+        "unknown": "Unknown",
+        "incomplete": "The session report is incomplete; the total count is unknown.",
+        "fetchError": "Unable to load tunnel sessions. The count is unknown."
+      },
+      "clientAddresses": {
+        "title": "Observed client addresses",
+        "hint": "Diagnostic network IP observations only. Devices behind the same NAT share an IP address. This is not a session count or a physical device count and does not determine a concurrent limit.",
+        "count": "Observed address count",
+        "unknown": "Unknown",
+        "incomplete": "Observations are incomplete. Any listed addresses are partial; the total count is unknown.",
+        "address": "Client IP address",
+        "empty": "No client addresses observed",
+        "fetchError": "Unable to load client addresses. The count is unknown."
+      },
       "deviceCountHint": "{{count}} registered devices.",
       "onlineUnknown": "Live online UUID count is unavailable; registered devices do not indicate who is online.",
       "fetchError": "Failed to load user",

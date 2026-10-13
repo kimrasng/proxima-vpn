@@ -3,6 +3,7 @@ package xray
 import (
 	"context"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"net"
 )
@@ -138,10 +139,13 @@ func marshalSOCKSOutbound(o SOCKSOutbound) []byte {
 
 // RoutingRule is the subset of a field rule the agent installs at runtime.
 type RoutingRule struct {
-	RuleTag     string
-	OutboundTag string
-	UserEmail   []string
-	InboundTag  []string
+	RuleTag      string
+	OutboundTag  string
+	UserEmail    []string
+	InboundTag   []string
+	SourceCIDRs  []string
+	SourcePorts  []uint16
+	SessionToken string
 }
 
 func marshalRoutingRule(r RoutingRule) []byte {
@@ -156,7 +160,61 @@ func marshalRoutingRule(r RoutingRule) []byte {
 		buf = appendTag(buf, 8, 2)
 		buf = appendBytes(buf, []byte(tag))
 	}
-	if r.RuleTag != "" {
+	for _, source := range r.SourceCIDRs {
+		ip, network, err := net.ParseCIDR(source)
+		if err != nil {
+			continue
+		} // ReplaceRoutingRules validates before encoding.
+		bits, _ := network.Mask.Size()
+		if v4 := ip.To4(); v4 != nil {
+			ip = v4
+		} else {
+			ip = ip.To16()
+		}
+		var cidr []byte
+		cidr = appendTag(cidr, 1, 2)
+		cidr = appendBytes(cidr, ip)
+		cidr = appendTag(cidr, 2, 0)
+		cidr = binary.AppendUvarint(cidr, uint64(bits))
+		var custom []byte
+		custom = appendTag(custom, 1, 2)
+		custom = appendBytes(custom, cidr)
+		var rule []byte
+		rule = appendTag(rule, 2, 2)
+		rule = appendBytes(rule, custom)
+		buf = appendTag(buf, 11, 2)
+		buf = appendBytes(buf, rule)
+	}
+	if r.SessionToken != "" {
+		if len(r.SessionToken) != 64 || len(r.SourceCIDRs) != 1 || len(r.SourcePorts) != 1 {
+			return buf
+		}
+		decoded, err := hex.DecodeString(r.SessionToken)
+		if err != nil || len(decoded) != 32 || hex.EncodeToString(decoded) != r.SessionToken {
+			return buf
+		}
+		if r.RuleTag == "" {
+			r.RuleTag = "session-" + r.SessionToken
+		}
+	}
+	if len(r.SourcePorts) > 0 {
+		var ports []byte
+		for _, port := range r.SourcePorts {
+			var span []byte
+			span = appendTag(span, 1, 0)
+			span = binary.AppendUvarint(span, uint64(port))
+			span = appendTag(span, 2, 0)
+			span = binary.AppendUvarint(span, uint64(port))
+			ports = appendTag(ports, 1, 2)
+			ports = appendBytes(ports, span)
+		}
+		buf = appendTag(buf, 16, 2)
+		buf = appendBytes(buf, ports)
+	}
+	if r.RuleTag != "" || r.SessionToken != "" {
+		if r.RuleTag == "" {
+			r.RuleTag = "session-" + r.SessionToken
+		}
 		buf = appendTag(buf, 19, 2)
 		buf = appendBytes(buf, []byte(r.RuleTag))
 	}
@@ -202,6 +260,37 @@ func (c *StatsClient) RemoveOutbound(ctx context.Context, tag string) error {
 // would land a new device's rule behind the deny fallback, so the agent always
 // supplies the complete ordered list instead.
 func (c *StatsClient) ReplaceRoutingRules(ctx context.Context, rules []RoutingRule) error {
+	for _, rule := range rules {
+		for _, source := range rule.SourceCIDRs {
+			ip, network, err := net.ParseCIDR(source)
+			if err != nil || network.String() != source {
+				return fmt.Errorf("invalid or non-canonical source CIDR %q", source)
+			}
+			if len(rule.SourcePorts) > 0 {
+				bits, total := network.Mask.Size()
+				if bits != total || ip.IsUnspecified() || ip.IsMulticast() || (len(ip.To4()) > 0 && len(ip.To16()) == net.IPv6len) {
+					return fmt.Errorf("source-port rule requires exact canonical unicast host")
+				}
+			}
+		}
+		if rule.SessionToken != "" {
+			token := rule.SessionToken
+			decoded, err := hex.DecodeString(token)
+			expectedTag := "session-" + token
+			if len(token) != 64 || err != nil || len(decoded) != 32 || hex.EncodeToString(decoded) != token || len(rule.SourceCIDRs) != 1 || len(rule.SourcePorts) != 1 || (rule.RuleTag != "" && rule.RuleTag != expectedTag) {
+				return fmt.Errorf("invalid session-qualified routing rule")
+			}
+			rule.RuleTag = expectedTag
+		}
+		if len(rule.SourcePorts) > 0 && len(rule.SourceCIDRs) != 1 {
+			return fmt.Errorf("source-port rule requires one source network")
+		}
+		for _, port := range rule.SourcePorts {
+			if port == 0 {
+				return fmt.Errorf("source-port rule has zero port")
+			}
+		}
+	}
 	req := &addRuleRequest{Config: marshalTypedMessage(typeRouterConfig, marshalRouterConfig(rules))}
 	if err := c.conn.Invoke(ctx, addRuleMethod, req, &emptyResponse{}); err != nil {
 		return fmt.Errorf("replace routing rules: %w", err)

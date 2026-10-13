@@ -15,21 +15,54 @@ import (
 
 const (
 	concurrencyCheckInterval = 10 * time.Second
+	sessionReconcileInterval = 30 * time.Second
 	evictionCooldown         = 10 * time.Minute
+	// addressClosureCooldown bounds how often transport closures are queued
+	// for one account by the opt-in client address cap enforcement.
+	addressClosureCooldown = 90 * time.Second
 )
 
 type ConcurrencyScheduler struct {
-	db        *pgxpool.Pool
-	tracker   *services.OnlineTracker
-	enforce   bool
-	grace     int
-	threshold int
-	strikes   map[string]int
-	cancel    context.CancelFunc
+	db                       *pgxpool.Pool
+	tracker                  *services.OnlineTracker
+	enforce                  bool
+	grace                    int
+	threshold                int
+	strikes                  map[string]int
+	sessionStrikes           map[string]int
+	sessionReconcileAt       map[string]time.Time
+	reconcileTunnelSessions  func(context.Context, string) (services.TunnelSessionObservation, []string, error)
+	addressStrikes           map[string]int
+	addressReconcileAt       map[string]time.Time
+	reconcileClientAddresses func(context.Context, string) (services.ClientAddressObservation, []string, error)
+	// enforceAddresses is the opt-in (ENFORCE_CLIENT_ADDRESS_LIMIT=1) switch for
+	// closing the transports of the newest over-cap client addresses. It is
+	// independent of enforce and never leads to UUID revocation.
+	enforceAddresses     bool
+	addressClosureAt     map[string]time.Time
+	queueAddressClosures func(context.Context, services.ClientAddressObservation, []string) (int, error)
+	cancel               context.CancelFunc
 }
 
 func NewConcurrencyScheduler(db *pgxpool.Pool, rdb *redis.Client) *ConcurrencyScheduler {
-	return &ConcurrencyScheduler{db: db, tracker: services.NewOnlineTracker(rdb), enforce: os.Getenv("ENFORCE_CONCURRENCY") == "1", grace: nonnegativeEnv("CONCURRENCY_GRACE", 0), threshold: positiveEnv("CONCURRENCY_STRIKES", 2), strikes: map[string]int{}}
+	return &ConcurrencyScheduler{
+		db: db, tracker: services.NewOnlineTracker(rdb),
+		enforce: os.Getenv("ENFORCE_CONCURRENCY") == "1",
+		grace:   nonnegativeEnv("CONCURRENCY_GRACE", 0), threshold: positiveEnv("CONCURRENCY_STRIKES", 2),
+		strikes: map[string]int{}, sessionStrikes: map[string]int{}, sessionReconcileAt: map[string]time.Time{},
+		reconcileTunnelSessions: func(ctx context.Context, account string) (services.TunnelSessionObservation, []string, error) {
+			return services.ObserveAndReconcileTunnelSessions(ctx, db, rdb, account)
+		},
+		addressStrikes: map[string]int{}, addressReconcileAt: map[string]time.Time{},
+		reconcileClientAddresses: func(ctx context.Context, account string) (services.ClientAddressObservation, []string, error) {
+			return services.ObserveAndReconcileClientAddressSlots(ctx, db, rdb, account)
+		},
+		enforceAddresses: os.Getenv("ENFORCE_CLIENT_ADDRESS_LIMIT") == "1",
+		addressClosureAt: map[string]time.Time{},
+		queueAddressClosures: func(ctx context.Context, observation services.ClientAddressObservation, denied []string) (int, error) {
+			return services.QueueClientAddressClosures(ctx, rdb, observation, denied)
+		},
+	}
 }
 
 func nonnegativeEnv(name string, fallback int) int {
@@ -52,6 +85,7 @@ func (s *ConcurrencyScheduler) Start(ctx context.Context) {
 		log.Printf("concurrency enforcement requested: all Exit epochs and revocation acknowledgments required")
 	}
 	log.Printf("concurrency scheduler started (enforce=%t)", s.enforce)
+	log.Printf("client address cap enforcement (enabled=%t): transport closure only, no UUID revocation", s.enforceAddresses)
 	for {
 		select {
 		case <-ctx.Done():
@@ -92,11 +126,161 @@ func (s *ConcurrencyScheduler) sweep(ctx context.Context) {
 		return
 	}
 	for _, r := range caps {
+		s.checkTunnelSessions(ctx, r)
+		s.checkClientAddresses(ctx, r)
 		if r.cap > 0 {
 			s.checkUser(ctx, r)
 		}
 	}
 }
+func (s *ConcurrencyScheduler) checkTunnelSessions(ctx context.Context, r capRow) {
+	now := time.Now()
+	if s.sessionReconcileAt == nil {
+		s.sessionReconcileAt = make(map[string]time.Time)
+	}
+	if next := s.sessionReconcileAt[r.userID]; now.Before(next) {
+		return
+	}
+	s.sessionReconcileAt[r.userID] = now.Add(sessionReconcileInterval)
+	if s.reconcileTunnelSessions == nil {
+		delete(s.sessionStrikes, r.userID)
+		return
+	}
+	observation, released, err := s.reconcileTunnelSessions(ctx, r.userID)
+	if err != nil || !observation.Complete {
+		delete(s.sessionStrikes, r.userID)
+		if err != nil {
+			log.Printf("tunnel session reconciliation: user=%s err=%v", r.userID, err)
+		}
+		return
+	}
+	if len(released) > 0 {
+		log.Printf("tunnel session reservations released: user=%s count=%d", r.userID, len(released))
+	}
+	if r.cap <= 0 {
+		delete(s.sessionStrikes, r.userID)
+		return
+	}
+	count, err := services.CountTunnelSessions(observation)
+	if err != nil {
+		delete(s.sessionStrikes, r.userID)
+		return
+	}
+	if count <= r.cap {
+		delete(s.sessionStrikes, r.userID)
+		return
+	}
+	targets, err := services.NewestTunnelSessions(observation, r.cap)
+	if err != nil || len(targets) == 0 {
+		return
+	}
+	s.sessionStrikes[r.userID]++
+	if s.sessionStrikes[r.userID] < s.threshold {
+		return
+	}
+	// Reporting only. Per-session local credential materialization and a
+	// durable, multi-exit admission policy are not enabled yet; never fall
+	// through to UUID-wide revocation for a session-count excess.
+	log.Printf("tunnel session cap exceeded, no session-specific enforcement: user=%s sessions=%d cap=%d candidate_exit=%s peer=%s:%d", r.userID, count, r.cap, targets[0].ExitID, targets[0].Connection.PeerIP, targets[0].Connection.PeerPort)
+	s.sessionStrikes[r.userID] = 0
+}
+
+// checkClientAddresses frees stale client source address slots and reports a
+// sustained excess. Only when enforceAddresses is set does it also queue exact
+// transport closures for the newest over-cap addresses. It never revokes or
+// evicts a UUID. Raw addresses are never logged.
+func (s *ConcurrencyScheduler) checkClientAddresses(ctx context.Context, r capRow) {
+	now := time.Now()
+	if s.addressReconcileAt == nil {
+		s.addressReconcileAt = make(map[string]time.Time)
+	}
+	if s.addressStrikes == nil {
+		s.addressStrikes = make(map[string]int)
+	}
+	if next := s.addressReconcileAt[r.userID]; now.Before(next) {
+		return
+	}
+	s.addressReconcileAt[r.userID] = now.Add(sessionReconcileInterval)
+	if s.reconcileClientAddresses == nil {
+		delete(s.addressStrikes, r.userID)
+		return
+	}
+	observation, released, err := s.reconcileClientAddresses(ctx, r.userID)
+	if err != nil || !observation.Complete {
+		delete(s.addressStrikes, r.userID)
+		if err != nil {
+			log.Printf("client address reconciliation: user=%s err=%v", r.userID, err)
+		}
+		return
+	}
+	if len(released) > 0 {
+		log.Printf("client address slots released: user=%s count=%d", r.userID, len(released))
+	}
+	if r.cap <= 0 || len(observation.Addresses) <= r.cap {
+		delete(s.addressStrikes, r.userID)
+		return
+	}
+	s.addressStrikes[r.userID]++
+	if s.addressStrikes[r.userID] < s.threshold {
+		return
+	}
+	if s.enforceAddresses {
+		s.closeExcessClientAddresses(ctx, r, observation, now)
+	} else {
+		// Reporting only: an address count is not a device count, so an excess
+		// is never grounds for UUID revocation.
+		log.Printf("client address cap exceeded, observation only: user=%s addresses=%d cap=%d", r.userID, len(observation.Addresses), r.cap)
+	}
+	s.addressStrikes[r.userID] = 0
+}
+
+// closeExcessClientAddresses queues exact transport closures for the newest
+// client addresses beyond the cap. It acts only on a complete observation with
+// a known, unambiguous policy, and at most once per addressClosureCooldown per
+// account. It never touches UUID eviction or revocation, and logs only counts
+// and fixed reason tokens, never client addresses.
+func (s *ConcurrencyScheduler) closeExcessClientAddresses(ctx context.Context, r capRow, observation services.ClientAddressObservation, now time.Time) {
+	if !observation.Complete || r.cap <= 0 || s.queueAddressClosures == nil {
+		return
+	}
+	skip := func(reason string) {
+		log.Printf("client address cap exceeded, no transport closure: user=%s addresses=%d cap=%d reason=%s", r.userID, len(observation.Addresses), r.cap, reason)
+	}
+	policy, err := services.ProposeClientAddressPolicy(observation, r.cap)
+	switch {
+	case err != nil:
+		skip("policy_error")
+		return
+	case !policy.Known:
+		reason := policy.Reason
+		if reason == "" {
+			reason = "unknown"
+		}
+		skip(reason)
+		return
+	case len(policy.Denied) == 0:
+		skip("no_denied_addresses")
+		return
+	}
+	if s.addressClosureAt == nil {
+		s.addressClosureAt = make(map[string]time.Time)
+	}
+	if next := s.addressClosureAt[r.userID]; now.Before(next) {
+		skip("cooldown")
+		return
+	}
+	queued, err := s.queueAddressClosures(ctx, observation, policy.Denied)
+	if err != nil {
+		s.addressClosureAt[r.userID] = now.Add(addressClosureCooldown)
+		log.Printf("client address cap exceeded, transport closure failed: user=%s addresses=%d cap=%d denied=%d queued=%d err=%v", r.userID, len(observation.Addresses), r.cap, len(policy.Denied), queued, err)
+		return
+	}
+	if queued >= 1 {
+		s.addressClosureAt[r.userID] = now.Add(addressClosureCooldown)
+	}
+	log.Printf("client address cap exceeded, transport closure queued: user=%s addresses=%d cap=%d denied=%d queued=%d", r.userID, len(observation.Addresses), r.cap, len(policy.Denied), queued)
+}
+
 func (s *ConcurrencyScheduler) checkUser(ctx context.Context, r capRow) {
 	obs, err := s.tracker.ObserveAccount(ctx, s.db, r.userID)
 	if err != nil {

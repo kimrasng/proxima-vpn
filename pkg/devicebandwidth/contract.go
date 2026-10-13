@@ -2,10 +2,11 @@
 package devicebandwidth
 
 const (
-	ListenAddress  = "127.0.0.1:10086"
-	Port           = 10086
-	OutboundPrefix = "device-egress-"
-	MaxChunk       = 32768
+	ListenAddress   = "127.0.0.1:10086"
+	ListenAddressIP = "127.0.0.1"
+	Port            = 10086
+	OutboundPrefix  = "device-egress-"
+	MaxChunk        = 32768
 )
 
 type Direction string
@@ -28,6 +29,8 @@ type PermitResponse struct {
 }
 
 type Credential struct {
-	UUID     string
-	Password string
+	UUID          string
+	Password      string
+	SourceAddress string // Optional server-origin cohort address; never supplied by the SOCKS client.
+	SessionToken  string // Optional server-origin session key hash; never supplied by the SOCKS client.
 }

@@ -14,7 +14,7 @@ func TestRenderNftablesSyntax(t *testing.T) {
 		t.Skip("requires nftables")
 	}
 	for _, role := range []nodeprov.Role{nodeprov.RoleExit, nodeprov.RoleRelay, nodeprov.RoleBoth} {
-		script, err := Render(role, []nodeprov.RelayRule{{EntryPort: 5223, Transport: nodeprov.TransportUDP, ExitIP: "172.30.0.10", ExitPort: 51820}}, []nodeprov.ExitRule{{ExitPort: 51820, Transport: nodeprov.TransportUDP, RelayIPs: []string{"172.30.0.20"}}})
+		script, err := Render(role, []nodeprov.RelayRule{{EntryPort: 5223, Transport: nodeprov.TransportTCPUDP, ExitIP: "172.30.0.10", ExitPort: 51820}}, []nodeprov.ExitRule{{ExitPort: 51820, Transport: nodeprov.TransportUDP, RelayIPs: []string{"172.30.0.20"}}})
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -49,6 +49,7 @@ services:
     environment:
       E2E_ACTION: ${E2E_ACTION:-provision}
       E2E_API_URL: http://api:2053
+      CLIENT_FRONT_IP: ${CLIENT_FRONT_IP}
       ADMIN_EMAIL: admin@relay-e2e.test
       ADMIN_PASSWORD: RelayE2EAdminPassword123!
       RELAY_FRONT_IP: ${RELAY_FRONT_IP}

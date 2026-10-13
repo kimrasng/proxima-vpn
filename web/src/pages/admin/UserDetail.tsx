@@ -27,6 +27,8 @@ import {
 } from "@cloudscape-design/components";
 import {
   getUser,
+  getUserClientAddresses,
+  getUserTunnelSessions,
   getUserLoginHistory,
   getUserTraffic,
   listPlans,
@@ -39,6 +41,8 @@ import type {
   TrafficWindow,
   UpdateUserRequest,
   UserDetail as UserDetailData,
+  UserClientAddresses,
+  UserTunnelSessions,
   UserTraffic,
 } from "../../api/types";
 import { usePublishBreadcrumbLeaf } from "../../hooks/useBreadcrumbLeaf";
@@ -98,6 +102,10 @@ function UserDetailPage() {
   const { t } = useTranslation();
 
   const [user, setUser] = useState<UserDetailData | null>(null);
+  const [clientAddresses, setClientAddresses] = useState<UserClientAddresses | null>(null);
+  const [clientAddressesError, setClientAddressesError] = useState(false);
+  const [tunnelSessions, setTunnelSessions] = useState<UserTunnelSessions | null>(null);
+  const [tunnelSessionsError, setTunnelSessionsError] = useState(false);
   const [traffic, setTraffic] = useState<UserTraffic | null>(null);
   const [logins, setLogins] = useState<LoginHistoryEntry[]>([]);
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -115,9 +123,9 @@ function UserDetailPage() {
   const fetchAll = useCallback(async () => {
     if (!userId) return;
     try {
-      // Traffic and login history each degrade to their own error marker: a
-      // failure in either must not blank the identity card or the edit form.
-      const [detail, plansData, trafficResult, loginResult] = await Promise.all([
+      // Optional observations degrade independently: their failures must not
+      // blank the identity card or the edit form.
+      const [detail, plansData, trafficResult, loginResult, addressResult, sessionResult] = await Promise.all([
         getUser(userId),
         listPlans().then(
           (data) => data,
@@ -131,10 +139,24 @@ function UserDetailPage() {
           (entries) => ({ ok: true as const, entries }),
           () => ({ ok: false as const, entries: [] as LoginHistoryEntry[] }),
         ),
+        getUserClientAddresses(userId).then(
+          (data) => ({ ok: true as const, data }),
+          () => ({ ok: false as const, data: null }),
+        ),
+        getUserTunnelSessions(userId).then(
+          (data) => ({ ok: true as const, data }),
+          () => ({ ok: false as const, data: null }),
+        ),
       ]);
 
       setUser(detail);
       setPlans(plansData);
+      // Never present a previous successful snapshot as a current known count
+      // after a failed refresh.
+      setClientAddresses(addressResult.data);
+      setClientAddressesError(!addressResult.ok);
+      setTunnelSessions(sessionResult.data);
+      setTunnelSessionsError(!sessionResult.ok);
 
       // The form is seeded once. Re-seeding on every poll would discard whatever
       // the admin has typed while the interval fires underneath them.
@@ -508,6 +530,78 @@ function UserDetailPage() {
                 },
               ]}
               empty={<Box textAlign="center">{t("admin.userDetail.byNodeEmpty")}</Box>}
+            />
+          </SpaceBetween>
+        </Container>
+
+        <Container header={<Header variant="h2">{t("admin.userDetail.tunnelSessions.title")}</Header>}>
+          <SpaceBetween size="s">
+            <Box variant="small" color="text-body-secondary">
+              {t("admin.userDetail.tunnelSessions.hint")}
+            </Box>
+            {tunnelSessionsError && (
+              <Alert type="warning">{t("admin.userDetail.tunnelSessions.fetchError")}</Alert>
+            )}
+            <KeyValuePairs items={[{
+              label: t("admin.userDetail.tunnelSessions.count"),
+              value: tunnelSessions?.complete && tunnelSessions.count !== null
+                ? tunnelSessions.count
+                : t("admin.userDetail.tunnelSessions.unknown"),
+            }, {
+              label: t("admin.userDetail.tunnelSessions.limit"),
+              value: tunnelSessions?.limit && tunnelSessions.limit > 0
+                ? tunnelSessions.limit
+                : t("admin.userDetail.tunnelSessions.unlimited"),
+            }]} />
+            {tunnelSessions?.complete && tunnelSessions.over_limit && (
+              <Alert type="warning">{t("admin.userDetail.tunnelSessions.overLimitUnenforced")}</Alert>
+            )}
+            {tunnelSessions && !tunnelSessions.complete && (
+              <Alert type="info">{t("admin.userDetail.tunnelSessions.incomplete")}</Alert>
+            )}
+          </SpaceBetween>
+        </Container>
+
+        <Container
+          header={<Header variant="h2">{t("admin.userDetail.clientAddresses.title")}</Header>}
+        >
+          <SpaceBetween size="s">
+            <Box variant="small" color="text-body-secondary">
+              {t("admin.userDetail.clientAddresses.hint")}
+            </Box>
+            {clientAddressesError && (
+              <Alert type="warning">{t("admin.userDetail.clientAddresses.fetchError")}</Alert>
+            )}
+            <KeyValuePairs
+              items={[
+                {
+                  label: t("admin.userDetail.clientAddresses.count"),
+                  value: clientAddresses?.complete && clientAddresses.count !== null
+                    ? clientAddresses.count
+                    : t("admin.userDetail.clientAddresses.unknown"),
+                },
+              ]}
+            />
+            {clientAddresses && !clientAddresses.complete && (
+              <Alert type="info">{t("admin.userDetail.clientAddresses.incomplete")}</Alert>
+            )}
+            <Table
+              variant="embedded"
+              items={clientAddresses?.addresses ?? []}
+              columnDefinitions={[
+                {
+                  id: "address",
+                  header: t("admin.userDetail.clientAddresses.address"),
+                  cell: (address) => address,
+                },
+              ]}
+              empty={
+                <Box textAlign="center">
+                  {t(clientAddresses?.complete
+                    ? "admin.userDetail.clientAddresses.empty"
+                    : "admin.userDetail.clientAddresses.unknown")}
+                </Box>
+              }
             />
           </SpaceBetween>
         </Container>

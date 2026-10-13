@@ -311,6 +311,21 @@ export interface UserDetail extends User {
   traffic_reset_at?: string;
 }
 
+export interface UserClientAddresses {
+  complete: boolean;
+  addresses: string[];
+  count: number | null;
+}
+
+export interface UserTunnelSessions {
+  complete: boolean;
+  count: number | null;
+  limit?: number;
+  over_limit?: boolean | null;
+  report_id?: string;
+  enforced: false;
+}
+
 export interface PaginatedUsers {
   users: User[];
   total: number;

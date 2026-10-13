@@ -5,7 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net"
+	"net/netip"
+	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/proximavpn/proxima-vpn/node-agent/internal/xray"
@@ -22,11 +26,14 @@ type liveTopology struct {
 }
 
 type rawRule struct {
-	Type        string   `json:"type"`
-	RuleTag     string   `json:"ruleTag"`
-	OutboundTag string   `json:"outboundTag"`
-	User        []string `json:"user"`
-	InboundTag  []string `json:"inboundTag"`
+	Type         string   `json:"type"`
+	RuleTag      string   `json:"ruleTag"`
+	OutboundTag  string   `json:"outboundTag"`
+	User         []string `json:"user"`
+	InboundTag   []string `json:"inboundTag"`
+	Source       []string `json:"source"`
+	SourcePort   []string `json:"sourcePort"`
+	SessionToken string   `json:"sessionToken"`
 }
 
 // parseLiveTopology extracts the live-managed topology from a materialized
@@ -84,27 +91,73 @@ func parseLiveTopology(runtime []byte) (liveTopology, error) {
 			Password: server.Users[0].Pass,
 		}
 	}
-	for i, raw := range cfg.Routing.Rules {
+	for _, raw := range cfg.Routing.Rules {
 		var fields map[string]json.RawMessage
 		var rule rawRule
 		if json.Unmarshal(raw, &fields) != nil || json.Unmarshal(raw, &rule) != nil {
-			return liveTopology{}, fmt.Errorf("decode routing rule %d", i)
+			return liveTopology{}, fmt.Errorf("decode routing rule")
 		}
 		for key := range fields {
 			switch key {
-			case "type", "ruleTag", "outboundTag", "user", "inboundTag":
+			case "type", "ruleTag", "outboundTag", "user", "inboundTag", "source", "sourcePort", "sessionToken":
 			default:
-				return liveTopology{}, fmt.Errorf("routing rule %d uses %q, which live edits cannot express", i, key)
+				return liveTopology{}, fmt.Errorf("routing rule uses %q, which live edits cannot express", key)
 			}
 		}
 		if rule.Type != "" && rule.Type != "field" || rule.OutboundTag == "" {
-			return liveTopology{}, fmt.Errorf("routing rule %d is not a field rule with an outbound", i)
+			return liveTopology{}, fmt.Errorf("routing rule is not a field rule with an outbound")
+		}
+		for _, source := range rule.Source {
+			address, network, err := net.ParseCIDR(source)
+			if err != nil || network.String() != source {
+				return liveTopology{}, fmt.Errorf("routing rule has invalid or non-canonical source CIDR")
+			}
+			if len(rule.SourcePort) > 0 {
+				bits, total := network.Mask.Size()
+				if bits != total || address.IsUnspecified() || address.IsMulticast() || netip.MustParseAddr(address.String()).Is4In6() {
+					return liveTopology{}, fmt.Errorf("routing rule source-port match must be an exact unicast host")
+				}
+			}
+		}
+
+		ports := []uint16{}
+		if len(rule.SourcePort) > 0 && len(rule.SourcePort) != 1 {
+			return liveTopology{}, fmt.Errorf("routing rule must have one exact source port")
+		}
+		for _, rawPort := range rule.SourcePort {
+			port, err := strconv.Atoi(rawPort)
+			if err != nil || port < 1 || port > 65535 || strconv.Itoa(port) != rawPort || len(rule.Source) != 1 {
+				return liveTopology{}, fmt.Errorf("routing rule has invalid source port")
+			}
+			ports = append(ports, uint16(port))
+		}
+		if rule.SessionToken != "" {
+			if len(rule.SessionToken) != 64 {
+				return liveTopology{}, fmt.Errorf("routing rule has invalid session token")
+			}
+			deviceID, key, ok := parseLocalDeviceTag(rule.OutboundTag)
+			if !ok || key != rule.SessionToken {
+				return liveTopology{}, fmt.Errorf("session token does not match qualified outbound")
+			}
+			outbound, exists := topology.outbounds[rule.OutboundTag]
+			if !exists || outbound.Address != devicebandwidth.ListenAddressIP || outbound.Port != devicebandwidth.Port || outbound.Username != deviceID {
+				return liveTopology{}, fmt.Errorf("session outbound is not bound to its device egress")
+			}
+			if len(rule.User) != 1 || rule.User[0] != deviceID+"@proxima" || len(ports) != 1 || len(rule.Source) != 1 {
+				return liveTopology{}, fmt.Errorf("session rule needs matching identity and exact tuple")
+			}
+			if rule.RuleTag != "" && rule.RuleTag != "session-"+rule.SessionToken {
+				return liveTopology{}, fmt.Errorf("routing rule has invalid session rule tag")
+			}
 		}
 		topology.rules = append(topology.rules, xray.RoutingRule{
-			RuleTag:     rule.RuleTag,
-			OutboundTag: rule.OutboundTag,
-			UserEmail:   rule.User,
-			InboundTag:  rule.InboundTag,
+			RuleTag:      rule.RuleTag,
+			OutboundTag:  rule.OutboundTag,
+			UserEmail:    rule.User,
+			InboundTag:   rule.InboundTag,
+			SourceCIDRs:  rule.Source,
+			SourcePorts:  ports,
+			SessionToken: rule.SessionToken,
 		})
 	}
 	return topology, nil
@@ -118,7 +171,9 @@ func sameRules(a, b []xray.RoutingRule) bool {
 	for i := range a {
 		if a[i].RuleTag != b[i].RuleTag || a[i].OutboundTag != b[i].OutboundTag ||
 			strings.Join(a[i].UserEmail, "\x00") != strings.Join(b[i].UserEmail, "\x00") ||
-			strings.Join(a[i].InboundTag, "\x00") != strings.Join(b[i].InboundTag, "\x00") {
+			strings.Join(a[i].InboundTag, "\x00") != strings.Join(b[i].InboundTag, "\x00") ||
+			strings.Join(a[i].SourceCIDRs, "\x00") != strings.Join(b[i].SourceCIDRs, "\x00") ||
+			!reflect.DeepEqual(a[i].SourcePorts, b[i].SourcePorts) || a[i].SessionToken != b[i].SessionToken {
 			return false
 		}
 	}
