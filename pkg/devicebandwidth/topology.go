@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"net/netip"
+	"strconv"
 	"strings"
 )
 
@@ -66,11 +67,25 @@ func IsDeviceRule(rule map[string]json.RawMessage) bool {
 		if err != nil || prefix.Bits() != prefix.Addr().BitLen() || prefix.Addr().IsUnspecified() || prefix.Addr().IsMulticast() {
 			return false
 		}
+		if _, hasPort := rule["sourcePort"]; hasPort {
+			var ports []string
+			if json.Unmarshal(rule["sourcePort"], &ports) != nil || len(ports) != 1 {
+				return false
+			}
+			port, err := strconv.Atoi(ports[0])
+			if err != nil || port < 1 || port > 65535 || strconv.Itoa(port) != ports[0] {
+				return false
+			}
+		}
 	}
 	for key := range rule {
 		switch key {
 		case "type", "user", "outboundTag", "ruleTag":
 		case "source":
+			if !qualified {
+				return false
+			}
+		case "sourcePort":
 			if !qualified {
 				return false
 			}

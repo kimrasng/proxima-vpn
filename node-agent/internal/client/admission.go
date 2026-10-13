@@ -15,6 +15,16 @@ import (
 var ErrUUIDCapacity = errors.New("online UUID limit reached")
 
 var ErrAddressCapacity = errors.New("online address limit reached")
+var ErrSessionCapacity = errors.New("online session limit reached")
+
+// AdmitSession carries a server-generated exact transport token, not a client
+// installation identifier. The control plane requires fresh Exit evidence.
+func (c *APIClient) AdmitSession(ctx context.Context,deviceUUID,token string) error {
+	if len(token)!=64{return errors.New("invalid session token")}
+	err:=c.admitPayload(ctx,deviceUUID,map[string]any{"session_token":token},true)
+	if errors.Is(err,ErrAddressCapacity){return ErrSessionCapacity}
+	return err
+}
 
 // AdmitSource admits a server-configured direct source cohort, never a client
 // identity header. Relay original-source attribution is not supported here.

@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/netip"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -26,6 +27,7 @@ type deviceEgress struct {
 	// means rates are unknown and metered traffic must be denied.
 	setRates   func(map[string]int)
 	passwords  map[string]string
+	passwordTokens map[string]string
 	authorized map[string]struct{}
 	managed    map[string]struct{}
 	ready      func() bool
@@ -37,12 +39,13 @@ func newDeviceEgress(setCredentials func([]devicebandwidth.Credential) error) *d
 }
 
 type deviceConfig struct {
-	root          map[string]json.RawMessage
-	outbounds     []map[string]json.RawMessage
-	devices       map[string]int    // outbound tag -> index
-	deviceIDs     map[string]string // outbound tag -> device UUID
-	identities    map[string]struct{}
-	deviceSources map[string]string
+	root              map[string]json.RawMessage
+	outbounds         []map[string]json.RawMessage
+	devices           map[string]int    // outbound tag -> index
+	deviceIDs         map[string]string // outbound tag -> device UUID
+	identities        map[string]struct{}
+	deviceSources     map[string]string
+	deviceSourcePorts map[string]int // outbound tag -> exact source port (0 = source-only)
 	// rates maps each managed device UUID to its plan speed in Mbps (0 =
 	// unlimited), taken from the limit tier of the inbound it belongs to.
 	rates map[string]int
@@ -60,7 +63,7 @@ type deviceSOCKSServer struct {
 // parseDeviceConfig rejects invalid declarations and missing exact routing.
 // Legacy unlimited configs without device declarations are left unchanged.
 func parseDeviceConfig(data []byte) (*deviceConfig, error) {
-	cfg := &deviceConfig{deviceSources: make(map[string]string), devices: make(map[string]int), deviceIDs: make(map[string]string), identities: make(map[string]struct{}), rates: make(map[string]int)}
+	cfg := &deviceConfig{deviceSources: make(map[string]string), deviceSourcePorts: make(map[string]int), devices: make(map[string]int), deviceIDs: make(map[string]string), identities: make(map[string]struct{}), rates: make(map[string]int)}
 	if err := json.Unmarshal(data, &cfg.root); err != nil || cfg.root == nil {
 		return nil, fmt.Errorf("invalid xray configuration")
 	}
@@ -189,7 +192,7 @@ func parseDeviceConfig(data []byte) (*deviceConfig, error) {
 			}
 			found, denied := false, false
 			clientMatched := make(map[string]bool)
-			seenSources := make(map[netip.Prefix]bool)
+			seenSources := make(map[netip.Prefix]map[int]bool)
 			for _, rawRule := range routing.Rules {
 				var rule struct {
 					Type        string   `json:"type"`
@@ -197,6 +200,7 @@ func parseDeviceConfig(data []byte) (*deviceConfig, error) {
 					InboundTag  []string `json:"inboundTag"`
 					OutboundTag string   `json:"outboundTag"`
 					Source      []string `json:"source"`
+					SourcePort  []string `json:"sourcePort"`
 				}
 				if err := decodeDeviceRule(rawRule, &rule); err != nil {
 					return nil, err
@@ -207,13 +211,14 @@ func parseDeviceConfig(data []byte) (*deviceConfig, error) {
 				strict := rule.Type == "field"
 				for key := range rawRule {
 					switch key {
-					case "type", "user", "inboundTag", "outboundTag", "ruleTag", "source":
+					case "type", "user", "inboundTag", "outboundTag", "ruleTag", "source", "sourcePort":
 					default:
 						strict = false
 					}
 				}
 				_, hasSource := rawRule["source"]
-				if sourceMode && strict && !hasSource && denyTags[rule.OutboundTag] {
+				_, hasSourcePort := rawRule["sourcePort"]
+				if sourceMode && strict && !hasSource && !hasSourcePort && denyTags[rule.OutboundTag] {
 					denied = true
 					break
 				}
@@ -227,15 +232,37 @@ func parseDeviceConfig(data []byte) (*deviceConfig, error) {
 						return nil, fmt.Errorf("device %q requires exact source routing", user.ID)
 					}
 					prefix, err := netip.ParsePrefix(rule.Source[0])
-					if err != nil || prefix.Bits() != prefix.Addr().BitLen() || prefix.Addr().Is4In6() || seenSources[prefix] {
+					if err != nil || prefix.Bits() != prefix.Addr().BitLen() || prefix.Addr().Is4In6() {
 						return nil, fmt.Errorf("device %q has invalid or shadowed source route", user.ID)
 					}
-					seenSources[prefix] = true
+					port := 0
+					if hasSourcePort {
+						if len(rule.SourcePort) != 1 {
+							return nil, fmt.Errorf("device %q requires one exact source port", user.ID)
+						}
+						port, err = strconv.Atoi(rule.SourcePort[0])
+						if err != nil || port < 1 || port > 65535 || strconv.Itoa(port) != rule.SourcePort[0] {
+							return nil, fmt.Errorf("device %q has invalid source port", user.ID)
+						}
+					}
+					if seenSources[prefix] == nil {
+						seenSources[prefix] = make(map[int]bool)
+					}
+					// A source-only rule overlaps every port for that address,
+					// regardless of its position in the first-match rule list.
+					if seenSources[prefix][port] || port == 0 && len(seenSources[prefix]) > 0 || port != 0 && seenSources[prefix][0] {
+						return nil, fmt.Errorf("device %q has invalid or shadowed source route", user.ID)
+					}
+					seenSources[prefix][port] = true
 					if previous := cfg.deviceSources[rule.OutboundTag]; previous != "" && previous != prefix.Addr().String() {
 						return nil, fmt.Errorf("source credential is bound to multiple addresses")
 					}
 					cfg.deviceSources[rule.OutboundTag] = prefix.Addr().String()
-				} else if hasSource {
+					if previous := cfg.deviceSourcePorts[rule.OutboundTag]; previous != 0 && previous != port {
+						return nil, fmt.Errorf("source credential is bound to multiple ports")
+					}
+					cfg.deviceSourcePorts[rule.OutboundTag] = port
+				} else if hasSource || hasSourcePort {
 					return nil, fmt.Errorf("device %q requires unconditional legacy routing", user.ID)
 				}
 				found = true

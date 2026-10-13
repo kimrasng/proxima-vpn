@@ -18,6 +18,7 @@ func (h *NodeAgentHandler) AdmitDevice(c *fiber.Ctx) error {
 		return c.SendStatus(401)
 	}
 	var req struct {
+		SessionToken string `json:"session_token"`
 		DeviceUUID    string `json:"device_uuid"`
 		SourceAddress string `json:"source_address"`
 		RelayPeer     *struct {
@@ -40,7 +41,12 @@ func (h *NodeAgentHandler) AdmitDevice(c *fiber.Ctx) error {
 	if req.RelayPeer != nil && req.SourceAddress != "" {
 		return c.Status(400).JSON(fiber.Map{"error": "ambiguous admission source"})
 	}
-	if req.RelayPeer != nil {
+	if req.SessionToken!="" && (req.RelayPeer!=nil || req.SourceAddress!="") {
+		return c.Status(400).JSON(fiber.Map{"error":"ambiguous admission identity"})
+	}
+	if req.SessionToken!="" {
+		allowed, err = service.AdmitReportedTunnelSession(ctx,nodeID,device.String(),req.SessionToken)
+	} else if req.RelayPeer != nil {
 		allowed, err = service.AdmitProvenRelaySource(ctx, nodeID, device.String(), req.RelayPeer.IP, req.RelayPeer.Port, req.RelayPeer.LocalPort)
 	} else if req.SourceAddress != "" {
 		allowed, err = service.AdmitSourceDevice(ctx, nodeID, device.String(), req.SourceAddress)
@@ -56,6 +62,7 @@ func (h *NodeAgentHandler) AdmitDevice(c *fiber.Ctx) error {
 		if req.SourceAddress != "" || req.RelayPeer != nil {
 			message = "online address limit reached"
 		}
+		if req.SessionToken!="" {message="online session limit reached"}
 		return c.Status(409).JSON(fiber.Map{"error": message})
 	}
 	return c.SendStatus(204)

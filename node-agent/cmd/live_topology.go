@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/proximavpn/proxima-vpn/node-agent/internal/xray"
@@ -23,12 +25,14 @@ type liveTopology struct {
 }
 
 type rawRule struct {
-	Type        string   `json:"type"`
-	RuleTag     string   `json:"ruleTag"`
-	OutboundTag string   `json:"outboundTag"`
-	User        []string `json:"user"`
-	InboundTag  []string `json:"inboundTag"`
-	Source      []string `json:"source"`
+	Type         string   `json:"type"`
+	RuleTag      string   `json:"ruleTag"`
+	OutboundTag  string   `json:"outboundTag"`
+	User         []string `json:"user"`
+	InboundTag   []string `json:"inboundTag"`
+	Source       []string `json:"source"`
+	SourcePort   []string `json:"sourcePort"`
+	SessionToken string   `json:"sessionToken"`
 }
 
 // parseLiveTopology extracts the live-managed topology from a materialized
@@ -94,7 +98,7 @@ func parseLiveTopology(runtime []byte) (liveTopology, error) {
 		}
 		for key := range fields {
 			switch key {
-			case "type", "ruleTag", "outboundTag", "user", "inboundTag", "source":
+			case "type", "ruleTag", "outboundTag", "user", "inboundTag", "source", "sourcePort":
 			default:
 				return liveTopology{}, fmt.Errorf("routing rule %d uses %q, which live edits cannot express", i, key)
 			}
@@ -107,12 +111,25 @@ func parseLiveTopology(runtime []byte) (liveTopology, error) {
 				return liveTopology{}, fmt.Errorf("routing rule %d has invalid source CIDR", i)
 			}
 		}
+		ports := []uint16{}
+		for _, raw := range rule.SourcePort {
+			port, err := strconv.Atoi(raw)
+			if err != nil || port < 1 || port > 65535 || strconv.Itoa(port) != raw || len(rule.SourcePort) != 1 || len(rule.Source) != 1 {
+				return liveTopology{}, fmt.Errorf("routing rule %d has invalid source port", i)
+			}
+			ports = append(ports, uint16(port))
+		}
+		if rule.SessionToken != "" && (len(rule.Source) != 1 || len(ports) != 1) {
+			return liveTopology{}, fmt.Errorf("session rule needs exact source,port")
+		}
 		topology.rules = append(topology.rules, xray.RoutingRule{
-			RuleTag:     rule.RuleTag,
-			OutboundTag: rule.OutboundTag,
-			UserEmail:   rule.User,
-			InboundTag:  rule.InboundTag,
-			SourceCIDRs: rule.Source,
+			RuleTag:      rule.RuleTag,
+			OutboundTag:  rule.OutboundTag,
+			UserEmail:    rule.User,
+			InboundTag:   rule.InboundTag,
+			SourceCIDRs:  rule.Source,
+			SourcePorts:  ports,
+			SessionToken: rule.SessionToken,
 		})
 	}
 	return topology, nil
@@ -127,7 +144,8 @@ func sameRules(a, b []xray.RoutingRule) bool {
 		if a[i].RuleTag != b[i].RuleTag || a[i].OutboundTag != b[i].OutboundTag ||
 			strings.Join(a[i].UserEmail, "\x00") != strings.Join(b[i].UserEmail, "\x00") ||
 			strings.Join(a[i].InboundTag, "\x00") != strings.Join(b[i].InboundTag, "\x00") ||
-			strings.Join(a[i].SourceCIDRs, "\x00") != strings.Join(b[i].SourceCIDRs, "\x00") {
+			strings.Join(a[i].SourceCIDRs, "\x00") != strings.Join(b[i].SourceCIDRs, "\x00") ||
+			!reflect.DeepEqual(a[i].SourcePorts, b[i].SourcePorts) || a[i].SessionToken != b[i].SessionToken {
 			return false
 		}
 	}

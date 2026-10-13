@@ -31,4 +31,5 @@ type Credential struct {
 	UUID          string
 	Password      string
 	SourceAddress string // Optional server-origin cohort address; never supplied by the SOCKS client.
+	SessionToken  string // Optional server-origin session key hash; never supplied by the SOCKS client.
 }

@@ -24,5 +24,5 @@ func AddressOutboundTag(credential, source string) (string, string, error) {
 	address = address.Unmap()
 	prefix := netip.PrefixFrom(address, address.BitLen()).String()
 	sum := sha256.Sum256([]byte(prefix))
-	return OutboundPrefix + id.String() + "~" + hex.EncodeToString(sum[:16]), prefix, nil
+	return OutboundPrefix + id.String() + "~" + hex.EncodeToString(sum[:]), prefix, nil
 }
