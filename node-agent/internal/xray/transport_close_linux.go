@@ -68,6 +68,32 @@ func CloseTransportPeer(peer TransportPeer) error {
 	}
 }
 
+// ProbeTransportClose reports whether this host can destroy established TCP
+// sockets, without closing anything real. It asks the kernel to destroy a
+// tuple inside TEST-NET-1 (RFC 5737), which no real connection can use, and
+// reads the answer: ENOENT means the kernel has SOCK_DESTROY and this process
+// may use it (nothing matched, as intended); EOPNOTSUPP means the kernel lacks
+// CONFIG_INET_DIAG_DESTROY; EPERM means CAP_NET_ADMIN is missing.
+func ProbeTransportClose() error {
+	return classifyTransportCloseProbe(CloseTransportPeer(TransportPeer{
+		Local:  netip.MustParseAddrPort("192.0.2.1:1"),
+		Remote: netip.MustParseAddrPort("192.0.2.2:1"),
+	}))
+}
+
+func classifyTransportCloseProbe(err error) error {
+	switch {
+	case err == nil, errors.Is(err, unix.ENOENT):
+		return nil
+	case errors.Is(err, unix.EOPNOTSUPP):
+		return errors.New("kernel lacks CONFIG_INET_DIAG_DESTROY, so over-limit connections cannot be closed on this host")
+	case errors.Is(err, unix.EPERM), errors.Is(err, unix.EACCES):
+		return errors.New("CAP_NET_ADMIN is required to close over-limit connections")
+	default:
+		return fmt.Errorf("could not verify connection closing: %w", err)
+	}
+}
+
 func transportDestroyRequest(peer TransportPeer) ([]byte, error) {
 	local, remote := peer.Local.Addr().Unmap(), peer.Remote.Addr().Unmap()
 	if !peer.Local.IsValid() || !peer.Remote.IsValid() || peer.Local.Port() == 0 || peer.Remote.Port() == 0 || local.IsUnspecified() || remote.IsUnspecified() || local.Is4() != remote.Is4() {

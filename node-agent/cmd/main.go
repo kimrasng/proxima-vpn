@@ -203,6 +203,15 @@ func runCmd() *cobra.Command {
 
 			runner := xray.NewXrayRunner("", "")
 
+			// Over-limit client connections are closed with the kernel's
+			// SOCK_DESTROY. Say plainly at startup if this host cannot do that,
+			// rather than leaving the limit to silently never take effect.
+			if err := xray.ProbeTransportClose(); err != nil {
+				log.Printf("WARNING: client address limit cannot be enforced on this node: %v", err)
+			} else {
+				log.Printf("client address limit: connection closing is available on this node")
+			}
+
 			xrayConfig, err := apiClient.GetConfig(ctx)
 			if err != nil {
 				return fmt.Errorf("fetch initial config: %w", err)
