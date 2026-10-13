@@ -1329,7 +1329,7 @@
       },
       "clientAddresses": {
         "title": "Observed client addresses",
-        "hint": "Diagnostic network IP observations only. Devices behind the same NAT share an IP address. This is not a session count or a physical device count and does not determine a concurrent limit.",
+        "hint": "Network IP observations. A device is counted as one client IP address, so devices behind the same NAT share one, and an IPv6 network (/64) counts once. When the plan limit is exceeded, the connections of the newest addresses are closed automatically. This is not a count of physical devices.",
         "count": "Observed address count",
         "unknown": "Unknown",
         "incomplete": "Observations are incomplete. Any listed addresses are partial; the total count is unknown.",
