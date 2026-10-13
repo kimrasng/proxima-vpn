@@ -25,7 +25,7 @@ func CloseTransportPeer(peer TransportPeer) error {
 	if err != nil {
 		return fmt.Errorf("close transport peer: socket: %w", err)
 	}
-	defer unix.Close(fd)
+	defer func() { _ = unix.Close(fd) }()
 	if err := unix.Bind(fd, &unix.SockaddrNetlink{Family: unix.AF_NETLINK}); err != nil {
 		return fmt.Errorf("close transport peer: bind: %w", err)
 	}

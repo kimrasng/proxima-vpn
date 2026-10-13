@@ -37,7 +37,7 @@ func TransportPeers(ports []int) ([]TransportPeer, error) {
 	if err != nil {
 		return nil, fmt.Errorf("transport peers: netlink socket: %w", err)
 	}
-	defer unix.Close(fd)
+	defer func() { _ = unix.Close(fd) }()
 	if err := unix.Bind(fd, &unix.SockaddrNetlink{Family: unix.AF_NETLINK}); err != nil {
 		return nil, fmt.Errorf("transport peers: netlink bind: %w", err)
 	}

@@ -119,7 +119,7 @@ func TestCloseTransportPeerLive(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer listener.Close()
+	defer func() { _ = listener.Close() }()
 	if err := listener.SetDeadline(time.Now().Add(3 * time.Second)); err != nil {
 		t.Fatal(err)
 	}
@@ -130,12 +130,12 @@ func TestCloseTransportPeerLive(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer client.Close()
+		defer func() { _ = client.Close() }()
 		server, err := listener.AcceptTCP()
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer server.Close()
+		defer func() { _ = server.Close() }()
 		clients, servers = append(clients, client), append(servers, server)
 	}
 	peer := TransportPeer{Local: servers[0].LocalAddr().(*net.TCPAddr).AddrPort(), Remote: servers[0].RemoteAddr().(*net.TCPAddr).AddrPort()}
