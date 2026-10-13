@@ -1317,6 +1317,16 @@
       }
     },
     "userDetail": {
+      "clientAddresses": {
+        "title": "观测到的客户端地址",
+        "hint": "观测到的网络 IP 地址与已登记的凭据不同，不代表准确的物理设备数量：同一 NAT 后的设备共享一个 IP 地址。基于地址的限制尚未实施。",
+        "count": "观测到的地址数量",
+        "unknown": "未知",
+        "incomplete": "观测信息不完整。所列地址仅为部分结果，总数未知。",
+        "address": "客户端 IP 地址",
+        "empty": "未观测到客户端地址",
+        "fetchError": "无法加载客户端地址，数量未知。"
+      },
       "deviceCountHint": "已登记设备 {{count}} 台。",
       "onlineUnknown": "无法获取实时在线 UUID 数；已登记设备数不代表在线状态。",
       "fetchError": "加载用户失败",

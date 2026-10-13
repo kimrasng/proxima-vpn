@@ -54,6 +54,10 @@ E2E_MODE=positive "${compose[@]}" run --rm -T client >/dev/null
 for name in tcp_a tcp_b udp_a udp_b; do assert "$name"; done
 E2E_ACTION=traffic "${compose[@]}" run --rm -T control >/dev/null
 assert route_traffic
+E2E_MODE=observation "${compose[@]}" run -d --name "${project}-observer" client >/dev/null
+E2E_ACTION=observation "${compose[@]}" run --rm -T control >/dev/null
+docker rm -f "${project}-observer" >/dev/null
+assert client_observation
 echo 'Positive TCP/UDP probes passed; checking bracketed denials'
 E2E_MODE=negative "${compose[@]}" run --rm -T client >/dev/null
 for name in unused_port swapped_port_a swapped_port_b cross_credentials_a cross_credentials_b \
@@ -98,4 +102,4 @@ mkdir -p "$(dirname "$output")"
 [[ ! -e "$output" && ! -L "$output" ]] || exit 2
 mv "$work" "$output"
 work=$(mktemp -d)
-echo "PASS: 26 assertions; sanitized evidence: $output"
+echo "PASS: 27 assertions; sanitized evidence: $output"

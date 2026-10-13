@@ -106,6 +106,7 @@ func (s *Server) registerRoutes() {
 	adminUsers.Get("/", adminUserHandler.List)
 	adminUsers.Get("/:id", adminUserHandler.Get)
 	adminUsers.Get("/:id/traffic", adminUserHandler.GetTraffic)
+	adminUsers.Get("/:id/client-addresses", handlers.NewAdminClientAddressHandler(s.db, s.redis).Get)
 	adminUsers.Get("/:id/login-history", adminUserHandler.GetLoginHistory)
 	adminUsers.Put("/:id", adminUserHandler.Update)
 	adminUsers.Delete("/:id", adminUserHandler.Delete)

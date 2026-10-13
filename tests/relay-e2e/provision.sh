@@ -64,6 +64,7 @@ user_profile() {
   device=$(post /api/v1/user/devices "$user_token" "$(jq -nc --arg name "device-$label" '{name:$name}')")
   device_id=$(id .id <<<"$device")
   sub=$(post /api/v1/user/sub-token/regenerate "$user_token" '{}')
+  printf 'USER_%s=%q\n' "$label" "$user_id" >>"$state"
   printf 'CHAIN_%s=%q\nEXIT_%s=%q\nEXIT_KEY_%s=%q\nDEVICE_%s=%q\nUUID_%s=%q\nSUB_%s=%q\n' \
     "$label" "$chain_id" "$label" "$exit_id" "$label" "$key" "$label" "$device_id" \
     "$label" "$(id .xray_uuid <<<"$device")" "$label" "$(id .sub_token <<<"$sub")" >>"$state"
@@ -187,6 +188,22 @@ load_traffic() {
   echo 'route traffic never settled after the load' >&2
   exit 1
 }
+client_observation() {
+  source "$state"
+  local a b
+  for attempt in {1..40}; do
+    a=$(curl -fsS "${api}/api/v1/admin/users/${USER_A}/client-addresses" -H "Authorization: Bearer ${ADMIN_TOKEN}")
+    b=$(curl -fsS "${api}/api/v1/admin/users/${USER_B}/client-addresses" -H "Authorization: Bearer ${ADMIN_TOKEN}")
+    if jq -e --arg ip "$CLIENT_FRONT_IP" '.complete and .count == 1 and .addresses == [$ip]' <<<"$a" >/dev/null &&
+       jq -e --arg ip "$CLIENT_FRONT_IP" '.complete and .count == 1 and .addresses == [$ip]' <<<"$b" >/dev/null; then
+      echo 'Both accounts observe the original client address, not the Entry address'
+      return
+    fi
+    sleep 1
+  done
+  echo "client attribution did not become complete: A=$a B=$b" >&2
+  exit 1
+}
 legacy() {
   source "$state"
   local pool
@@ -220,7 +237,7 @@ INSERT INTO node_group_nodes(node_group_id,node_id) VALUES (:'pool',:'entry');
 SQL
 }
 case "$E2E_ACTION" in
-  provision) provision ;; subscription) subscription ;; apply) apply_status ;; traffic) route_traffic ;; load_traffic) load_traffic ;; legacy) legacy ;;
+  provision) provision ;; subscription) subscription ;; apply) apply_status ;; traffic) route_traffic ;; observation) client_observation ;; load_traffic) load_traffic ;; legacy) legacy ;;
   fault) fault ;; restore) restore ;;
   *) exit 1 ;;
 esac

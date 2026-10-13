@@ -106,6 +106,16 @@ case "$E2E_MODE" in
   lkg)
     healthy A 1101; healthy B 1102
     ;;
+  observation)
+    healthy A 1101; healthy B 1102
+    for socks in 1101 1102; do
+      curl --noproxy '' --socks5-hostname "127.0.0.1:$socks" --limit-rate 1024 \
+        --max-time 70 -fsS http://198.51.100.10:9090/observation-payload >/dev/null &
+    done
+    # Keep authenticated tunnels established while the control container
+    # checks their original client address through the observation endpoint.
+    sleep 60
+    ;;
   load)
     # Benchmark both routes through real tunnels: the healthy controls prove
     # each SOCKS listener reaches its own Exit before any number is taken.

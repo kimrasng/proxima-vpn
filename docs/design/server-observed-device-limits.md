@@ -69,11 +69,18 @@ container with all capabilities dropped. Selective enforcement remains open.
 
 ## Remaining integration
 
-- End-to-end validation of authenticated transport observation with real Xray.
+- Actual Xray relay E2E passed 27 assertions, including authenticated Exit
+  transports joined to the original Entry-side client address. The observer
+  endpoint returns an unknown count for incomplete reports. The admin UI
+  separately shows observed addresses, not physical-device claims.
+- Exact TCP socket-close support is implemented using Linux SOCK_DESTROY with
+  an authenticated-owner/start-time fence, but the current Docker kernel
+  returns EOPNOTSUPP. Successful selective closure and survivor isolation are
+  **not verified**. No automatic address-limit scheduler is enabled.
+- Preventing immediate reconnection needs an account/address-specific deny
+  mechanism as well as connection closure; closure alone is not enforcement.
 - Restart/tuple-reuse lifetime handling and bounded ownership-index cleanup.
-- Selective enforcement that closes the offending address without revoking
-  every client using the shared UUID.
-- Direct and relayed end-to-end tests and operator visibility.
+- Same-account multi-address direct/relayed enforcement E2E remains open.
 
 Do not enable or advertise these unfinished paths as enforcing device limits.
 

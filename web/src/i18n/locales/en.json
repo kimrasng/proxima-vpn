@@ -1316,6 +1316,16 @@
       }
     },
     "userDetail": {
+      "clientAddresses": {
+        "title": "Observed client addresses",
+        "hint": "Observed network IP addresses are separate from registered credentials and are not an exact physical device count: devices behind the same NAT share an IP address. Address-based limits are not enforced yet.",
+        "count": "Observed address count",
+        "unknown": "Unknown",
+        "incomplete": "Observations are incomplete. Any listed addresses are partial; the total count is unknown.",
+        "address": "Client IP address",
+        "empty": "No client addresses observed",
+        "fetchError": "Unable to load client addresses. The count is unknown."
+      },
       "deviceCountHint": "{{count}} registered devices.",
       "onlineUnknown": "Live online UUID count is unavailable; registered devices do not indicate who is online.",
       "fetchError": "Failed to load user",

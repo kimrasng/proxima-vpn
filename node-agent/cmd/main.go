@@ -726,11 +726,18 @@ func heartbeatLoop(ctx context.Context, apiClient *client.APIClient, runner *xra
 					log.Printf("route traffic: %v", trafficErr)
 				}
 			}
-			if err := apiClient.SendHeartbeat(ctx, m.CPU, m.Memory, m.Disk, m.LoadAvg, m.NetworkIn, m.NetworkOut, status); err != nil {
-				log.Printf("heartbeat: %v", err)
+			closures, heartbeatErr := apiClient.SendHeartbeatWithClosures(ctx, m.CPU, m.Memory, m.Disk, m.LoadAvg, m.NetworkIn, m.NetworkOut, status)
+			if heartbeatErr != nil {
+				log.Printf("heartbeat: %v", heartbeatErr)
 				if policy != nil {
 					// Keep the forwarded bytes for the next heartbeat.
 					policy.ReturnTraffic(status.RouteTraffic)
+				}
+			} else if runner != nil {
+				for _, closure := range closures {
+					if err := runner.CloseObservedTransport(closure); err != nil {
+						log.Printf("transport closure %s not confirmed: %v", closure.ID, err)
+					}
 				}
 			}
 		}

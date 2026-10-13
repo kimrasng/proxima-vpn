@@ -443,7 +443,11 @@ func (h *NodeAgentHandler) Heartbeat(c *fiber.Ctx) error {
 		}
 	}
 
-	return c.JSON(fiber.Map{"status": "ok"})
+	closures, closureErr := services.PendingTransportClosures(c.UserContext(), h.redis, nodeID)
+	if closureErr != nil {
+		log.Printf("node %s transport closure delivery unavailable: %v", nodeID, closureErr)
+	}
+	return c.JSON(fiber.Map{"status": "ok", "transport_closures": closures})
 }
 
 type inboundConfigEntry struct {
