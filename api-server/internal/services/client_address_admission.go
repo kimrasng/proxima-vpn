@@ -3,7 +3,6 @@ package services
 import (
 	"context"
 	"fmt"
-	"net/netip"
 
 	"github.com/redis/go-redis/v9"
 )
@@ -13,15 +12,16 @@ func AddressSlotKey(account string) string { return "account:" + account + ":obs
 
 // ReserveObservedClientAddress atomically admits one server-observed source
 // across Exits. It does not accept a client identity header. A live address
-// holds one slot regardless of connection count. Reservations never expire on
-// missing reports; confirmed absence must release them explicitly. This
+// holds one slot regardless of connection count; the slot key is
+// NormalizeClientAddress (IPv6 collapses to its /64). Reservations never expire
+// on missing reports; confirmed absence must release them explicitly. This
 // primitive is not wired into production admission yet.
 func ReserveObservedClientAddress(ctx context.Context, rdb *redis.Client, account, address string, limit int) (bool, error) {
 	if rdb == nil || account == "" {
 		return false, fmt.Errorf("address admission unavailable")
 	}
-	ip, err := netip.ParseAddr(address)
-	if err != nil || ip.Zone() != "" || ip.IsUnspecified() || ip.IsMulticast() {
+	slot, err := NormalizeClientAddress(address)
+	if err != nil {
 		return false, fmt.Errorf("invalid observed client address")
 	}
 	const script = `
@@ -38,6 +38,6 @@ redis.call('HINCRBY',KEYS[2],address,1)
 redis.call('HDEL',KEYS[3],address)
 return 1`
 	key := AddressSlotKey(account)
-	result, err := redis.NewScript(script).Run(ctx, rdb, []string{key, key + ":sequence", key + ":absence"}, ip.Unmap().String(), limit).Int()
+	result, err := redis.NewScript(script).Run(ctx, rdb, []string{key, key + ":sequence", key + ":absence"}, slot, limit).Int()
 	return result == 1, err
 }

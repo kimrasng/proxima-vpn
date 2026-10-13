@@ -31,6 +31,11 @@ type ClientAddressObservation struct {
 	// resolved to it. Only unambiguously attributed transports are present:
 	// a direct peer, or an Entry peer with exactly one relay flow candidate.
 	Transports map[string][]ObservedAddressTransport
+	// Idle is the smallest TCP idle time, in milliseconds, among the
+	// attributed transports of each address: how long since the peer last
+	// acknowledged anything. An address is only as stale as its freshest
+	// transport. A missing entry means no idle evidence, never "active".
+	Idle map[string]int64
 }
 
 // exitConnection is an Exit transport tagged with the Exit that reported it.
@@ -86,14 +91,27 @@ func joinClientAddresses(connections []exitConnection, entryPeers map[string]boo
 		Addresses:  []string{},
 		Starts:     map[string]int64{},
 		Transports: map[string][]ObservedAddressTransport{},
+		Idle:       map[string]int64{},
 	}
-	record := func(address string, tagged exitConnection) {
+	record := func(raw string, tagged exitConnection) {
+		// Key every client by its slot identity so that privacy-address rotation
+		// within one IPv6 /64 is one client, consistently with admission/release.
+		// An address that cannot be keyed cannot be counted, so the snapshot is
+		// incomplete rather than silently under-counting.
+		address, err := NormalizeClientAddress(raw)
+		if err != nil {
+			out.Complete = false
+			return
+		}
 		addresses[address] = true
 		acceptedAt := tagged.connection.AcceptedAt
 		if previous, exists := out.Starts[address]; !exists || acceptedAt < previous {
 			out.Starts[address] = acceptedAt
 		}
 		out.Transports[address] = append(out.Transports[address], ObservedAddressTransport{ExitID: tagged.exitID, Connection: tagged.connection})
+		if idle, seen := out.Idle[address]; !seen || tagged.connection.IdleMillis < idle {
+			out.Idle[address] = tagged.connection.IdleMillis
+		}
 	}
 	for _, tagged := range connections {
 		connection := tagged.connection
