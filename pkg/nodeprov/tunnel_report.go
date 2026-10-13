@@ -1,11 +1,34 @@
 package nodeprov
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"net/netip"
 
 	"github.com/google/uuid"
 )
+
+// TunnelSessionToken is a stable opaque key for one authenticated Exit
+// transport generation. It includes both endpoints, the owning credential and
+// the first authenticated acceptance time; it does not use an address alone.
+func TunnelSessionToken(exitID string, connection TunnelConnection) (string, error) {
+	exit, err := uuid.Parse(exitID)
+	if err != nil {
+		return "", fmt.Errorf("invalid session Exit identity")
+	}
+	if err := connection.Validate(); err != nil {
+		return "", err
+	}
+	credential, err := uuid.Parse(connection.UUID)
+	if err != nil {
+		return "", fmt.Errorf("invalid tunnel credential UUID")
+	}
+	local := netip.AddrPortFrom(netip.MustParseAddr(connection.LocalIP).Unmap(), uint16(connection.LocalPort))
+	peer := netip.AddrPortFrom(netip.MustParseAddr(connection.PeerIP).Unmap(), uint16(connection.PeerPort))
+	sum := sha256.Sum256([]byte(fmt.Sprintf("%s|%s|%s|%s|%d", exit.String(), credential.String(), local, peer, connection.AcceptedAt)))
+	return hex.EncodeToString(sum[:]), nil
+}
 
 // TunnelConnection is a node-observed authenticated TCP transport peer, not a
 // destination stream and not a client-provided installation identifier.
@@ -25,7 +48,11 @@ func (c TunnelConnection) Validate() error {
 	}
 	for _, raw := range []string{c.PeerIP, c.LocalIP} {
 		addr, err := netip.ParseAddr(raw)
-		if err != nil || addr.IsUnspecified() || addr.IsMulticast() {
+		if err != nil {
+			return fmt.Errorf("invalid tunnel address %q", raw)
+		}
+		addr = addr.Unmap()
+		if addr.IsUnspecified() || addr.IsMulticast() {
 			return fmt.Errorf("invalid tunnel address %q", raw)
 		}
 	}

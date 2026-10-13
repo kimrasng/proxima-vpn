@@ -2,10 +2,11 @@
 package devicebandwidth
 
 const (
-	ListenAddress  = "127.0.0.1:10086"
-	Port           = 10086
-	OutboundPrefix = "device-egress-"
-	MaxChunk       = 32768
+	ListenAddress   = "127.0.0.1:10086"
+	ListenAddressIP = "127.0.0.1"
+	Port            = 10086
+	OutboundPrefix  = "device-egress-"
+	MaxChunk        = 32768
 )
 
 type Direction string

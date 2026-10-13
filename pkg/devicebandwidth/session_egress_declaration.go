@@ -32,6 +32,6 @@ func SessionEgressDeclaration(credential string, peer netip.AddrPort, localIP st
 	if err != nil {
 		return nil, nil, err
 	}
-	rule, err := json.Marshal(map[string]any{"type": "field", "user": []string{DeviceUser(credential)}, "source": []string{netip.PrefixFrom(peerIP, peerIP.BitLen()).String()}, "sourcePort": []string{strconv.Itoa(int(peer.Port()))}, "sessionToken": token, "outboundTag": tag})
+	rule, err := json.Marshal(map[string]any{"type": "field", "user": []string{DeviceUser(credential)}, "source": []string{netip.PrefixFrom(peerIP, peerIP.BitLen()).String()}, "sourcePort": []string{strconv.Itoa(int(peer.Port()))}, "ruleTag": "session-" + token, "sessionToken": token, "outboundTag": tag})
 	return encoded, rule, err
 }
