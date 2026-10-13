@@ -6,11 +6,17 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/proximavpn/proxima-vpn/pkg/nodeprov"
 	"github.com/redis/go-redis/v9"
 )
 
 const RelayFlowFreshness = 25 * time.Second
+
+type storedRelayFlowReport struct {
+	nodeprov.RelayFlowReport
+	ReportID string `json:"ReportID,omitempty"`
+}
 
 // PublishRelayFlows stores one authenticated Entry snapshot with a short TTL.
 // Unknown and malformed reports invalidate the prior snapshot immediately;
@@ -34,7 +40,7 @@ func PublishRelayFlows(ctx context.Context, rdb *redis.Client, nodeID string, re
 	if report.Flows == nil {
 		report.Flows = []nodeprov.RelayFlow{}
 	}
-	data, err := json.Marshal(report)
+	data, err := json.Marshal(storedRelayFlowReport{RelayFlowReport: report, ReportID: uuid.NewString()})
 	if err != nil {
 		return err
 	}
@@ -43,24 +49,32 @@ func PublishRelayFlows(ctx context.Context, rdb *redis.Client, nodeID string, re
 
 // ReadRelayFlows never conflates expiration or missing reports with emptiness.
 func ReadRelayFlows(ctx context.Context, rdb *redis.Client, nodeID string) (nodeprov.RelayFlowReport, error) {
+	report, _, err := ReadRelayFlowsWithID(ctx, rdb, nodeID)
+	return report, err
+}
+
+// ReadRelayFlowsWithID returns the server receipt identity together with its snapshot.
+// Legacy snapshots without an identity are unknown, not empty.
+func ReadRelayFlowsWithID(ctx context.Context, rdb *redis.Client, nodeID string) (nodeprov.RelayFlowReport, string, error) {
 	if rdb == nil {
-		return nodeprov.RelayFlowReport{}, fmt.Errorf("relay flow observation storage unavailable")
+		return nodeprov.RelayFlowReport{}, "", fmt.Errorf("relay flow observation storage unavailable")
 	}
 	data, err := rdb.Get(ctx, "node:"+nodeID+":relay_flows").Bytes()
 	if err != nil {
-		return nodeprov.RelayFlowReport{}, err
+		return nodeprov.RelayFlowReport{}, "", err
 	}
-	var report nodeprov.RelayFlowReport
-	if err := json.Unmarshal(data, &report); err != nil {
-		return report, err
+	var stored storedRelayFlowReport
+	if err := json.Unmarshal(data, &stored); err != nil {
+		return nodeprov.RelayFlowReport{}, "", err
 	}
-	if !report.Known || report.Flows == nil || len(report.Flows) > nodeprov.MaxRelayFlowReport {
-		return nodeprov.RelayFlowReport{}, fmt.Errorf("incomplete relay flow report")
+	report := stored.RelayFlowReport
+	if stored.ReportID == "" || !report.Known || report.Flows == nil || len(report.Flows) > nodeprov.MaxRelayFlowReport {
+		return nodeprov.RelayFlowReport{}, "", fmt.Errorf("incomplete relay flow report")
 	}
 	for _, flow := range report.Flows {
 		if err := flow.Validate(); err != nil {
-			return nodeprov.RelayFlowReport{}, err
+			return nodeprov.RelayFlowReport{}, "", err
 		}
 	}
-	return report, nil
+	return report, stored.ReportID, nil
 }

@@ -103,11 +103,23 @@ container with all capabilities dropped. Selective enforcement remains open.
   Exits from admitting N+1 addresses. Reservations deliberately have no TTL:
   lost observations are not evidence that live connections closed. Confirmed
   absence/release and production admission integration remain open.
+- Address-slot release now has a tested admission-sequence fence, a minimum
+  30-second absence interval, replay protection, and incomplete-report reset.
+  Collection captures the reservation fence before reading fleet reports.
+  Independently published Entry/Exit snapshots now have server-generated IDs;
+  a stable fleet fingerprint fences release against reused reports. Legacy
+  unidentified reports are unknown. Redis failover/persistence and automatic
+  release integration still need a gate.
 - A policy proposal retains older address cohorts up to the cap; equal start
   times at the cutoff suspend selection instead of choosing arbitrarily.
 - These primitives are **not yet an integrated enforcement path**. Initial
   source admission, relayed source-to-egress association, automatic policy
   construction and fleet policy acknowledgement remain open.
+- Relay route proposals now associate an original source-address cohort with
+  the exact masqueraded peer IP/port; missing or ambiguous tuple joins fail.
+  Xray protobuf encoding supports exact source-port ranges (unit tested).
+  These proposals cannot migrate already-dispatched shared egress sessions
+  and are not automatically applied; initial relay admission is still open.
 - Same-account multi-address direct/relayed enforcement E2E remains open.
 
 Do not enable or advertise these unfinished paths as enforcing device limits.

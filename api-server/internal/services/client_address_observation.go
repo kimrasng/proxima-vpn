@@ -14,6 +14,9 @@ import (
 type ClientAddressObservation struct {
 	Complete  bool
 	Addresses []string
+	// SnapshotID fingerprints all fresh Entry and Exit server report identities.
+	// Empty means no complete, independently identifiable fleet snapshot.
+	SnapshotID string
 	// First authenticated transport time per address. A missing/ambiguous
 	// attribution never supplies a guessed start for eviction selection.
 	Starts map[string]int64

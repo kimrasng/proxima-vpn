@@ -19,7 +19,9 @@ func TestObservedAddressAdmissionIsAtomicAcrossExits(t *testing.T) {
 	t.Cleanup(func() { _ = rdb.Close() })
 	ctx := context.Background()
 	account := uuid.NewString()
-	t.Cleanup(func() { _ = rdb.Del(ctx, "account:"+account+":observed_address_slots").Err() })
+	t.Cleanup(func() {
+		_ = rdb.Del(ctx, AddressSlotKey(account), AddressSlotKey(account)+":sequence", AddressSlotKey(account)+":absence").Err()
+	})
 	var wg sync.WaitGroup
 	results := make(chan bool, 2)
 	for _, source := range []string{"203.0.113.2", "203.0.113.3"} {

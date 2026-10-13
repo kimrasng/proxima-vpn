@@ -145,6 +145,7 @@ type RoutingRule struct {
 	// SourceCIDRs are server-controlled exact source networks, for address-
 	// qualified routing. Encoded for the pinned Xray 26.7.28 IPRule schema.
 	SourceCIDRs []string
+	SourcePorts []uint16
 }
 
 func marshalRoutingRule(r RoutingRule) []byte {
@@ -183,6 +184,20 @@ func marshalRoutingRule(r RoutingRule) []byte {
 		rule = appendBytes(rule, custom)
 		buf = appendTag(buf, 11, 2)
 		buf = appendBytes(buf, rule)
+	}
+	if len(r.SourcePorts) > 0 {
+		var ports []byte
+		for _, port := range r.SourcePorts {
+			var span []byte
+			span = appendTag(span, 1, 0)
+			span = binary.AppendUvarint(span, uint64(port))
+			span = appendTag(span, 2, 0)
+			span = binary.AppendUvarint(span, uint64(port))
+			ports = appendTag(ports, 1, 2)
+			ports = appendBytes(ports, span)
+		}
+		buf = appendTag(buf, 16, 2)
+		buf = appendBytes(buf, ports)
 	}
 	if r.RuleTag != "" {
 		buf = appendTag(buf, 19, 2)
@@ -231,9 +246,24 @@ func (c *StatsClient) RemoveOutbound(ctx context.Context, tag string) error {
 // supplies the complete ordered list instead.
 func (c *StatsClient) ReplaceRoutingRules(ctx context.Context, rules []RoutingRule) error {
 	for _, rule := range rules {
+		if len(rule.SourcePorts) > 0 && len(rule.SourceCIDRs) != 1 {
+			return fmt.Errorf("source-port rule requires one source network")
+		}
+		for _, port := range rule.SourcePorts {
+			if port == 0 {
+				return fmt.Errorf("source-port rule has zero port")
+			}
+		}
 		for _, source := range rule.SourceCIDRs {
-			if _, _, err := net.ParseCIDR(source); err != nil {
+			ip, network, err := net.ParseCIDR(source)
+			if err != nil {
 				return fmt.Errorf("invalid source CIDR %q", source)
+			}
+			if len(rule.SourcePorts) > 0 {
+				bits, total := network.Mask.Size()
+				if bits != total || ip.IsUnspecified() || ip.IsMulticast() {
+					return fmt.Errorf("source-port rule requires exact unicast host")
+				}
 			}
 		}
 	}

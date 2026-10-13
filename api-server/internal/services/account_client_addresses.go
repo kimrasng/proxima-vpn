@@ -2,6 +2,9 @@ package services
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"sort"
 
@@ -64,6 +67,7 @@ func ObserveClientAddresses(ctx context.Context, db *pgxpool.Pool, rdb *redis.Cl
 	reports := []nodeprov.RelayFlowReport{}
 	connections := []nodeprov.TunnelConnection{}
 	complete := true
+	reportIDs := []string{}
 	exits := 0
 	for _, p := range participants {
 		if p.role == "relay" || p.role == "both" {
@@ -72,10 +76,11 @@ func ObserveClientAddresses(ctx context.Context, db *pgxpool.Pool, rdb *redis.Cl
 				complete = false
 				continue
 			}
-			report, err := ReadRelayFlows(ctx, rdb, p.id)
+			report, reportID, err := ReadRelayFlowsWithID(ctx, rdb, p.id)
 			if err != nil {
 				complete = false
 			} else {
+				reportIDs = append(reportIDs, "entry:"+p.id+":"+reportID)
 				reports = append(reports, report)
 				for _, flow := range report.Flows {
 					entries[flow.PeerIP] = true // multihomed Entry egress address
@@ -92,11 +97,12 @@ func ObserveClientAddresses(ctx context.Context, db *pgxpool.Pool, rdb *redis.Cl
 			complete = false
 			continue
 		}
-		report, err := ReadTunnelReport(ctx, rdb, p.id)
+		report, reportID, err := ReadTunnelReportWithID(ctx, rdb, p.id)
 		if err != nil {
 			complete = false
 			continue
 		}
+		reportIDs = append(reportIDs, "exit:"+p.id+":"+reportID)
 		for _, c := range report.Connections {
 			if owned[c.UUID] {
 				connections = append(connections, c)
@@ -111,6 +117,17 @@ func ObserveClientAddresses(ctx context.Context, db *pgxpool.Pool, rdb *redis.Cl
 		return ClientAddressObservation{}, err
 	}
 	observation.Complete = observation.Complete && complete
+	if observation.Complete {
+		observation.SnapshotID = clientAddressSnapshotID(reportIDs)
+	}
 	sort.Strings(observation.Addresses)
 	return PreserveClientAddressStarts(ctx, rdb, userID, observation)
+}
+
+// Order-independent identity for the exact set of reports used by collection.
+func clientAddressSnapshotID(reportIDs []string) string {
+	sort.Strings(reportIDs)
+	data, _ := json.Marshal(reportIDs)
+	digest := sha256.Sum256(data)
+	return hex.EncodeToString(digest[:])
 }
