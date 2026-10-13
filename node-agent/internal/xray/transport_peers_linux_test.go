@@ -9,9 +9,24 @@ import (
 	"os"
 	"testing"
 	"time"
+	"unsafe"
 
 	"golang.org/x/sys/unix"
 )
+
+// TestTCPInfoIdleOffsetIsLastAckRecv pins the hand-parsed offset to the real
+// kernel struct layout. Reading a neighbouring field (last_data_recv, 52) would
+// still compile and pass the parser tests but report stale idle times for any
+// download-heavy tunnel.
+func TestTCPInfoIdleOffsetIsLastAckRecv(t *testing.T) {
+	var info unix.TCPInfo
+	if got := unsafe.Offsetof(info.Last_ack_recv); got != tcpInfoLastAckRecvOffset {
+		t.Fatalf("tcpi_last_ack_recv offset = %d, parser reads %d", got, tcpInfoLastAckRecvOffset)
+	}
+	if unsafe.Offsetof(info.Last_data_recv) == tcpInfoLastAckRecvOffset {
+		t.Fatal("last_data_recv and last_ack_recv share an offset")
+	}
+}
 
 // TestTransportPeersLive observes real sockets without requiring socket control
 // privileges. Run in a Linux network namespace with a non-loopback IPv4 address.
@@ -116,7 +131,7 @@ func transportTestDiag(local, remote string, port uint16, info bool) []byte {
 		attr := make([]byte, 4+104)
 		binary.NativeEndian.PutUint16(attr[:2], uint16(len(attr)))
 		binary.NativeEndian.PutUint16(attr[2:4], transportDiagInfo)
-		binary.NativeEndian.PutUint32(attr[4+56:4+60], 123456)
+		binary.NativeEndian.PutUint32(attr[4+tcpInfoLastAckRecvOffset:4+tcpInfoLastAckRecvOffset+4], 123456)
 		data = append(data, attr...)
 	}
 	return data
