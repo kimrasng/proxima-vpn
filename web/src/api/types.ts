@@ -320,6 +320,8 @@ export interface UserClientAddresses {
 export interface UserTunnelSessions {
   complete: boolean;
   count: number | null;
+  limit?: number;
+  over_limit?: boolean | null;
   report_id?: string;
   enforced: false;
 }

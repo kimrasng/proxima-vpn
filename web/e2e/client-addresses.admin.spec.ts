@@ -84,6 +84,16 @@ for (const snapshot of [
   });
 }
 
+test("over-limit sessions warn but never claim a completed block", async ({ page }) => {
+  await mockUser(page);
+  await page.route("**/api/v1/admin/users/address-user/tunnel-sessions", (route) => route.fulfill({ json: { complete: true, count: 2, limit: 1, over_limit: true, enforced: false } }));
+  await page.goto("/admin/users/address-user");
+  const section = sessionSection(page);
+  await expect(section.getByText("Plan session limit", { exact: true })).toBeVisible();
+  await expect(section.getByText(/Observed sessions exceed the plan limit/)).toBeVisible();
+  await expect(section.getByText(/not a confirmed block/)).toBeVisible();
+});
+
 test("failed address refresh clears the count without hiding user details", async ({ page }) => {
   await mockUser(page);
   let failed = false;

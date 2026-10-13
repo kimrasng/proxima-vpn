@@ -1320,6 +1320,9 @@
         "title": "Authenticated tunnel sessions",
         "hint": "Each authenticated tunnel counts as one session, even when tunnels share the same IP address or UUID. This is not a count of physical devices. Session limits are not enforced yet.",
         "count": "Authenticated tunnel session count",
+        "limit": "Plan session limit",
+        "unlimited": "Unlimited",
+        "overLimitUnenforced": "Observed sessions exceed the plan limit. Automatic session enforcement is not enabled yet; this is a warning, not a confirmed block.",
         "unknown": "Unknown",
         "incomplete": "The session report is incomplete; the total count is unknown.",
         "fetchError": "Unable to load tunnel sessions. The count is unknown."

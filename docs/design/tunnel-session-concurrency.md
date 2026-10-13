@@ -36,5 +36,11 @@ both. Partial reports reset absence evidence; Redis reservations do not expire
 silently. Redis failover/durability and exact first-contact reservation still
 need verification before automatic enforcement.
 
+The read-only admin endpoint displays the configured plan session limit and
+warns if a complete observation exceeds it; it explicitly says no automatic
+block has been confirmed. An incomplete observation never shows a numeric
+count or over-limit judgment. Browser tests cover 2 sessions alongside one
+observed IP, unknown reports and the warning.
+
 Default runtime still uses the legacy UUID admission path and must not be
 advertised as a session-count limiter.

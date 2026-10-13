@@ -547,7 +547,15 @@ function UserDetailPage() {
               value: tunnelSessions?.complete && tunnelSessions.count !== null
                 ? tunnelSessions.count
                 : t("admin.userDetail.tunnelSessions.unknown"),
+            }, {
+              label: t("admin.userDetail.tunnelSessions.limit"),
+              value: tunnelSessions?.limit && tunnelSessions.limit > 0
+                ? tunnelSessions.limit
+                : t("admin.userDetail.tunnelSessions.unlimited"),
             }]} />
+            {tunnelSessions?.complete && tunnelSessions.over_limit && (
+              <Alert type="warning">{t("admin.userDetail.tunnelSessions.overLimitUnenforced")}</Alert>
+            )}
             {tunnelSessions && !tunnelSessions.complete && (
               <Alert type="info">{t("admin.userDetail.tunnelSessions.incomplete")}</Alert>
             )}
