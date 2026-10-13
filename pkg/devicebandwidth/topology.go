@@ -1,7 +1,9 @@
 package devicebandwidth
 
 import (
+	"encoding/hex"
 	"encoding/json"
+	"net/netip"
 	"strings"
 )
 
@@ -13,9 +15,10 @@ func IsDeviceOutboundTag(tag string) bool {
 // DeviceUser is the Xray user email of a device: "<uuid>@proxima".
 func DeviceUser(id string) string { return id + "@proxima" }
 
-// IsDeviceRule reports whether a routing rule is the exact per-device rule
-// {user:["<uuid>@proxima"], outboundTag:"device-egress-<uuid>"} and nothing
-// else. Any other condition makes it structural.
+// IsDeviceRule reports whether a rule belongs to live-managed credential
+// topology: a legacy exact user rule or a server-address-qualified rule whose
+// outbound has a validated ~hex suffix and one exact host CIDR. Broader
+// networks and other conditions remain structural.
 func IsDeviceRule(rule map[string]json.RawMessage) bool {
 	var outbound string
 	_ = json.Unmarshal(rule["outboundTag"], &outbound)
@@ -26,12 +29,34 @@ func IsDeviceRule(rule map[string]json.RawMessage) bool {
 	if err := json.Unmarshal(rule["user"], &users); err != nil || len(users) != 1 {
 		return false
 	}
-	if users[0] != DeviceUser(strings.TrimPrefix(outbound, OutboundPrefix)) {
+	identity := strings.TrimPrefix(outbound, OutboundPrefix)
+	id, key, qualified := strings.Cut(identity, "~")
+	if users[0] != DeviceUser(id) {
 		return false
+	}
+	if qualified {
+		if len(key) < 16 || len(key) > 64 || len(key)%2 != 0 {
+			return false
+		}
+		if _, err := hex.DecodeString(key); err != nil {
+			return false
+		}
+		var sources []string
+		if json.Unmarshal(rule["source"], &sources) != nil || len(sources) != 1 {
+			return false
+		}
+		prefix, err := netip.ParsePrefix(sources[0])
+		if err != nil || prefix.Bits() != prefix.Addr().BitLen() || prefix.Addr().IsUnspecified() || prefix.Addr().IsMulticast() {
+			return false
+		}
 	}
 	for key := range rule {
 		switch key {
 		case "type", "user", "outboundTag", "ruleTag":
+		case "source":
+			if !qualified {
+				return false
+			}
 		default:
 			return false
 		}

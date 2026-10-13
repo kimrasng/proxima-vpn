@@ -58,6 +58,27 @@ func TestAccessIndexPreservesFirstObservationAndRejectsConflictingOwnership(t *t
 	}
 }
 
+func TestAccessIndexPrunesOnlyConfirmedAbsentOldPeers(t *testing.T) {
+	i := NewAccessIndex()
+	now := time.Now()
+	old := netip.MustParseAddrPort("203.0.113.2:40000")
+	recent := netip.MustParseAddrPort("203.0.113.3:40001")
+	live := netip.MustParseAddrPort("203.0.113.4:40002")
+	i.Observe(accessLine(old.String(), accessUUID), now.Add(-time.Minute))
+	i.Observe(accessLine(recent.String(), accessUUID), now)
+	i.Observe(accessLine(live.String(), accessUUID), now.Add(-time.Hour))
+	i.PruneAbsent(map[netip.AddrPort]bool{live: true}, now)
+	if _, known, _ := i.Lookup(old); known {
+		t.Fatal("old absent peer retained")
+	}
+	if _, known, _ := i.Lookup(recent); !known {
+		t.Fatal("fresh log/socket-dump race discarded")
+	}
+	if _, known, _ := i.Lookup(live); !known {
+		t.Fatal("live peer discarded")
+	}
+}
+
 func TestAccessWriterIndexesFragmentedLinesWithoutChangingOutput(t *testing.T) {
 	i := NewAccessIndex()
 	var out bytes.Buffer

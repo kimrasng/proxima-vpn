@@ -142,6 +142,9 @@ type RoutingRule struct {
 	OutboundTag string
 	UserEmail   []string
 	InboundTag  []string
+	// SourceCIDRs are server-controlled exact source networks, for address-
+	// qualified routing. Encoded for the pinned Xray 26.7.28 IPRule schema.
+	SourceCIDRs []string
 }
 
 func marshalRoutingRule(r RoutingRule) []byte {
@@ -155,6 +158,31 @@ func marshalRoutingRule(r RoutingRule) []byte {
 	for _, tag := range r.InboundTag {
 		buf = appendTag(buf, 8, 2)
 		buf = appendBytes(buf, []byte(tag))
+	}
+	for _, source := range r.SourceCIDRs {
+		ip, network, err := net.ParseCIDR(source)
+		if err != nil {
+			continue
+		} // ReplaceRoutingRules validates before encoding.
+		bits, _ := network.Mask.Size()
+		if v4 := ip.To4(); v4 != nil {
+			ip = v4
+		} else {
+			ip = ip.To16()
+		}
+		var cidr []byte
+		cidr = appendTag(cidr, 1, 2)
+		cidr = appendBytes(cidr, ip)
+		cidr = appendTag(cidr, 2, 0)
+		cidr = binary.AppendUvarint(cidr, uint64(bits))
+		var custom []byte
+		custom = appendTag(custom, 1, 2)
+		custom = appendBytes(custom, cidr)
+		var rule []byte
+		rule = appendTag(rule, 2, 2)
+		rule = appendBytes(rule, custom)
+		buf = appendTag(buf, 11, 2)
+		buf = appendBytes(buf, rule)
 	}
 	if r.RuleTag != "" {
 		buf = appendTag(buf, 19, 2)
@@ -202,6 +230,13 @@ func (c *StatsClient) RemoveOutbound(ctx context.Context, tag string) error {
 // would land a new device's rule behind the deny fallback, so the agent always
 // supplies the complete ordered list instead.
 func (c *StatsClient) ReplaceRoutingRules(ctx context.Context, rules []RoutingRule) error {
+	for _, rule := range rules {
+		for _, source := range rule.SourceCIDRs {
+			if _, _, err := net.ParseCIDR(source); err != nil {
+				return fmt.Errorf("invalid source CIDR %q", source)
+			}
+		}
+	}
 	req := &addRuleRequest{Config: marshalTypedMessage(typeRouterConfig, marshalRouterConfig(rules))}
 	if err := c.conn.Invoke(ctx, addRuleMethod, req, &emptyResponse{}); err != nil {
 		return fmt.Errorf("replace routing rules: %w", err)

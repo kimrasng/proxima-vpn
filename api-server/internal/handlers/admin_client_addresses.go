@@ -34,5 +34,13 @@ func (h *AdminClientAddressHandler) Get(c *fiber.Ctx) error {
 	if observation.Complete {
 		count = len(observation.Addresses)
 	}
-	return c.JSON(fiber.Map{"complete": observation.Complete, "addresses": observation.Addresses, "count": count})
+	var limit int
+	if err := h.db.QueryRow(c.UserContext(), `SELECT COALESCE(p.max_concurrent,p.max_devices,0)
+		FROM users u LEFT JOIN plans p ON p.id=u.plan_id WHERE u.id::text=$1`, c.Params("id")).Scan(&limit); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "client limit unavailable"})
+	}
+	decision := services.DecideClientAddressLimit(observation, limit)
+	return c.JSON(fiber.Map{"complete": observation.Complete, "addresses": observation.Addresses, "count": count,
+		"limit": limit, "over_limit": decision.OverLimit, "candidate_address": decision.Target,
+		"selection_reason": decision.Reason, "enforced": false})
 }

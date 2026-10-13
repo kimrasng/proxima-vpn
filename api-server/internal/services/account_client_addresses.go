@@ -112,5 +112,5 @@ func ObserveClientAddresses(ctx context.Context, db *pgxpool.Pool, rdb *redis.Cl
 	}
 	observation.Complete = observation.Complete && complete
 	sort.Strings(observation.Addresses)
-	return observation, nil
+	return PreserveClientAddressStarts(ctx, rdb, userID, observation)
 }

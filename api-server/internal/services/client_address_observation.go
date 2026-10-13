@@ -14,6 +14,9 @@ import (
 type ClientAddressObservation struct {
 	Complete  bool
 	Addresses []string
+	// First authenticated transport time per address. A missing/ambiguous
+	// attribution never supplies a guessed start for eviction selection.
+	Starts map[string]int64
 }
 
 // JoinClientAddresses requires the caller to supply the known Entry peer
@@ -42,14 +45,20 @@ func JoinClientAddresses(connections []nodeprov.TunnelConnection, entryPeers map
 		}
 	}
 	addresses := make(map[string]bool)
-	out := ClientAddressObservation{Complete: true, Addresses: []string{}}
+	out := ClientAddressObservation{Complete: true, Addresses: []string{}, Starts: map[string]int64{}}
+	record := func(address string, acceptedAt int64) {
+		addresses[address] = true
+		if previous, exists := out.Starts[address]; !exists || acceptedAt < previous {
+			out.Starts[address] = acceptedAt
+		}
+	}
 	for _, connection := range connections {
 		if err := connection.Validate(); err != nil {
 			return ClientAddressObservation{}, fmt.Errorf("invalid Exit transport: %w", err)
 		}
 		peer := netip.MustParseAddr(connection.PeerIP).Unmap().String()
 		if !entryPeers[peer] {
-			addresses[peer] = true
+			record(peer, connection.AcceptedAt)
 			continue
 		}
 		key := tuple{peer, netip.MustParseAddr(connection.LocalIP).Unmap().String(), connection.PeerPort, connection.LocalPort}
@@ -59,7 +68,7 @@ func JoinClientAddresses(connections []nodeprov.TunnelConnection, entryPeers map
 			continue
 		}
 		for address := range candidates {
-			addresses[address] = true
+			record(address, connection.AcceptedAt)
 		}
 	}
 	for address := range addresses {

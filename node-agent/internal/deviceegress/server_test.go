@@ -189,6 +189,12 @@ func mustClose(t *testing.T, c net.Conn) {
 
 func TestAuthenticationIsRequired(t *testing.T) {
 	s := startServer(t, allowAll, nil)
+	if err := s.SetCredentials([]devicebandwidth.Credential{
+		{UUID: "device-a", Password: "secret-a"},
+		{UUID: "device-a", Password: "second-secret"},
+	}); err != nil {
+		t.Fatal(err)
+	}
 	for _, test := range []struct {
 		name     string
 		greeting []byte
@@ -278,6 +284,61 @@ func TestPermitErrorsFailClosedInBothDirections(t *testing.T) {
 			mustClose(t, c)
 		})
 	}
+}
+
+func TestMultiplePasswordsShareUUIDAndRevokeOnlyRemovedCredential(t *testing.T) {
+	s := startServer(t, allowAll, dialEcho(t))
+	credentials := []devicebandwidth.Credential{
+		{UUID: "device-a", Password: "secret-a"},
+		{UUID: "device-a", Password: "second-secret"},
+	}
+	if err := s.SetCredentials(credentials); err != nil {
+		t.Fatal(err)
+	}
+	// Reject an exact duplicate atomically, retaining both existing passwords.
+	if err := s.SetCredentials(append(credentials, credentials[0])); err == nil {
+		t.Fatal("duplicate UUID/password accepted")
+	}
+	first := authenticate(t, s, "device-a", "secret-a")
+	second := authenticate(t, s, "device-a", "second-secret")
+	assertActive(t, s, nil)
+	for _, conn := range []net.Conn{first, second} {
+		if code, _ := request(t, conn, 1); code != 0 {
+			t.Fatalf("CONNECT: %d", code)
+		}
+		if _, err := conn.Write([]byte("ok")); err != nil {
+			t.Fatal(err)
+		}
+		var echo [2]byte
+		if _, err := io.ReadFull(conn, echo[:]); err != nil || string(echo[:]) != "ok" {
+			t.Fatalf("TCP echo: %q, %v", echo, err)
+		}
+	}
+	assertActive(t, s, []string{"device-a"})
+	if err := s.SetCredentials(credentials[1:]); err != nil {
+		t.Fatal(err)
+	}
+	mustClose(t, first)
+	if _, err := second.Write([]byte("still-live")); err != nil {
+		t.Fatal(err)
+	}
+	var echo [10]byte
+	if _, err := io.ReadFull(second, echo[:]); err != nil || string(echo[:]) != "still-live" {
+		t.Fatalf("retained password session revoked: %q, %v", echo, err)
+	}
+	assertActive(t, s, []string{"device-a"})
+	if err := s.SetCredentials(credentials); err != nil {
+		t.Fatal(err)
+	}
+	firstAgain := authenticate(t, s, "device-a", "secret-a")
+	if code, _ := request(t, firstAgain, 1); code != 0 {
+		t.Fatalf("CONNECT after restoring password: %d", code)
+	}
+	// UUID-wide revocation still closes sessions using either password.
+	s.ReconcileRevokedUUIDs([]string{"device-a"})
+	mustClose(t, firstAgain)
+	mustClose(t, second)
+	assertActive(t, s, nil)
 }
 
 func TestCredentialReplacementRevokesChangedOrRemovedSessionsOnly(t *testing.T) {

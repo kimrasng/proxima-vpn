@@ -2,6 +2,7 @@ package xray
 
 import (
 	"fmt"
+	"net/netip"
 	"sort"
 	"time"
 
@@ -27,13 +28,17 @@ func (r *XrayRunner) TunnelReport() (nodeprov.TunnelReport, error) {
 	if err != nil {
 		return nodeprov.TunnelReport{}, err
 	}
-	report := joinTransportOwners(index, peers)
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if generation != r.exited || !r.runningLocked() {
 		return nodeprov.TunnelReport{}, fmt.Errorf("xray restarted during transport observation")
 	}
-	return report, nil
+	live := make(map[netip.AddrPort]bool, len(peers))
+	for _, peer := range peers {
+		live[peer.Remote] = true
+	}
+	index.PruneAbsent(live, time.Now())
+	return joinTransportOwners(index, peers), nil
 }
 
 func joinTransportOwners(index *AccessIndex, peers []TransportPeer) nodeprov.TunnelReport {

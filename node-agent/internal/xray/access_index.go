@@ -80,6 +80,27 @@ func (i *AccessIndex) Lookup(peer netip.AddrPort) (owner AccessPeer, known, comp
 	return owner, known, !i.overflow
 }
 
+// PruneAbsent removes ownership only after a successful full socket dump
+// shows the peer absent and its log record is at least 30 seconds old. The
+// grace preserves access records racing with a dump. Incomplete dumps must
+// never call this method.
+func (i *AccessIndex) PruneAbsent(live map[netip.AddrPort]bool, now time.Time) {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	for peer, owner := range i.peers {
+		if !live[peer] && now.Sub(owner.AcceptedAt) > 30*time.Second {
+			delete(i.peers, peer)
+		}
+	}
+	for peer := range i.ambiguous {
+		if !live[peer] {
+			delete(i.ambiguous, peer)
+		}
+	}
+	// Overflow stays sticky until restart: discarded ownership records
+	// cannot be reconstructed merely by freeing space.
+}
+
 func parseAccessPeer(line string, now time.Time) (AccessPeer, bool) {
 	fields := strings.Fields(line)
 	var address, email string

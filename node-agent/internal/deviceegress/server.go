@@ -38,7 +38,7 @@ type Server struct {
 	admit       func(context.Context, string) error
 	permit      PermitFunc
 	dial        DialFunc
-	credentials map[string][32]byte
+	credentials map[string]map[[32]byte]struct{}
 	revoked     map[string]struct{}
 	// The agent marks state unavailable before exposing the listener if bootstrap fails.
 	revocationKnown bool
@@ -104,7 +104,7 @@ func NewWithDialer(permit PermitFunc, dial DialFunc) *Server {
 	if dial == nil {
 		dial = (&net.Dialer{Timeout: dialTimeout}).DialContext
 	}
-	return &Server{permit: permit, dial: dial, credentials: make(map[string][32]byte), revoked: make(map[string]struct{}), revocationKnown: true, devices: make(map[string]*deviceState), sessions: make(map[*session]struct{})}
+	return &Server{permit: permit, dial: dial, credentials: make(map[string]map[[32]byte]struct{}), revoked: make(map[string]struct{}), revocationKnown: true, devices: make(map[string]*deviceState), sessions: make(map[*session]struct{})}
 }
 
 // ReconcileRevokedUUIDs replaces the control plane's current revocation set.
@@ -159,17 +159,24 @@ func (s *Server) RevocationUnavailable() {
 }
 
 // SetCredentials atomically replaces the credential set. Invalid input leaves
-// the old set intact; changed and removed credentials revoke live associations.
+// the old set intact; removed UUID/password pairs revoke their live associations.
+// A UUID may have multiple distinct passwords, but exact duplicates are invalid.
 func (s *Server) SetCredentials(credentials []devicebandwidth.Credential) error {
-	next := make(map[string][32]byte, len(credentials))
+	next := make(map[string]map[[32]byte]struct{}, len(credentials))
 	for _, credential := range credentials {
 		if len(credential.UUID) == 0 || len(credential.UUID) > 255 || len(credential.Password) == 0 || len(credential.Password) > 255 {
 			return errors.New("SOCKS credentials must contain 1–255 byte usernames and passwords")
 		}
-		if _, exists := next[credential.UUID]; exists {
+		password := sha256.Sum256([]byte(credential.Password))
+		passwords := next[credential.UUID]
+		if _, exists := passwords[password]; exists {
 			return fmt.Errorf("duplicate device credential %q", credential.UUID)
 		}
-		next[credential.UUID] = sha256.Sum256([]byte(credential.Password))
+		if passwords == nil {
+			passwords = make(map[[32]byte]struct{})
+			next[credential.UUID] = passwords
+		}
+		passwords[password] = struct{}{}
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -181,12 +188,21 @@ func (s *Server) SetCredentials(credentials []devicebandwidth.Credential) error 
 		if !connection.authenticated {
 			continue
 		}
-		password, exists := next[connection.uuid]
-		if !exists || subtle.ConstantTimeCompare(password[:], connection.password[:]) != 1 {
+		if !passwordAllowed(next[connection.uuid], connection.password) {
 			connection.close()
 		}
 	}
 	return nil
+}
+
+// passwordAllowed compares every hash without a hash-key lookup or early exit,
+// so membership and the matching password's position do not affect scan time.
+func passwordAllowed(passwords map[[32]byte]struct{}, actual [32]byte) bool {
+	matches := 0
+	for expected := range passwords {
+		matches |= subtle.ConstantTimeCompare(actual[:], expected[:])
+	}
+	return matches == 1
 }
 
 // Start binds only a numeric loopback address and serves asynchronously.
@@ -355,10 +371,9 @@ func (c *session) authenticate() error {
 	}
 	actual := sha256.Sum256(password)
 	c.server.mu.Lock()
-	expected, exists := c.server.credentials[string(username)]
-	matches := subtle.ConstantTimeCompare(actual[:], expected[:]) == 1
+	matches := passwordAllowed(c.server.credentials[string(username)], actual)
 	_, revoked := c.server.revoked[string(username)]
-	valid := exists && matches && !revoked && c.server.revocationKnown && c.ctx.Err() == nil
+	valid := matches && !revoked && c.server.revocationKnown && c.ctx.Err() == nil
 	if valid {
 		c.uuid = string(username)
 		c.password = actual

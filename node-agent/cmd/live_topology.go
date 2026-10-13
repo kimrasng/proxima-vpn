@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net"
 	"sort"
 	"strings"
 
@@ -27,6 +28,7 @@ type rawRule struct {
 	OutboundTag string   `json:"outboundTag"`
 	User        []string `json:"user"`
 	InboundTag  []string `json:"inboundTag"`
+	Source      []string `json:"source"`
 }
 
 // parseLiveTopology extracts the live-managed topology from a materialized
@@ -92,7 +94,7 @@ func parseLiveTopology(runtime []byte) (liveTopology, error) {
 		}
 		for key := range fields {
 			switch key {
-			case "type", "ruleTag", "outboundTag", "user", "inboundTag":
+			case "type", "ruleTag", "outboundTag", "user", "inboundTag", "source":
 			default:
 				return liveTopology{}, fmt.Errorf("routing rule %d uses %q, which live edits cannot express", i, key)
 			}
@@ -100,11 +102,17 @@ func parseLiveTopology(runtime []byte) (liveTopology, error) {
 		if rule.Type != "" && rule.Type != "field" || rule.OutboundTag == "" {
 			return liveTopology{}, fmt.Errorf("routing rule %d is not a field rule with an outbound", i)
 		}
+		for _, source := range rule.Source {
+			if _, _, err := net.ParseCIDR(source); err != nil {
+				return liveTopology{}, fmt.Errorf("routing rule %d has invalid source CIDR", i)
+			}
+		}
 		topology.rules = append(topology.rules, xray.RoutingRule{
 			RuleTag:     rule.RuleTag,
 			OutboundTag: rule.OutboundTag,
 			UserEmail:   rule.User,
 			InboundTag:  rule.InboundTag,
+			SourceCIDRs: rule.Source,
 		})
 	}
 	return topology, nil
@@ -118,7 +126,8 @@ func sameRules(a, b []xray.RoutingRule) bool {
 	for i := range a {
 		if a[i].RuleTag != b[i].RuleTag || a[i].OutboundTag != b[i].OutboundTag ||
 			strings.Join(a[i].UserEmail, "\x00") != strings.Join(b[i].UserEmail, "\x00") ||
-			strings.Join(a[i].InboundTag, "\x00") != strings.Join(b[i].InboundTag, "\x00") {
+			strings.Join(a[i].InboundTag, "\x00") != strings.Join(b[i].InboundTag, "\x00") ||
+			strings.Join(a[i].SourceCIDRs, "\x00") != strings.Join(b[i].SourceCIDRs, "\x00") {
 			return false
 		}
 	}

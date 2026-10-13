@@ -80,6 +80,22 @@ container with all capabilities dropped. Selective enforcement remains open.
 - Preventing immediate reconnection needs an account/address-specific deny
   mechanism as well as connection closure; closure alone is not enforcement.
 - Restart/tuple-reuse lifetime handling and bounded ownership-index cleanup.
+- A tested no-SOCK_DESTROY building block now allows several server-generated
+  local passwords for one UUID. Removing one password closes only its TCP
+  egress sessions; retained sessions and UUID-wide bandwidth gates survive.
+- Xray 26.7.28 source-qualified routing was verified live: exact IPv4 sources
+  select different outbounds, a gRPC rule swap preserves an existing survivor.
+  IPv6 live routing remains unverified.
+- Canonical per-source outbound materialization uses stable passwords per tag,
+  exact host CIDRs and a required unconditional blackhole fallback. Shared
+  catchall bypasses and broad networks are rejected.
+- Address-limit selection proposes the newest address only from complete,
+  unambiguous evidence. Account-wide starts survive Exit switches and partial
+  reports; confirmed absence resets them. The administrator endpoint exposes
+  the proposal with `enforced: false`.
+- These primitives are **not yet an integrated enforcement path**. Initial
+  source admission, relayed source-to-egress association, automatic policy
+  construction, reconnect denial and multi-client real-Xray closure E2E remain.
 - Same-account multi-address direct/relayed enforcement E2E remains open.
 
 Do not enable or advertise these unfinished paths as enforcing device limits.

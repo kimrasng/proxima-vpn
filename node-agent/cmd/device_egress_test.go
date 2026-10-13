@@ -235,3 +235,133 @@ func TestDeviceEgressFailedCredentialsCannotBeReportedReady(t *testing.T) {
 		t.Fatal("credential failure reported capability")
 	}
 }
+
+func sourceDeviceConfig(t *testing.T, two bool) []byte {
+	t.Helper()
+	var cfg map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(limitedDeviceConfig), &cfg); err != nil {
+		t.Fatal(err)
+	}
+	var outbounds []map[string]json.RawMessage
+	_ = json.Unmarshal(cfg["outbounds"], &outbounds)
+	device := outbounds[1]
+	outbounds = outbounds[:1]
+	rules := []map[string]any{}
+	keys := []string{"0123456789abcdef", "ABCDEF0123456789"}
+	sources := []string{"192.0.2.1/32", "2001:db8::1/128"}
+	for i, key := range keys {
+		if i == 1 && !two {
+			break
+		}
+		tag := "device-egress-uuid-a~" + key
+		copy := make(map[string]json.RawMessage)
+		for k, v := range device {
+			copy[k] = v
+		}
+		copy["tag"], _ = json.Marshal(tag)
+		outbounds = append(outbounds, copy)
+		rules = append(rules, map[string]any{"type": "field", "user": []string{"uuid-a@proxima"}, "source": []string{sources[i]}, "outboundTag": tag})
+	}
+	outbounds = append(outbounds, map[string]json.RawMessage{"tag": json.RawMessage(`"block"`), "protocol": json.RawMessage(`"blackhole"`)})
+	rules = append(rules, map[string]any{"type": "field", "user": []string{"uuid-a@proxima"}, "outboundTag": "block"})
+	cfg["outbounds"], _ = json.Marshal(outbounds)
+	cfg["routing"], _ = json.Marshal(map[string]any{"rules": rules})
+	cfg["inbounds"] = json.RawMessage(`[{"protocol":"vless","tag":"vless-reality-limit-10","settings":{"clients":[{"id":"uuid-a","email":"uuid-a@proxima"}]}}]`)
+	data, err := json.Marshal(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return data
+}
+
+func TestDeviceEgressSourceCredentialsStableAndIndependentlyRevoked(t *testing.T) {
+	var credentials []devicebandwidth.Credential
+	var rates map[string]int
+	e := newDeviceEgress(func(c []devicebandwidth.Credential) error { credentials = c; return nil })
+	e.setRates = func(r map[string]int) { rates = r }
+	canonical := sourceDeviceConfig(t, true)
+	original := append([]byte(nil), canonical...)
+	runtime, err := e.TransformConfig(canonical)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(credentials) != 2 || credentials[0].UUID != "uuid-a" || credentials[1].UUID != "uuid-a" || credentials[0].Password == credentials[1].Password {
+		t.Fatalf("unexpected credentials: %+v", credentials)
+	}
+	if len(rates) != 1 || rates["uuid-a"] != 10 {
+		t.Fatalf("rates not shared by UUID: %v", rates)
+	}
+	if !bytes.Equal(canonical, original) || bytes.Contains(runtime, []byte(deviceEgressPlaceholder)) {
+		t.Fatal("canonical modified or runtime not materialized")
+	}
+	passwords := make(map[string]string)
+	for tag, pass := range e.passwords {
+		passwords[tag] = pass
+	}
+	if _, err := e.TransformConfig(canonical); err != nil {
+		t.Fatal(err)
+	}
+	for tag, pass := range passwords {
+		if e.passwords[tag] != pass {
+			t.Fatal("unchanged tag password rotated")
+		}
+	}
+	if _, err := e.TransformConfig(sourceDeviceConfig(t, false)); err != nil {
+		t.Fatal(err)
+	}
+	remaining := "device-egress-uuid-a~0123456789abcdef"
+	if len(e.passwords) != 1 || e.passwords[remaining] != passwords[remaining] || len(credentials) != 1 || credentials[0].Password != passwords[remaining] {
+		t.Fatal("removing one tag changed or revoked the surviving credential")
+	}
+	if err := e.CanRestore(canonical); err == nil {
+		t.Fatal("rollback restored revoked source tag")
+	}
+}
+
+func TestDeviceEgressRejectsUnsafeSourceRouting(t *testing.T) {
+	canonical := string(sourceDeviceConfig(t, true))
+	for name, bad := range map[string]string{
+		"odd suffix":          strings.ReplaceAll(canonical, "~0123456789abcdef", "~0123456789abcdef0"),
+		"empty suffix":        strings.ReplaceAll(canonical, "~0123456789abcdef", "~"),
+		"short suffix":        strings.ReplaceAll(canonical, "~0123456789abcdef", "~0123456789abcde"),
+		"long suffix":         strings.ReplaceAll(canonical, "~0123456789abcdef", "~"+strings.Repeat("a", 65)),
+		"non hex":             strings.ReplaceAll(canonical, "~0123456789abcdef", "~0123456789abcdeg"),
+		"multiple separators": strings.ReplaceAll(canonical, "~0123456789abcdef", "~0123456789abcdef~"),
+		"unicode hex":         strings.ReplaceAll(canonical, "~0123456789abcdef", "~０123456789abcdef"),
+		"broad IPv4":          strings.ReplaceAll(canonical, "192.0.2.1/32", "192.0.2.0/24"),
+		"broad IPv6":          strings.ReplaceAll(canonical, "2001:db8::1/128", "2001:db8::/64"),
+		"bare address":        strings.ReplaceAll(canonical, "192.0.2.1/32", "192.0.2.1"),
+		"no deny":             strings.ReplaceAll(canonical, `"outboundTag":"block"`, `"outboundTag":"direct"`),
+		"conditional deny":    strings.ReplaceAll(canonical, `"outboundTag":"block"`, `"outboundTag":"block","network":"tcp"`),
+		"conditional source":  strings.ReplaceAll(canonical, `"source":["192.0.2.1/32"]`, `"source":["192.0.2.1/32"],"network":"tcp"`),
+		"shadowed source":     strings.ReplaceAll(canonical, "2001:db8::1/128", "192.0.2.1/32"),
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := parseDeviceConfig([]byte(bad)); err == nil {
+				t.Fatal("unsafe source config accepted")
+			}
+		})
+	}
+	// Even a valid legacy declaration cannot act as a shared catchall after
+	// source-qualified routes; unknown sources must be denied.
+	var mixed map[string]json.RawMessage
+	_ = json.Unmarshal([]byte(canonical), &mixed)
+	var outbounds []json.RawMessage
+	_ = json.Unmarshal(mixed["outbounds"], &outbounds)
+	var legacy map[string]json.RawMessage
+	_ = json.Unmarshal([]byte(limitedDeviceConfig), &legacy)
+	var legacyOutbounds []json.RawMessage
+	_ = json.Unmarshal(legacy["outbounds"], &legacyOutbounds)
+	outbounds = append(outbounds, legacyOutbounds[1])
+	mixed["outbounds"], _ = json.Marshal(outbounds)
+	mixed["routing"] = json.RawMessage(strings.ReplaceAll(string(mixed["routing"]), `"outboundTag":"block"`, `"outboundTag":"device-egress-uuid-a"`))
+	bad, _ := json.Marshal(mixed)
+	if _, err := parseDeviceConfig(bad); err == nil {
+		t.Fatal("shared legacy catchall bypass accepted")
+	}
+	for _, n := range []int{16, 32, 64} {
+		if _, _, ok := parseLocalDeviceTag("device-egress-uuid-a~" + strings.Repeat("f", n)); !ok {
+			t.Fatalf("valid %d-character ASCII hex key rejected", n)
+		}
+	}
+}
