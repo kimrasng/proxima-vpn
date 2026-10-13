@@ -1,6 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { mockSession } from "./subscription-domain-fixtures";
-import type { UserClientAddresses } from "../src/api/types";
+import type { UserClientAddresses, UserTunnelSessions } from "../src/api/types";
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
@@ -38,7 +38,7 @@ for (const snapshot of [
     await page.goto("/admin/users/address-user");
     const section = addressSection(page);
     await expect(section.getByText("Observed address count", { exact: true })).toBeVisible();
-    await expect(section.getByText(/same NAT share an IP address/)).toBeVisible();
+    await expect(section.getByText(/share an IP address/)).toBeVisible();
     for (const address of snapshot.addresses) {
       await expect(section.getByText(address, { exact: true })).toBeVisible();
     }
@@ -48,6 +48,38 @@ for (const snapshot of [
       await expect(section.getByText("Unknown", { exact: true })).toBeVisible();
       await expect(section.getByText("99", { exact: true })).toHaveCount(0);
       await expect(section.getByText(/Observations are incomplete/)).toBeVisible();
+    }
+  });
+}
+
+function sessionSection(page: Page) {
+  return page.locator("div").filter({
+    has: page.getByRole("heading", { name: "Authenticated tunnel sessions", exact: true }),
+  }).filter({ has: page.getByRole("term").filter({ hasText: "Authenticated tunnel session count" }) }).last();
+}
+
+for (const snapshot of [
+  { complete: true, count: 2, enforced: false },
+  { complete: false, count: 99, enforced: false },
+] satisfies UserTunnelSessions[]) {
+  test(`tunnel sessions: complete=${snapshot.complete}`, async ({ page }) => {
+    await mockUser(page);
+    await page.route("**/api/v1/admin/users/address-user/tunnel-sessions", (route) => route.fulfill({ json: snapshot }));
+    await page.route("**/api/v1/admin/users/address-user/client-addresses", (route) => route.fulfill({ json: {
+      complete: true, addresses: ["203.0.113.8"], count: 1,
+    } }));
+    await page.goto("/admin/users/address-user");
+    const section = sessionSection(page);
+    await expect(section.getByText(/same IP address or UUID/)).toBeVisible();
+    await expect(section.getByText(/not a count of physical devices/)).toBeVisible();
+    await expect(section.getByText(/not enforced yet/)).toBeVisible();
+    if (snapshot.complete) {
+      await expect(section.getByText("2", { exact: true })).toBeVisible();
+      await expect(addressSection(page).getByText("1", { exact: true })).toBeVisible();
+    } else {
+      await expect(section.getByText("Unknown", { exact: true })).toBeVisible();
+      await expect(section.getByText("99", { exact: true })).toHaveCount(0);
+      await expect(section.getByText(/report is incomplete/)).toBeVisible();
     }
   });
 }

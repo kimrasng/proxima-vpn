@@ -28,6 +28,7 @@ import {
 import {
   getUser,
   getUserClientAddresses,
+  getUserTunnelSessions,
   getUserLoginHistory,
   getUserTraffic,
   listPlans,
@@ -41,6 +42,7 @@ import type {
   UpdateUserRequest,
   UserDetail as UserDetailData,
   UserClientAddresses,
+  UserTunnelSessions,
   UserTraffic,
 } from "../../api/types";
 import { usePublishBreadcrumbLeaf } from "../../hooks/useBreadcrumbLeaf";
@@ -102,6 +104,8 @@ function UserDetailPage() {
   const [user, setUser] = useState<UserDetailData | null>(null);
   const [clientAddresses, setClientAddresses] = useState<UserClientAddresses | null>(null);
   const [clientAddressesError, setClientAddressesError] = useState(false);
+  const [tunnelSessions, setTunnelSessions] = useState<UserTunnelSessions | null>(null);
+  const [tunnelSessionsError, setTunnelSessionsError] = useState(false);
   const [traffic, setTraffic] = useState<UserTraffic | null>(null);
   const [logins, setLogins] = useState<LoginHistoryEntry[]>([]);
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -121,7 +125,7 @@ function UserDetailPage() {
     try {
       // Optional observations degrade independently: their failures must not
       // blank the identity card or the edit form.
-      const [detail, plansData, trafficResult, loginResult, addressResult] = await Promise.all([
+      const [detail, plansData, trafficResult, loginResult, addressResult, sessionResult] = await Promise.all([
         getUser(userId),
         listPlans().then(
           (data) => data,
@@ -139,6 +143,10 @@ function UserDetailPage() {
           (data) => ({ ok: true as const, data }),
           () => ({ ok: false as const, data: null }),
         ),
+        getUserTunnelSessions(userId).then(
+          (data) => ({ ok: true as const, data }),
+          () => ({ ok: false as const, data: null }),
+        ),
       ]);
 
       setUser(detail);
@@ -147,6 +155,8 @@ function UserDetailPage() {
       // after a failed refresh.
       setClientAddresses(addressResult.data);
       setClientAddressesError(!addressResult.ok);
+      setTunnelSessions(sessionResult.data);
+      setTunnelSessionsError(!sessionResult.ok);
 
       // The form is seeded once. Re-seeding on every poll would discard whatever
       // the admin has typed while the interval fires underneath them.
@@ -521,6 +531,26 @@ function UserDetailPage() {
               ]}
               empty={<Box textAlign="center">{t("admin.userDetail.byNodeEmpty")}</Box>}
             />
+          </SpaceBetween>
+        </Container>
+
+        <Container header={<Header variant="h2">{t("admin.userDetail.tunnelSessions.title")}</Header>}>
+          <SpaceBetween size="s">
+            <Box variant="small" color="text-body-secondary">
+              {t("admin.userDetail.tunnelSessions.hint")}
+            </Box>
+            {tunnelSessionsError && (
+              <Alert type="warning">{t("admin.userDetail.tunnelSessions.fetchError")}</Alert>
+            )}
+            <KeyValuePairs items={[{
+              label: t("admin.userDetail.tunnelSessions.count"),
+              value: tunnelSessions?.complete && tunnelSessions.count !== null
+                ? tunnelSessions.count
+                : t("admin.userDetail.tunnelSessions.unknown"),
+            }]} />
+            {tunnelSessions && !tunnelSessions.complete && (
+              <Alert type="info">{t("admin.userDetail.tunnelSessions.incomplete")}</Alert>
+            )}
           </SpaceBetween>
         </Container>
 

@@ -23,6 +23,7 @@ import type {
   User,
   UserDetail,
   UserClientAddresses,
+  UserTunnelSessions,
   PaginatedUsers,
   UpdateUserRequest,
   CreateUserRequest,
@@ -288,6 +289,11 @@ export function getUser(id: string): Promise<UserDetail> {
 export function getUserClientAddresses(id: string): Promise<UserClientAddresses> {
   applyAdminClient();
   return get<UserClientAddresses>(`/api/v1/admin/users/${id}/client-addresses`);
+}
+
+export function getUserTunnelSessions(id: string): Promise<UserTunnelSessions> {
+  applyAdminClient();
+  return get<UserTunnelSessions>(`/api/v1/admin/users/${id}/tunnel-sessions`);
 }
 
 export function updateUser(id: string, req: UpdateUserRequest): Promise<User> {

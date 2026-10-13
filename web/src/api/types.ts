@@ -317,6 +317,13 @@ export interface UserClientAddresses {
   count: number | null;
 }
 
+export interface UserTunnelSessions {
+  complete: boolean;
+  count: number | null;
+  report_id?: string;
+  enforced: false;
+}
+
 export interface PaginatedUsers {
   users: User[];
   total: number;

@@ -22,6 +22,14 @@ Implemented initial policy tests verify:
   provide permission to evict an arbitrary session.
 
 Automatic first-contact session admission, exact per-session local egress
-credentials and integrated N+1 enforcement remain unfinished. Default runtime
-still uses the legacy UUID admission path and must not be advertised as a
-session-count limiter.
+credentials and integrated N+1 enforcement remain unfinished. A Redis
+reservation primitive now atomically counts exact authenticated transport
+keys (Exit + UUID + local/peer tuple + acceptance generation), including
+separate sessions sharing one IP and UUID. It never expires slots on a missing
+report. An account-wide reader requires fresh reports from every registered
+Exit; partial coverage is unknown, not a lower count. The administrator
+read-only endpoint reports the count or unknown with `enforced: false`.
+These pieces are not wired to production admission.
+
+Default runtime still uses the legacy UUID admission path and must not be
+advertised as a session-count limiter.
