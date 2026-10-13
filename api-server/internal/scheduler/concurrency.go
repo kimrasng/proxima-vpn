@@ -19,17 +19,19 @@ const (
 )
 
 type ConcurrencyScheduler struct {
-	db        *pgxpool.Pool
-	tracker   *services.OnlineTracker
-	enforce   bool
-	grace     int
-	threshold int
-	strikes   map[string]int
-	cancel    context.CancelFunc
+	db             *pgxpool.Pool
+	tracker        *services.OnlineTracker
+	enforce        bool
+	grace          int
+	threshold      int
+	strikes        map[string]int
+	sessionStrikes map[string]int
+	redis          *redis.Client
+	cancel         context.CancelFunc
 }
 
 func NewConcurrencyScheduler(db *pgxpool.Pool, rdb *redis.Client) *ConcurrencyScheduler {
-	return &ConcurrencyScheduler{db: db, tracker: services.NewOnlineTracker(rdb), enforce: os.Getenv("ENFORCE_CONCURRENCY") == "1", grace: nonnegativeEnv("CONCURRENCY_GRACE", 0), threshold: positiveEnv("CONCURRENCY_STRIKES", 2), strikes: map[string]int{}}
+	return &ConcurrencyScheduler{db: db, tracker: services.NewOnlineTracker(rdb), redis: rdb, enforce: os.Getenv("ENFORCE_CONCURRENCY") == "1", grace: nonnegativeEnv("CONCURRENCY_GRACE", 0), threshold: positiveEnv("CONCURRENCY_STRIKES", 2), strikes: map[string]int{}, sessionStrikes: map[string]int{}}
 }
 
 func nonnegativeEnv(name string, fallback int) int {
@@ -94,9 +96,40 @@ func (s *ConcurrencyScheduler) sweep(ctx context.Context) {
 	for _, r := range caps {
 		if r.cap > 0 {
 			s.checkUser(ctx, r)
+			s.checkTunnelSessions(ctx, r)
 		}
 	}
 }
+func (s *ConcurrencyScheduler) checkTunnelSessions(ctx context.Context, r capRow) {
+	observation, snapshot, err := services.ObserveAccountTunnelSessions(ctx, s.db, s.redis, r.userID)
+	if err != nil || !observation.Complete || snapshot == "" {
+		delete(s.sessionStrikes, r.userID)
+		return
+	}
+	count, err := services.CountTunnelSessions(observation)
+	if err != nil {
+		delete(s.sessionStrikes, r.userID)
+		return
+	}
+	if count <= r.cap {
+		delete(s.sessionStrikes, r.userID)
+		return
+	}
+	targets, err := services.NewestTunnelSessions(observation, r.cap)
+	if err != nil || len(targets) == 0 {
+		return
+	}
+	s.sessionStrikes[r.userID]++
+	if s.sessionStrikes[r.userID] < s.threshold {
+		return
+	}
+	// Reporting only. Per-session local credential materialization and a
+	// durable, multi-exit admission policy are not enabled yet; never fall
+	// through to UUID-wide revocation for a session-count excess.
+	log.Printf("tunnel session cap exceeded, no session-specific enforcement: user=%s sessions=%d cap=%d candidate_exit=%s peer=%s:%d snapshot=%s", r.userID, count, r.cap, targets[0].ExitID, targets[0].Connection.PeerIP, targets[0].Connection.PeerPort, snapshot[:12])
+	s.sessionStrikes[r.userID] = 0
+}
+
 func (s *ConcurrencyScheduler) checkUser(ctx context.Context, r capRow) {
 	obs, err := s.tracker.ObserveAccount(ctx, s.db, r.userID)
 	if err != nil {
