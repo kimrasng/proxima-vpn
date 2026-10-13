@@ -10,6 +10,17 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
+func TestReportReceiptSnapshotIdentityMatchesAccountSnapshot(t *testing.T) {
+	receipts := map[string]tunnelReportReceipt{
+		"exit-a": {ReportID: "receipt-1", ReceivedAt: 1000},
+		"exit-b": {ReportID: "receipt-2", ReceivedAt: 1200},
+	}
+	want := clientAddressSnapshotID([]string{"exit-a:receipt-1", "exit-b:receipt-2"})
+	if got := receiptSnapshotID(receipts); got != want {
+		t.Fatalf("receipt identity mismatch: %s != %s", got, want)
+	}
+}
+
 func TestReportEpochIdentity(t *testing.T) {
 	addr := os.Getenv("TEST_REDIS_ADDR")
 	if addr == "" {

@@ -2,40 +2,24 @@ package services
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
-	"net/netip"
 
 	"github.com/google/uuid"
+	"github.com/proximavpn/proxima-vpn/pkg/nodeprov"
 	"github.com/redis/go-redis/v9"
 )
 
 // TunnelSessionKey identifies one authenticated Exit transport generation.
-// Neither source IP alone nor UUID alone identifies a session. AcceptedAt
-// prevents a later connection reusing the same peer tuple from sharing a slot.
+// The canonical algorithm lives in nodeprov so the control plane and node-agent
+// derive the identical opaque credential from the same observation.
 func TunnelSessionKey(session ObservedTunnelSession) (string, error) {
-	id, err := uuid.Parse(session.ExitID)
-	if err != nil {
-		return "", fmt.Errorf("invalid session Exit identity")
-	}
-	c := session.Connection
-	if err := c.Validate(); err != nil {
-		return "", err
-	}
-	local := netip.AddrPortFrom(netip.MustParseAddr(c.LocalIP).Unmap(), uint16(c.LocalPort))
-	peer := netip.AddrPortFrom(netip.MustParseAddr(c.PeerIP).Unmap(), uint16(c.PeerPort))
-	credential, _ := uuid.Parse(c.UUID)
-	sum := sha256.Sum256([]byte(fmt.Sprintf("%s|%s|%s|%s|%d", id.String(), credential.String(), local, peer, c.AcceptedAt)))
-	return hex.EncodeToString(sum[:]), nil
+	return nodeprov.TunnelSessionToken(session.ExitID, session.Connection)
 }
 
 func TunnelSlotKey(account string) string { return "account:" + account + ":tunnel_session_slots" }
 
-// ReserveTunnelSession atomically reserves a transport slot across Exits.
-// Retries of this exact session are idempotent, but another transport on the
-// same UUID/IP consumes another slot. No TTL silently frees live sessions.
-// This primitive is not automatically enabled on legacy UUID admission.
+// ReserveTunnelSession atomically reserves one exact transport slot. The
+// operation is idempotent for an existing token and does not assign a TTL.
 func ReserveTunnelSession(ctx context.Context, rdb *redis.Client, account string, session ObservedTunnelSession, limit int) (bool, error) {
 	if rdb == nil {
 		return false, fmt.Errorf("session admission unavailable")
@@ -51,7 +35,6 @@ func ReserveTunnelSession(ctx context.Context, rdb *redis.Client, account string
 	const script = `
 local key=ARGV[1]
 if redis.call('SISMEMBER',KEYS[1],key)==1 then
- redis.call('HINCRBY',KEYS[2],key,1)
  redis.call('HDEL',KEYS[3],key)
  return 1
 end

@@ -26,8 +26,18 @@ func TestTunnelReportsInvalidateUnknownAndMalformedEvidence(t *testing.T) {
 	if err := PublishTunnelReport(ctx, rdb, node, good); err != nil {
 		t.Fatal(err)
 	}
-	got, err := ReadTunnelReport(ctx, rdb, node)
-	if err != nil || len(got.Connections) != 1 || got.Connections[0] != connection {
+	_, firstID, firstAt, err := ReadTunnelReportWithReceipt(ctx, rdb, node)
+	if err != nil || firstID == "" || firstAt <= 0 {
+		t.Fatalf("receipt=%q %d %v", firstID, firstAt, err)
+	}
+	if err := PublishTunnelReport(ctx, rdb, node, good); err != nil {
+		t.Fatal(err)
+	}
+	got, secondID, secondAt, err := ReadTunnelReportWithReceipt(ctx, rdb, node)
+	if err != nil || secondID == "" || secondID == firstID || secondAt < firstAt {
+		t.Fatalf("second receipt=%q %d first=%q %d err=%v", secondID, secondAt, firstID, firstAt, err)
+	}
+	if len(got.Connections) != 1 || got.Connections[0] != connection {
 		t.Fatalf("report: %+v %v", got, err)
 	}
 	if ttl := rdb.TTL(ctx, key).Val(); ttl <= 0 || ttl > TunnelReportFreshness {

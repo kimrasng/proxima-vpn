@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 )
@@ -30,7 +31,11 @@ func ObserveAccountTunnelSessions(ctx context.Context, db *pgxpool.Pool, rdb *re
 			rows.Close()
 			return TunnelSessionObservation{}, "", err
 		}
-		owned[id] = true
+		credential, err := uuid.Parse(id)
+		if err != nil {
+			return TunnelSessionObservation{}, "", fmt.Errorf("invalid owned tunnel credential UUID")
+		}
+		owned[credential.String()] = true
 	}
 	rows.Close()
 	if err := rows.Err(); err != nil {
@@ -75,7 +80,12 @@ func ObserveAccountTunnelSessions(ctx context.Context, db *pgxpool.Pool, rdb *re
 		}
 		ids = append(ids, n.id+":"+reportID)
 		for _, connection := range report.Connections {
-			if owned[connection.UUID] {
+			credential, err := uuid.Parse(connection.UUID)
+			if err != nil {
+				observation.Complete = false
+				continue
+			}
+			if owned[credential.String()] {
 				observation.Sessions = append(observation.Sessions, ObservedTunnelSession{ExitID: n.id, Connection: connection})
 			}
 		}

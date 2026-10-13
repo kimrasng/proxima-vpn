@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -18,6 +19,30 @@ func seedSessionExit(t *testing.T, ctx context.Context, db *pgxpool.Pool) string
 	}
 	t.Cleanup(func() { _, _ = db.Exec(context.Background(), `DELETE FROM nodes WHERE id=$1`, id) })
 	return id
+}
+
+func TestAccountTunnelSessionsCanonicalUUIDOwnership(t *testing.T) {
+	db, rdb, _, ctx := setupTracker(t)
+	user, credentials := seedUserWithDevices(t, ctx, db, 1)
+	exit := seedSessionExit(t, ctx, db)
+	defer func() { _ = rdb.Del(context.Background(), "node:"+exit+":tunnels").Err() }()
+	connection := nodeprov.TunnelConnection{UUID: strings.ToUpper(credentials[0]), PeerIP: "203.0.113.7", PeerPort: 41000, LocalIP: "10.0.2.9", LocalPort: 8443, AcceptedAt: time.Now().UnixMilli()}
+	if err := PublishTunnelReport(ctx, rdb, exit, nodeprov.TunnelReport{Known: true, Connections: []nodeprov.TunnelConnection{connection}}); err != nil {
+		t.Fatal(err)
+	}
+	observation, snapshot, err := ObserveAccountTunnelSessions(ctx, db, rdb, user)
+	if err != nil || !observation.Complete || snapshot == "" || len(observation.Sessions) != 1 {
+		t.Fatalf("uppercase UUID report omitted live session: %+v snapshot=%q err=%v", observation, snapshot, err)
+	}
+
+	connection.UUID = "not-a-uuid"
+	if err := PublishTunnelReport(ctx, rdb, exit, nodeprov.TunnelReport{Known: true, Connections: []nodeprov.TunnelConnection{connection}}); err != nil {
+		t.Fatal(err)
+	}
+	observation, snapshot, err = ObserveAccountTunnelSessions(ctx, db, rdb, user)
+	if err != nil || observation.Complete || snapshot != "" {
+		t.Fatalf("malformed UUID report did not fail closed: %+v snapshot=%q err=%v", observation, snapshot, err)
+	}
 }
 
 func TestAccountTunnelSessionsCountTransportsAcrossExits(t *testing.T) {

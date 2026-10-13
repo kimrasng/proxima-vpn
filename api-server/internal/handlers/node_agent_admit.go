@@ -46,22 +46,23 @@ func (h *NodeAgentHandler) AdmitDevice(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "invalid learn-only admission"})
 	}
 	if req.LearnOnly {
-		entitled, entitlementErr := services.SessionEntitled(ctx, h.db, nodeID, device.String())
-		if entitlementErr != nil {
-			return c.Status(503).JSON(fiber.Map{"error": "session entitlement unavailable"})
-		}
-		if !entitled {
-			return c.Status(409).JSON(fiber.Map{"error": "session entitlement denied"})
-		}
-		c.Set("Cache-Control", "no-store")
-		return c.SendStatus(204)
+		return c.Status(503).JSON(fiber.Map{"error": "session learning not integrated"})
 	}
 	if req.SessionToken != "" && (req.RelayPeer != nil || req.SourceAddress != "") {
 		return c.Status(400).JSON(fiber.Map{"error": "ambiguous admission identity"})
 	}
 	if req.SessionToken != "" {
 		allowed, err = service.AdmitReportedTunnelSession(ctx, nodeID, device.String(), req.SessionToken)
-	} else if req.RelayPeer != nil {
+		if err != nil {
+			return c.Status(503).JSON(fiber.Map{"error": "session admission unavailable"})
+		}
+		c.Set("Cache-Control", "no-store")
+		if !allowed {
+			return c.Status(409).JSON(fiber.Map{"error": "online session limit reached"})
+		}
+		return c.SendStatus(204)
+	}
+	if req.RelayPeer != nil {
 		allowed, err = service.AdmitProvenRelaySource(ctx, nodeID, device.String(), req.RelayPeer.IP, req.RelayPeer.Port, req.RelayPeer.LocalPort)
 	} else if req.SourceAddress != "" {
 		allowed, err = service.AdmitSourceDevice(ctx, nodeID, device.String(), req.SourceAddress)

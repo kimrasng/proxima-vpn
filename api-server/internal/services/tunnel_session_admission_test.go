@@ -47,11 +47,19 @@ func TestSessionReservationCountsSameCredentialAndAddressSeparately(t *testing.T
 	if results[1] {
 		winner = second
 	}
+	winnerKey, err := TunnelSessionKey(winner)
+	if err != nil {
+		t.Fatal(err)
+	}
+	beforeRetrySequence := rdb.HGet(ctx, key+":sequence", winnerKey).Val()
 	for n := 0; n < 3; n++ {
 		allowed, err := ReserveTunnelSession(ctx, rdb, account, winner, 1)
 		if err != nil || !allowed {
 			t.Fatalf("idempotent reservation: %v %v", allowed, err)
 		}
+	}
+	if afterRetrySequence := rdb.HGet(ctx, key+":sequence", winnerKey).Val(); afterRetrySequence != beforeRetrySequence {
+		t.Fatalf("idempotent admission changed sequence from %q to %q", beforeRetrySequence, afterRetrySequence)
 	}
 	if ttl := rdb.TTL(ctx, key).Val(); ttl != -1 {
 		t.Fatalf("session reservations must not expire silently: %v", ttl)

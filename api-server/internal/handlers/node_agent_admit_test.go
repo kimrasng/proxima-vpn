@@ -14,6 +14,7 @@ import (
 	"github.com/proximavpn/proxima-vpn/api-server/internal/server"
 	"github.com/proximavpn/proxima-vpn/api-server/internal/services"
 	"github.com/proximavpn/proxima-vpn/pkg/crypto"
+	"github.com/proximavpn/proxima-vpn/pkg/nodeprov"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -73,7 +74,77 @@ func TestSourceAdmissionHTTP(t *testing.T) {
 	}
 	request(device, "192.0.2.1", "", 401, "")
 	request(device, "192.0.2.1", "test", 204, "")
-	request(second, "::ffff:192.0.2.1", "test", 204, "")
+	for _, body := range []string{
+		fmt.Sprintf(`{"device_uuid":%q,"session_token":%q}`, device, strings.Repeat("a", 64)),
+		fmt.Sprintf(`{"device_uuid":%q,"learn_only":true,"relay_peer":{"ip":"203.0.113.2","port":40000,"local_port":8443}}`, device),
+	} {
+		req := httptest.NewRequest(fiber.MethodPost, "/api/v1/nodes/"+node+"/devices/admit", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-Node-Key", "test")
+		res, err := app.Test(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		data, _ := io.ReadAll(res.Body)
+		_ = res.Body.Close()
+		if res.StatusCode != 503 {
+			t.Fatalf("session request without fresh Exit evidence status=%d body=%s", res.StatusCode, data)
+		}
+	}
+	if err := fixture.pool.QueryRow(ctx, `UPDATE plans SET max_concurrent=1 WHERE id=$1 RETURNING id`, plan).Scan(new(string)); err != nil {
+		t.Fatal(err)
+	}
+	firstConnection := nodeprov.TunnelConnection{UUID: device, PeerIP: "203.0.113.2", PeerPort: 40000, LocalIP: "10.0.2.2", LocalPort: 8443, AcceptedAt: 1000}
+	secondConnection := firstConnection
+	secondConnection.PeerPort++
+	secondConnection.AcceptedAt++
+	reportedFirst, reportedSecond := firstConnection, secondConnection
+	reportedFirst.UUID, reportedSecond.UUID = strings.ToUpper(device), strings.ToUpper(device)
+	if err := services.PublishTunnelReport(ctx, rdb, node, nodeprov.TunnelReport{Known: true, Connections: []nodeprov.TunnelConnection{reportedFirst, reportedSecond}}); err != nil {
+		t.Fatal(err)
+	}
+	sessionToken, err := nodeprov.TunnelSessionToken(node, firstConnection)
+	if err != nil {
+		t.Fatal(err)
+	}
+	admitSession := func(token string) (int, string) {
+		t.Helper()
+		body := fmt.Sprintf(`{"device_uuid":%q,"session_token":%q}`, device, token)
+		req := httptest.NewRequest(fiber.MethodPost, "/api/v1/nodes/"+node+"/devices/admit", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-Node-Key", "test")
+		res, err := app.Test(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _ = res.Body.Close() }()
+		data, _ := io.ReadAll(res.Body)
+		return res.StatusCode, string(data)
+	}
+	if status, body := admitSession(sessionToken); status != 204 {
+		t.Fatalf("first session: status=%d body=%s", status, body)
+	}
+	if status, body := admitSession(sessionToken); status != 204 {
+		t.Fatalf("repeat admission of same transport: status=%d body=%s", status, body)
+	}
+	secondToken, err := nodeprov.TunnelSessionToken(node, secondConnection)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status, body := admitSession(secondToken); status != 409 || !strings.Contains(body, "online session limit reached") {
+		t.Fatalf("N+1 session: status=%d body=%s", status, body)
+	}
+	if status, body := admitSession(strings.Repeat("a", 64)); status != 503 || !strings.Contains(body, "session admission unavailable") {
+		t.Fatalf("unknown session: status=%d body=%s", status, body)
+	}
+	sessionSlots := services.TunnelSlotKey(user)
+	t.Cleanup(func() {
+		_ = rdb.Del(ctx, sessionSlots, sessionSlots+":sequence", sessionSlots+":absence", sessionSlots+":epoch").Err()
+	})
+	if count := rdb.SCard(ctx, sessionSlots).Val(); count != 1 {
+		t.Fatalf("same transport repeat admission counted twice: session slot count=%d", count)
+	}
+	request(device, "::ffff:192.0.2.1", "test", 204, "")
 	request(device, "192.0.2.2", "test", 409, "online address limit reached")
 	if members, err := rdb.SMembers(ctx, addressKey).Result(); err != nil || len(members) != 1 || members[0] != "192.0.2.1" {
 		t.Fatalf("canonical slots=%v err=%v", members, err)
