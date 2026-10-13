@@ -139,12 +139,10 @@ func marshalSOCKSOutbound(o SOCKSOutbound) []byte {
 
 // RoutingRule is the subset of a field rule the agent installs at runtime.
 type RoutingRule struct {
-	RuleTag     string
-	OutboundTag string
-	UserEmail   []string
-	InboundTag  []string
-	// SourceCIDRs are server-controlled exact source networks, for address-
-	// qualified routing. Encoded for the pinned Xray 26.7.28 IPRule schema.
+	RuleTag      string
+	OutboundTag  string
+	UserEmail    []string
+	InboundTag   []string
 	SourceCIDRs  []string
 	SourcePorts  []uint16
 	SessionToken string
@@ -187,18 +185,15 @@ func marshalRoutingRule(r RoutingRule) []byte {
 		buf = appendTag(buf, 11, 2)
 		buf = appendBytes(buf, rule)
 	}
-	if r.SessionToken != "" {
-		if len(r.SessionToken) != 64 || len(r.SourceCIDRs) != 1 || len(r.SourcePorts) != 1 {
-			return buf
-		}
-		decoded, err := hex.DecodeString(r.SessionToken)
-		if err != nil || len(decoded) != 32 || hex.EncodeToString(decoded) != r.SessionToken {
-			return buf
-		}
-		buf = appendTag(buf, 14, 2)
-		buf = appendBytes(buf, []byte(r.SessionToken))
-	}
 	if len(r.SourcePorts) > 0 {
+		if r.SessionToken != "" {
+			decoded, err := hex.DecodeString(r.SessionToken)
+			if len(r.SessionToken) != 64 || err != nil || len(decoded) != 32 || hex.EncodeToString(decoded) != r.SessionToken || len(r.SourceCIDRs) != 1 {
+				return buf
+			}
+			buf = appendTag(buf, 14, 2)
+			buf = appendBytes(buf, []byte(r.SessionToken))
+		}
 		var ports []byte
 		for _, port := range r.SourcePorts {
 			var span []byte
@@ -212,7 +207,10 @@ func marshalRoutingRule(r RoutingRule) []byte {
 		buf = appendTag(buf, 16, 2)
 		buf = appendBytes(buf, ports)
 	}
-	if r.RuleTag != "" {
+	if r.RuleTag != "" || r.SessionToken != "" {
+		if r.RuleTag == "" {
+			r.RuleTag = "session-" + r.SessionToken
+		}
 		buf = appendTag(buf, 19, 2)
 		buf = appendBytes(buf, []byte(r.RuleTag))
 	}
@@ -260,15 +258,10 @@ func (c *StatsClient) RemoveOutbound(ctx context.Context, tag string) error {
 func (c *StatsClient) ReplaceRoutingRules(ctx context.Context, rules []RoutingRule) error {
 	for _, rule := range rules {
 		if rule.SessionToken != "" {
-			if len(rule.SessionToken) != 64 {
-				return fmt.Errorf("invalid session token")
-			}
-			decoded, err := hex.DecodeString(rule.SessionToken)
-			if err != nil || len(decoded) != 32 || hex.EncodeToString(decoded) != rule.SessionToken {
-				return fmt.Errorf("invalid session token")
-			}
-			if len(rule.SourceCIDRs) != 1 || len(rule.SourcePorts) != 1 {
-				return fmt.Errorf("session rule requires exact source and port")
+			token := rule.SessionToken
+			decoded, err := hex.DecodeString(token)
+			if len(token) != 64 || err != nil || len(decoded) != 32 || hex.EncodeToString(decoded) != token || len(rule.SourceCIDRs) != 1 || len(rule.SourcePorts) != 1 || rule.RuleTag != "" {
+				return fmt.Errorf("invalid session-qualified routing rule")
 			}
 		}
 		if len(rule.SourcePorts) > 0 && len(rule.SourceCIDRs) != 1 {

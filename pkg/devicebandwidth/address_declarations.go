@@ -9,7 +9,7 @@ import (
 // AddressEgressDeclarations builds allowlisted source-qualified local egress
 // declarations for one credential. Caller must append a controlled-inbound
 // blackhole fallback and must never retain that credential's shared catchall.
-// This builder does not recover original sources hidden behind NAT.
+// This builder does not recover sources hidden behind NAT.
 func AddressEgressDeclarations(credential string, addresses []string) ([]json.RawMessage, []json.RawMessage, error) {
 	sources := append([]string(nil), addresses...)
 	sort.Strings(sources)

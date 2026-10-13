@@ -89,6 +89,18 @@ func IsDeviceRule(rule map[string]json.RawMessage) bool {
 			if !qualified {
 				return false
 			}
+		case "sessionToken":
+			var token string
+			if !qualified || json.Unmarshal(rule["sessionToken"], &token) != nil || len(token) != 64 {
+				return false
+			}
+			if decoded, err := hex.DecodeString(token); err != nil || len(decoded) != 32 || hex.EncodeToString(decoded) != token {
+				return false
+			}
+			var ports []string
+			if json.Unmarshal(rule["sourcePort"], &ports) != nil || len(ports) != 1 {
+				return false
+			}
 		default:
 			return false
 		}

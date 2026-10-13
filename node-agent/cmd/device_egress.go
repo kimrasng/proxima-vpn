@@ -25,27 +25,28 @@ type deviceEgress struct {
 	setCredentials func([]devicebandwidth.Credential) error
 	// setRates receives per-device plan speeds for local enforcement; nil
 	// means rates are unknown and metered traffic must be denied.
-	setRates   func(map[string]int)
-	passwords  map[string]string
+	setRates       func(map[string]int)
+	passwords      map[string]string
 	passwordTokens map[string]string
-	authorized map[string]struct{}
-	managed    map[string]struct{}
-	ready      func() bool
-	count      int
+	authorized     map[string]struct{}
+	managed        map[string]struct{}
+	ready          func() bool
+	count          int
 }
 
 func newDeviceEgress(setCredentials func([]devicebandwidth.Credential) error) *deviceEgress {
-	return &deviceEgress{setCredentials: setCredentials, passwords: make(map[string]string)}
+	return &deviceEgress{setCredentials: setCredentials, passwords: make(map[string]string), passwordTokens: make(map[string]string)}
 }
 
 type deviceConfig struct {
-	root              map[string]json.RawMessage
-	outbounds         []map[string]json.RawMessage
-	devices           map[string]int    // outbound tag -> index
-	deviceIDs         map[string]string // outbound tag -> device UUID
-	identities        map[string]struct{}
-	deviceSources     map[string]string
-	deviceSourcePorts map[string]int // outbound tag -> exact source port (0 = source-only)
+	root                map[string]json.RawMessage
+	outbounds           []map[string]json.RawMessage
+	devices             map[string]int    // outbound tag -> index
+	deviceIDs           map[string]string // outbound tag -> device UUID
+	identities          map[string]struct{}
+	deviceSources       map[string]string
+	deviceSourcePorts   map[string]int // outbound tag -> exact source port (0 = source-only)
+	deviceSessionTokens map[string]string
 	// rates maps each managed device UUID to its plan speed in Mbps (0 =
 	// unlimited), taken from the limit tier of the inbound it belongs to.
 	rates map[string]int
@@ -63,7 +64,7 @@ type deviceSOCKSServer struct {
 // parseDeviceConfig rejects invalid declarations and missing exact routing.
 // Legacy unlimited configs without device declarations are left unchanged.
 func parseDeviceConfig(data []byte) (*deviceConfig, error) {
-	cfg := &deviceConfig{deviceSources: make(map[string]string), deviceSourcePorts: make(map[string]int), devices: make(map[string]int), deviceIDs: make(map[string]string), identities: make(map[string]struct{}), rates: make(map[string]int)}
+	cfg := &deviceConfig{deviceSources: make(map[string]string), deviceSourcePorts: make(map[string]int), deviceSessionTokens: make(map[string]string), devices: make(map[string]int), deviceIDs: make(map[string]string), identities: make(map[string]struct{}), rates: make(map[string]int)}
 	if err := json.Unmarshal(data, &cfg.root); err != nil || cfg.root == nil {
 		return nil, fmt.Errorf("invalid xray configuration")
 	}
@@ -195,12 +196,13 @@ func parseDeviceConfig(data []byte) (*deviceConfig, error) {
 			seenSources := make(map[netip.Prefix]map[int]bool)
 			for _, rawRule := range routing.Rules {
 				var rule struct {
-					Type        string   `json:"type"`
-					User        []string `json:"user"`
-					InboundTag  []string `json:"inboundTag"`
-					OutboundTag string   `json:"outboundTag"`
-					Source      []string `json:"source"`
-					SourcePort  []string `json:"sourcePort"`
+					Type         string   `json:"type"`
+					User         []string `json:"user"`
+					InboundTag   []string `json:"inboundTag"`
+					OutboundTag  string   `json:"outboundTag"`
+					Source       []string `json:"source"`
+					SourcePort   []string `json:"sourcePort"`
+					SessionToken string   `json:"sessionToken"`
 				}
 				if err := decodeDeviceRule(rawRule, &rule); err != nil {
 					return nil, err
@@ -211,19 +213,29 @@ func parseDeviceConfig(data []byte) (*deviceConfig, error) {
 				strict := rule.Type == "field"
 				for key := range rawRule {
 					switch key {
-					case "type", "user", "inboundTag", "outboundTag", "ruleTag", "source", "sourcePort":
+					case "type", "user", "inboundTag", "outboundTag", "ruleTag", "source", "sourcePort", "sessionToken":
 					default:
 						strict = false
 					}
 				}
 				_, hasSource := rawRule["source"]
 				_, hasSourcePort := rawRule["sourcePort"]
-				if sourceMode && strict && !hasSource && !hasSourcePort && denyTags[rule.OutboundTag] {
+				_, hasSessionToken := rawRule["sessionToken"]
+				if sourceMode && strict && !hasSource && !hasSourcePort && !hasSessionToken && denyTags[rule.OutboundTag] {
 					denied = true
 					break
 				}
 				id, sourceKey, valid := parseLocalDeviceTag(rule.OutboundTag)
 				_, declared := cfg.devices[rule.OutboundTag]
+				if rule.SessionToken != "" {
+					if !sourceMode || !hasSource || !hasSourcePort || len(rule.SessionToken) != 64 {
+						return nil, fmt.Errorf("invalid session-qualified route")
+					}
+					if previous := cfg.deviceSessionTokens[rule.OutboundTag]; previous != "" && previous != rule.SessionToken {
+						return nil, fmt.Errorf("conflicting session token")
+					}
+					cfg.deviceSessionTokens[rule.OutboundTag] = rule.SessionToken
+				}
 				if !strict || !valid || !declared || id != user.ID || len(rule.User) != 1 || rule.User[0] != user.Email {
 					return nil, fmt.Errorf("device %q lacks first-match authenticated egress routing", user.ID)
 				}
@@ -432,12 +444,13 @@ func (e *deviceEgress) TransformConfig(canonical []byte) ([]byte, error) {
 	for id := range e.passwords {
 		if _, keep := cfg.devices[id]; !keep {
 			delete(e.passwords, id)
+			delete(e.passwordTokens, id)
 		}
 	}
 	// Revoke first, before generating/admitting newly authorized credentials.
 	kept := make([]devicebandwidth.Credential, 0, len(e.passwords))
 	for id, password := range e.passwords {
-		kept = append(kept, devicebandwidth.Credential{UUID: cfg.deviceIDs[id], Password: password, SourceAddress: cfg.deviceSources[id]})
+		kept = append(kept, devicebandwidth.Credential{UUID: cfg.deviceIDs[id], Password: password, SourceAddress: cfg.deviceSources[id], SessionToken: e.passwordTokens[id]})
 	}
 	if err := e.setCredentials(kept); err != nil {
 		e.count = 0
@@ -455,7 +468,14 @@ func (e *deviceEgress) TransformConfig(canonical []byte) ([]byte, error) {
 			password = hex.EncodeToString(secret[:])
 			e.passwords[id] = password
 		}
-		credentials = append(credentials, devicebandwidth.Credential{UUID: cfg.deviceIDs[id], Password: password, SourceAddress: cfg.deviceSources[id]})
+		if sessionToken := cfg.deviceSessionTokens[id]; sessionToken != e.passwordTokens[id] {
+			if sessionToken == "" {
+				delete(e.passwordTokens, id)
+			} else {
+				e.passwordTokens[id] = sessionToken
+			}
+		}
+		credentials = append(credentials, devicebandwidth.Credential{UUID: cfg.deviceIDs[id], Password: password, SourceAddress: cfg.deviceSources[id], SessionToken: e.passwordTokens[id]})
 		// Replace only the credential field; retain any unrelated settings.
 		outbound := cfg.outbounds[index]
 		var settings map[string]json.RawMessage
