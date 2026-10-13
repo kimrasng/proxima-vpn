@@ -49,6 +49,10 @@ func TestTunnelSlotReleaseRequiresIndependentCompleteFleetReports(t *testing.T) 
 	}
 	// Use increasing Redis-controlled epochs; elapsed time is determined by
 	// the receipt timestamps and this integration test itself does not sleep.
+	// Two server-side rules bound each epoch: it may not be in Redis's future,
+	// and it may not precede any receipt it cites. Epochs therefore count UP
+	// from now-1000 while every receipt below is dated at or before the first
+	// epoch (now-999), so each epoch is both <= now and >= its receipts.
 	stamp := now - 1000
 	run := func(obs TunnelSessionObservation, receipts map[string]tunnelReportReceipt) []string {
 		t.Helper()
@@ -69,7 +73,7 @@ func TestTunnelSlotReleaseRequiresIndependentCompleteFleetReports(t *testing.T) 
 	if got := run(empty, first); len(got) != 0 {
 		t.Fatalf("same report receipt released slot: %v", got)
 	}
-	if got := run(empty, receipt("report-2", now)); len(got) != 0 {
+	if got := run(empty, receipt("report-2", now-1000)); len(got) != 0 {
 		t.Fatalf("report intervals under 30 seconds released slot: %v", got)
 	}
 	id, err := TunnelSessionKey(session)

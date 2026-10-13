@@ -42,22 +42,33 @@ func PublishTunnelReport(ctx context.Context, rdb *redis.Client, nodeID string, 
 	if report.Connections == nil {
 		report.Connections = []nodeprov.TunnelConnection{}
 	}
+	// ReceivedAt must be the Redis server clock, assigned atomically with the
+	// write. The payload is therefore NOT decoded and re-encoded in Lua: cjson
+	// turns an empty array into an object, which would corrupt an empty (but
+	// complete) connection list into one that cannot be read back. The Go side
+	// emits a fixed placeholder token and Lua substitutes only that token.
+	const placeholder = "__RECEIVED_AT__"
 	data, err := json.Marshal(storedTunnelReport{
 		TunnelReport: report,
 		ReportID:     uuid.NewString(),
-		ReceivedAt:   1, // Replaced atomically with Redis server time below.
+		ReceivedAt:   0, // omitted by omitempty; the placeholder is appended below.
 	})
 	if err != nil {
 		return err
 	}
+	if len(data) < 2 || data[len(data)-1] != '}' {
+		return fmt.Errorf("unexpected tunnel report encoding")
+	}
+	// Insert the field before the closing brace; the object is never empty
+	// because TunnelReport always encodes its fields.
+	data = append(data[:len(data)-1], []byte(`,"ReceivedAt":`+placeholder+`}`)...)
 	const storeScript = `
 local clock=redis.call('TIME')
 local now=tonumber(clock[1])*1000+math.floor(tonumber(clock[2])/1000)
-local report=cjson.decode(ARGV[1])
-report.ReceivedAt=now
-redis.call('SET',KEYS[1],cjson.encode(report),'PX',ARGV[2])
+local payload=string.gsub(ARGV[1],ARGV[3],string.format('%.0f',now),1)
+redis.call('SET',KEYS[1],payload,'PX',ARGV[2])
 return now`
-	_, err = redis.NewScript(storeScript).Run(ctx, rdb, []string{key}, string(data), strconv.FormatInt(TunnelReportFreshness.Milliseconds(), 10)).Result()
+	_, err = redis.NewScript(storeScript).Run(ctx, rdb, []string{key}, string(data), strconv.FormatInt(TunnelReportFreshness.Milliseconds(), 10), placeholder).Result()
 	return err
 }
 

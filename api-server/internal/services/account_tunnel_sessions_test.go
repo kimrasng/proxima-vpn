@@ -35,9 +35,11 @@ func TestAccountTunnelSessionsCanonicalUUIDOwnership(t *testing.T) {
 		t.Fatalf("uppercase UUID report omitted live session: %+v snapshot=%q err=%v", observation, snapshot, err)
 	}
 
+	// A malformed credential UUID is rejected at publish time and invalidates the
+	// prior snapshot, so the account observation must fail closed afterwards.
 	connection.UUID = "not-a-uuid"
-	if err := PublishTunnelReport(ctx, rdb, exit, nodeprov.TunnelReport{Known: true, Connections: []nodeprov.TunnelConnection{connection}}); err != nil {
-		t.Fatal(err)
+	if err := PublishTunnelReport(ctx, rdb, exit, nodeprov.TunnelReport{Known: true, Connections: []nodeprov.TunnelConnection{connection}}); err == nil {
+		t.Fatal("malformed credential UUID was accepted at publish time")
 	}
 	observation, snapshot, err = ObserveAccountTunnelSessions(ctx, db, rdb, user)
 	if err != nil || observation.Complete || snapshot != "" {
