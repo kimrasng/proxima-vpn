@@ -28,6 +28,7 @@ type PermitResponse struct {
 }
 
 type Credential struct {
-	UUID     string
-	Password string
+	UUID          string
+	Password      string
+	SourceAddress string // Optional server-origin cohort address; never supplied by the SOCKS client.
 }

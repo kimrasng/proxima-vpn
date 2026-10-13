@@ -73,6 +73,12 @@ func TestSourceEgressLive(t *testing.T) {
 		}
 		return (&net.Dialer{Timeout: 3 * time.Second}).DialContext(ctx, network, sink.Addr().String())
 	})
+	server.SetSourceAdmitter(func(_ context.Context, id, source string) error {
+		if id != uuid || (source != "127.0.0.2" && source != "127.0.0.3") {
+			return fmt.Errorf("unexpected authenticated source cohort")
+		}
+		return nil
+	})
 	if err := server.Start(ctx, devicebandwidth.ListenAddress); err != nil {
 		t.Fatal(err)
 	}

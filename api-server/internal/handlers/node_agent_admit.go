@@ -18,7 +18,8 @@ func (h *NodeAgentHandler) AdmitDevice(c *fiber.Ctx) error {
 		return c.SendStatus(401)
 	}
 	var req struct {
-		DeviceUUID string `json:"device_uuid"`
+		DeviceUUID    string `json:"device_uuid"`
+		SourceAddress string `json:"source_address"`
 	}
 	if err := json.Unmarshal(c.Body(), &req); err != nil {
 		return c.SendStatus(400)
@@ -29,13 +30,23 @@ func (h *NodeAgentHandler) AdmitDevice(c *fiber.Ctx) error {
 	}
 	ctx, cancel := context.WithTimeout(c.UserContext(), 3*time.Second)
 	defer cancel()
-	allowed, err := services.NewDeviceBandwidthService(h.db, h.redis).AdmitDevice(ctx, nodeID, device.String())
+	service := services.NewDeviceBandwidthService(h.db, h.redis)
+	var allowed bool
+	if req.SourceAddress != "" {
+		allowed, err = service.AdmitSourceDevice(ctx, nodeID, device.String(), req.SourceAddress)
+	} else {
+		allowed, err = service.AdmitDevice(ctx, nodeID, device.String())
+	}
 	if err != nil {
 		return c.Status(503).JSON(fiber.Map{"error": "device admission unavailable"})
 	}
 	c.Set("Cache-Control", "no-store")
 	if !allowed {
-		return c.Status(409).JSON(fiber.Map{"error": "online UUID limit reached"})
+		message := "online UUID limit reached"
+		if req.SourceAddress != "" {
+			message = "online address limit reached"
+		}
+		return c.Status(409).JSON(fiber.Map{"error": message})
 	}
 	return c.SendStatus(204)
 }

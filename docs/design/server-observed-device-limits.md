@@ -99,6 +99,18 @@ container with all capabilities dropped. Selective enforcement remains open.
 - API canonical address allowlists retain all controlled-inbound deny
   fallbacks and emit explicit credential deny when the list becomes empty.
   This builder is still not automatically applied to production config.
+- Source-qualified canonical credentials now carry their server-validated
+  source into device-egress admission before SOCKS success. Nonempty source
+  credentials require a source admitter and fail closed if absent; legacy
+  credentials retain UUID admission. Client headers never populate this field.
+  Real Xray selective-close/reconnect tests pass on the updated source-bound
+  path. The authenticated node admission API now checks entitlement under the
+  existing transaction locks and atomically reserves account-wide address
+  slots. Source addresses matching registered Entry nodes are rejected as
+  unattributed rather than counted as clients. HTTP and client tests cover
+  capacity, entitlement, mapped addresses and ignored x-hwid headers.
+  Default production configuration still uses legacy admission; first-contact
+  cohort creation and Entry original-address proof are not integrated.
 - Atomic account-wide observed-address reservations prevent concurrent
   Exits from admitting N+1 addresses. Reservations deliberately have no TTL:
   lost observations are not evidence that live connections closed. Confirmed

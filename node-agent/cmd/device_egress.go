@@ -37,11 +37,12 @@ func newDeviceEgress(setCredentials func([]devicebandwidth.Credential) error) *d
 }
 
 type deviceConfig struct {
-	root       map[string]json.RawMessage
-	outbounds  []map[string]json.RawMessage
-	devices    map[string]int    // outbound tag -> index
-	deviceIDs  map[string]string // outbound tag -> device UUID
-	identities map[string]struct{}
+	root          map[string]json.RawMessage
+	outbounds     []map[string]json.RawMessage
+	devices       map[string]int    // outbound tag -> index
+	deviceIDs     map[string]string // outbound tag -> device UUID
+	identities    map[string]struct{}
+	deviceSources map[string]string
 	// rates maps each managed device UUID to its plan speed in Mbps (0 =
 	// unlimited), taken from the limit tier of the inbound it belongs to.
 	rates map[string]int
@@ -59,7 +60,7 @@ type deviceSOCKSServer struct {
 // parseDeviceConfig rejects invalid declarations and missing exact routing.
 // Legacy unlimited configs without device declarations are left unchanged.
 func parseDeviceConfig(data []byte) (*deviceConfig, error) {
-	cfg := &deviceConfig{devices: make(map[string]int), deviceIDs: make(map[string]string), identities: make(map[string]struct{}), rates: make(map[string]int)}
+	cfg := &deviceConfig{deviceSources: make(map[string]string), devices: make(map[string]int), deviceIDs: make(map[string]string), identities: make(map[string]struct{}), rates: make(map[string]int)}
 	if err := json.Unmarshal(data, &cfg.root); err != nil || cfg.root == nil {
 		return nil, fmt.Errorf("invalid xray configuration")
 	}
@@ -230,6 +231,10 @@ func parseDeviceConfig(data []byte) (*deviceConfig, error) {
 						return nil, fmt.Errorf("device %q has invalid or shadowed source route", user.ID)
 					}
 					seenSources[prefix] = true
+					if previous := cfg.deviceSources[rule.OutboundTag]; previous != "" && previous != prefix.Addr().String() {
+						return nil, fmt.Errorf("source credential is bound to multiple addresses")
+					}
+					cfg.deviceSources[rule.OutboundTag] = prefix.Addr().String()
 				} else if hasSource {
 					return nil, fmt.Errorf("device %q requires unconditional legacy routing", user.ID)
 				}
@@ -405,7 +410,7 @@ func (e *deviceEgress) TransformConfig(canonical []byte) ([]byte, error) {
 	// Revoke first, before generating/admitting newly authorized credentials.
 	kept := make([]devicebandwidth.Credential, 0, len(e.passwords))
 	for id, password := range e.passwords {
-		kept = append(kept, devicebandwidth.Credential{UUID: cfg.deviceIDs[id], Password: password})
+		kept = append(kept, devicebandwidth.Credential{UUID: cfg.deviceIDs[id], Password: password, SourceAddress: cfg.deviceSources[id]})
 	}
 	if err := e.setCredentials(kept); err != nil {
 		e.count = 0
@@ -423,7 +428,7 @@ func (e *deviceEgress) TransformConfig(canonical []byte) ([]byte, error) {
 			password = hex.EncodeToString(secret[:])
 			e.passwords[id] = password
 		}
-		credentials = append(credentials, devicebandwidth.Credential{UUID: cfg.deviceIDs[id], Password: password})
+		credentials = append(credentials, devicebandwidth.Credential{UUID: cfg.deviceIDs[id], Password: password, SourceAddress: cfg.deviceSources[id]})
 		// Replace only the credential field; retain any unrelated settings.
 		outbound := cfg.outbounds[index]
 		var settings map[string]json.RawMessage

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/netip"
 	"slices"
 	"strconv"
 	"sync"
@@ -36,9 +37,10 @@ type DialFunc func(context.Context, string, string) (net.Conn, error)
 type Server struct {
 	mu          sync.Mutex
 	admit       func(context.Context, string) error
+	sourceAdmit func(context.Context, string, string) error
 	permit      PermitFunc
 	dial        DialFunc
-	credentials map[string]map[[32]byte]struct{}
+	credentials map[string]map[[32]byte]string
 	revoked     map[string]struct{}
 	// The agent marks state unavailable before exposing the listener if bootstrap fails.
 	revocationKnown bool
@@ -58,8 +60,9 @@ type session struct {
 	cancel        context.CancelFunc
 	uuid          string
 	password      [32]byte
-	authenticated bool // protected by server.mu
-	admitted      bool // protected by server.mu; set only after a successful permit
+	sourceAddress string // Bound only by the server-configured credential.
+	authenticated bool   // protected by server.mu
+	admitted      bool   // protected by server.mu; set only after a successful permit
 	device        *deviceState
 }
 
@@ -94,6 +97,14 @@ func (s *Server) SetAdmitter(admit func(context.Context, string) error) {
 	s.admit = admit
 }
 
+// SetSourceAdmitter installs admission for credentials bound to a source address.
+// Source-bound credentials fail closed if this callback is not installed.
+func (s *Server) SetSourceAdmitter(admit func(context.Context, string, string) error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.sourceAdmit = admit
+}
+
 func New(permit PermitFunc) *Server {
 	return NewWithDialer(permit, nil)
 }
@@ -104,7 +115,7 @@ func NewWithDialer(permit PermitFunc, dial DialFunc) *Server {
 	if dial == nil {
 		dial = (&net.Dialer{Timeout: dialTimeout}).DialContext
 	}
-	return &Server{permit: permit, dial: dial, credentials: make(map[string]map[[32]byte]struct{}), revoked: make(map[string]struct{}), revocationKnown: true, devices: make(map[string]*deviceState), sessions: make(map[*session]struct{})}
+	return &Server{permit: permit, dial: dial, credentials: make(map[string]map[[32]byte]string), revoked: make(map[string]struct{}), revocationKnown: true, devices: make(map[string]*deviceState), sessions: make(map[*session]struct{})}
 }
 
 // ReconcileRevokedUUIDs replaces the control plane's current revocation set.
@@ -162,10 +173,16 @@ func (s *Server) RevocationUnavailable() {
 // the old set intact; removed UUID/password pairs revoke their live associations.
 // A UUID may have multiple distinct passwords, but exact duplicates are invalid.
 func (s *Server) SetCredentials(credentials []devicebandwidth.Credential) error {
-	next := make(map[string]map[[32]byte]struct{}, len(credentials))
+	next := make(map[string]map[[32]byte]string, len(credentials))
 	for _, credential := range credentials {
 		if len(credential.UUID) == 0 || len(credential.UUID) > 255 || len(credential.Password) == 0 || len(credential.Password) > 255 {
 			return errors.New("SOCKS credentials must contain 1–255 byte usernames and passwords")
+		}
+		if credential.SourceAddress != "" {
+			address, err := netip.ParseAddr(credential.SourceAddress)
+			if err != nil || address.Zone() != "" || (!address.IsGlobalUnicast() && !address.IsLoopback() && !address.IsLinkLocalUnicast()) || address.Unmap().String() != credential.SourceAddress {
+				return fmt.Errorf("invalid device credential source address %q", credential.SourceAddress)
+			}
 		}
 		password := sha256.Sum256([]byte(credential.Password))
 		passwords := next[credential.UUID]
@@ -173,10 +190,10 @@ func (s *Server) SetCredentials(credentials []devicebandwidth.Credential) error 
 			return fmt.Errorf("duplicate device credential %q", credential.UUID)
 		}
 		if passwords == nil {
-			passwords = make(map[[32]byte]struct{})
+			passwords = make(map[[32]byte]string)
 			next[credential.UUID] = passwords
 		}
-		passwords[password] = struct{}{}
+		passwords[password] = credential.SourceAddress
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -188,21 +205,27 @@ func (s *Server) SetCredentials(credentials []devicebandwidth.Credential) error 
 		if !connection.authenticated {
 			continue
 		}
-		if !passwordAllowed(next[connection.uuid], connection.password) {
+		allowed, source := passwordSource(next[connection.uuid], connection.password)
+		if !allowed || source != connection.sourceAddress {
 			connection.close()
 		}
 	}
 	return nil
 }
 
-// passwordAllowed compares every hash without a hash-key lookup or early exit,
-// so membership and the matching password's position do not affect scan time.
-func passwordAllowed(passwords map[[32]byte]struct{}, actual [32]byte) bool {
+// passwordSource compares every hash without a hash-key lookup or early exit.
+// The source comes only from the matching server-configured credential.
+func passwordSource(passwords map[[32]byte]string, actual [32]byte) (bool, string) {
 	matches := 0
-	for expected := range passwords {
-		matches |= subtle.ConstantTimeCompare(actual[:], expected[:])
+	var source string
+	for expected, address := range passwords {
+		match := subtle.ConstantTimeCompare(actual[:], expected[:])
+		matches |= match
+		if match == 1 {
+			source = address
+		}
 	}
-	return matches == 1
+	return matches == 1, source
 }
 
 // Start binds only a numeric loopback address and serves asynchronously.
@@ -371,12 +394,13 @@ func (c *session) authenticate() error {
 	}
 	actual := sha256.Sum256(password)
 	c.server.mu.Lock()
-	matches := passwordAllowed(c.server.credentials[string(username)], actual)
+	matches, source := passwordSource(c.server.credentials[string(username)], actual)
 	_, revoked := c.server.revoked[string(username)]
 	valid := matches && !revoked && c.server.revocationKnown && c.ctx.Err() == nil
 	if valid {
 		c.uuid = string(username)
 		c.password = actual
+		c.sourceAddress = source
 		c.authenticated = true
 		c.device = c.server.devices[c.uuid]
 		if c.device == nil {
@@ -543,7 +567,16 @@ func resolveDestination(ctx context.Context, host string, port int) (string, err
 func (c *session) reserveBeforeSuccess() error {
 	c.server.mu.Lock()
 	admit := c.server.admit
+	sourceAdmit := c.server.sourceAdmit
 	c.server.mu.Unlock()
+	if c.sourceAddress != "" {
+		if sourceAdmit == nil {
+			return errors.New("source-bound credential requires a source admitter")
+		}
+		admit = func(ctx context.Context, uuid string) error {
+			return sourceAdmit(ctx, uuid, c.sourceAddress)
+		}
+	}
 	if admit == nil {
 		return nil
 	} // isolated legacy tests; production always installs an admitter

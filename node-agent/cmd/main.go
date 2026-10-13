@@ -214,6 +214,7 @@ func runCmd() *cobra.Command {
 			limiter := newLocalBandwidth()
 			egressServer := deviceegress.NewWithDialer(limiter.Permit, egressDialer())
 			egressServer.SetAdmitter(apiClient.AdmitDevice)
+			egressServer.SetSourceAdmitter(apiClient.AdmitSource)
 			// No SOCKS authentication until an authoritative revocation snapshot
 			// has been fetched; stale state cannot preserve idle associations.
 			egressServer.RevocationUnavailable()
