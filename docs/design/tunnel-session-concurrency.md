@@ -49,13 +49,50 @@ What is **not** active, so the limit is currently not enforced anywhere:
   any admission call, so a legitimate new IP could never be admitted without
   a dynamic rule update. This first-contact problem is unresolved; do not
   enable the allowlist until it has a designed answer.
-- IP slots are keyed by the exact address string. IPv6 privacy-address
-  rotation and a Wi-Fi/LTE switch can therefore make one device hold two
-  slots. IPv6 /64 normalization and a switch grace period are required before
-  enabling enforcement.
+- Wi-Fi/LTE switching is only partly handled: see "Address identity and
+  network switches" below. The first-contact problem above remains the blocker
+  for connect-time enforcement.
 
-Automatic enforcement stays OFF. Database and Redis integration tests have
-not been run in the current environment.
+Automatic enforcement stays OFF.
+
+### Address identity and network switches
+
+Two behaviours that previously made one device look like two clients are now
+handled, and both are covered by tests (the Redis-backed ones against a real
+Redis 7):
+
+- **One slot per IPv6 /64.** `NormalizeClientAddress` is the single slot-key
+  definition used by observation, admission and release. IPv4 and IPv4-mapped
+  IPv6 keep the exact address; IPv6 collapses to its /64 network address, so
+  SLAAC privacy-address rotation does not consume a second slot. Release
+  uses the same key, otherwise a live /64 would never match the slot admission
+  created. Closing a denied /64 closes every transport observed inside it.
+  Consequence: hosts on one /64 count as one client, as devices behind one
+  IPv4 NAT already do.
+- **Abandoned addresses are denied first.** The Exit reports, per transport,
+  the kernel's time since the peer last acknowledged anything
+  (`tcpi_last_ack_recv`). An address whose freshest transport has been silent
+  for 120 s or more is treated as abandoned and sorts after every active
+  address, regardless of age. A phone that moved from Wi-Fi to LTE therefore
+  loses its dead old address rather than its live new one. The admin
+  candidate (`DecideClientAddressLimit`) and the enforcement policy share this
+  ordering. Without idle evidence the previous newest-denied order is used.
+
+This is an ordering preference, not a grace timer: nothing waits for the old
+address to expire before the new one is judged. Enforcement still acts only
+after the configured number of consecutive over-cap sweeps and respects the
+per-account closure cooldown. The 120 s threshold is an estimate, not a
+measured value; it has not been validated on real mobile clients. An Entry
+that terminated TCP itself (a proxy rather than the current NAT-forwarding
+relay) would acknowledge on the client's behalf and keep every Idle near zero,
+which degrades safely to the newest-denied order.
+
+Verification so far: unit and Redis-backed tests, `go test -race` across
+the three Go modules, golangci-lint v2.13.1, and the TCP_INFO offset checked
+against `golang.org/x/sys/unix.TCPInfo` and against a live socket. The
+previously reported `TestUUIDSlotReconciliationReleasesDisconnectedAfterTwoFreshEpochs`
+flake is unrelated and still occurs on the unmodified base. No test has run
+with real clients or a deployed two-Exit topology.
 
 ## Earlier session-transport model (not the product contract)
 
