@@ -137,8 +137,8 @@ sequenceDiagram
     participant Sub as Panel /sub
     participant In as Entry node
     participant Out as Exit node
-    App->>Sub: GET /sub/{token} (User-Agent, x-hwid)
-    Sub-->>App: Native profile + per-installation UUID + quota headers
+    App->>Sub: GET /sub/{token} (User-Agent)
+    Sub-->>App: Native profile + account UUID + quota headers
     alt Direct route
         App->>Out: exit-ip : inbound-port
     else Relayed route
@@ -300,7 +300,7 @@ Each account has a **single URL**: `GET /sub/{sub_token}`. The format is chosen 
 
 - Responses carry `Subscription-Userinfo`, `Profile-Update-Interval` and `Profile-Title`, so apps show remaining data and expiry natively.
 - WireGuard is also available as a downloadable `.conf`.
-- **No device registration step.** When an app sends `x-hwid`, the panel issues a stable UUID slot per installation, and concurrency is counted from live connections on the nodes.
+- **No device registration step.** Every app on an account uses the account's UUID; client-supplied identity headers such as `x-hwid` are ignored. Concurrent devices are counted from the client addresses the nodes observe, including the original address behind an Entry relay.
 
 ### Plans, limits and billing
 

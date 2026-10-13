@@ -90,9 +90,8 @@ func TestAccountSubscriptionSharesOneUUIDWithoutClientIdentity(t *testing.T) {
 		return ids
 	}
 
-	// Concurrent first fetches from different apps that send no x-hwid must
-	// not fail and must converge on exactly one account UUID. A valid x-hwid
-	// selects a per-installation slot instead (TestAccountSubscriptionHWIDSlots).
+	// Concurrent first fetches from different apps must not fail and must
+	// converge on exactly one account UUID.
 	var wg sync.WaitGroup
 	for i := 0; i < 8; i++ {
 		wg.Add(1)
@@ -120,6 +119,16 @@ func TestAccountSubscriptionSharesOneUUIDWithoutClientIdentity(t *testing.T) {
 	}
 	if after := devices(); len(after) != 1 || after[0] != first[0] {
 		t.Fatalf("account UUID changed: %v -> %v", first, after)
+	}
+	// Client-supplied identity is ignored: distinct x-hwid values neither mint
+	// new UUIDs nor are refused. Concurrency is counted from node observations.
+	for _, hwid := range []string{crypto.NewUUID(), crypto.NewUUID(), "not a valid id"} {
+		if status := request("/sub/"+token, map[string]string{"x-hwid": hwid, "User-Agent": "Happ/1.63.1"}); status != 200 {
+			t.Errorf("fetch with x-hwid %q: status %d", hwid, status)
+		}
+	}
+	if after := devices(); len(after) != 1 || after[0] != first[0] {
+		t.Fatalf("x-hwid changed the account devices: %v -> %v", first, after)
 	}
 	// The same URL answers each client in its own format. This fixture has no
 	// ready node, so profile formats that cannot be empty ask the client to
@@ -164,8 +173,7 @@ func TestAccountSubscriptionSharesOneUUIDWithoutClientIdentity(t *testing.T) {
 	}
 }
 
-// A failed device write must answer 500 and leave no device behind, on both
-// the shared (no x-hwid) and the slot path. The handler runs on its own pool
+// A failed device write must answer 500 and leave no device behind. The handler runs on its own pool
 // with a short lock_timeout while another transaction holds an EXCLUSIVE lock
 // on devices: reads still pass, so the handler gets as far as its device write,
 // which then fails.
@@ -205,6 +213,7 @@ func TestAccountSubscriptionDeviceWriteFailure(t *testing.T) {
 		t.Helper()
 		req := httptest.NewRequest(fiber.MethodGet, accountPath, nil)
 		req.Header.Set(fiber.HeaderUserAgent, "v2rayNG/1.9.16")
+		// A client identity header must change nothing: it is ignored.
 		if hwid != "" {
 			req.Header.Set("x-hwid", hwid)
 		}
@@ -230,7 +239,7 @@ func TestAccountSubscriptionDeviceWriteFailure(t *testing.T) {
 	}
 	for _, hwid := range []string{"", crypto.NewUUID()} {
 		if status, body := fetch(hwid); status != fiber.StatusInternalServerError || body != `{"error":"failed to resolve subscription"}` {
-			t.Errorf("device write failure (x-hwid %q): status %d body %s, want 500", hwid, status, body)
+			t.Errorf("device write failure (x-hwid header %q): status %d body %s, want 500", hwid, status, body)
 		}
 	}
 	if err := lockTx.Rollback(ctx); err != nil {

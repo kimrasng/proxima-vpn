@@ -3,13 +3,13 @@ id = "TSK-1791620105-p7w"
 type = "task"
 title = "Enforce concurrent device caps from server-observed sessions"
 description = "Real apps do not send x-hwid, so concurrency must be measured from Exit observations."
-status = "draft"
+status = "active"
 created_at = 2026-10-10T17:15:05+09:00
-updated_at = 2026-10-10T17:15:05+09:00
+updated_at = 2026-10-13T11:55:23+09:00
 
 [metadata]
-acceptance = ["N+1 concurrent sessions without x-hwid are detected and enforced."]
-instructions = ["Define the concurrency signal from agent-reported online sessions and source addresses per account UUID.", "Count per account across Exits and enforce the plan cap with the existing eviction machinery.", "Keep x-hwid as an optional hint only.", "Add end-to-end tests."]
+acceptance = ["N+1 concurrent client addresses on one account, without x-hwid, through direct and relayed routes, are detected and the newest is blocked."]
+instructions = ["Remove every use of x-hwid; the account URL serves the account UUID to every client.", "Entry: record per relayed connection the original client address (nftables map keyed by masqueraded flow) and report it.", "Exit: index live tunnel connections by UUID from Xray's access log and report (UUID, peer address, port) per connection.", "API: join Exit connections with Entry flows to get account-wide distinct client addresses; enforce the plan cap by blocking the newest address.", "Add end-to-end tests through direct and relayed routes."]
 must_not = ["Do not require x-hwid."]
 order = 1.0
 qa = [{command = "cd api-server && TEST_DATABASE_URL=$TEST_DATABASE_URL TEST_REDIS_ADDR=$TEST_REDIS_ADDR go test -p 1 ./...", evidence = "", expected = "exit 0"}]

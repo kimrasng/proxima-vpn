@@ -1,5 +1,7 @@
 # HWID/UUID concurrency implementation checkpoint
 
+> **Superseded (2026-10).** The server no longer reads `x-hwid` or any other client-supplied identity. Every client of an account uses the account UUID, and concurrent devices are counted from node-observed client addresses; see `server-observed-device-limits.md`. This document is kept as history.
+
 Graph: `PLN-1790874094-3qa` (draft); Phase 1 `PHS-1790874094-cgs` is active. The plan is deliberately draft because this spec-graph validator requires unrelated active legacy requirements to be covered by any active plan; falsely mapping this HWID effort to them is prohibited. Generated IDs were created by the isolated v0.4.0-beta.8 CLI, not invented by hand. Phase exit remains open pending complete evidence.
 
 ## Implemented and verified increments

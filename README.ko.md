@@ -101,8 +101,8 @@ sequenceDiagram
     participant API as 패널 /sub
     participant In as 입구 노드
     participant Out as 출구 노드
-    App->>API: GET /sub/{token} (User-Agent, x-hwid)
-    API-->>App: 앱에 맞는 형식의 프로필 + 기기별 UUID
+    App->>API: GET /sub/{token} (User-Agent)
+    API-->>App: 앱에 맞는 형식의 프로필 + 계정 UUID
     alt 직접 연결
         App->>Out: 출구 IP:인바운드 포트
     else 입구 경유
@@ -149,7 +149,7 @@ sequenceDiagram
 
 - 응답에는 `Subscription-Userinfo`, `Profile-Update-Interval`, `Profile-Title` 헤더가 붙어 앱이 남은 데이터와 만료일을 보여줍니다.
 - WireGuard는 `.conf` 파일로도 내려받을 수 있습니다.
-- 사용자가 기기를 직접 등록할 필요는 없습니다. 앱이 `x-hwid` 헤더를 보내면 설치마다 고정 UUID 슬롯을 발급하고, 동시 접속은 실제 연결을 기준으로 셉니다.
+- 사용자가 기기를 직접 등록할 필요는 없습니다. 계정의 모든 앱은 계정 UUID 하나를 쓰고, `x-hwid` 같은 클라이언트 제공 식별 헤더는 무시합니다. 동시 접속 기기는 노드가 실제로 관찰한 클라이언트 주소(입구 경유 시 입구 뒤의 원래 주소 포함)로 셉니다.
 
 ### 요금제, 제한, 결제
 
