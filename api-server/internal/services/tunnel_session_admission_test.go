@@ -20,7 +20,7 @@ func TestSessionReservationCountsSameCredentialAndAddressSeparately(t *testing.T
 	ctx := context.Background()
 	account := uuid.NewString()
 	key := "account:" + account + ":tunnel_session_slots"
-	t.Cleanup(func() { _ = rdb.Del(ctx, key).Err() })
+	t.Cleanup(func() { _ = rdb.Del(ctx, key, key+":sequence", key+":absence", key+":epoch").Err() })
 	first := ObservedTunnelSession{ExitID: uuid.NewString(), Connection: nodeprov.TunnelConnection{UUID: uuid.NewString(), PeerIP: "203.0.113.2", PeerPort: 40000, LocalIP: "10.0.2.2", LocalPort: 8443, AcceptedAt: 100}}
 	second := first
 	second.Connection.PeerPort++

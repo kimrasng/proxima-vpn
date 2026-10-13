@@ -30,6 +30,8 @@ func TunnelSessionKey(session ObservedTunnelSession) (string, error) {
 	return hex.EncodeToString(sum[:]), nil
 }
 
+func TunnelSlotKey(account string) string { return "account:" + account + ":tunnel_session_slots" }
+
 // ReserveTunnelSession atomically reserves a transport slot across Exits.
 // Retries of this exact session are idempotent, but another transport on the
 // same UUID/IP consumes another slot. No TTL silently frees live sessions.
@@ -47,11 +49,19 @@ func ReserveTunnelSession(ctx context.Context, rdb *redis.Client, account string
 		return false, err
 	}
 	const script = `
-if redis.call('SISMEMBER',KEYS[1],ARGV[1])==1 then return 1 end
+local key=ARGV[1]
+if redis.call('SISMEMBER',KEYS[1],key)==1 then
+ redis.call('HINCRBY',KEYS[2],key,1)
+ redis.call('HDEL',KEYS[3],key)
+ return 1
+end
 local cap=tonumber(ARGV[2])
 if cap>0 and redis.call('SCARD',KEYS[1])>=cap then return 0 end
-redis.call('SADD',KEYS[1],ARGV[1])
+redis.call('SADD',KEYS[1],key)
+redis.call('HINCRBY',KEYS[2],key,1)
+redis.call('HDEL',KEYS[3],key)
 return 1`
-	result, err := redis.NewScript(script).Run(ctx, rdb, []string{"account:" + user.String() + ":tunnel_session_slots"}, key, limit).Int()
+	prefix := TunnelSlotKey(user.String())
+	result, err := redis.NewScript(script).Run(ctx, rdb, []string{prefix, prefix + ":sequence", prefix + ":absence"}, key, limit).Int()
 	return result == 1, err
 }
