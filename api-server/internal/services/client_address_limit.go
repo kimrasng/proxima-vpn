@@ -12,7 +12,7 @@ type ClientAddressLimitDecision struct {
 
 // DecideClientAddressLimit names the single address that
 // ProposeClientAddressPolicy would deny first, so the read-only admin view and
-// the opt-in enforcement path never disagree about who is next to go: an
+// the enforcement path never disagree about who is next to go: an
 // abandoned address (see staleAddressIdleMillis) before any active one, and
 // otherwise the newest.
 func DecideClientAddressLimit(observation ClientAddressObservation, limit int) ClientAddressLimitDecision {

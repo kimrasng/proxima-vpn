@@ -186,7 +186,18 @@ func TestAdminClientAddressesFromAuthenticatedHeartbeats(t *testing.T) {
 		heartbeat(exitID, heartbeatRequest{TunnelReport: &nodeprov.TunnelReport{Known: true, Connections: connections}})
 	}
 
-	t.Run("two original addresses sharing one credential select newest without enforcement", func(t *testing.T) {
+	t.Run("kill switch reports enforcement off without changing the observation", func(t *testing.T) {
+		t.Setenv("ENFORCE_CLIENT_ADDRESS_LIMIT", "0")
+		publish([]nodeprov.TunnelConnection{
+			connection(credential, entryIP, 41001, start),
+			connection(credential, entryIP, 41002, start+1000),
+		})
+		got := observe()
+		if !got.Complete || got.Enforced || !got.OverLimit || got.CandidateAddress != newerIP {
+			t.Fatalf("kill switch must flip only the enforced flag; got %+v", got)
+		}
+	})
+	t.Run("two original addresses sharing one credential select the newest as the closure candidate", func(t *testing.T) {
 		publish([]nodeprov.TunnelConnection{
 			connection(credential, entryIP, 41001, start),
 			connection(credential, entryIP, 41002, start+1000),
@@ -194,8 +205,8 @@ func TestAdminClientAddressesFromAuthenticatedHeartbeats(t *testing.T) {
 		got := observe()
 		if !got.Complete || got.Count == nil || *got.Count != 2 ||
 			!reflect.DeepEqual(got.Addresses, []string{olderIP, newerIP}) || got.Limit != 1 ||
-			!got.OverLimit || got.CandidateAddress != newerIP || got.Enforced || got.SelectionReason != "" {
-			t.Fatalf("want original source addresses, newest candidate, observation only; got %+v", got)
+			!got.OverLimit || got.CandidateAddress != newerIP || !got.Enforced || got.SelectionReason != "" {
+			t.Fatalf("want original source addresses, newest candidate, enforcement reported on by default; got %+v", got)
 		}
 	})
 
@@ -211,7 +222,7 @@ func TestAdminClientAddressesFromAuthenticatedHeartbeats(t *testing.T) {
 		got := observe()
 		if !got.Complete || got.Count == nil || *got.Count != 1 ||
 			!reflect.DeepEqual(got.Addresses, []string{olderIP}) || got.OverLimit ||
-			got.CandidateAddress != "" || got.Enforced {
+			got.CandidateAddress != "" || !got.Enforced {
 			t.Fatalf("want one deduplicated account-wide address; got %+v", got)
 		}
 	})
@@ -220,7 +231,7 @@ func TestAdminClientAddressesFromAuthenticatedHeartbeats(t *testing.T) {
 		heartbeat(exitID, heartbeatRequest{TunnelReport: &nodeprov.TunnelReport{Known: false}})
 		got := observe()
 		if got.Complete || got.Count != nil || got.OverLimit || got.CandidateAddress != "" ||
-			got.Enforced || got.SelectionReason != "incomplete_observation" {
+			!got.Enforced || got.SelectionReason != "incomplete_observation" {
 			t.Fatalf("unknown report must suspend counting and selection; got %+v", got)
 		}
 	})
@@ -230,7 +241,7 @@ func TestAdminClientAddressesFromAuthenticatedHeartbeats(t *testing.T) {
 		heartbeat(entryID, heartbeatRequest{RelayFlows: &nodeprov.RelayFlowReport{Known: false}})
 		got := observe()
 		if got.Complete || got.Count != nil || len(got.Addresses) != 0 || got.OverLimit ||
-			got.CandidateAddress != "" || got.Enforced || got.SelectionReason != "incomplete_observation" {
+			got.CandidateAddress != "" || !got.Enforced || got.SelectionReason != "incomplete_observation" {
 			t.Fatalf("unknown attribution must not count the relay address; got %+v", got)
 		}
 	})

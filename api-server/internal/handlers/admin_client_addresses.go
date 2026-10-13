@@ -7,8 +7,11 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-// AdminClientAddressHandler exposes observation only; incomplete evidence must
-// not be displayed as zero clients or used to evict a shared account UUID.
+// AdminClientAddressHandler exposes the observation and the pending decision.
+// Incomplete evidence must not be displayed as zero clients or used to evict a
+// shared account UUID. "enforced" reports whether the scheduler is allowed to
+// close the transports of over-cap addresses; it is not proof that any
+// particular connection was closed.
 type AdminClientAddressHandler struct {
 	db    *pgxpool.Pool
 	redis *redis.Client
@@ -42,5 +45,5 @@ func (h *AdminClientAddressHandler) Get(c *fiber.Ctx) error {
 	decision := services.DecideClientAddressLimit(observation, limit)
 	return c.JSON(fiber.Map{"complete": observation.Complete, "addresses": observation.Addresses, "count": count,
 		"limit": limit, "over_limit": decision.OverLimit, "candidate_address": decision.Target,
-		"selection_reason": decision.Reason, "enforced": false})
+		"selection_reason": decision.Reason, "enforced": services.ClientAddressEnforcementEnabled()})
 }
