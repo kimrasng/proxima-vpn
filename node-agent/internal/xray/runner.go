@@ -41,13 +41,14 @@ const (
 // mu. The exited channel lets IsRunning report liveness without reaping the
 // child itself - a single owner goroutine per process calls cmd.Wait().
 type XrayRunner struct {
-	mu         sync.Mutex
-	cmd        *exec.Cmd
-	exited     chan struct{} // closed by the reaper when cmd terminates
-	waitErr    error         // exit error observed by the reaper
-	configPath string
-	grpcAddr   string
-	binaryPath string
+	mu          sync.Mutex
+	cmd         *exec.Cmd
+	exited      chan struct{} // closed by the reaper when cmd terminates
+	waitErr     error         // exit error observed by the reaper
+	configPath  string
+	grpcAddr    string
+	binaryPath  string
+	accessIndex *AccessIndex
 
 	// Config writes and restores share the same canonical-to-runtime transform.
 	// canonicalConfig never contains node-local SOCKS passwords.
@@ -70,9 +71,10 @@ func NewXrayRunner(configPath, grpcAddr string) *XrayRunner {
 		grpcAddr = DefaultGRPCAddr
 	}
 	return &XrayRunner{
-		configPath: configPath,
-		grpcAddr:   grpcAddr,
-		binaryPath: DefaultBinaryPath,
+		configPath:  configPath,
+		grpcAddr:    grpcAddr,
+		binaryPath:  DefaultBinaryPath,
+		accessIndex: NewAccessIndex(),
 	}
 }
 
@@ -93,8 +95,15 @@ func (r *XrayRunner) Start() error {
 	}
 
 	cmd := exec.Command(r.binaryPath, "-config", r.configPath)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	// Bound output-copy shutdown if a descendant retains the log pipe after
+	// Xray exits; otherwise the single reaper could wait indefinitely.
+	cmd.WaitDelay = time.Second
+	if r.accessIndex == nil {
+		r.accessIndex = NewAccessIndex()
+	}
+	r.accessIndex.Reset()
+	cmd.Stdout = &accessWriter{destination: os.Stdout, index: r.accessIndex}
+	cmd.Stderr = &accessWriter{destination: os.Stderr, index: r.accessIndex}
 
 	if err := cmd.Start(); err != nil {
 		r.mu.Unlock()

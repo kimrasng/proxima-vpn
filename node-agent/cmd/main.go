@@ -703,6 +703,11 @@ func heartbeatLoop(ctx context.Context, apiClient *client.APIClient, runner *xra
 			if runner != nil {
 				status.XrayVersion = xrayVersion.Get()
 				status.XrayRunning = runner.IsRunning()
+				report, reportErr := runner.TunnelReport()
+				status.TunnelReport = &report
+				if reportErr != nil {
+					log.Printf("tunnel observation: %v", reportErr)
+				}
 			}
 			if policy != nil {
 				policyStatus := policy.Status()
@@ -710,6 +715,12 @@ func heartbeatLoop(ctx context.Context, apiClient *client.APIClient, runner *xra
 				status.PolicyError = policyStatus.Error
 				// Whatever was drained still goes out; a counter read
 				// failure only costs this interval's per-route figures.
+				if flows, flowErr := policy.Flows(); flowErr == nil {
+					status.RelayFlows = &nodeprov.RelayFlowReport{Known: true, Flows: flows}
+				} else {
+					status.RelayFlows = &nodeprov.RelayFlowReport{Known: false}
+					log.Printf("relay flow observation: %v", flowErr)
+				}
 				var trafficErr error
 				if status.RouteTraffic, trafficErr = policy.DrainTraffic(); trafficErr != nil {
 					log.Printf("route traffic: %v", trafficErr)

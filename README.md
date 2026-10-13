@@ -300,7 +300,7 @@ Each account has a **single URL**: `GET /sub/{sub_token}`. The format is chosen 
 
 - Responses carry `Subscription-Userinfo`, `Profile-Update-Interval` and `Profile-Title`, so apps show remaining data and expiry natively.
 - WireGuard is also available as a downloadable `.conf`.
-- **No device registration step.** Every app on an account uses the account's UUID; client-supplied identity headers such as `x-hwid` are ignored. Concurrent devices are counted from the client addresses the nodes observe, including the original address behind an Entry relay.
+- **No device registration step.** Every app on an account uses the account's UUID; client-supplied identity headers such as `x-hwid` are ignored. Server-observed concurrent client-address enforcement is under development; the existing UUID-slot limiter cannot distinguish several clients sharing that UUID.
 
 ### Plans, limits and billing
 

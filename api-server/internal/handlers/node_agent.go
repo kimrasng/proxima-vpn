@@ -360,7 +360,9 @@ type heartbeatRequest struct {
 	PolicyFingerprint string `json:"policy_fingerprint"`
 	PolicyError       string `json:"policy_error"`
 	// Per-route forwarded bytes since the previous heartbeat (Entries only).
-	RouteTraffic []nodeprov.RouteTraffic `json:"route_traffic"`
+	RouteTraffic []nodeprov.RouteTraffic   `json:"route_traffic"`
+	RelayFlows   *nodeprov.RelayFlowReport `json:"relay_flows"`
+	TunnelReport *nodeprov.TunnelReport    `json:"tunnel_report"`
 }
 
 func (h *NodeAgentHandler) Heartbeat(c *fiber.Ctx) error {
@@ -426,6 +428,18 @@ func (h *NodeAgentHandler) Heartbeat(c *fiber.Ctx) error {
 	if len(req.RouteTraffic) > 0 {
 		if err := services.RecordRouteTraffic(context.Background(), h.db, nodeID, req.RouteTraffic); err != nil {
 			log.Printf("node %s: %v", nodeID, err)
+		}
+	}
+
+	if req.TunnelReport != nil {
+		if err := services.PublishTunnelReport(c.UserContext(), h.redis, nodeID, *req.TunnelReport); err != nil {
+			log.Printf("node %s tunnel observation unavailable: %v", nodeID, err)
+		}
+	}
+
+	if req.RelayFlows != nil {
+		if err := services.PublishRelayFlows(c.UserContext(), h.redis, nodeID, *req.RelayFlows); err != nil {
+			log.Printf("node %s relay flow observation unavailable: %v", nodeID, err)
 		}
 	}
 

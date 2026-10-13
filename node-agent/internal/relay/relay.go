@@ -177,6 +177,12 @@ func Render(role nodeprov.Role, rules []nodeprov.RelayRule, exitRules []nodeprov
 	var b strings.Builder
 	fmt.Fprintf(&b, "table inet %s {\n", tableName)
 	if role.Forwards() {
+		if len(tcpPorts) > 0 {
+			// Record the post-NAT tuple and original client together. Including
+			// the original client in the key exposes tuple reuse as ambiguity
+			// rather than silently attributing a connection to the wrong client.
+			b.WriteString("\tset client_flows {\n\t\ttype ipv4_addr . inet_service . ipv4_addr . inet_service . ipv4_addr\n\t\tflags timeout\n\t\ttimeout 5m\n\t\tsize 262144\n\t}\n")
+		}
 		// One named counter per route, protocol and direction. Named counters
 		// can be read and zeroed atomically (nft reset counters), which is what
 		// lets the agent report deltas without a race against new packets.
@@ -208,6 +214,11 @@ func Render(role nodeprov.Role, rules []nodeprov.RelayRule, exitRules []nodeprov
 			fmt.Fprintf(&b, "\t\tip daddr %s masquerade\n", ip)
 		}
 		fmt.Fprintf(&b, "\t}\n")
+		if len(tcpPorts) > 0 {
+			// srcnat runs first, so the tuple matches what the Exit sees.
+			// This rule has no verdict and never changes packet forwarding.
+			b.WriteString("\tchain observe_flows {\n\t\ttype filter hook postrouting priority srcnat + 10; policy accept;\n\t\tct status dnat ct direction original meta l4proto tcp update @client_flows { ip saddr . tcp sport . ip daddr . tcp dport . ct original ip saddr }\n\t}\n")
+		}
 
 		// A relayed packet is redirected in prerouting and leaves through forward, so
 		// a DROP policy there silently blackholes every chain. Accepting only the
