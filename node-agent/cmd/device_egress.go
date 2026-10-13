@@ -202,6 +202,7 @@ func parseDeviceConfig(data []byte) (*deviceConfig, error) {
 					OutboundTag  string   `json:"outboundTag"`
 					Source       []string `json:"source"`
 					SourcePort   []string `json:"sourcePort"`
+					RuleTag      string   `json:"ruleTag"`
 					SessionToken string   `json:"sessionToken"`
 				}
 				if err := decodeDeviceRule(rawRule, &rule); err != nil {
@@ -225,10 +226,12 @@ func parseDeviceConfig(data []byte) (*deviceConfig, error) {
 					denied = true
 					break
 				}
-				id, sourceKey, valid := parseLocalDeviceTag(rule.OutboundTag)
+				_, sourceKey, _ := parseLocalDeviceTag(rule.OutboundTag)
 				_, declared := cfg.devices[rule.OutboundTag]
 				if rule.SessionToken != "" {
-					if !sourceMode || !hasSource || !hasSourcePort || len(rule.SessionToken) != 64 {
+					token, err := hex.DecodeString(rule.SessionToken)
+					id, key, validTag := parseLocalDeviceTag(rule.OutboundTag)
+					if !sourceMode || !hasSource || !hasSourcePort || !validTag || id != user.ID || key != rule.SessionToken || len(rule.SessionToken) != 64 || err != nil || len(token) != 32 || hex.EncodeToString(token) != rule.SessionToken || (rule.RuleTag != "" && rule.RuleTag != "session-"+rule.SessionToken) {
 						return nil, fmt.Errorf("invalid session-qualified route")
 					}
 					if previous := cfg.deviceSessionTokens[rule.OutboundTag]; previous != "" && previous != rule.SessionToken {
@@ -236,7 +239,7 @@ func parseDeviceConfig(data []byte) (*deviceConfig, error) {
 					}
 					cfg.deviceSessionTokens[rule.OutboundTag] = rule.SessionToken
 				}
-				if !strict || !valid || !declared || id != user.ID || len(rule.User) != 1 || rule.User[0] != user.Email {
+				if id, sourceKey, valid := parseLocalDeviceTag(rule.OutboundTag); !strict || !valid || !declared || id != user.ID || len(rule.User) != 1 || rule.User[0] != user.Email || (rule.SessionToken != "" && sourceKey != rule.SessionToken) {
 					return nil, fmt.Errorf("device %q lacks first-match authenticated egress routing", user.ID)
 				}
 				if sourceMode {

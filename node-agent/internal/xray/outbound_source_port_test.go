@@ -2,8 +2,23 @@ package xray
 
 import (
 	"encoding/binary"
+	"strings"
 	"testing"
 )
+
+func TestSessionTokenEncodesAsXrayRuleTagNotPortList(t *testing.T) {
+	token := strings.Repeat("a", 64)
+	fields := decodeFields(t, marshalRoutingRule(RoutingRule{OutboundTag: "session", SourceCIDRs: []string{"10.0.2.1/32"}, SourcePorts: []uint16{40000}, SessionToken: token}))
+	if len(fields[16]) != 1 {
+		t.Fatalf("sourcePort=%d", len(fields[16]))
+	}
+	if string(fields[19][0]) != "session-"+token {
+		t.Fatalf("ruleTag=%q", fields[19][0])
+	}
+	if _, present := fields[14]; present {
+		t.Fatal("nonexistent Xray protobuf field 14 was emitted")
+	}
+}
 
 func TestSourcePortsEncodeExactRanges(t *testing.T) {
 	fields := decodeFields(t, marshalRoutingRule(RoutingRule{OutboundTag: "cohort", SourceCIDRs: []string{"10.0.2.1/32"}, SourcePorts: []uint16{40000, 40001}}))

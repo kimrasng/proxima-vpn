@@ -72,6 +72,67 @@ func TestDeviceEgressSameSourceDistinctPorts(t *testing.T) {
 	}
 }
 
+func TestDeviceEgressSessionTokenBindsCredentialAndExactRoute(t *testing.T) {
+	token := strings.Repeat("a", 64)
+	canonical := portDeviceConfig(t)
+	var cfg map[string]any
+	if err := json.Unmarshal([]byte(canonical), &cfg); err != nil {
+		t.Fatal(err)
+	}
+	outbounds := cfg["outbounds"].([]any)
+	routing := cfg["routing"].(map[string]any)
+	rules := routing["rules"].([]any)
+	oldTag := "device-egress-uuid-a~0123456789abcdef"
+	newTag := "device-egress-uuid-a~" + token
+	for _, item := range outbounds {
+		entry := item.(map[string]any)
+		if entry["tag"] == oldTag {
+			entry["tag"] = newTag
+		}
+	}
+	for _, item := range rules {
+		rule := item.(map[string]any)
+		if rule["outboundTag"] == oldTag {
+			rule["outboundTag"] = newTag
+			rule["sessionToken"] = token
+			rule["ruleTag"] = "session-" + token
+		}
+	}
+	encoded, err := json.Marshal(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	canonical = string(encoded)
+	var credentials []devicebandwidth.Credential
+	e := newDeviceEgress(func(got []devicebandwidth.Credential) error {
+		credentials = append([]devicebandwidth.Credential(nil), got...)
+		return nil
+	})
+	if _, err := e.TransformConfig([]byte(canonical)); err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, credential := range credentials {
+		if credential.UUID == "uuid-a" && credential.SessionToken == token {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("session token not bound to materialized egress credentials: %+v", credentials)
+	}
+	for name, bad := range map[string]string{
+		"tag mismatch":      strings.Replace(canonical, "session-"+token, "wrong", 1),
+		"outbound mismatch": strings.Replace(canonical, "device-egress-uuid-a~"+token, "device-egress-uuid-a~"+strings.Repeat("b", 64), 1),
+		"token malformed":   strings.Replace(canonical, token, strings.Repeat("z", 64), 1),
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := parseDeviceConfig([]byte(bad)); err == nil {
+				t.Fatal("invalid session-qualified configuration accepted")
+			}
+		})
+	}
+}
+
 func TestDeviceEgressRejectsInvalidSourcePorts(t *testing.T) {
 	canonical := portDeviceConfig(t)
 	for name, bad := range map[string]string{

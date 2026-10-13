@@ -3,6 +3,7 @@ package client
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -19,10 +20,15 @@ var ErrSessionCapacity = errors.New("online session limit reached")
 
 // AdmitSession carries a server-generated exact transport token, not a client
 // installation identifier. The control plane requires fresh Exit evidence.
-func (c *APIClient) AdmitSession(ctx context.Context,deviceUUID,token string) error {
-	if len(token)!=64{return errors.New("invalid session token")}
-	err:=c.admitPayload(ctx,deviceUUID,map[string]any{"session_token":token},true)
-	if errors.Is(err,ErrAddressCapacity){return ErrSessionCapacity}
+func (c *APIClient) AdmitSession(ctx context.Context, deviceUUID, token string) error {
+	decoded, err := hex.DecodeString(token)
+	if err != nil || len(decoded) != 32 || hex.EncodeToString(decoded) != token {
+		return errors.New("invalid session token")
+	}
+	err = c.admitPayload(ctx, deviceUUID, map[string]any{"session_token": token}, false)
+	if errors.Is(err, ErrUUIDCapacity) {
+		return ErrSessionCapacity
+	}
 	return err
 }
 

@@ -185,15 +185,19 @@ func marshalRoutingRule(r RoutingRule) []byte {
 		buf = appendTag(buf, 11, 2)
 		buf = appendBytes(buf, rule)
 	}
-	if len(r.SourcePorts) > 0 {
-		if r.SessionToken != "" {
-			decoded, err := hex.DecodeString(r.SessionToken)
-			if len(r.SessionToken) != 64 || err != nil || len(decoded) != 32 || hex.EncodeToString(decoded) != r.SessionToken || len(r.SourceCIDRs) != 1 {
-				return buf
-			}
-			buf = appendTag(buf, 14, 2)
-			buf = appendBytes(buf, []byte(r.SessionToken))
+	if r.SessionToken != "" {
+		if len(r.SessionToken) != 64 || len(r.SourceCIDRs) != 1 || len(r.SourcePorts) != 1 {
+			return buf
 		}
+		decoded, err := hex.DecodeString(r.SessionToken)
+		if err != nil || len(decoded) != 32 || hex.EncodeToString(decoded) != r.SessionToken {
+			return buf
+		}
+		if r.RuleTag == "" {
+			r.RuleTag = "session-" + r.SessionToken
+		}
+	}
+	if len(r.SourcePorts) > 0 {
 		var ports []byte
 		for _, port := range r.SourcePorts {
 			var span []byte
@@ -257,12 +261,26 @@ func (c *StatsClient) RemoveOutbound(ctx context.Context, tag string) error {
 // supplies the complete ordered list instead.
 func (c *StatsClient) ReplaceRoutingRules(ctx context.Context, rules []RoutingRule) error {
 	for _, rule := range rules {
+		for _, source := range rule.SourceCIDRs {
+			ip, network, err := net.ParseCIDR(source)
+			if err != nil || network.String() != source {
+				return fmt.Errorf("invalid or non-canonical source CIDR %q", source)
+			}
+			if len(rule.SourcePorts) > 0 {
+				bits, total := network.Mask.Size()
+				if bits != total || ip.IsUnspecified() || ip.IsMulticast() || (len(ip.To4()) > 0 && len(ip.To16()) == net.IPv6len) {
+					return fmt.Errorf("source-port rule requires exact canonical unicast host")
+				}
+			}
+		}
 		if rule.SessionToken != "" {
 			token := rule.SessionToken
 			decoded, err := hex.DecodeString(token)
-			if len(token) != 64 || err != nil || len(decoded) != 32 || hex.EncodeToString(decoded) != token || len(rule.SourceCIDRs) != 1 || len(rule.SourcePorts) != 1 || rule.RuleTag != "" {
+			expectedTag := "session-" + token
+			if len(token) != 64 || err != nil || len(decoded) != 32 || hex.EncodeToString(decoded) != token || len(rule.SourceCIDRs) != 1 || len(rule.SourcePorts) != 1 || (rule.RuleTag != "" && rule.RuleTag != expectedTag) {
 				return fmt.Errorf("invalid session-qualified routing rule")
 			}
+			rule.RuleTag = expectedTag
 		}
 		if len(rule.SourcePorts) > 0 && len(rule.SourceCIDRs) != 1 {
 			return fmt.Errorf("source-port rule requires one source network")
@@ -270,18 +288,6 @@ func (c *StatsClient) ReplaceRoutingRules(ctx context.Context, rules []RoutingRu
 		for _, port := range rule.SourcePorts {
 			if port == 0 {
 				return fmt.Errorf("source-port rule has zero port")
-			}
-		}
-		for _, source := range rule.SourceCIDRs {
-			ip, network, err := net.ParseCIDR(source)
-			if err != nil {
-				return fmt.Errorf("invalid source CIDR %q", source)
-			}
-			if len(rule.SourcePorts) > 0 {
-				bits, total := network.Mask.Size()
-				if bits != total || ip.IsUnspecified() || ip.IsMulticast() {
-					return fmt.Errorf("source-port rule requires exact unicast host")
-				}
 			}
 		}
 	}

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/proximavpn/proxima-vpn/node-agent/internal/config"
@@ -54,6 +55,54 @@ func TestAdmissionSourceAndLegacyHTTP(t *testing.T) {
 			}
 			srv.Close()
 		}
+	}
+}
+
+func TestSessionAdmissionClassifiesCapacityAndUnavailableSeparately(t *testing.T) {
+	const device = "3a2ecdb6-6283-46c0-a971-e9adeea2a27e"
+	for _, tc := range []struct {
+		status int
+		want   error
+	}{{http.StatusConflict, ErrSessionCapacity}, {http.StatusServiceUnavailable, nil}} {
+		t.Run(http.StatusText(tc.status), func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path != "/api/v1/nodes/node/devices/admit" {
+					t.Errorf("path=%s", r.URL.Path)
+				}
+				var payload map[string]string
+				if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+					t.Fatal(err)
+				}
+				if payload["device_uuid"] != device || payload["session_token"] != strings.Repeat("a", 64) {
+					t.Errorf("payload=%v", payload)
+				}
+				w.WriteHeader(tc.status)
+			}))
+			defer srv.Close()
+			c := NewAPIClient(&config.AgentConfig{ServerURL: srv.URL, NodeID: "node", APIKey: "secret"})
+			err := c.AdmitSession(context.Background(), device, strings.Repeat("a", 64))
+			if tc.want != nil && !errors.Is(err, tc.want) {
+				t.Fatalf("error=%v want %v", err, tc.want)
+			}
+			if tc.want == nil && err == nil {
+				t.Fatal("503 was reported as capacity")
+			}
+		})
+	}
+}
+
+func TestSessionAdmissionRejectsInvalidTokensWithoutRequest(t *testing.T) {
+	hits := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { hits++; w.WriteHeader(http.StatusNoContent) }))
+	defer srv.Close()
+	c := NewAPIClient(&config.AgentConfig{ServerURL: srv.URL, NodeID: "node", APIKey: "secret"})
+	for _, token := range []string{"", strings.Repeat("a", 63), strings.Repeat("a", 65), strings.Repeat("A", 64), strings.Repeat("z", 64)} {
+		if err := c.AdmitSession(context.Background(), "3a2ecdb6-6283-46c0-a971-e9adeea2a27e", token); err == nil {
+			t.Errorf("invalid token accepted: %q", token)
+		}
+	}
+	if hits != 0 {
+		t.Fatalf("sent %d invalid admission requests", hits)
 	}
 }
 

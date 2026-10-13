@@ -4,6 +4,8 @@ import (
 	"net/netip"
 	"testing"
 	"time"
+
+	"github.com/proximavpn/proxima-vpn/pkg/nodeprov"
 )
 
 func TestTransportOwnershipRequiresAuthenticatedEvidence(t *testing.T) {
@@ -24,5 +26,14 @@ func TestTransportOwnershipRequiresAuthenticatedEvidence(t *testing.T) {
 	}
 	if report := joinTransportOwners(i, nil); !report.Known || len(report.Connections) != 0 {
 		t.Fatal("explicit empty observation not known")
+	}
+	exitID := "00000000-0000-4000-8000-000000000001"
+	token, err := nodeprov.TunnelSessionToken(exitID, c)
+	if err != nil || len(token) != 64 {
+		t.Fatalf("invalid canonical session token %q: %v", token, err)
+	}
+	again, err := nodeprov.TunnelSessionToken(exitID, c)
+	if err != nil || again != token {
+		t.Fatalf("same observation changed token: %s != %s (%v)", again, token, err)
 	}
 }
