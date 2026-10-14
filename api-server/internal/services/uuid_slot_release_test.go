@@ -47,6 +47,12 @@ func TestUUIDSlotReconciliationReleasesDisconnectedAfterTwoFreshEpochs(t *testin
 	if _, err := ReconcileAccountUUIDSlots(ctx, db, rdb, user); err != nil {
 		t.Fatal(err)
 	}
+	// Release only trusts a report published strictly after the reservation
+	// (reconcile compares Redis-clock milliseconds). Without a pause the
+	// reservation and the next report can land in the same millisecond, which
+	// is correctly treated as "report predates reservation" and blocks release.
+	// The real agent reports every 10s, so this only affects a tight test.
+	time.Sleep(5 * time.Millisecond)
 	if err := PublishAdmittedUUIDReport(ctx, rdb, node, gen, 2, []string{}, time.Now()); err != nil {
 		t.Fatal(err)
 	}
