@@ -18,7 +18,7 @@ const (
 	sessionReconcileInterval = 30 * time.Second
 	evictionCooldown         = 10 * time.Minute
 	// addressClosureCooldown bounds how often transport closures are queued
-	// for one account by the opt-in client address cap enforcement.
+	// for one account by the client address cap enforcement.
 	addressClosureCooldown = 90 * time.Second
 )
 
@@ -35,9 +35,10 @@ type ConcurrencyScheduler struct {
 	addressStrikes           map[string]int
 	addressReconcileAt       map[string]time.Time
 	reconcileClientAddresses func(context.Context, string) (services.ClientAddressObservation, []string, error)
-	// enforceAddresses is the opt-in (ENFORCE_CLIENT_ADDRESS_LIMIT=1) switch for
-	// closing the transports of the newest over-cap client addresses. It is
-	// independent of enforce and never leads to UUID revocation.
+	// enforceAddresses closes the transports of over-cap client addresses. It is
+	// ON by default; ENFORCE_CLIENT_ADDRESS_LIMIT=0 (or false/off/no) is the
+	// kill switch. It is independent of enforce and never leads to UUID
+	// revocation.
 	enforceAddresses     bool
 	addressClosureAt     map[string]time.Time
 	queueAddressClosures func(context.Context, services.ClientAddressObservation, []string) (int, error)
@@ -57,7 +58,7 @@ func NewConcurrencyScheduler(db *pgxpool.Pool, rdb *redis.Client) *ConcurrencySc
 		reconcileClientAddresses: func(ctx context.Context, account string) (services.ClientAddressObservation, []string, error) {
 			return services.ObserveAndReconcileClientAddressSlots(ctx, db, rdb, account)
 		},
-		enforceAddresses: os.Getenv("ENFORCE_CLIENT_ADDRESS_LIMIT") == "1",
+		enforceAddresses: services.ClientAddressEnforcementEnabled(),
 		addressClosureAt: map[string]time.Time{},
 		queueAddressClosures: func(ctx context.Context, observation services.ClientAddressObservation, denied []string) (int, error) {
 			return services.QueueClientAddressClosures(ctx, rdb, observation, denied)

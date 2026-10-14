@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/netip"
+	"sort"
 	"strconv"
 
 	"github.com/redis/go-redis/v9"
@@ -38,12 +38,14 @@ func ReconcileAbsentClientAddresses(ctx context.Context, rdb *redis.Client, acco
 	}
 	addresses := make([]string, 0, len(observation.Addresses))
 	for _, raw := range observation.Addresses {
-		ip, err := netip.ParseAddr(raw)
-		if err != nil || ip.IsUnspecified() || ip.IsMulticast() || ip.Zone() != "" {
+		// Same slot key as admission, so a live /64 keeps the slot it holds.
+		slot, err := NormalizeClientAddress(raw)
+		if err != nil {
 			return nil, fmt.Errorf("invalid observed address")
 		}
-		addresses = append(addresses, ip.Unmap().String())
+		addresses = append(addresses, slot)
 	}
+	sort.Strings(addresses)
 	live, err := json.Marshal(addresses)
 	if err != nil {
 		return nil, err

@@ -190,6 +190,9 @@ func TestClientAddressIncompleteObservationResetsStrikes(t *testing.T) {
 }
 
 func TestClientAddressOverCapNeedsConsecutiveCompleteSweeps(t *testing.T) {
+	// Strike counting is the subject here; the observation-only report line is
+	// only emitted when the kill switch has turned closing off.
+	t.Setenv("ENFORCE_CLIENT_ADDRESS_LIMIT", "0")
 	logs := captureLog(t)
 	s := NewConcurrencyScheduler(nil, nil)
 	s.threshold = 3
@@ -306,9 +309,9 @@ func (r *closureRecorder) queue(_ context.Context, observation services.ClientAd
 // reconciliation always returns observation and whose closures are recorded.
 func newAddressScheduler(t *testing.T, enabled bool, observation services.ClientAddressObservation) (*ConcurrencyScheduler, *closureRecorder) {
 	t.Helper()
-	flag := ""
+	flag := "0" // the kill switch; enforcement is otherwise on by default
 	if enabled {
-		flag = "1"
+		flag = ""
 	}
 	t.Setenv("ENFORCE_CLIENT_ADDRESS_LIMIT", flag)
 	s := NewConcurrencyScheduler(nil, nil)
@@ -343,31 +346,36 @@ func assertNoFixtureAddresses(t *testing.T, logs *bytes.Buffer) {
 	}
 }
 
-func TestClientAddressEnforcementFlagRequiresExplicitOptIn(t *testing.T) {
+func TestClientAddressEnforcementIsOnByDefaultWithKillSwitch(t *testing.T) {
 	t.Setenv("ENFORCE_CLIENT_ADDRESS_LIMIT", "")
-	t.Setenv("ENFORCE_CONCURRENCY", "1")
+	t.Setenv("ENFORCE_CONCURRENCY", "")
 	s := NewConcurrencyScheduler(nil, nil)
-	if s.enforceAddresses {
-		t.Fatal("address enforcement must default off, even when ENFORCE_CONCURRENCY=1")
+	if !s.enforceAddresses {
+		t.Fatal("address enforcement must default on")
 	}
-	if !s.enforce {
-		t.Fatal("ENFORCE_CONCURRENCY=1 must still enable UUID enforcement")
+	if s.enforce {
+		t.Fatal("address enforcement must not enable UUID enforcement")
 	}
 	if s.queueAddressClosures == nil {
 		t.Fatal("default closure queue func must be wired")
 	}
-	t.Setenv("ENFORCE_CLIENT_ADDRESS_LIMIT", "true")
-	if NewConcurrencyScheduler(nil, nil).enforceAddresses {
-		t.Fatal("only the value 1 may enable address enforcement")
+	for _, off := range []string{"0", "false", "off", "no"} {
+		t.Setenv("ENFORCE_CLIENT_ADDRESS_LIMIT", off)
+		if NewConcurrencyScheduler(nil, nil).enforceAddresses {
+			t.Fatalf("%q must turn address enforcement off", off)
+		}
 	}
-	t.Setenv("ENFORCE_CLIENT_ADDRESS_LIMIT", "1")
-	t.Setenv("ENFORCE_CONCURRENCY", "")
+	// A typo must never silently disable the limit.
+	t.Setenv("ENFORCE_CLIENT_ADDRESS_LIMIT", "flase")
+	if !NewConcurrencyScheduler(nil, nil).enforceAddresses {
+		t.Fatal("an unrecognised value must leave enforcement on")
+	}
+	// Independent of UUID enforcement in both directions.
+	t.Setenv("ENFORCE_CLIENT_ADDRESS_LIMIT", "0")
+	t.Setenv("ENFORCE_CONCURRENCY", "1")
 	s = NewConcurrencyScheduler(nil, nil)
-	if !s.enforceAddresses {
-		t.Fatal("explicit opt-in did not enable address enforcement")
-	}
-	if s.enforce {
-		t.Fatal("address enforcement must not enable UUID enforcement")
+	if s.enforceAddresses || !s.enforce {
+		t.Fatalf("flags must be independent: addresses=%v uuid=%v", s.enforceAddresses, s.enforce)
 	}
 }
 

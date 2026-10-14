@@ -38,7 +38,10 @@ for (const snapshot of [
     await page.goto("/admin/users/address-user");
     const section = addressSection(page);
     await expect(section.getByText("Observed address count", { exact: true })).toBeVisible();
-    await expect(section.getByText(/share an IP address/)).toBeVisible();
+    // Same NAT counts once, an IPv6 /64 counts once, and this is not a device count.
+    await expect(section.getByText(/behind the same NAT share one/)).toBeVisible();
+    await expect(section.getByText(/closed automatically/)).toBeVisible();
+    await expect(section.getByText(/not a count of physical devices/)).toBeVisible();
     for (const address of snapshot.addresses) {
       await expect(section.getByText(address, { exact: true })).toBeVisible();
     }

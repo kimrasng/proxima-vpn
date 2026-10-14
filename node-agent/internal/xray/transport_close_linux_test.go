@@ -5,10 +5,12 @@ package xray
 import (
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"net/netip"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -175,5 +177,49 @@ func TestCloseTransportPeerLive(t *testing.T) {
 	}
 	if len(peers) != 1 || peers[0].Remote != servers[1].RemoteAddr().(*net.TCPAddr).AddrPort() {
 		t.Fatalf("unexpected survivors: %v", peers)
+	}
+}
+
+func TestClassifyTransportCloseProbe(t *testing.T) {
+	wrap := func(e error) error { return fmt.Errorf("close transport peer: kernel rejected SOCK_DESTROY: %w", e) }
+	for _, tc := range []struct {
+		name    string
+		in      error
+		wantErr string // substring; empty means the host is capable
+	}{
+		{"acknowledged destroy is capable", nil, ""},
+		{"a vanished probe socket is not evidence of capability", wrap(unix.ENOENT), "could not verify"},
+		{"kernel without the option", wrap(unix.EOPNOTSUPP), "CONFIG_INET_DIAG_DESTROY"},
+		{"missing capability", wrap(unix.EPERM), "CAP_NET_ADMIN"},
+		{"missing capability (EACCES)", wrap(unix.EACCES), "CAP_NET_ADMIN"},
+		{"anything else is reported, not assumed capable", wrap(unix.EINVAL), "could not verify"},
+		{"transport failure", errors.New("close transport peer: socket: boom"), "could not verify"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := classifyTransportCloseProbe(tc.in)
+			if tc.wantErr == "" {
+				if got != nil {
+					t.Fatalf("want capable, got %v", got)
+				}
+				return
+			}
+			if got == nil || !strings.Contains(got.Error(), tc.wantErr) {
+				t.Fatalf("want error containing %q, got %v", tc.wantErr, got)
+			}
+		})
+	}
+}
+
+// TestProbeTransportCloseLive asks the real kernel. It only asserts that the
+// answer is classified (capable, or a specific reason), never a panic or a raw
+// netlink failure, because the result depends on the host kernel.
+func TestProbeTransportCloseLive(t *testing.T) {
+	if os.Getenv("TRANSPORT_CLOSE_LIVE") != "1" {
+		t.Skip("set TRANSPORT_CLOSE_LIVE=1")
+	}
+	err := ProbeTransportClose()
+	t.Logf("probe result on this kernel: %v", err)
+	if err != nil && strings.Contains(err.Error(), "could not verify") {
+		t.Fatalf("probe could not classify the kernel's answer: %v", err)
 	}
 }

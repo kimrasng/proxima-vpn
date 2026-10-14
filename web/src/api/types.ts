@@ -315,6 +315,12 @@ export interface UserClientAddresses {
   complete: boolean;
   addresses: string[];
   count: number | null;
+  limit?: number;
+  over_limit?: boolean;
+  candidate_address?: string;
+  selection_reason?: string;
+  /** Whether the scheduler may close the transports of over-cap addresses. */
+  enforced?: boolean;
 }
 
 export interface UserTunnelSessions {

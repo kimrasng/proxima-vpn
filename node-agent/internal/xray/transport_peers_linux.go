@@ -18,6 +18,14 @@ const (
 	transportDiagSize    = 72 // struct inet_diag_msg
 	transportMaxBytes    = 64 << 20
 	transportMaxPeers    = 262144
+
+	// tcpInfoLastAckRecvOffset is the byte offset of tcpi_last_ack_recv inside
+	// struct tcp_info: milliseconds since the last ACK-bearing segment arrived
+	// from the peer. A pure ACK for server-pushed data updates it, whereas
+	// tcpi_last_data_recv (offset 52) would stay stale during a download, so it
+	// is the right liveness signal for a download-heavy tunnel. The offset is
+	// pinned against golang.org/x/sys/unix.TCPInfo by a test.
+	tcpInfoLastAckRecvOffset = 56
 )
 
 // TransportPeers reads established TCP sockets in the current network namespace.
@@ -193,7 +201,7 @@ func parseTransportDiag(data []byte, family byte, ports map[uint16]bool) (Transp
 			return peer, false, errors.New("transport peers: invalid inet_diag attribute length")
 		}
 		if binary.NativeEndian.Uint16(attrs[2:4]) == transportDiagInfo {
-			if info != nil || n < 4+60 {
+			if info != nil || n < 4+tcpInfoLastAckRecvOffset+4 {
 				return peer, false, errors.New("transport peers: invalid TCP_INFO attribute")
 			}
 			info = attrs[4:n]
@@ -211,6 +219,6 @@ func parseTransportDiag(data []byte, family byte, ports map[uint16]bool) (Transp
 	}
 	peer.Local = netip.AddrPortFrom(local, localPort)
 	peer.Remote = netip.AddrPortFrom(remote, remotePort)
-	peer.Idle = time.Duration(binary.NativeEndian.Uint32(info[56:60])) * time.Millisecond
+	peer.Idle = time.Duration(binary.NativeEndian.Uint32(info[tcpInfoLastAckRecvOffset:tcpInfoLastAckRecvOffset+4])) * time.Millisecond
 	return peer, true, nil
 }

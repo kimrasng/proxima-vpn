@@ -8,7 +8,10 @@ import (
 
 // TransportPeer is an observation of an established TCP socket, not a device
 // identity or proof of authentication. Idle is Linux TCP_INFO's elapsed time
-// since last_data_recv; it is not an application-level activity measurement.
+// since tcpi_last_ack_recv, i.e. since the peer last sent any ACK-bearing
+// segment. It is a transport liveness signal, not an application-level activity
+// measurement: a peer that left the network stops acknowledging, so its Idle
+// keeps growing, while a peer that is downloading keeps it near zero.
 type TransportPeer struct {
 	Local  netip.AddrPort
 	Remote netip.AddrPort
