@@ -187,8 +187,8 @@ func TestClassifyTransportCloseProbe(t *testing.T) {
 		in      error
 		wantErr string // substring; empty means the host is capable
 	}{
-		{"nothing matched is the capable answer", wrap(unix.ENOENT), ""},
-		{"unexpected success is still capable", nil, ""},
+		{"acknowledged destroy is capable", nil, ""},
+		{"a vanished probe socket is not evidence of capability", wrap(unix.ENOENT), "could not verify"},
 		{"kernel without the option", wrap(unix.EOPNOTSUPP), "CONFIG_INET_DIAG_DESTROY"},
 		{"missing capability", wrap(unix.EPERM), "CAP_NET_ADMIN"},
 		{"missing capability (EACCES)", wrap(unix.EACCES), "CAP_NET_ADMIN"},

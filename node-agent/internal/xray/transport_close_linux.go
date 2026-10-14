@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"net"
 	"net/netip"
 	"time"
 
@@ -68,22 +69,64 @@ func CloseTransportPeer(peer TransportPeer) error {
 	}
 }
 
-// ProbeTransportClose reports whether this host can destroy established TCP
-// sockets, without closing anything real. It asks the kernel to destroy a
-// tuple inside TEST-NET-1 (RFC 5737), which no real connection can use, and
-// reads the answer: ENOENT means the kernel has SOCK_DESTROY and this process
-// may use it (nothing matched, as intended); EOPNOTSUPP means the kernel lacks
-// CONFIG_INET_DIAG_DESTROY; EPERM means CAP_NET_ADMIN is missing.
+// ProbeTransportClose reports whether this host can really destroy an
+// established TCP socket. It opens a loopback connection of its own, destroys
+// that one socket, and checks that the peer saw the connection die.
+//
+// Destroying a tuple that matches nothing is NOT a usable probe: the kernel
+// answers ENOENT for it before it checks CAP_NET_ADMIN, so an unprivileged
+// process would be told it can close connections when it cannot. Only a real
+// socket gets the permission and CONFIG_INET_DIAG_DESTROY checks.
+//
+// The sockets belong to this probe alone; nothing else is touched.
 func ProbeTransportClose() error {
-	return classifyTransportCloseProbe(CloseTransportPeer(TransportPeer{
-		Local:  netip.MustParseAddrPort("192.0.2.1:1"),
-		Remote: netip.MustParseAddrPort("192.0.2.2:1"),
+	ln, err := net.ListenTCP("tcp4", &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1)})
+	if err != nil {
+		return fmt.Errorf("could not verify connection closing: %w", err)
+	}
+	defer func() { _ = ln.Close() }()
+	client, err := net.DialTCP("tcp4", nil, ln.Addr().(*net.TCPAddr))
+	if err != nil {
+		return fmt.Errorf("could not verify connection closing: %w", err)
+	}
+	defer func() { _ = client.Close() }()
+	if err := ln.SetDeadline(time.Now().Add(2 * time.Second)); err != nil {
+		return fmt.Errorf("could not verify connection closing: %w", err)
+	}
+	server, err := ln.AcceptTCP()
+	if err != nil {
+		return fmt.Errorf("could not verify connection closing: %w", err)
+	}
+	defer func() { _ = server.Close() }()
+
+	// transportDestroyRequest refuses loopback only through the caller's
+	// filtering, not itself, so the exact tuple of the probe socket is valid.
+	err = classifyTransportCloseProbe(CloseTransportPeer(TransportPeer{
+		Local:  server.LocalAddr().(*net.TCPAddr).AddrPort(),
+		Remote: server.RemoteAddr().(*net.TCPAddr).AddrPort(),
 	}))
+	if err != nil {
+		return err
+	}
+	// The kernel acknowledged; confirm the connection really died.
+	if err := client.SetReadDeadline(time.Now().Add(2 * time.Second)); err != nil {
+		return fmt.Errorf("could not verify connection closing: %w", err)
+	}
+	if _, err := client.Read(make([]byte, 1)); err == nil {
+		return errors.New("could not verify connection closing: probe connection survived SOCK_DESTROY")
+	} else if ne, ok := err.(net.Error); ok && ne.Timeout() {
+		return errors.New("could not verify connection closing: probe connection did not close")
+	}
+	return nil
 }
 
+// classifyTransportCloseProbe turns the kernel's answer to a destroy request
+// for a real socket into a host capability verdict. A nil error is the only
+// "capable" answer: ENOENT here would mean the probe socket vanished, which is
+// not evidence of anything.
 func classifyTransportCloseProbe(err error) error {
 	switch {
-	case err == nil, errors.Is(err, unix.ENOENT):
+	case err == nil:
 		return nil
 	case errors.Is(err, unix.EOPNOTSUPP):
 		return errors.New("kernel lacks CONFIG_INET_DIAG_DESTROY, so over-limit connections cannot be closed on this host")
