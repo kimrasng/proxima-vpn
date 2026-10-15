@@ -27,6 +27,7 @@ docker build -t "${E2E_IMAGE}" -f "${root}/tests/relay-e2e/Dockerfile" "${root}"
 "${compose[@]}" up -d --wait postgres redis api
 "${compose[@]}" run --rm control
 "${compose[@]}" up -d --wait exit
+"${compose[@]}" run --rm publish
 
 exit_process=$("${compose[@]}" exec -T exit cat /proc/1/comm)
 xray_pid=$("${compose[@]}" exec -T exit busybox pidof xray)

@@ -44,9 +44,11 @@ start_client() {
   exit 1
 }
 
+# The exit's production egress dialer refuses loopback destinations. The e2e
+# build maps this documentation address (RFC 5737) to the exit's local marker.
 fetch_marker() {
   curl --noproxy '' --socks5-hostname "127.0.0.1:$1" \
-    --connect-timeout 2 --max-time 8 -fsS http://127.0.0.1:9090/
+    --connect-timeout 2 --max-time 8 -fsS http://198.51.100.10:9090/
 }
 
 start_client "$client_uuid" 1080

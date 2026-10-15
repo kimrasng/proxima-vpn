@@ -11,4 +11,9 @@ openssl req -x509 -newkey rsa:2048 -nodes -days 1 \
 openssl s_server -quiet -accept 127.0.0.1:9443 \
   -cert /tmp/decoy.crt -key /tmp/decoy.key >/tmp/decoy.log 2>&1 &
 
-exec node-agent run --config /state/exit-agent.json
+# The agent keeps its stats outbox beside its config, so it needs a writable
+# directory; the state volume is mounted read-only. Run from a private copy.
+install -d -m 700 /var/lib/node-agent
+install -m 600 /state/exit-agent.json /var/lib/node-agent/agent.json
+
+exec node-agent run --config /var/lib/node-agent/agent.json

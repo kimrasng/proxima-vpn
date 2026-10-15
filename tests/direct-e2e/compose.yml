@@ -56,6 +56,16 @@ services:
       - e2e-client:/client-state
     networks: [control]
 
+  publish:
+    image: ${E2E_IMAGE}
+    command: ["bash", "/src/tests/direct-e2e/publish.sh"]
+    environment:
+      E2E_API_URL: http://api:2053
+      EXIT_IP: ${EXIT_IP}
+    volumes:
+      - e2e-client:/client-state
+    networks: [control]
+
   exit:
     image: ${E2E_IMAGE}
     privileged: true
