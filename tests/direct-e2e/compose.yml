@@ -94,6 +94,32 @@ services:
       - e2e-client:/state:ro
     networks: [direct]
 
+  cap-first:
+    image: ${E2E_IMAGE}
+    command: ["bash", "/src/tests/direct-e2e/cap.sh"]
+    environment:
+      EXIT_IP: ${EXIT_IP}
+      CAP_ROLE: first
+      CAP_HOLD_SECONDS: ${CAP_HOLD_SECONDS:-170}
+    volumes:
+      - e2e-client:/state:ro
+    networks:
+      direct:
+        ipv4_address: ${CAP_FIRST_IP}
+
+  cap-second:
+    image: ${E2E_IMAGE}
+    command: ["bash", "/src/tests/direct-e2e/cap.sh"]
+    environment:
+      EXIT_IP: ${EXIT_IP}
+      CAP_ROLE: second
+      CAP_HOLD_SECONDS: ${CAP_HOLD_SECONDS:-170}
+    volumes:
+      - e2e-client:/state:ro
+    networks:
+      direct:
+        ipv4_address: ${CAP_SECOND_IP}
+
 volumes:
   e2e-exit:
   e2e-client:

@@ -20,6 +20,7 @@ on:
       - 'pkg/**'
       - 'scripts/e2e_full_test.sh'
       - 'tests/relay-e2e/**'
+      - 'tests/direct-e2e/**'
       - '.github/workflows/e2e.yml'
   push:
     branches: [main]
@@ -29,6 +30,7 @@ on:
       - 'pkg/**'
       - 'scripts/e2e_full_test.sh'
       - 'tests/relay-e2e/**'
+      - 'tests/direct-e2e/**'
       - '.github/workflows/e2e.yml'
 
 jobs:
@@ -39,6 +41,27 @@ jobs:
       - uses: actions/checkout@v7
       - name: Verify relay-only VLESS Reality dataplane
         run: bash tests/relay-e2e/run.sh
+
+  # Direct (no Entry) VLESS Reality dataplane plus the account cap enforcement
+  # stage. ubuntu-latest runs a kernel with CONFIG_INET_DIAG_DESTROY, which the
+  # stage needs; the runner script skips the stage loudly where it is missing.
+  direct-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - name: Verify direct VLESS Reality dataplane and account cap enforcement
+        shell: bash
+        run: |
+          set -o pipefail
+          bash tests/direct-e2e/run.sh 2>&1 | tee /tmp/direct-e2e.log
+      - name: Require the account cap stage to have actually run
+        run: |
+          if grep -q '^SKIP: this kernel lacks CONFIG_INET_DIAG_DESTROY' /tmp/direct-e2e.log; then
+            echo "::error::account cap enforcement stage was skipped: the runner kernel lacks CONFIG_INET_DIAG_DESTROY"
+            exit 1
+          fi
+          grep -q '^PASS: account cap enforcement E2E completed' /tmp/direct-e2e.log
 
   e2e:
     runs-on: ubuntu-latest
