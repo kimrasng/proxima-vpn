@@ -66,21 +66,13 @@ device_id=$(require_id .id <<<"$device")
 device_uuid=$(require_id .xray_uuid <<<"$device")
 subscription_token=$(require_id .sub_token <<<"$(json_post /api/v1/user/sub-token/regenerate "$user_token" '{}')")
 
-subscription=$(curl -fsS "${api}/sub/${subscription_token}/${device_id}" | base64 -d)
-link=$(sed -n '/^vless:\/\//{p;q;}' <<<"$subscription")
-[[ "$link" == vless://"$device_uuid"@"$EXIT_IP":8443\?* ]] || {
-  echo 'FAIL: subscription did not advertise the direct exit endpoint' >&2
-  exit 1
-}
-server_config=$(curl -fsS "${api}/api/v1/nodes/${exit_id}/config" -H "X-Node-Key: ${exit_key}")
-private_key=$(jq -er '.inbounds[] | select(.protocol == "vless") | .streamSettings.realitySettings.privateKey' <<<"$server_config")
-server_public=$(xray x25519 -i "$private_key" | awk '/^Password \(PublicKey\):/ {print $3}')
-server_short=$(jq -er '.inbounds[] | select(.protocol == "vless") | .streamSettings.realitySettings.shortIds[0]' <<<"$server_config")
-[[ "$link" == *"pbk=${server_public}"* && "$link" == *"sid=${server_short}"* ]] || {
-  echo 'FAIL: direct subscription Reality credentials differ from exit config' >&2
-  exit 1
-}
-printf '%s\n' "$link" > /client-state/vless-link.txt
+# The agent must acknowledge its config before the panel publishes the
+# subscription, so the rest runs in the "publish" stage after the Exit starts.
+# Hand the stage everything it needs through the shared state volumes.
 jq -nc --arg id "$exit_id" --arg key "$exit_key" --arg url "$api" \
   '{node_id:$id,api_key:$key,server_url:$url}' > /exit-state/exit-agent.json
-echo 'PASS: subscription has the direct exit endpoint and generated Reality credentials'
+jq -nc --arg exit "$exit_id" --arg key "$exit_key" --arg device "$device_id" \
+  --arg uuid "$device_uuid" --arg sub "$subscription_token" \
+  '{exit_id:$exit,exit_key:$key,device_id:$device,device_uuid:$uuid,sub_token:$sub}' \
+  > /client-state/direct-e2e-state.json
+echo 'PASS: provisioned exit, plan, user and device; waiting for agent acknowledgement'
