@@ -696,6 +696,7 @@ const heartbeatInterval = 10 * time.Second
 func heartbeatLoop(ctx context.Context, apiClient *client.APIClient, runner *xray.XrayRunner, xrayVersion *versionHolder, state *nodeState, policy *relay.Manager) {
 	ticker := time.NewTicker(heartbeatInterval)
 	defer ticker.Stop()
+	ledger := newClosureLedger()
 
 	for {
 		select {
@@ -746,10 +747,21 @@ func heartbeatLoop(ctx context.Context, apiClient *client.APIClient, runner *xra
 					policy.ReturnTraffic(status.RouteTraffic)
 				}
 			} else if runner != nil {
+				now := time.Now()
 				for _, closure := range closures {
-					if err := runner.CloseObservedTransport(closure); err != nil {
-						log.Printf("transport closure %s not confirmed: %v", closure.ID, err)
+					// The panel redelivers a command until its key expires, so
+					// skip ones this agent already closed successfully.
+					if !ledger.shouldRun(closure.ID, now) {
+						continue
 					}
+					if err := runner.CloseObservedTransport(closure); err != nil {
+						if ledger.shouldWarn(closure.ID, now) {
+							log.Printf("transport closure %s not confirmed: %v", closure.ID, err)
+						}
+						continue
+					}
+					ledger.markDone(closure.ID, now)
+					log.Printf("transport closure %s applied", closure.ID)
 				}
 			}
 		}
