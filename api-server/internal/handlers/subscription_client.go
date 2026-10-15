@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"fmt"
 	"html/template"
-	"net/url"
 	"regexp"
 	"strings"
 	"time"
@@ -125,10 +124,11 @@ func setSubscriptionHeaders(c *fiber.Ctx, user subscriptionUser, s subscriptionS
 	}
 	c.Set("Profile-Update-Interval", fmt.Sprintf("%d", hours))
 	c.Set("Profile-Title", "base64:"+base64.StdEncoding.EncodeToString([]byte(s.profileTitle)))
-	c.Set(fiber.HeaderContentDisposition, fmt.Sprintf(`attachment; filename="%s"; filename*=UTF-8''%s`,
-		asciiFilename(s.profileTitle), url.PathEscape(s.profileTitle)))
+	c.Set(fiber.HeaderContentDisposition, `attachment; filename="Proxima.yaml"`)
 	if s.supportURL != "" {
 		c.Set("Support-Url", s.supportURL)
+		// Clash Verge Rev and compatible clients show a home-page shortcut.
+		c.Set("Profile-Web-Page-Url", s.supportURL)
 	}
 }
 

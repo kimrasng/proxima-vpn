@@ -105,12 +105,12 @@ func TestPathClientTypesCannotShadowDeviceIDs(t *testing.T) {
 }
 
 func TestSetSubscriptionHeaders(t *testing.T) {
-	limit := int64(100 << 30)
+	limit := int64(64 << 30)
 	expires := time.Unix(1893456000, 0)
-	user := subscriptionUser{TrafficUsed: 5 << 30, TrafficLimit: &limit, PlanExpiresAt: &expires}
+	user := subscriptionUser{TrafficUsed: 5400921375, TrafficLimit: &limit, PlanExpiresAt: &expires}
 	app := fiber.New()
 	app.Get("/", func(c *fiber.Ctx) error {
-		setSubscriptionHeaders(c, user, subscriptionSettings{updateIntervalSeconds: 3600, profileTitle: "프록시마 VPN", supportURL: "https://example.test/help"})
+		setSubscriptionHeaders(c, user, subscriptionSettings{updateIntervalSeconds: 24 * 3600, profileTitle: "Proxima", supportURL: "https://example.test/help"})
 		return nil
 	})
 	resp, err := app.Test(httptest.NewRequest(fiber.MethodGet, "/", nil))
@@ -119,20 +119,23 @@ func TestSetSubscriptionHeaders(t *testing.T) {
 	}
 	_ = resp.Body.Close()
 	h := resp.Header
-	if got := h.Get("Subscription-Userinfo"); got != "upload=0; download=5368709120; total=107374182400; expire=1893456000" {
+	if got := h.Get("Subscription-Userinfo"); got != "upload=0; download=5400921375; total=68719476736; expire=1893456000" {
 		t.Errorf("Subscription-Userinfo = %q", got)
 	}
-	if got := h.Get("Profile-Update-Interval"); got != "1" {
+	if got := h.Get("Profile-Update-Interval"); got != "24" {
 		t.Errorf("Profile-Update-Interval = %q, want hours", got)
 	}
 	title := strings.TrimPrefix(h.Get("Profile-Title"), "base64:")
-	if decoded, err := base64.StdEncoding.DecodeString(title); err != nil || string(decoded) != "프록시마 VPN" {
+	if decoded, err := base64.StdEncoding.DecodeString(title); err != nil || string(decoded) != "Proxima" {
 		t.Errorf("Profile-Title = %q", h.Get("Profile-Title"))
 	}
-	if got := h.Get("Content-Disposition"); !strings.Contains(got, `filename="VPN"`) || !strings.Contains(got, "filename*=UTF-8''") {
+	if got := h.Get("Content-Disposition"); got != `attachment; filename="Proxima.yaml"` {
 		t.Errorf("Content-Disposition = %q", got)
 	}
 	if got := h.Get("Support-Url"); got != "https://example.test/help" {
 		t.Errorf("Support-Url = %q", got)
+	}
+	if got := h.Get("Profile-Web-Page-Url"); got != "https://example.test/help" {
+		t.Errorf("Profile-Web-Page-Url = %q", got)
 	}
 }
