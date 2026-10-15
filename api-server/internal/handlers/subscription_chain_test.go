@@ -130,6 +130,35 @@ func TestDirectChainStillOffersEveryProtocolAtTheExit(t *testing.T) {
 	}
 }
 
+func TestDirectChainUsesConfiguredPublicPortForBaseInbound(t *testing.T) {
+	node := exitNode()
+	node.PublicPort = ptrInt(1324)
+	infos := buildNodeInfoList([]subscriptionNode{node}, "uuid-1", 0, nil, nil)
+	if len(infos) == 0 || infos[0].Port != 1324 {
+		t.Fatalf("direct base inbound port = %+v, want public port 1324", infos)
+	}
+}
+
+func TestDirectChainUsesPublicPortOnlyForNodePortInbound(t *testing.T) {
+	node := exitNode()
+	node.Port = 8443
+	node.PublicPort = ptrInt(1324)
+	node.RealityPorts = []int{8443, 20100}
+	infos := buildNodeInfoList([]subscriptionNode{node}, "uuid-1", 0, nil, nil)
+	if len(infos) < 2 || infos[0].Port != 1324 || infos[1].Port != 20100 {
+		t.Fatalf("direct inbound ports = %+v, want public 1324 for node port and unchanged additional listener 20100", infos)
+	}
+}
+
+func TestRelayedChainIgnoresExitPublicPort(t *testing.T) {
+	node := relayedTo("entry.example.test", 24443, 443)
+	node.PublicPort = ptrInt(1324)
+	infos := buildNodeInfoList([]subscriptionNode{node}, "uuid-1", 0, nil, nil)
+	if len(infos) != 1 || infos[0].Port != 24443 {
+		t.Fatalf("relayed endpoint = %+v; want entry port 24443", infos)
+	}
+}
+
 // A chain naming an exit port with no inbound behind it cannot be connected to, so
 // it must be withheld rather than published as a dead endpoint.
 func TestRelayedChainWithNoMatchingExitPortIsOmitted(t *testing.T) {

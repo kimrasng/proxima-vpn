@@ -51,6 +51,7 @@ type subscriptionNode struct {
 	Name                  string
 	IP                    string
 	Port                  int
+	PublicPort            *int
 	Status                string
 	RealityPublicKey      string
 	RealityShortID        string
@@ -161,7 +162,7 @@ func (h *SubscriptionHandler) getSubscriptionForDevice(c *fiber.Ctx, deviceID, f
 	}
 
 	rows, err := h.db.Query(ctx,
-		`SELECT n.id, COALESCE(NULLIF(nl.name, ''), NULLIF(c.name, ''), n.name), host(n.ip), n.port, n.status,
+		`SELECT n.id, COALESCE(NULLIF(nl.name, ''), NULLIF(c.name, ''), n.name), host(n.ip), n.port, n.public_port, n.status,
 		        n.reality_public_key, n.reality_short_id,
 		        n.tls_cert_file, n.tls_key_file,
 		        vmessib.port, trojanib.port, ssib.port, ssib.settings->>'password',
@@ -237,7 +238,7 @@ func (h *SubscriptionHandler) getSubscriptionForDevice(c *fiber.Ctx, deviceID, f
 	for rows.Next() {
 		var node subscriptionNode
 		if err := rows.Scan(
-			&node.ID, &node.Name, &node.IP, &node.Port,
+			&node.ID, &node.Name, &node.IP, &node.Port, &node.PublicPort,
 			&node.Status, &node.RealityPublicKey, &node.RealityShortID,
 			&node.TLSCertFile, &node.TLSKeyFile,
 			&node.VmessPort, &node.TrojanPort, &node.SSPort, &node.SSPassword,
@@ -606,8 +607,12 @@ func buildNodeInfoList(nodes []subscriptionNode, userUUID string, speedMbps int,
 				if len(ports) > 1 {
 					name = fmt.Sprintf("%s :%d", node.Name, port)
 				}
+				publicPort := port
+				if port == node.Port && node.PublicPort != nil {
+					publicPort = *node.PublicPort
+				}
 				infos = append(infos, subscription.NodeInfo{
-					Name: name, IP: node.IP, Port: port, Protocol: "vless_reality",
+					Name: name, IP: node.IP, Port: publicPort, Protocol: "vless_reality",
 					RealityPublicKey: node.RealityPublicKey, RealityShortID: node.RealityShortID,
 					ServerName: node.RealitySNI,
 				})

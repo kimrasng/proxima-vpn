@@ -39,7 +39,7 @@ func TestAdminNodeUpdateReturnsSafeFinalEndpointStateThroughHTTP(t *testing.T) {
 			}
 
 			status, body := f.request(fiber.MethodPut, "/admin/nodes/"+id,
-				`{"name":"updated","reality_client_sni":"WWW.CLOUDFLARE.COM."}`)
+				`{"name":"updated","public_port":1324,"reality_client_sni":"WWW.CLOUDFLARE.COM."}`)
 			if status != fiber.StatusOK {
 				t.Fatalf("update status=%d: %s", status, body)
 			}
@@ -58,7 +58,7 @@ func TestAdminNodeUpdateReturnsSafeFinalEndpointStateThroughHTTP(t *testing.T) {
 					t.Errorf("%s=%v present=%t, want %v", field, actual, present, expected)
 				}
 			}
-			if response["id"] != id || response["name"] != "updated" || response["port"] != float64(443) {
+			if response["id"] != id || response["name"] != "updated" || response["port"] != float64(443) || response["public_port"] != float64(1324) {
 				t.Errorf("existing update response fields changed: %v", response)
 			}
 			for _, field := range []string{

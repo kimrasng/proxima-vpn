@@ -398,6 +398,7 @@ type nodeListItem struct {
 	Region      string     `json:"region"`
 	IP          string     `json:"ip"`
 	Port        int        `json:"port"`
+	PublicPort  *int       `json:"public_port"`
 	Status      string     `json:"status"`
 	XrayVersion string     `json:"xray_version"`
 	CPUUsage    *float64   `json:"cpu_usage"`
@@ -467,7 +468,7 @@ type nodeListItem struct {
 func (h *AdminNodeHandler) ListNodes(c *fiber.Ctx) error {
 	rows, err := h.db.Query(
 		context.Background(),
-		`SELECT nodes.id, name, country, region, host(nodes.ip), port, status, xray_version,
+		`SELECT nodes.id, name, country, region, host(nodes.ip), port, public_port, status, xray_version,
 		        cpu_usage, memory_usage, disk_usage, load_avg, network_in, network_out,
 			        last_seen, nodes.created_at, nodes.updated_at, last_ping_at, status_changed_at,
 		        xray_running, config_hash,
@@ -495,7 +496,7 @@ func (h *AdminNodeHandler) ListNodes(c *fiber.Ctx) error {
 	for rows.Next() {
 		var n nodeListItem
 		targets := []any{
-			&n.ID, &n.Name, &n.Country, &n.Region, &n.IP, &n.Port,
+			&n.ID, &n.Name, &n.Country, &n.Region, &n.IP, &n.Port, &n.PublicPort,
 			&n.Status, &n.XrayVersion,
 			&n.CPUUsage, &n.MemoryUsage, &n.DiskUsage, &n.LoadAvg, &n.NetworkIn, &n.NetworkOut,
 			&n.LastSeen, &n.CreatedAt, &n.UpdatedAt, &n.LastPingAt, &n.StatusChangedAt,
@@ -602,7 +603,7 @@ func (h *AdminNodeHandler) GetNode(c *fiber.Ctx) error {
 	var n nodeListItem
 	row := h.db.QueryRow(
 		context.Background(),
-		`SELECT nodes.id, name, country, region, host(nodes.ip), port, status, xray_version,
+		`SELECT nodes.id, name, country, region, host(nodes.ip), port, public_port, status, xray_version,
 		        cpu_usage, memory_usage, disk_usage, load_avg, network_in, network_out,
 			        last_seen, nodes.created_at, nodes.updated_at, last_ping_at, status_changed_at,
 		        xray_running, config_hash,
@@ -612,7 +613,7 @@ func (h *AdminNodeHandler) GetNode(c *fiber.Ctx) error {
 		id,
 	)
 	targets := []any{
-		&n.ID, &n.Name, &n.Country, &n.Region, &n.IP, &n.Port,
+		&n.ID, &n.Name, &n.Country, &n.Region, &n.IP, &n.Port, &n.PublicPort,
 		&n.Status, &n.XrayVersion,
 		&n.CPUUsage, &n.MemoryUsage, &n.DiskUsage, &n.LoadAvg, &n.NetworkIn, &n.NetworkOut,
 		&n.LastSeen, &n.CreatedAt, &n.UpdatedAt, &n.LastPingAt, &n.StatusChangedAt,
@@ -947,6 +948,7 @@ type updateNodeRequest struct {
 	Name               *string             `json:"name"`
 	Country            *string             `json:"country"`
 	Region             *string             `json:"region"`
+	PublicPort         *int                `json:"public_port"`
 	TrafficMultiplier  *float64            `json:"traffic_multiplier"`
 	OSFamily           *string             `json:"os_family"`
 	Role               *string             `json:"role"`
@@ -1105,6 +1107,14 @@ func (h *AdminNodeHandler) UpdateNode(c *fiber.Ctx) error {
 		args = append(args, *req.Region)
 		argIdx++
 	}
+	if req.PublicPort != nil {
+		if *req.PublicPort < 1 || *req.PublicPort > 65535 {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "public_port must be between 1 and 65535"})
+		}
+		setClauses = append(setClauses, fmt.Sprintf("public_port = $%d", argIdx))
+		args = append(args, *req.PublicPort)
+		argIdx++
+	}
 	if req.TrafficMultiplier != nil {
 		if *req.TrafficMultiplier <= 0 || *req.TrafficMultiplier > maxTrafficMultiplier {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
@@ -1259,7 +1269,7 @@ func (h *AdminNodeHandler) UpdateNode(c *fiber.Ctx) error {
 	}
 
 	query := fmt.Sprintf(
-		"UPDATE nodes SET %s WHERE id = $%d RETURNING id, name, country, region, host(ip), port, status, xray_version, traffic_multiplier, os_family, max_concurrent_conns, firewall_preset, firewall_ports, created_at",
+		"UPDATE nodes SET %s WHERE id = $%d RETURNING id, name, country, region, host(ip), port, public_port, status, xray_version, traffic_multiplier, os_family, max_concurrent_conns, firewall_preset, firewall_ports, created_at",
 		strings.Join(setClauses, ", "), argIdx,
 	)
 	args = append(args, id)
@@ -1272,6 +1282,7 @@ func (h *AdminNodeHandler) UpdateNode(c *fiber.Ctx) error {
 		Region      string `json:"region"`
 		IP          string `json:"ip"`
 		Port        int    `json:"port"`
+		PublicPort  *int   `json:"public_port"`
 		Status      string `json:"status"`
 		XrayVersion string `json:"xray_version"`
 
@@ -1286,7 +1297,7 @@ func (h *AdminNodeHandler) UpdateNode(c *fiber.Ctx) error {
 	}
 
 	err = tx.QueryRow(ctx, query, args...).Scan(
-		&n.ID, &n.Name, &n.Country, &n.Region, &n.IP, &n.Port,
+		&n.ID, &n.Name, &n.Country, &n.Region, &n.IP, &n.Port, &n.PublicPort,
 		&n.Status, &n.XrayVersion, &n.TrafficMultiplier,
 		&n.OSFamily, &n.MaxConcurrentConns, &n.FirewallPreset, &n.FirewallPorts,
 		&n.CreatedAt,
