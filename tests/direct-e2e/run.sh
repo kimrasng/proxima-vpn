@@ -56,7 +56,13 @@ echo 'PASS: direct VLESS Reality E2E completed without an entry relay'
 # destroys a socket. Kernel config files are not visible inside containers, so
 # they cannot be used to decide this.
 cap_supported() {
-  "${compose[@]}" logs exit 2>/dev/null | grep -q 'client address limit: connection closing is available'
+  # Capture first, then match. `docker logs | grep -q` under `set -o pipefail`
+  # fails whenever the log is long: grep -q exits on the first match, docker logs
+  # then dies of SIGPIPE, and the pipeline reports failure even though the line
+  # was found. That made this check pass or fail depending on log size.
+  local out
+  out=$("${compose[@]}" logs --no-color exit 2>/dev/null) || true
+  grep -q 'client address limit: connection closing is available' <<<"$out"
 }
 if [[ "${CAP_E2E:-auto}" == 0 ]]; then
   echo 'SKIP: account cap enforcement stage disabled (CAP_E2E=0)'
@@ -66,11 +72,12 @@ if [[ "${CAP_E2E:-auto}" != 1 ]] && ! cap_supported; then
   # Say WHY: the agent's own startup probe names the missing piece (kernel
   # option, CAP_NET_ADMIN, or an inconclusive probe).
   echo "kernel: $(uname -r)"
-  "${compose[@]}" logs --no-color exit 2>/dev/null | grep -E 'client address limit' | sed -E 's/^[^|]*\| *//' || true
+  grep -E 'client address limit' <<<"$("${compose[@]}" logs --no-color exit 2>/dev/null || true)" | sed -E 's/^[^|]*\| *//' || true
   echo 'SKIP: this kernel lacks CONFIG_INET_DIAG_DESTROY; account cap enforcement stage not run'
   exit 0
 fi
-if "${compose[@]}" logs exit 2>/dev/null | grep -q 'client address limit cannot be enforced'; then
+exit_logs=$("${compose[@]}" logs --no-color exit 2>/dev/null) || true
+if grep -q 'client address limit cannot be enforced' <<<"${exit_logs}"; then
   echo 'FAIL: exit agent reports it cannot close connections on this host' >&2
   exit 1
 fi
