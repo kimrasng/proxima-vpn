@@ -63,6 +63,10 @@ if [[ "${CAP_E2E:-auto}" == 0 ]]; then
   exit 0
 fi
 if [[ "${CAP_E2E:-auto}" != 1 ]] && ! cap_supported; then
+  # Say WHY: the agent's own startup probe names the missing piece (kernel
+  # option, CAP_NET_ADMIN, or an inconclusive probe).
+  echo "kernel: $(uname -r)"
+  "${compose[@]}" logs --no-color exit 2>/dev/null | grep -E 'client address limit' | sed -E 's/^[^|]*\| *//' || true
   echo 'SKIP: this kernel lacks CONFIG_INET_DIAG_DESTROY; account cap enforcement stage not run'
   exit 0
 fi
