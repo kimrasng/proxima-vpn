@@ -1,6 +1,12 @@
 package database
 
 var managedEndpointMigrations = []string{
+	`ALTER TABLE nodes ADD COLUMN IF NOT EXISTS public_port INT`,
+	`DO $$ BEGIN
+		IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'nodes'::regclass AND conname = 'nodes_public_port_valid') THEN
+			ALTER TABLE nodes ADD CONSTRAINT nodes_public_port_valid CHECK (public_port IS NULL OR public_port BETWEEN 1 AND 65535);
+		END IF;
+	END $$`,
 	`ALTER TABLE nodes ADD COLUMN IF NOT EXISTS reality_client_sni TEXT`,
 	`ALTER TABLE nodes ADD COLUMN IF NOT EXISTS reality_sni_source TEXT`,
 	`ALTER TABLE nodes ADD COLUMN IF NOT EXISTS reality_sni_status TEXT`,

@@ -73,6 +73,7 @@ CREATE TABLE IF NOT EXISTS nodes (
     region              TEXT NOT NULL DEFAULT '',
     ip                  INET NOT NULL,
     port                INT NOT NULL DEFAULT 443,
+    public_port         INT,
     status              TEXT NOT NULL DEFAULT 'pending',
     xray_version        TEXT NOT NULL DEFAULT '',
     reality_private_key TEXT NOT NULL DEFAULT '',
