@@ -1,6 +1,6 @@
 # Phase 1: Minimal relay-only node installation
 
-Status: Planned; implementation has not started.
+Status: Implemented. `scripts/install.sh` resolves the panel role and skips the VPN engine for `relay` nodes (commit `2fb2455`); `tests/installer/test_install.py` has relay-branch tests for dependencies, firewall and registration arguments, an existing Xray being left alone, and the agent download fallback. The acceptance criteria below were not re-verified on a real relay host in this review.
 
 ## Goal
 
