@@ -11,6 +11,7 @@ import type {
   CreateOrderResult,
   OrderResponse,
   StartCheckoutResponse,
+  OrderReceipt,
   PaymentProviderItem,
   PublicSubscriptionDomain,
 } from './types';
@@ -88,6 +89,11 @@ export function cancelOrder(id: string): Promise<void> {
 export function startCheckout(orderId: string, provider: string): Promise<StartCheckoutResponse> {
   applyUserClient();
   return post<StartCheckoutResponse>(`/api/v1/user/orders/${orderId}/checkout`, { provider });
+}
+
+export function getOrderReceipt(orderId: string): Promise<OrderReceipt> {
+  applyUserClient();
+  return get<OrderReceipt>(`/api/v1/user/orders/${orderId}/receipt`);
 }
 
 export function listPaymentProviders(): Promise<PaymentProviderItem[]> {

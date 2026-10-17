@@ -1844,6 +1844,18 @@
           "status": "Status",
           "createdAt": "Ordered At",
           "actions": "Actions"
+        },
+        "receipt": {
+          "view": "Receipt",
+          "title": "Receipt",
+          "orderId": "Order ID",
+          "paidAt": "Paid at",
+          "total": "Total",
+          "email": "Email",
+          "method": "Payment method",
+          "methodPanel": "Panel",
+          "openStripe": "View Stripe receipt",
+          "error": "Failed to load the receipt"
         }
       },
       "promotion": {
