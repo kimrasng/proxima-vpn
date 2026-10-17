@@ -147,3 +147,19 @@ func (p *StripeProvider) VerifyWebhook(rawBody []byte, header func(string) strin
 		ActorLabel:  customerEmail,
 	}, nil
 }
+
+// ReceiptURL returns the Stripe-hosted receipt of the charge behind a paid
+// Checkout Session. Zero-total sessions never create a PaymentIntent, so they
+// have no receipt and return "".
+func (p *StripeProvider) ReceiptURL(ctx context.Context, sessionID string) (string, error) {
+	params := &stripe.CheckoutSessionRetrieveParams{}
+	params.AddExpand("payment_intent.latest_charge")
+	session, err := p.client.V1CheckoutSessions.Retrieve(ctx, sessionID, params)
+	if err != nil {
+		return "", fmt.Errorf("retrieve checkout session: %w", err)
+	}
+	if session.PaymentIntent == nil || session.PaymentIntent.LatestCharge == nil {
+		return "", nil
+	}
+	return session.PaymentIntent.LatestCharge.ReceiptURL, nil
+}
