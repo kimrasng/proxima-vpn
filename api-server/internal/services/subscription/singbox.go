@@ -7,10 +7,14 @@ func GenerateSingbox(nodes []NodeInfo, userUUID string) ([]byte, error) {
 	var nodeTags []string
 
 	for _, node := range nodes {
+		if !TCPProtocol(node.Protocol) {
+			continue
+		}
 		ob := singboxOutbound(node, userUUID)
 		if ob == nil {
 			continue
 		}
+		ob["network"] = "tcp"
 		nodeOutbounds = append(nodeOutbounds, ob)
 		nodeTags = append(nodeTags, node.Name)
 	}

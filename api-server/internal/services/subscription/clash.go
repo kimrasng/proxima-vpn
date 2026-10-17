@@ -82,6 +82,11 @@ func GenerateClash(nodes []NodeInfo, userUUID string, infoLabels []string) ([]by
 	var proxyNames []string
 
 	for _, node := range nodes {
+		// Every node is served TCP-only: UDP-only protocols are not offered and
+		// the remaining proxies set udp: false (nodes also drop UDP egress).
+		if !TCPProtocol(node.Protocol) {
+			continue
+		}
 		proxy := clashProxy(node, userUUID)
 		if proxy == nil {
 			continue
@@ -97,6 +102,7 @@ func GenerateClash(nodes []NodeInfo, userUUID string, infoLabels []string) ([]by
 	// Informational pseudo-nodes are real (working) proxies cloned from the
 	// first node but renamed, so any Clash client accepts them.
 	var infoNames []string
+	var infoProxies []any
 	if template, ok := proxies[0].(map[string]any); ok {
 		for _, label := range infoLabels {
 			clone := make(map[string]any, len(template))
@@ -104,10 +110,12 @@ func GenerateClash(nodes []NodeInfo, userUUID string, infoLabels []string) ([]by
 				clone[k] = v
 			}
 			clone["name"] = label
-			proxies = append(proxies, clone)
+			infoProxies = append(infoProxies, clone)
 			infoNames = append(infoNames, label)
 		}
 	}
+	// Subscription info leads the list so clients show it first.
+	proxies = append(infoProxies, proxies...)
 
 	// "DIRECT" is a Clash built-in policy. It is offered in the manual node group
 	// and the fallback group so users can route a connection without any proxy
@@ -144,11 +152,11 @@ func GenerateClash(nodes []NodeInfo, userUUID string, infoLabels []string) ([]by
 		},
 	}
 	if len(infoNames) > 0 {
-		groups = append(groups, proxyGroup{
+		groups = append([]proxyGroup{{
 			Name:    groupInfo,
 			Type:    "select",
 			Proxies: infoNames,
-		})
+		}}, groups...)
 	}
 
 	config := clashConfig{
@@ -236,7 +244,7 @@ func clashHysteria2(node NodeInfo, userUUID string) map[string]any {
 		"port":     node.Port,
 		"password": userUUID,
 		"sni":      node.IP,
-		"udp":      true,
+		"udp":      false,
 	}
 }
 
@@ -253,7 +261,7 @@ func clashWireGuard(node NodeInfo) map[string]any {
 		"ip":          strings.SplitN(node.WGAddress, "/", 2)[0],
 		"private-key": node.WGPrivateKey,
 		"public-key":  node.WGPeerPublicKey,
-		"udp":         true,
+		"udp":         false,
 	}
 }
 
@@ -266,7 +274,7 @@ func clashVLESSReality(node NodeInfo, uuid string) map[string]any {
 		"uuid":               uuid,
 		"network":            "tcp",
 		"tls":                true,
-		"udp":                true,
+		"udp":                false,
 		"flow":               "xtls-rprx-vision",
 		"client-fingerprint": "chrome",
 		"servername":         node.ServerName,
@@ -292,7 +300,7 @@ func clashVMessWS(node NodeInfo, uuid string) map[string]any {
 		"alterId": 0,
 		"cipher":  "auto",
 		"tls":     true,
-		"udp":     true,
+		"udp":     false,
 		"network": "ws",
 		"ws-opts": map[string]any{
 			"path": wsPath,
@@ -310,7 +318,7 @@ func clashTrojan(node NodeInfo, uuid string) map[string]any {
 		"server":   node.IP,
 		"port":     node.Port,
 		"password": uuid,
-		"udp":      true,
+		"udp":      false,
 		"sni":      node.IP,
 	}
 }
@@ -328,6 +336,17 @@ func clashShadowsocks(node NodeInfo) map[string]any {
 		"port":     node.Port,
 		"cipher":   method,
 		"password": node.SSPassword,
-		"udp":      true,
+		"udp":      false,
+	}
+}
+
+// TCPProtocol reports whether a protocol runs over TCP. Subscriptions only
+// offer these: Hysteria2 (QUIC) and WireGuard are UDP-only.
+func TCPProtocol(protocol string) bool {
+	switch protocol {
+	case "vless_reality", "vmess_ws", "trojan_tls", "shadowsocks":
+		return true
+	default:
+		return false
 	}
 }

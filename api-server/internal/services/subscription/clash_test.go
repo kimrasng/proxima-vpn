@@ -1,6 +1,7 @@
 package subscription
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 
@@ -93,78 +94,44 @@ func TestGenerateClashSkipsUnsupportedProtocols(t *testing.T) {
 	}
 }
 
-func TestGenerateClashWireGuard(t *testing.T) {
+func TestGenerateClashOmitsUDPOnlyProtocols(t *testing.T) {
 	nodes := []NodeInfo{
-		{
-			Name:            "wg-1",
-			IP:              "203.0.113.20",
-			Port:            51820,
-			Protocol:        "wireguard",
-			WGPrivateKey:    "clientPrivKey=",
-			WGPeerPublicKey: "serverPubKey=",
-			WGAddress:       "10.66.0.2/32",
-		},
+		{Name: "wg-1", IP: "203.0.113.20", Port: 51820, Protocol: "wireguard",
+			WGPrivateKey: "k=", WGPeerPublicKey: "p=", WGAddress: "10.66.0.2/32"},
+		{Name: "hy2-1", IP: "203.0.113.20", Port: 44300, Protocol: "hysteria2"},
 	}
-
-	out, err := GenerateClash(nodes, "uuid", nil)
-	if err != nil {
-		t.Fatalf("GenerateClash: %v", err)
-	}
-
-	var config map[string]any
-	if err := yaml.Unmarshal(out, &config); err != nil {
-		t.Fatalf("unmarshal clash yaml: %v", err)
-	}
-
-	proxies, ok := config["proxies"].([]any)
-	if !ok || len(proxies) == 0 {
-		t.Fatal("expected at least one proxy in output")
-	}
-	proxy, ok := proxies[0].(map[string]any)
-	if !ok {
-		t.Fatalf("proxy entry has unexpected type %T", proxies[0])
-	}
-	if proxy["type"] != "wireguard" {
-		t.Errorf("type = %v, want wireguard", proxy["type"])
-	}
-	if proxy["ip"] != "10.66.0.2" {
-		t.Errorf("ip = %v, want 10.66.0.2 (CIDR suffix stripped)", proxy["ip"])
-	}
-	if proxy["private-key"] != "clientPrivKey=" {
-		t.Errorf("private-key = %v, want clientPrivKey=", proxy["private-key"])
-	}
-	if proxy["public-key"] != "serverPubKey=" {
-		t.Errorf("public-key = %v, want serverPubKey=", proxy["public-key"])
+	if _, err := GenerateClash(nodes, "uuid", nil); err == nil {
+		t.Fatal("UDP-only protocols must not produce proxies")
 	}
 }
 
-func TestGenerateClashHysteria2(t *testing.T) {
+func TestGenerateClashTCPOnlyAndInfoFirst(t *testing.T) {
 	nodes := []NodeInfo{
+		{Name: "vless-1", IP: "203.0.113.10", Port: 443, Protocol: "vless_reality"},
 		{Name: "hy2-1", IP: "203.0.113.20", Port: 44300, Protocol: "hysteria2"},
 	}
-
-	out, err := GenerateClash(nodes, "device-uuid", nil)
+	out, err := GenerateClash(nodes, "uuid", []string{"info-a", "info-b"})
 	if err != nil {
 		t.Fatalf("GenerateClash: %v", err)
 	}
-
 	var config map[string]any
 	if err := yaml.Unmarshal(out, &config); err != nil {
 		t.Fatalf("unmarshal clash yaml: %v", err)
 	}
-
-	proxies, ok := config["proxies"].([]any)
-	if !ok || len(proxies) == 0 {
-		t.Fatal("expected at least one proxy in output")
+	proxies := config["proxies"].([]any)
+	var names []string
+	for _, p := range proxies {
+		m := p.(map[string]any)
+		names = append(names, m["name"].(string))
+		if m["udp"] != false {
+			t.Errorf("%v: udp = %v, want false", m["name"], m["udp"])
+		}
 	}
-	proxy, ok := proxies[0].(map[string]any)
-	if !ok {
-		t.Fatalf("proxy entry has unexpected type %T", proxies[0])
+	if want := []string{"info-a", "info-b", "vless-1"}; !reflect.DeepEqual(names, want) {
+		t.Errorf("proxy order = %v, want %v", names, want)
 	}
-	if proxy["type"] != "hysteria2" {
-		t.Errorf("type = %v, want hysteria2", proxy["type"])
-	}
-	if proxy["password"] != "device-uuid" {
-		t.Errorf("password = %v, want device-uuid", proxy["password"])
+	groups := config["proxy-groups"].([]any)
+	if first := groups[0].(map[string]any)["name"]; first != groupInfo {
+		t.Errorf("first group = %v, want %v", first, groupInfo)
 	}
 }
