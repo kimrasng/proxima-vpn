@@ -32,6 +32,7 @@ import type {
   OrderStatus,
   PaymentProviderItem,
   PromotionRejectReason,
+  OrderReceipt,
 } from "../../api/types";
 import * as userApi from "../../api/user";
 import { ApiError } from "../../api/client";
@@ -100,6 +101,8 @@ export default function PlanInfo() {
   const [flash, setFlash] = useState<FlashbarProps.MessageDefinition[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
+  const [receipt, setReceipt] = useState<OrderReceipt | null>(null);
+  const [receiptLoading, setReceiptLoading] = useState<string | null>(null);
   const [selectedDurations, setSelectedDurations] = useState<Record<string, number>>({});
   const [orderReview, setOrderReview] = useState<{ plan: UserPlanItem; price: UserPlanPrice } | null>(null);
   const [orderReviewError, setOrderReviewError] = useState<string | null>(null);
@@ -180,6 +183,15 @@ export default function PlanInfo() {
       });
       if (result.promotion_rejected) {
         showRejection(result.promotion_rejected);
+      } else if (result.order.status === "pending" && redirectProvider) {
+        // Place order goes straight to hosted checkout; the order already
+        // exists, so a failed handoff leaves it payable from My Orders.
+        setOrderReview(null);
+        setPromotionCode("");
+        const redirected = await redirectToCheckout(result.order.id);
+        if (redirected) return;
+        await loadData();
+        return;
       } else {
         setFlash([{ type: "success", content: t("user.plan.order.placed"), dismissible: true, onDismiss: () => setFlash([]) }]);
         setPromotionCode("");
@@ -241,21 +253,39 @@ export default function PlanInfo() {
   // At most one redirect provider exists today (stripe), so the button needs no picker.
   const redirectProvider = providers.find((p) => p.mode === "redirect") ?? null;
 
-  const handleStartCheckout = async (orderId: string) => {
-    if (!redirectProvider) return;
+  // Returns true once the browser is leaving for the hosted checkout page.
+  const redirectToCheckout = async (orderId: string): Promise<boolean> => {
+    if (!redirectProvider) return false;
     try {
       setCheckoutLoading(orderId);
       const session = await userApi.startCheckout(orderId, redirectProvider.name);
       if (!session.redirect_url) {
         setFlash([{ type: "error", content: t("user.plan.order.checkout.error"), dismissible: true, onDismiss: () => setFlash([]) }]);
-        return;
+        return false;
       }
       // Checkout lives on Stripe's domain, so this must leave the SPA entirely.
       window.location.href = session.redirect_url;
+      return true;
     } catch {
       setFlash([{ type: "error", content: t("user.plan.order.checkout.error"), dismissible: true, onDismiss: () => setFlash([]) }]);
+      return false;
     } finally {
       setCheckoutLoading(null);
+    }
+  };
+
+  const handleStartCheckout = async (orderId: string) => {
+    await redirectToCheckout(orderId);
+  };
+
+  const handleViewReceipt = async (orderId: string) => {
+    try {
+      setReceiptLoading(orderId);
+      setReceipt(await userApi.getOrderReceipt(orderId));
+    } catch {
+      setFlash([{ type: "error", content: t("user.plan.order.receipt.error"), dismissible: true, onDismiss: () => setFlash([]) }]);
+    } finally {
+      setReceiptLoading(null);
     }
   };
 
@@ -595,6 +625,15 @@ export default function PlanInfo() {
                         {t("user.plan.order.cancel")}
                       </Button>
                     </SpaceBetween>
+                  ) : item.status === "paid" ? (
+                    <Button
+                      variant="inline-link"
+                      loading={receiptLoading === item.id}
+                      disabled={receiptLoading !== null}
+                      onClick={() => void handleViewReceipt(item.id)}
+                    >
+                      {t("user.plan.order.receipt.view")}
+                    </Button>
                   ) : (
                     <Box color="text-status-inactive">—</Box>
                   ),
@@ -658,6 +697,70 @@ export default function PlanInfo() {
               {pendingOrder && <Alert type="warning">{t("user.plan.order.blockedByPending")}</Alert>}
               {orderReviewError && <Alert type="error">{orderReviewError}</Alert>}
             </SpaceBetween>
+          )}
+        </Modal>
+
+        <Modal
+          visible={receipt !== null}
+          onDismiss={() => setReceipt(null)}
+          closeAriaLabel={t("user.announcements.close")}
+          header={t("user.plan.order.receipt.title")}
+          footer={
+            <Box float="right">
+              <SpaceBetween direction="horizontal" size="xs">
+                <Button onClick={() => setReceipt(null)}>{t("user.plan.order.dismiss")}</Button>
+                {receipt?.receipt_url && (
+                  <Button
+                    variant="primary"
+                    href={receipt.receipt_url}
+                    target="_blank"
+                    iconName="external"
+                    iconAlign="right"
+                  >
+                    {t("user.plan.order.receipt.openStripe")}
+                  </Button>
+                )}
+              </SpaceBetween>
+            </Box>
+          }
+        >
+          {receipt && (
+            <ColumnLayout columns={2} variant="text-grid">
+              <SpaceBetween size="xxs">
+                <Box variant="awsui-key-label">{t("user.plan.order.receipt.orderId")}</Box>
+                <Box variant="code">{receipt.order_id}</Box>
+              </SpaceBetween>
+              <SpaceBetween size="xxs">
+                <Box variant="awsui-key-label">{t("user.plan.order.receipt.paidAt")}</Box>
+                <Box>{receipt.paid_at ? new Date(receipt.paid_at).toLocaleString(i18n.resolvedLanguage ?? i18n.language) : "-"}</Box>
+              </SpaceBetween>
+              <SpaceBetween size="xxs">
+                <Box variant="awsui-key-label">{t("user.plan.planName")}</Box>
+                <Box>{receipt.plan_name}</Box>
+              </SpaceBetween>
+              <SpaceBetween size="xxs">
+                <Box variant="awsui-key-label">{t("user.plan.duration")}</Box>
+                <Box>{receipt.duration_days} {t("user.plan.durationDays")}</Box>
+              </SpaceBetween>
+              {receipt.discount_cents > 0 && (
+                <SpaceBetween size="xxs">
+                  <Box variant="awsui-key-label">{t("user.plan.promotion.discountApplied")}</Box>
+                  <Box>-{formatPriceCents(receipt.discount_cents)}</Box>
+                </SpaceBetween>
+              )}
+              <SpaceBetween size="xxs">
+                <Box variant="awsui-key-label">{t("user.plan.order.receipt.total")}</Box>
+                <Box fontWeight="bold">{formatPriceCents(receipt.price_cents)}</Box>
+              </SpaceBetween>
+              <SpaceBetween size="xxs">
+                <Box variant="awsui-key-label">{t("user.plan.order.receipt.email")}</Box>
+                <Box>{receipt.email}</Box>
+              </SpaceBetween>
+              <SpaceBetween size="xxs">
+                <Box variant="awsui-key-label">{t("user.plan.order.receipt.method")}</Box>
+                <Box>{receipt.provider === "stripe" ? "Stripe" : t("user.plan.order.receipt.methodPanel")}</Box>
+              </SpaceBetween>
+            </ColumnLayout>
           )}
         </Modal>
 

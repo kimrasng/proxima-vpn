@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"log"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/jackc/pgx/v5"
@@ -162,4 +164,73 @@ func (h *UserCheckoutHandler) ListProviders(c *fiber.Ctx) error {
 		items = append(items, paymentProviderItem{Name: name, Mode: mode})
 	}
 	return c.JSON(items)
+}
+
+type orderReceiptResponse struct {
+	OrderID      string     `json:"order_id"`
+	PlanName     string     `json:"plan_name"`
+	DurationDays int        `json:"duration_days"`
+	PriceCents   int64      `json:"price_cents"`
+	Discount     int64      `json:"discount_cents"`
+	Currency     string     `json:"currency"`
+	Provider     string     `json:"provider"`
+	Email        string     `json:"email"`
+	PaidAt       *time.Time `json:"paid_at"`
+	ReceiptURL   string     `json:"receipt_url,omitempty"`
+}
+
+// Receipt handles GET /api/v1/user/orders/:id/receipt. Only the order's own
+// user can read it, and only once it is paid. When the provider hosts a
+// receipt (Stripe), its URL is included; the panel-side summary is always
+// returned so a zero-total or admin-settled order still has a receipt.
+// @Summary Get the receipt of my paid order
+// @Tags user-orders
+// @Produce json
+// @Param id path string true "Order ID"
+// @Success 200 {object} orderReceiptResponse
+// @Failure 404 {object} map[string]string
+// @Security BearerAuth
+// @Router /user/orders/{id}/receipt [get]
+func (h *UserCheckoutHandler) Receipt(c *fiber.Ctx) error {
+	userID := c.Locals("user_id").(string)
+	orderID := c.Params("id")
+	ctx := c.Context()
+
+	var r orderReceiptResponse
+	var sessionID string
+	err := h.db.QueryRow(ctx,
+		`SELECT o.id, p.name, o.duration_days, o.price_cents, o.discount_cents,
+		        o.provider, o.provider_session_id, u.email, o.paid_at
+		 FROM plan_orders o
+		 JOIN plans p ON p.id = o.plan_id
+		 JOIN users u ON u.id = o.user_id
+		 WHERE o.id = $1 AND o.user_id = $2 AND o.status = 'paid'`,
+		orderID, userID,
+	).Scan(&r.OrderID, &r.PlanName, &r.DurationDays, &r.PriceCents, &r.Discount,
+		&r.Provider, &sessionID, &r.Email, &r.PaidAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "paid order not found"})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "internal server error"})
+	}
+	_ = h.db.QueryRow(ctx,
+		`SELECT currency FROM payment_events
+		 WHERE order_id = $1 AND outcome = 'granted' AND currency <> ''
+		 ORDER BY received_at DESC LIMIT 1`, orderID,
+	).Scan(&r.Currency)
+
+	if sessionID != "" {
+		if provider, ok := h.registry.Get(r.Provider); ok {
+			if rp, ok := provider.(payments.ReceiptProvider); ok {
+				url, err := rp.ReceiptURL(ctx, sessionID)
+				if err != nil {
+					log.Printf("[payments] receipt lookup for order %s failed: %v", orderID, err)
+				} else {
+					r.ReceiptURL = url
+				}
+			}
+		}
+	}
+	return c.JSON(r)
 }

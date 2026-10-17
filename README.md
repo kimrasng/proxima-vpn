@@ -424,7 +424,7 @@ Pushing a `v*` tag runs the release workflow, which publishes `ghcr.io/kimrasng/
 | `TRUSTED_PROXIES` · `PROXY_HEADER` | | Real client IPs behind a reverse proxy |
 | `TELEGRAM_ENABLED` · `TELEGRAM_BOT_TOKEN` · `TELEGRAM_CHAT_ID` | | Alerts and the admin bot |
 | `CLOUDFLARE_API_TOKEN` · `CLOUDFLARE_ZONE_ID` · `ENTRY_DNS_BASE_DOMAIN` | | Managed entry-node DNS |
-| `STRIPE_SECRET_KEY` · `STRIPE_WEBHOOK_SECRET` | | Stripe checkout |
+| `STRIPE_SECRET_KEY` · `STRIPE_WEBHOOK_SECRET` · `STRIPE_PRODUCT_ID` | | Stripe checkout |
 | `PAYMENTS_CURRENCY` · `PAYMENTS_PENDING_TTL` | | Currency and unpaid-order lifetime |
 | `S3_ENDPOINT` · `S3_BUCKET` · `S3_ACCESS_KEY` · `S3_SECRET_KEY` · `S3_REGION` | | S3-compatible object storage |
 | `SWAGGER_ENABLED` | | API docs (`false` in production) |

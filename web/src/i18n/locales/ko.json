@@ -1844,6 +1844,18 @@
           "status": "상태",
           "createdAt": "주문일",
           "actions": "작업"
+        },
+        "receipt": {
+          "view": "영수증",
+          "title": "영수증",
+          "orderId": "주문 ID",
+          "paidAt": "결제 일시",
+          "total": "결제 금액",
+          "email": "이메일",
+          "method": "결제 수단",
+          "methodPanel": "패널",
+          "openStripe": "Stripe 영수증 보기",
+          "error": "영수증을 불러오지 못했습니다"
         }
       },
       "promotion": {

@@ -1845,6 +1845,18 @@
           "status": "状态",
           "createdAt": "下单时间",
           "actions": "操作"
+        },
+        "receipt": {
+          "view": "收据",
+          "title": "收据",
+          "orderId": "订单 ID",
+          "paidAt": "支付时间",
+          "total": "支付金额",
+          "email": "邮箱",
+          "method": "支付方式",
+          "methodPanel": "面板",
+          "openStripe": "查看 Stripe 收据",
+          "error": "无法加载收据"
         }
       },
       "promotion": {

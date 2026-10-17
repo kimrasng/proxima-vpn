@@ -55,7 +55,7 @@ func deref(t *testing.T, label string, value *string) string {
 func createOrderApp(t *testing.T, pool *pgxpool.Pool, userID string, body []byte, headers map[string]string) (orderResponse, int) {
 	t.Helper()
 
-	handler := NewUserOrderHandler(pool, config.PaymentsConfig{PendingTTLRaw: "1h"})
+	handler := NewUserOrderHandler(pool, config.PaymentsConfig{PendingTTLRaw: "1h"}, payments.Registry{})
 	app := fiber.New()
 	app.Post("/orders", func(c *fiber.Ctx) error {
 		c.Locals("user_id", userID)

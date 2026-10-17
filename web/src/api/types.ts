@@ -657,6 +657,19 @@ export interface OrderResponse {
   cancelled_at?: string;
 }
 
+export interface OrderReceipt {
+  order_id: string;
+  plan_name: string;
+  duration_days: number;
+  price_cents: number;
+  discount_cents: number;
+  currency: string;
+  provider: string;
+  email: string;
+  paid_at?: string;
+  receipt_url?: string;
+}
+
 export type PromotionRejectReason =
   | 'not_found'
   | 'inactive'

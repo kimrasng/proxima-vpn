@@ -215,7 +215,7 @@ func (s *Server) registerRoutes() {
 	user.Get("/plans", userPlanHandler.ListPlans)
 	user.Get("/nodes", userPlanHandler.ListNodes)
 
-	userOrderHandler := handlers.NewUserOrderHandler(s.db, s.config.Payments)
+	userOrderHandler := handlers.NewUserOrderHandler(s.db, s.config.Payments, s.payments)
 	user.Post("/orders", userOrderHandler.Create)
 	user.Get("/orders", userOrderHandler.List)
 	user.Post("/orders/:id/cancel", userOrderHandler.Cancel)
@@ -224,6 +224,7 @@ func (s *Server) registerRoutes() {
 	userCheckoutHandler := handlers.NewUserCheckoutHandler(s.db, s.payments)
 	user.Post("/orders/:id/checkout", userCheckoutHandler.Start)
 	user.Get("/payment-providers", userCheckoutHandler.ListProviders)
+	user.Get("/orders/:id/receipt", userCheckoutHandler.Receipt)
 
 	userDeviceHandler := handlers.NewUserDeviceHandler(s.db)
 	user.Post("/devices", userDeviceHandler.Create)

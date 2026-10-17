@@ -13,6 +13,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/proximavpn/proxima-vpn/api-server/internal/config"
+	"github.com/proximavpn/proxima-vpn/api-server/internal/payments"
 	"github.com/proximavpn/proxima-vpn/api-server/internal/services"
 )
 
@@ -88,7 +89,7 @@ func TestCreate_FreePromotionSettlesWithoutExternalProvider(t *testing.T) {
 		_, _ = pool.Exec(context.Background(), `DELETE FROM promotion_codes WHERE code = $1`, code)
 	})
 
-	handler := NewUserOrderHandler(pool, config.PaymentsConfig{PendingTTLRaw: "1h"})
+	handler := NewUserOrderHandler(pool, config.PaymentsConfig{PendingTTLRaw: "1h"}, payments.Registry{})
 	app := fiber.New()
 	app.Post("/orders", func(c *fiber.Ctx) error {
 		c.Locals("user_id", userID)
@@ -212,7 +213,7 @@ func TestCreate_ReadsPriceAfterConcurrentPlanEdit(t *testing.T) {
 	app := fiber.New()
 	app.Post("/orders", func(c *fiber.Ctx) error {
 		c.Locals("user_id", userID)
-		return NewUserOrderHandler(pool, config.PaymentsConfig{PendingTTLRaw: "1h"}).Create(c)
+		return NewUserOrderHandler(pool, config.PaymentsConfig{PendingTTLRaw: "1h"}, payments.Registry{}).Create(c)
 	})
 	type result struct {
 		status int

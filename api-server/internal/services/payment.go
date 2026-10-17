@@ -164,7 +164,9 @@ func (s *PaymentService) Settle(ctx context.Context, conf payments.Confirmation)
 	// own snapshotted price exactly. The order claim above already flipped
 	// this row to 'paid' inside the same transaction, so a mismatch has to
 	// explicitly revert it here - otherwise it would commit paid regardless.
-	if conf.AmountCents > 0 && conf.AmountCents != priceCents {
+	if (conf.Provider == payments.ProviderStripe && conf.AmountCents == 0 && priceCents != 0) ||
+		(conf.Provider == payments.ProviderStripe && conf.AmountCents != priceCents) ||
+		(conf.AmountCents > 0 && conf.AmountCents != priceCents) {
 		if _, err := tx.Exec(ctx,
 			`UPDATE plan_orders SET status = 'pending', paid_at = NULL, paid_by = '' WHERE id = $1`,
 			conf.OrderID,

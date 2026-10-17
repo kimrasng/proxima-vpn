@@ -69,9 +69,10 @@ func TestSettle_GrantsOncePerOrder(t *testing.T) {
 
 	externalID := fmt.Sprintf("evt_grant_once_%d", os.Getpid())
 	res, err := svc.Settle(ctx, payments.Confirmation{
-		Provider:   "stripe",
-		ExternalID: externalID,
-		OrderID:    orderID,
+		Provider:    "stripe",
+		ExternalID:  externalID,
+		OrderID:     orderID,
+		AmountCents: 2700,
 	})
 	if err != nil {
 		t.Fatalf("Settle: %v", err)
@@ -109,9 +110,10 @@ func TestSettle_ConfirmsPromotionReservation(t *testing.T) {
 	}
 
 	res, err := paymentService.Settle(ctx, payments.Confirmation{
-		Provider:   "stripe",
-		ExternalID: fmt.Sprintf("evt_promo_confirm_%d", os.Getpid()),
-		OrderID:    orderID,
+		Provider:    "stripe",
+		ExternalID:  fmt.Sprintf("evt_promo_confirm_%d", os.Getpid()),
+		OrderID:     orderID,
+		AmountCents: 1000,
 	})
 	if err != nil {
 		t.Fatalf("Settle: %v", err)
@@ -138,7 +140,7 @@ func TestSettle_DuplicateEventDoesNotGrantTwice(t *testing.T) {
 	userID := seedUser(t, pool, ctx, fmt.Sprintf("settle-dup-%d@x.test", os.Getpid()), planID, nil, nil, nil, 0, "pending")
 	orderID := seedOrder(t, pool, ctx, userID, planID, 30, 1000, "pending", nil)
 
-	conf := payments.Confirmation{Provider: "stripe", ExternalID: fmt.Sprintf("evt_dup_1_%d", os.Getpid()), OrderID: orderID}
+	conf := payments.Confirmation{Provider: "stripe", ExternalID: fmt.Sprintf("evt_dup_1_%d", os.Getpid()), OrderID: orderID, AmountCents: 1000}
 
 	first, err := svc.Settle(ctx, conf)
 	if err != nil {
@@ -188,12 +190,12 @@ func TestSettle_SecondDistinctEventOnPaidOrderIsIgnored(t *testing.T) {
 	userID := seedUser(t, pool, ctx, fmt.Sprintf("settle-second-%d@x.test", os.Getpid()), planID, nil, nil, nil, 0, "pending")
 	orderID := seedOrder(t, pool, ctx, userID, planID, 30, 1000, "pending", nil)
 
-	if _, err := svc.Settle(ctx, payments.Confirmation{Provider: "stripe", ExternalID: fmt.Sprintf("evt_A_%d", os.Getpid()), OrderID: orderID}); err != nil {
+	if _, err := svc.Settle(ctx, payments.Confirmation{Provider: "stripe", ExternalID: fmt.Sprintf("evt_A_%d", os.Getpid()), OrderID: orderID, AmountCents: 1000}); err != nil {
 		t.Fatalf("first Settle: %v", err)
 	}
 
 	evtB := fmt.Sprintf("evt_B_%d", os.Getpid())
-	res, err := svc.Settle(ctx, payments.Confirmation{Provider: "stripe", ExternalID: evtB, OrderID: orderID})
+	res, err := svc.Settle(ctx, payments.Confirmation{Provider: "stripe", ExternalID: evtB, OrderID: orderID, AmountCents: 1000})
 	if err != nil {
 		t.Fatalf("second Settle: %v", err)
 	}
@@ -273,7 +275,7 @@ func TestSettle_ExpiredOrderHonoursLateConfirmation(t *testing.T) {
 	userID := seedUser(t, pool, ctx, fmt.Sprintf("settle-expired-%d@x.test", os.Getpid()), planID, nil, nil, nil, 0, "pending")
 	orderID := seedOrder(t, pool, ctx, userID, planID, 30, 1000, "expired", nil)
 
-	res, err := svc.Settle(ctx, payments.Confirmation{Provider: "stripe", ExternalID: fmt.Sprintf("evt_late_expired_%d", os.Getpid()), OrderID: orderID})
+	res, err := svc.Settle(ctx, payments.Confirmation{Provider: "stripe", ExternalID: fmt.Sprintf("evt_late_expired_%d", os.Getpid()), OrderID: orderID, AmountCents: 1000})
 	if err != nil {
 		t.Fatalf("Settle: %v", err)
 	}

@@ -117,3 +117,11 @@ func (r Registry) Names() []string {
 	}
 	return names
 }
+
+// ReceiptProvider is implemented by providers that host a payment receipt.
+// ReceiptURL resolves the receipt for a completed session; an empty URL with
+// a nil error means the provider has no receipt for it (for example a
+// zero-total session that never created a charge).
+type ReceiptProvider interface {
+	ReceiptURL(ctx context.Context, sessionID string) (string, error)
+}

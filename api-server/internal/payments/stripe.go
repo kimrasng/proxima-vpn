@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/proximavpn/proxima-vpn/api-server/internal/config"
 	"github.com/stripe/stripe-go/v86"
@@ -18,6 +19,7 @@ type StripeProvider struct {
 	webhookSecret string
 	panelURL      string
 	currency      string
+	productID     string
 }
 
 // NewStripeProvider constructs a StripeProvider. Callers must check
@@ -25,11 +27,15 @@ type StripeProvider struct {
 // constructor does not validate, so a provider built from empty values would
 // fail lazily on first use instead of at startup.
 func NewStripeProvider(cfg config.StripeConfig, panelURL, currency string) *StripeProvider {
+	if currency == "" {
+		currency = "usd"
+	}
 	return &StripeProvider{
 		client:        stripe.NewClient(cfg.SecretKey),
 		webhookSecret: cfg.WebhookSecret,
 		panelURL:      panelURL,
 		currency:      currency,
+		productID:     cfg.ProductID,
 	}
 }
 
@@ -64,13 +70,12 @@ func (p *StripeProvider) StartCheckout(ctx context.Context, req CheckoutRequest)
 		LineItems: []*stripe.CheckoutSessionCreateLineItemParams{
 			{
 				Quantity: stripe.Int64(1),
+				// The Stripe product is a generic balance descriptor; never label the
+				// item as a VPN service on Stripe.
 				PriceData: &stripe.CheckoutSessionCreateLineItemPriceDataParams{
 					Currency:   stripe.String(p.currency),
 					UnitAmount: stripe.Int64(req.PriceCents),
-					ProductData: &stripe.CheckoutSessionCreateLineItemPriceDataProductDataParams{
-						Name:        stripe.String(req.PlanName),
-						Description: stripe.String(fmt.Sprintf("%d days", req.DurationDays)),
-					},
+					Product:    stripe.String(p.productID),
 				},
 			},
 		},
@@ -110,8 +115,18 @@ func (p *StripeProvider) VerifyWebhook(rawBody []byte, header func(string) strin
 	if err := json.Unmarshal(event.Data.Raw, &session); err != nil {
 		return nil, fmt.Errorf("unmarshal checkout session: %w", err)
 	}
-	if session.PaymentStatus != stripe.CheckoutSessionPaymentStatusPaid {
+	paid := session.PaymentStatus == stripe.CheckoutSessionPaymentStatusPaid
+	// A free plan completes with nothing to collect; only a zero total counts.
+	freeSession := session.PaymentStatus == stripe.CheckoutSessionPaymentStatusNoPaymentRequired && session.AmountTotal == 0
+	if !paid && !freeSession {
 		return nil, nil
+	}
+	customerEmail := strings.TrimSpace(session.CustomerEmail)
+	if customerEmail == "" {
+		customerEmail = strings.TrimSpace(session.CustomerDetails.Email)
+	}
+	if customerEmail == "" || session.CustomerDetails.Email != "" && !strings.EqualFold(session.CustomerDetails.Email, customerEmail) {
+		return nil, fmt.Errorf("checkout session %s customer email is missing or inconsistent", session.ID)
 	}
 
 	orderID := session.Metadata["order_id"]
@@ -129,5 +144,22 @@ func (p *StripeProvider) VerifyWebhook(rawBody []byte, header func(string) strin
 		Payload:     rawBody,
 		ActorType:   "provider",
 		ActorID:     ProviderStripe,
+		ActorLabel:  customerEmail,
 	}, nil
+}
+
+// ReceiptURL returns the Stripe-hosted receipt of the charge behind a paid
+// Checkout Session. Zero-total sessions never create a PaymentIntent, so they
+// have no receipt and return "".
+func (p *StripeProvider) ReceiptURL(ctx context.Context, sessionID string) (string, error) {
+	params := &stripe.CheckoutSessionRetrieveParams{}
+	params.AddExpand("payment_intent.latest_charge")
+	session, err := p.client.V1CheckoutSessions.Retrieve(ctx, sessionID, params)
+	if err != nil {
+		return "", fmt.Errorf("retrieve checkout session: %w", err)
+	}
+	if session.PaymentIntent == nil || session.PaymentIntent.LatestCharge == nil {
+		return "", nil
+	}
+	return session.PaymentIntent.LatestCharge.ReceiptURL, nil
 }
