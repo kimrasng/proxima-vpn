@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/base64"
+	"fmt"
 	"io"
 	"net/http/httptest"
 	"strings"
@@ -104,6 +105,52 @@ func TestPathClientTypesCannotShadowDeviceIDs(t *testing.T) {
 	}
 }
 
+func TestSetSubscriptionHeadersReflectsEachPlan(t *testing.T) {
+	plans := []struct {
+		name         string
+		used, total  int64
+		expiry       int64
+		wantInterval string
+	}{
+		{name: "starter-30-days-10GiB", used: 123456, total: 10 << 30, expiry: 1893456000, wantInterval: "24"},
+		{name: "pro-60-days-60GiB", used: 5400921375, total: 60 << 30, expiry: 1896048000, wantInterval: "24"},
+		{name: "unlimited-no-expiry", used: 7654321, total: 0, expiry: 0, wantInterval: "24"},
+	}
+	for _, plan := range plans {
+		t.Run(plan.name, func(t *testing.T) {
+			var limitPtr *int64
+			if plan.total > 0 {
+				limitPtr = &plan.total
+			}
+			user := subscriptionUser{TrafficUsed: plan.used, TrafficLimit: limitPtr}
+			if plan.expiry > 0 {
+				expires := time.Unix(plan.expiry, 0)
+				user.PlanExpiresAt = &expires
+			}
+			app := fiber.New()
+			app.Get("/", func(c *fiber.Ctx) error {
+				setSubscriptionHeaders(c, user, subscriptionSettings{updateIntervalSeconds: 86400, profileTitle: "Proxima VPN"})
+				return nil
+			})
+			resp, err := app.Test(httptest.NewRequest(fiber.MethodGet, "/", nil))
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() { _ = resp.Body.Close() }()
+			wantInfo := fmt.Sprintf("upload=0; download=%d; total=%d; expire=%d", plan.used, plan.total, plan.expiry)
+			if got := resp.Header.Get("Subscription-Userinfo"); got != wantInfo {
+				t.Errorf("Subscription-Userinfo = %q, want %q", got, wantInfo)
+			}
+			if got := resp.Header.Get("Profile-Update-Interval"); got != plan.wantInterval {
+				t.Errorf("Profile-Update-Interval = %q, want %q", got, plan.wantInterval)
+			}
+			if got := resp.Header.Get("Content-Disposition"); got != `attachment; filename=Proxima.yaml; filename*=UTF-8''Proxima.yaml` {
+				t.Errorf("Content-Disposition = %q", got)
+			}
+		})
+	}
+}
+
 func TestSetSubscriptionHeaders(t *testing.T) {
 	limit := int64(64 << 30)
 	expires := time.Unix(1893456000, 0)
@@ -129,7 +176,7 @@ func TestSetSubscriptionHeaders(t *testing.T) {
 	if decoded, err := base64.StdEncoding.DecodeString(title); err != nil || string(decoded) != "Proxima" {
 		t.Errorf("Profile-Title = %q", h.Get("Profile-Title"))
 	}
-	if got := h.Get("Content-Disposition"); got != `attachment; filename="Proxima.yaml"` {
+	if got := h.Get("Content-Disposition"); got != `attachment; filename=Proxima.yaml; filename*=UTF-8''Proxima.yaml` {
 		t.Errorf("Content-Disposition = %q", got)
 	}
 	if got := h.Get("Support-Url"); got != "https://example.test/help" {

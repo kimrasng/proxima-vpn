@@ -124,31 +124,14 @@ func setSubscriptionHeaders(c *fiber.Ctx, user subscriptionUser, s subscriptionS
 	}
 	c.Set("Profile-Update-Interval", fmt.Sprintf("%d", hours))
 	c.Set("Profile-Title", "base64:"+base64.StdEncoding.EncodeToString([]byte(s.profileTitle)))
-	c.Set(fiber.HeaderContentDisposition, `attachment; filename="Proxima.yaml"`)
+	// Unquoted token plus RFC 5987 filename*: Clash Verge Rev parses this header
+	// from its debug-escaped form, so a quoted filename shows up as \"Proxima.yaml\.
+	c.Set(fiber.HeaderContentDisposition, `attachment; filename=Proxima.yaml; filename*=UTF-8''Proxima.yaml`)
 	if s.supportURL != "" {
 		c.Set("Support-Url", s.supportURL)
 		// Clash Verge Rev and compatible clients show a home-page shortcut.
 		c.Set("Profile-Web-Page-Url", s.supportURL)
 	}
-}
-
-// asciiFilename is the quoted-filename fallback for clients that ignore
-// filename*; it must not carry quotes, separators or non-ASCII bytes.
-func asciiFilename(title string) string {
-	var b strings.Builder
-	for _, r := range title {
-		switch {
-		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9', r == '-', r == '_', r == '.':
-			b.WriteRune(r)
-		case r == ' ':
-			b.WriteRune('-')
-		}
-	}
-	name := strings.Trim(b.String(), "-_.")
-	if name == "" {
-		return "proxima"
-	}
-	return name
 }
 
 var subscriptionPageText = map[string]map[string]string{
