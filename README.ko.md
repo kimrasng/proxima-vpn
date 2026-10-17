@@ -273,7 +273,7 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 | `TRUSTED_PROXIES` / `PROXY_HEADER` | | 리버스 프록시 뒤에서 실제 클라이언트 IP를 읽을 때 |
 | `TELEGRAM_ENABLED` / `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` | | Telegram 알림과 봇 |
 | `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ZONE_ID` / `ENTRY_DNS_BASE_DOMAIN` | | 입구 노드 DNS 자동 관리 |
-| `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` | | Stripe 결제 |
+| `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` / `STRIPE_PRODUCT_ID` | | Stripe 결제 |
 | `PAYMENTS_CURRENCY` / `PAYMENTS_PENDING_TTL` | | 결제 통화와 미결제 주문 만료 시간 |
 | `S3_ENDPOINT` / `S3_BUCKET` / `S3_ACCESS_KEY` / `S3_SECRET_KEY` / `S3_REGION` | | S3 호환 저장소 |
 | `SWAGGER_ENABLED` | | API 문서 노출 (운영에서는 `false`) |

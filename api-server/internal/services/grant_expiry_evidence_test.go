@@ -118,9 +118,10 @@ func TestSettle_RecordsGrantExpiryEvidence(t *testing.T) {
 	orderID := seedOrder(t, pool, ctx, userID, planID, 90, 2700, "pending", nil)
 
 	res, err := svc.Settle(ctx, payments.Confirmation{
-		Provider:   "stripe",
-		ExternalID: fmt.Sprintf("evt_evidence_renew_%d", os.Getpid()),
-		OrderID:    orderID,
+		Provider:    "stripe",
+		ExternalID:  fmt.Sprintf("evt_evidence_renew_%d", os.Getpid()),
+		OrderID:     orderID,
+		AmountCents: 2700,
 	})
 	if err != nil {
 		t.Fatalf("Settle: %v", err)
@@ -159,9 +160,10 @@ func TestSettle_FirstPurchaseRecordsNullBeforeEvidence(t *testing.T) {
 
 	settledAt := time.Now()
 	res, err := svc.Settle(ctx, payments.Confirmation{
-		Provider:   "stripe",
-		ExternalID: fmt.Sprintf("evt_evidence_first_%d", os.Getpid()),
-		OrderID:    orderID,
+		Provider:    "stripe",
+		ExternalID:  fmt.Sprintf("evt_evidence_first_%d", os.Getpid()),
+		OrderID:     orderID,
+		AmountCents: 1000,
 	})
 	if err != nil {
 		t.Fatalf("Settle: %v", err)

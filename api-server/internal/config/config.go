@@ -38,6 +38,7 @@ type PaymentsConfig struct {
 type StripeConfig struct {
 	SecretKey     string `yaml:"secret_key"`
 	WebhookSecret string `yaml:"webhook_secret"`
+	ProductID     string `yaml:"product_id"`
 }
 
 // PendingTTL parses PaymentsConfig.PendingTTLRaw, falling back to 24h on an
@@ -247,6 +248,9 @@ func applyEnvOverrides(cfg *Config) {
 	}
 	if v := os.Getenv("STRIPE_WEBHOOK_SECRET"); v != "" {
 		cfg.Payments.Stripe.WebhookSecret = v
+	}
+	if v := os.Getenv("STRIPE_PRODUCT_ID"); v != "" {
+		cfg.Payments.Stripe.ProductID = v
 	}
 	if v := os.Getenv("PAYMENTS_CURRENCY"); v != "" {
 		cfg.Payments.Currency = v
