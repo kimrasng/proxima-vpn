@@ -12,6 +12,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/proximavpn/proxima-vpn/api-server/internal/config"
+	"github.com/proximavpn/proxima-vpn/api-server/internal/payments"
 )
 
 func planHTTP(t *testing.T, app *fiber.App, method, path, body string, status int) []byte {
@@ -61,7 +62,7 @@ func TestPlanPublicationWorkflow(t *testing.T) {
 	app.Get("/user/plans", NewUserPlanHandler(pool).ListPlans)
 	app.Post("/orders", func(c *fiber.Ctx) error {
 		c.Locals("user_id", userID)
-		return NewUserOrderHandler(pool, config.PaymentsConfig{PendingTTLRaw: "1h"}).Create(c)
+		return NewUserOrderHandler(pool, config.PaymentsConfig{PendingTTLRaw: "1h"}, payments.Registry{}).Create(c)
 	})
 	var customID string
 	if err := pool.QueryRow(ctx, `SELECT gen_random_uuid()::text`).Scan(&customID); err != nil {

@@ -21,17 +21,19 @@ type UserOrderHandler struct {
 	activity   *services.ActivityService
 	promotion  *services.PromotionService
 	payment    *services.PaymentService
+	providers  payments.Registry
 	pendingTTL time.Duration
 }
 
 // NewUserOrderHandler creates a new UserOrderHandler.
-func NewUserOrderHandler(db *pgxpool.Pool, payments config.PaymentsConfig) *UserOrderHandler {
+func NewUserOrderHandler(db *pgxpool.Pool, paymentsCfg config.PaymentsConfig, providers payments.Registry) *UserOrderHandler {
 	return &UserOrderHandler{
 		db:         db,
 		activity:   services.NewActivityService(db),
 		promotion:  services.NewPromotionService(db),
 		payment:    services.NewPaymentService(db),
-		pendingTTL: payments.PendingTTL(),
+		providers:  providers,
+		pendingTTL: paymentsCfg.PendingTTL(),
 	}
 }
 
@@ -195,7 +197,12 @@ func (h *UserOrderHandler) Create(c *fiber.Ctx) error {
 		}
 	}
 
-	if resp.PriceCents == 0 {
+	_, stripeCheckoutAvailable := h.providers.Get(payments.ProviderStripe)
+	// Base free orders use hosted Checkout when it is configured so Stripe
+	// records a zero-total session. Fully discounted orders retain the local
+	// idempotent settlement path. Without Stripe, free plans still fulfill
+	// through the app's authenticated settlement.
+	if resp.PriceCents == 0 && (!stripeCheckoutAvailable || req.PromotionCode != "") {
 		if err := h.settleZeroCostOrder(ctx, resp.ID, userID); err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 				"error": "internal server error",
