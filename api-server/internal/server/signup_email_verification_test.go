@@ -24,7 +24,7 @@ func TestSignupCodeLookupRequiresExplicitFakeMail(t *testing.T) {
 		t.Run(enabled, func(t *testing.T) {
 			t.Setenv("ENABLE_TEST_EMAIL_CODE_LOOKUP", enabled)
 			s := NewServer(cfg, nil, nil, nil, nil)
-			defer s.App().Shutdown()
+			defer func() { _ = s.App().Shutdown() }()
 			_, fake := s.mailer.(*testSignupMailer)
 			if fake != (enabled == "true") {
 				t.Fatalf("fake sender=%v enabled=%q", fake, enabled)
@@ -34,7 +34,7 @@ func TestSignupCodeLookupRequiresExplicitFakeMail(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 			want := 404
 			if enabled == "true" {
 				want = 401
@@ -61,12 +61,12 @@ func TestSignupCodeLookupAdminOnlyAndBeforeOtherAuthRoutes(t *testing.T) {
 	if err := db.QueryRow(ctx, `INSERT INTO admins(email,password_hash) VALUES($1,'unused') RETURNING id::text`, "signup-admin-"+time.Now().Format("150405.000000000")+"@example.test").Scan(&adminID); err != nil {
 		t.Fatal(err)
 	}
-	defer db.Exec(ctx, `DELETE FROM admins WHERE id=$1`, adminID)
+	defer func() { _, _ = db.Exec(ctx, `DELETE FROM admins WHERE id=$1`, adminID) }()
 	t.Setenv("SWAGGER_ENABLED", "false")
 	t.Setenv("ENABLE_TEST_EMAIL_CODE_LOOKUP", "true")
 	const secret = "signup-route-secret"
 	s := NewServer(&config.Config{JWT: config.JWTConfig{Secret: secret}}, db, nil, nil, nil)
-	defer s.App().Shutdown()
+	defer func() { _ = s.App().Shutdown() }()
 	fake := s.mailer.(*testSignupMailer)
 	if err := fake.Send(ctx, mail.Message{To: "signup@example.test", Subject: "Email verification", Body: "123456"}); err != nil {
 		t.Fatal(err)
@@ -92,7 +92,7 @@ func TestSignupCodeLookupAdminOnlyAndBeforeOtherAuthRoutes(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 			if resp.StatusCode != tc.want {
 				t.Fatalf("status=%d want=%d", resp.StatusCode, tc.want)
 			}
@@ -112,7 +112,7 @@ func TestSignupCodeLookupAdminOnlyAndBeforeOtherAuthRoutes(t *testing.T) {
 func TestSignupRequestAndVerificationHaveSeparateLimits(t *testing.T) {
 	t.Setenv("SWAGGER_ENABLED", "false")
 	s := NewServer(&config.Config{}, nil, nil, nil, nil)
-	defer s.App().Shutdown()
+	defer func() { _ = s.App().Shutdown() }()
 	request := func(path string) int {
 		req := httptest.NewRequest(fiber.MethodPost, "/api/v1/auth/"+path, strings.NewReader(`{}`))
 		req.Header.Set("Content-Type", "application/json")
@@ -120,7 +120,7 @@ func TestSignupRequestAndVerificationHaveSeparateLimits(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer res.Body.Close()
+		defer func() { _ = res.Body.Close() }()
 		return res.StatusCode
 	}
 	for i := 0; i < 6; i++ {

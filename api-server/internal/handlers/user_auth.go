@@ -72,12 +72,6 @@ func (h *UserAuthHandler) SetPasskeyServices(rdb *redis.Client, wa *webauthn.Web
 
 var emailRegex = regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$`)
 
-type registerRequest struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
-	Name     string `json:"name"`
-}
-
 type registerResponse struct {
 	ID       string `json:"id"`
 	Email    string `json:"email"`

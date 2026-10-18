@@ -38,7 +38,7 @@ func TestSignupEmailCodeSecurity(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer res.Body.Close()
+		defer func() { _ = res.Body.Close() }()
 		out, _ := io.ReadAll(res.Body)
 		return signupHTTPResponse{res.StatusCode, string(out)}
 	}
