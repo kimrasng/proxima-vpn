@@ -232,6 +232,56 @@ func TestApplyPromotion_CancelWaitsForAtomicReservation(t *testing.T) {
 	requirePromotionCounter(t, pool, promotionID, 0)
 }
 
+func TestCancel_PromotionReleaseFailureRollsBack(t *testing.T) {
+	pool := testOrderDB(t)
+	f := newPromotionRaceFixture(t, pool)
+	code, promotionID := f.code(t, "cancel-release-failure", "fixed", 100)
+	requirePromotionHTTP(t, f.request("PATCH", "/promotion", code), fiber.StatusOK)
+	before := requirePromotionSnapshot(t, f, "pending", 900, 100, promotionID, "reserved")
+	ctx := context.Background()
+
+	// Fail the counter update after ReleaseTx has changed the ledger row,
+	// proving that cancellation, ledger and counter all roll back together.
+	name := pgx.Identifier{fmt.Sprintf("cancel_release_failure_%d", time.Now().UnixNano())}.Sanitize()
+	dropTrigger := `DROP TRIGGER IF EXISTS ` + name + ` ON promotion_codes`
+	t.Cleanup(func() {
+		_, _ = pool.Exec(ctx, dropTrigger)
+		_, _ = pool.Exec(ctx, `DROP FUNCTION IF EXISTS `+name+`() `)
+	})
+	if _, err := pool.Exec(ctx, `CREATE FUNCTION `+name+`() RETURNS trigger LANGUAGE plpgsql AS $$
+	 BEGIN
+	   RAISE EXCEPTION 'injected promotion release failure';
+	 END $$`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, fmt.Sprintf(`CREATE TRIGGER %s BEFORE UPDATE OF redeemed_count ON promotion_codes
+	 FOR EACH ROW WHEN (OLD.id = '%s'::uuid) EXECUTE FUNCTION %s()`, name, promotionID, name)); err != nil {
+		t.Fatal(err)
+	}
+
+	requirePromotionHTTP(t, f.request("POST", "/cancel", ""), fiber.StatusInternalServerError)
+	if after := promotionSnapshot(t, f); after != before {
+		t.Fatalf("failed cancellation changed order/ledger: before=%+v after=%+v", before, after)
+	}
+	requirePromotionCounter(t, pool, promotionID, 1)
+	var cancelledAt *time.Time
+	if err := pool.QueryRow(ctx, `SELECT cancelled_at FROM plan_orders WHERE id = $1`, f.orderID).Scan(&cancelledAt); err != nil {
+		t.Fatal(err)
+	}
+	if cancelledAt != nil {
+		t.Fatalf("failed cancellation left cancelled_at = %v", cancelledAt)
+	}
+
+	if _, err := pool.Exec(ctx, dropTrigger); err != nil {
+		t.Fatal(err)
+	}
+	requirePromotionHTTP(t, f.request("POST", "/cancel", ""), fiber.StatusOK)
+	requirePromotionSnapshot(t, f, "cancelled", 900, 100, promotionID, "released")
+	requirePromotionCounter(t, pool, promotionID, 0)
+	requirePromotionHTTP(t, f.request("POST", "/cancel", ""), fiber.StatusConflict)
+	requirePromotionCounter(t, pool, promotionID, 0)
+}
+
 func TestApplyPromotion_SettleWaitsAndChecksUpdatedPrice(t *testing.T) {
 	pool := testOrderDB(t)
 	f := newPromotionRaceFixture(t, pool)

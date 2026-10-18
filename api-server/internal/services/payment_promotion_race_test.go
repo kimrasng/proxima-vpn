@@ -10,6 +10,45 @@ import (
 	"github.com/proximavpn/proxima-vpn/api-server/internal/services"
 )
 
+func TestReleaseTx_CounterNeverGoesNegative(t *testing.T) {
+	pool := testDB(t)
+	ctx := context.Background()
+	suffix := fmt.Sprintf("promotion-counter-guard-%d", time.Now().UnixNano())
+	planID := seedPlan(t, pool, ctx, suffix, 30, nil)
+	userID := seedUser(t, pool, ctx, suffix+"@x.test", planID, nil, nil, nil, 0, "pending")
+	promotionID := seedPromotion(t, pool, ctx, suffix, "fixed", 100, 0, nil, 1,
+		time.Now().Add(-time.Hour), time.Now().Add(time.Hour))
+	orderID := seedOrder(t, pool, ctx, userID, planID, 30, 1000, "pending", nil)
+	t.Cleanup(func() {
+		_, _ = pool.Exec(ctx, `DELETE FROM promotion_redemptions WHERE order_id = $1`, orderID)
+	})
+	svc := services.NewPromotionService(pool)
+	if _, err := svc.Reserve(ctx, suffix, userID, orderID, planID, 30, 1000, true); err != nil {
+		t.Fatal(err)
+	}
+	// Simulate a legacy ledger/counter mismatch without changing the active
+	// reservation. Releasing it must not persist a negative counter.
+	if _, err := pool.Exec(ctx, `UPDATE promotion_codes SET redeemed_count = 0 WHERE id = $1`, promotionID); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 2; i++ {
+		tx, err := pool.Begin(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = tx.Rollback(ctx) })
+		if err := svc.ReleaseTx(ctx, tx, orderID); err != nil {
+			t.Fatal(err)
+		}
+		if err := tx.Commit(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if count, status := redeemedCount(t, pool, ctx, promotionID), redemptionStatus(t, pool, ctx, orderID); count != 0 || status != "released" {
+			t.Fatalf("release %d counter/status = %d/%s; want 0/released", i+1, count, status)
+		}
+	}
+}
+
 func TestSettle_PromotionZeroAmountRejectsNonzeroOrder(t *testing.T) {
 	pool := testDB(t)
 	ctx := context.Background()

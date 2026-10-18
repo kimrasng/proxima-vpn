@@ -256,7 +256,9 @@ func (s *PromotionService) ReleaseTx(ctx context.Context, tx pgx.Tx, orderID str
 		return nil
 	}
 	if _, err := tx.Exec(ctx,
-		`UPDATE promotion_codes SET redeemed_count = redeemed_count - 1 WHERE id = $1`,
+		// Legacy counter drift must not turn a valid release into a negative
+		// count; the reserved-to-released transition still guards retries.
+		`UPDATE promotion_codes SET redeemed_count = GREATEST(redeemed_count - 1, 0) WHERE id = $1`,
 		promotionID,
 	); err != nil {
 		return fmt.Errorf("return redemption slot: %w", err)

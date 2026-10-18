@@ -386,13 +386,14 @@ func (h *UserOrderHandler) List(c *fiber.Ctx) error {
 // Cancel handles POST /api/v1/user/orders/:id/cancel. Only the order's own
 // user can cancel it, and only while it is still pending.
 // @Summary Cancel my order
-// @Description Cancels one of the authenticated user's own pending orders
+// @Description Atomically cancels one of the authenticated user's own pending orders and releases its promotion reservation
 // @Tags user-orders
 // @Produce json
 // @Param id path string true "Order ID"
 // @Success 200 {object} orderResponse
 // @Failure 404 {object} map[string]string
 // @Failure 409 {object} map[string]string
+// @Failure 500 {object} map[string]string
 // @Security BearerAuth
 // @Router /user/orders/{id}/cancel [post]
 func (h *UserOrderHandler) Cancel(c *fiber.Ctx) error {
@@ -400,7 +401,13 @@ func (h *UserOrderHandler) Cancel(c *fiber.Ctx) error {
 	id := c.Params("id")
 	ctx := context.Background()
 
-	tag, err := h.db.Exec(ctx,
+	tx, err := h.db.Begin(ctx)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "internal server error"})
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	tag, err := tx.Exec(ctx,
 		`UPDATE plan_orders SET status = 'cancelled', cancelled_at = NOW()
 		 WHERE id = $1 AND user_id = $2 AND status = 'pending'`,
 		id, userID,
@@ -414,10 +421,13 @@ func (h *UserOrderHandler) Cancel(c *fiber.Ctx) error {
 		})
 	}
 
-	if err := h.promotion.Release(ctx, id); err != nil {
-		// The order is already cancelled; a stuck redemption slot is a
-		// bookkeeping gap, not a reason to fail the user-facing cancel.
-		fmt.Printf("promotions: failed to release order %s on cancel: %v\n", id, err)
+	// Commit the cancellation and returned promotion capacity together; a
+	// release failure must leave the order pending so cancellation can retry.
+	if err := h.promotion.ReleaseTx(ctx, tx, id); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "internal server error"})
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "internal server error"})
 	}
 
 	h.activity.Log(context.Background(), services.Record{
