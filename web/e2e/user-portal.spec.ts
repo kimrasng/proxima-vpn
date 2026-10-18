@@ -25,6 +25,15 @@ test.describe("user authentication", () => {
     const email = `e2e-ui-${uniq()}@example.com`;
     const password = "E2EUiPass123!";
 
+    await page.route("**/api/v1/auth/register/request-code", async (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ message: "sent", expires_in_seconds: 600 }) }));
+    await page.route("**/api/v1/auth/register/verify-code", async (route) => route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ id: "test-user", email, name: "E2E UI User", sub_token: "test-sub-token" }) }));
+    await page.route("**/api/v1/auth/login", async (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ token: "test-user-token" }) }));
+    await page.route("**/api/v1/auth/register", async (route) => {
+      const body = route.request().postDataJSON() as { code?: string };
+      if (!body.code) return route.fulfill({ status: 400, body: "verification code required" });
+      await route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ id: "test-user", email, name: "E2E UI User", sub_token: "test-sub-token" }) });
+    });
+
     await page.goto("/register");
     await page.getByRole("textbox", { name: "Name" }).fill("E2E UI User");
     await page.getByRole("textbox", { name: "Email" }).fill(email);
@@ -32,6 +41,9 @@ test.describe("user authentication", () => {
     await page.getByRole("textbox", { name: "Confirm Password" }).fill(password);
     await page.getByRole("button", { name: "Create Account" }).click();
 
+    await expect(page.getByRole("textbox", { name: "6-digit verification code" })).toBeVisible();
+    await page.getByRole("textbox", { name: "6-digit verification code" }).fill("123456");
+    await page.getByRole("button", { name: "Verify and create account" }).click();
     await expect(page.getByText(/Registration successful/i)).toBeVisible();
 
     // The app redirects to login after a successful registration.
@@ -39,7 +51,7 @@ test.describe("user authentication", () => {
 
     await page.getByRole("textbox", { name: "Email" }).fill(email);
     await page.getByRole("textbox", { name: "Password" }).fill(password);
-    await page.getByRole("button", { name: "Sign In" }).click();
+    await page.getByRole("button", { name: "Sign In", exact: true }).click();
 
     await expect(page).toHaveURL(/\/portal\//);
   });
@@ -53,7 +65,6 @@ test.describe("user authentication", () => {
     await page.getByRole("textbox", { name: "Password", exact: true }).fill("Password123!");
     await page.getByRole("textbox", { name: "Confirm Password" }).fill("Different123!");
     await page.getByRole("button", { name: "Create Account" }).click();
-
     await expect(page.getByText(/Passwords do not match/i)).toBeVisible();
     await expect(page).toHaveURL(/\/register/);
   });
@@ -64,7 +75,7 @@ test.describe("user authentication", () => {
 
     await page.getByRole("textbox", { name: "Email" }).fill("nobody-e2e@example.com");
     await page.getByRole("textbox", { name: "Password" }).fill("wrong-password");
-    await page.getByRole("button", { name: "Sign In" }).click();
+    await page.getByRole("button", { name: "Sign In", exact: true }).click();
 
     // Login.tsx surfaces the API's own error text when present, falling back
     // to the translated message.
@@ -82,17 +93,25 @@ test.describe("user portal pages", () => {
     const email = `e2e-ui-nav-${uniq()}@example.com`;
     const password = "E2EUiPass123!";
 
+    await page.route("**/api/v1/auth/register/request-code", async (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ message: "sent", expires_in_seconds: 600 }) }));
+    await page.route("**/api/v1/auth/register/verify-code", async (route) => route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ id: "test-user", email, name: "E2E Nav User", sub_token: "test-sub-token" }) }));
+    await page.route("**/api/v1/auth/login", async (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ token: "test-user-token" }) }));
+    await page.route("**/api/v1/auth/register", async (route) => route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ id: "test-user", email, name: "E2E Nav User", sub_token: "test-sub-token" }) }));
+
     await page.goto("/register");
     await page.getByRole("textbox", { name: "Name" }).fill("E2E Nav User");
     await page.getByRole("textbox", { name: "Email" }).fill(email);
     await page.getByRole("textbox", { name: "Password", exact: true }).fill(password);
     await page.getByRole("textbox", { name: "Confirm Password" }).fill(password);
     await page.getByRole("button", { name: "Create Account" }).click();
+    await expect(page.getByRole("textbox", { name: "6-digit verification code" })).toBeVisible();
+    await page.getByRole("textbox", { name: "6-digit verification code" }).fill("123456");
+    await page.getByRole("button", { name: "Verify and create account" }).click();
     await expect(page).toHaveURL(/\/login/, { timeout: 20_000 });
 
     await page.getByRole("textbox", { name: "Email" }).fill(email);
     await page.getByRole("textbox", { name: "Password" }).fill(password);
-    await page.getByRole("button", { name: "Sign In" }).click();
+    await page.getByRole("button", { name: "Sign In", exact: true }).click();
     await expect(page).toHaveURL(/\/portal\//);
 
     // Each portal page fetches its own data on mount; a 4xx/5xx or a render

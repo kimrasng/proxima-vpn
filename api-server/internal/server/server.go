@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -23,6 +24,11 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
+type mailerCodeLookup interface {
+	mail.Sender
+	LatestSignupCode(ctx context.Context, email string) (string, bool)
+}
+
 type Server struct {
 	app           *fiber.App
 	config        *config.Config
@@ -31,7 +37,9 @@ type Server struct {
 	backupService *services.BackupService
 	payments      payments.Registry
 	// mailer is nil when SMTP is not configured; password reset then answers 503.
-	mailer mail.Sender
+	mailer mailerCodeLookup
+	// testMailerCodeLookup is nil unless explicitly enabled for automated e2e.
+	testMailerCodeLookup bool
 }
 
 // fiberConfig builds the Fiber config, including the trusted-proxy settings
@@ -119,21 +127,31 @@ func NewServer(cfg *config.Config, db *pgxpool.Pool, rdb *redis.Client, backupSv
 	// A bad SMTP configuration disables password reset email instead of
 	// stopping the API, the same stance as managed entry DNS. The error never
 	// includes the password.
-	mailer, err := mail.NewFromConfig(cfg.SMTP)
-	if err != nil {
-		log.Printf("[Mail] disabled: %v", err)
-	} else if mailer != nil {
-		log.Printf("[Mail] password reset email enabled via %s:%d (tls=%s)", cfg.SMTP.Host, cfg.SMTP.Port, cfg.SMTP.TLS)
+	var mailer mailerCodeLookup
+	testMailerCodeLookup := strings.EqualFold(os.Getenv("ENABLE_TEST_EMAIL_CODE_LOOKUP"), "true")
+	if testMailerCodeLookup {
+		mailer = &testSignupMailer{}
+		log.Printf("[Mail] test signup mailer enabled (test code lookup is enabled)")
+	} else {
+		configuredMailer, mailErr := mail.NewFromConfig(cfg.SMTP)
+		if mailErr != nil {
+			log.Printf("[Mail] disabled: %v", mailErr)
+		} else if configuredMailer != nil {
+			log.Printf("[Mail] password reset email enabled via %s:%d (tls=%s)", cfg.SMTP.Host, cfg.SMTP.Port, cfg.SMTP.TLS)
+		}
+		if configuredMailer != nil {
+			mailer = mailerAdapter{Sender: configuredMailer}
+		}
 	}
 
 	s := &Server{
-		app:           app,
-		config:        cfg,
-		db:            db,
-		redis:         rdb,
-		backupService: backupSvc,
-		payments:      paymentProviders,
-		mailer:        mailer,
+		app:                  app,
+		config:               cfg,
+		db:                   db,
+		redis:                rdb,
+		backupService:        backupSvc,
+		mailer:               mailer,
+		testMailerCodeLookup: testMailerCodeLookup,
 	}
 
 	s.registerRoutes()

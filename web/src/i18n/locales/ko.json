@@ -2007,7 +2007,17 @@
       "success": "회원가입이 완료되었습니다! 로그인 페이지로 이동합니다...",
       "error": "회원가입에 실패했습니다. 다시 시도해주세요.",
       "referralCode": "추천인 코드 (선택)",
-      "referralCodePlaceholder": "추천인 코드를 입력하세요."
+      "referralCodePlaceholder": "추천인 코드를 입력하세요.",
+      "codeTitle": "이메일 인증",
+      "codeSent": "{{email}} 주소로 6자리 인증 코드를 보냈어요.",
+      "codeLabel": "6자리 인증 코드",
+      "codeHelp": "이메일로 받은 코드를 입력해 주세요. 코드는 10분 동안 유효해요.",
+      "codeInvalid": "6자리 인증 코드를 입력해 주세요.",
+      "codeVerifyError": "인증 코드를 확인하지 못했어요.",
+      "verifyCode": "인증하고 가입하기",
+      "resendCode": "인증 코드 다시 보내기",
+      "resendError": "인증 코드를 다시 보내지 못했어요.",
+      "backToDetails": "가입 정보로 돌아가기"
     },
     "portal": {
       "name": "Proxima Portal",

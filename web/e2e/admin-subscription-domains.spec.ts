@@ -167,8 +167,13 @@ test.describe("PHS-027 public filtering integration", () => {
     const suffix = crypto.randomUUID();
     const email = `domain-${suffix}@example.test`;
     const password = "DomainFixturePass123!";
-    const registration = await request.post("/api/v1/auth/register", { data: { email, password, name: "Domain fixture" } });
+    const registration = await request.post("/api/v1/auth/register/request-code", { data: { email, password, name: "Domain fixture", language: "en" } });
     expect(registration.ok()).toBe(true);
+    const mailer = await request.get(`/api/v1/__test__/signup-email-code?email=${encodeURIComponent(email)}`, { headers });
+    expect(mailer.ok()).toBe(true);
+    const { code } = await mailer.json() as { code: string };
+    const verified = await request.post("/api/v1/auth/register/verify-code", { data: { email, code } });
+    expect(verified.ok()).toBe(true);
     const userLogin = await request.post("/api/v1/auth/login", { data: { email, password } });
     expect(userLogin.ok()).toBe(true);
     const user: unknown = await userLogin.json();

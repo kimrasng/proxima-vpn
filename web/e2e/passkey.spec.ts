@@ -11,12 +11,19 @@ test.describe("passkey authentication", () => {
   test("register, sign in, and remove a passkey", async ({ page, context }) => {
     await useEnglish(page);
     const email = `passkey-${uniq()}@gmail.com`;
-    const registered = await page.request.post("/api/v1/auth/register", {
-      data: { name: "Passkey E2E", email, password },
+    const registered = await page.request.post("/api/v1/auth/register/request-code", {
+      data: { name: "Passkey E2E", email, password, language: "en" },
     });
-    expect(registered.status()).toBe(201);
-    const login = await page.request.post("/api/v1/auth/login", { data: { email, password } });
-    const { token } = (await login.json()) as { token: string };
+    expect(registered.status()).toBe(200);
+    const login = await page.request.post("/api/v1/admin/auth/login", { data: { email: process.env.E2E_ADMIN_EMAIL, password: process.env.E2E_ADMIN_PASSWORD } });
+    const admin = await login.json() as { token: string };
+    const mailer = await page.request.get(`/api/v1/__test__/signup-email-code?email=${encodeURIComponent(email)}`, { headers: { Authorization: `Bearer ${admin.token}` } });
+    expect(mailer.ok()).toBe(true);
+    const { code } = await mailer.json() as { code: string };
+    const verified = await page.request.post("/api/v1/auth/register/verify-code", { data: { email, code } });
+    expect(verified.status()).toBe(201);
+    const userLogin = await page.request.post("/api/v1/auth/login", { data: { email, password } });
+    const { token } = (await userLogin.json()) as { token: string };
     await page.goto("/login");
     await page.evaluate((value) => localStorage.setItem("proxima_user_token", value), token);
 

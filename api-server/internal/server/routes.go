@@ -15,6 +15,8 @@ import (
 	"github.com/proximavpn/proxima-vpn/api-server/internal/services"
 )
 
+const signupCodeMaxRequestsPerIP = 5
+
 func (s *Server) registerRoutes() {
 	if os.Getenv("SWAGGER_ENABLED") != "false" {
 		s.app.Get("/swagger/*", swagger.HandlerDefault)
@@ -208,8 +210,30 @@ func (s *Server) registerRoutes() {
 	if wa := passkeyWebAuthn(s.config.Server.PanelURL); wa != nil {
 		userAuthHandler.SetPasskeyServices(s.redis, wa, strings.HasPrefix(s.config.Server.PanelURL, "https://"))
 	}
+	if s.testMailerCodeLookup {
+		if s.mailer != nil {
+			adminTest := api.Group("/__test__", middleware.AdminJWTMiddleware(s.config.JWT.Secret, s.db))
+			adminTest.Get("/signup-email-code", func(c *fiber.Ctx) error {
+				email := strings.TrimSpace(c.Query("email"))
+				if email == "" {
+					return c.SendStatus(fiber.StatusBadRequest)
+				}
+				code, found := s.mailer.LatestSignupCode(c.UserContext(), email)
+				if !found {
+					return c.SendStatus(fiber.StatusNotFound)
+				}
+				return c.JSON(fiber.Map{"code": code})
+			})
+		}
+	}
+
 	auth := api.Group("/auth")
-	auth.Post("/register", userAuthHandler.Register)
+	signupCodeLimiter := limiter.New(limiter.Config{Max: signupCodeMaxRequestsPerIP, Expiration: 15 * time.Minute, KeyGenerator: func(c *fiber.Ctx) string { return c.IP() }, LimitReached: func(c *fiber.Ctx) error {
+		return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{"error": "too many verification code requests; try again later"})
+	}})
+	auth.Post("/register/request-code", signupCodeLimiter, userAuthHandler.RequestSignupEmailCode)
+	auth.Post("/register/verify-code", signupCodeLimiter, userAuthHandler.VerifySignupEmailCode)
+	auth.Post("/register", signupCodeLimiter, userAuthHandler.VerifySignupEmailCode)
 	auth.Get("/signup-policy", userAuthHandler.SignupPolicy)
 	auth.Post("/login", loginLimiter, userAuthHandler.Login)
 	auth.Post("/passkey/login/begin", loginLimiter, userAuthHandler.BeginPasskeyLogin)

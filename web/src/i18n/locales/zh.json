@@ -2007,7 +2007,17 @@
       "success": "注册成功！正在跳转到登录页面...",
       "error": "注册失败，请重试。",
       "referralCode": "推荐码（选填）",
-      "referralCodePlaceholder": "请输入推荐码"
+      "referralCodePlaceholder": "请输入推荐码",
+      "codeTitle": "验证邮箱",
+      "codeSent": "我们已向 {{email}} 发送 6 位验证码。",
+      "codeLabel": "6 位验证码",
+      "codeHelp": "请输入邮件中的验证码。验证码 10 分钟内有效。",
+      "codeInvalid": "请输入 6 位验证码。",
+      "codeVerifyError": "无法验证该验证码。",
+      "verifyCode": "验证并创建账号",
+      "resendCode": "重新发送验证码",
+      "resendError": "无法重新发送验证码。",
+      "backToDetails": "返回注册信息"
     },
     "portal": {
       "name": "Proxima Portal",

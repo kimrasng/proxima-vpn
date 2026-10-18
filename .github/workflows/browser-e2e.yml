@@ -51,6 +51,7 @@ jobs:
       ADMIN_EMAIL: admin@e2e.test
       ADMIN_PASSWORD: E2ETestAdminPass123!
       SWAGGER_ENABLED: "false"
+      ENABLE_TEST_EMAIL_CODE_LOOKUP: "true"
 
     steps:
       - uses: actions/checkout@v7
@@ -115,6 +116,7 @@ jobs:
           E2E_BASE_URL: http://localhost:8080
           E2E_ADMIN_EMAIL: admin@e2e.test
           E2E_ADMIN_PASSWORD: E2ETestAdminPass123!
+          ENABLE_TEST_EMAIL_CODE_LOOKUP: "true"
           VITE_API_PROXY_TARGET: http://localhost:2053
         run: cd web && npm run test:e2e
 
