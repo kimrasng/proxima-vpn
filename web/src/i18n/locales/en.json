@@ -346,6 +346,7 @@
       "event": {
         "user.login": "signed in to the VPN.",
         "user.registered": "submitted a registration request.",
+        "user.password_reset": "reset their password using an emailed link.",
         "user.created": "was created.",
         "user.deleted": "was deleted.",
         "admin.login": "signed in to the admin console.",
@@ -1947,6 +1948,7 @@
       "password": "Password",
       "submit": "Sign In",
       "registerLink": "Don't have an account? Register",
+      "forgotPassword": "Forgot password?",
       "error": "Login failed. Please check your credentials."
     },
     "adminLogin": {
@@ -1974,6 +1976,64 @@
       "allowedDomainsBody": "You can only sign up with an email address at one of these domains.",
       "success": "Registration successful! Redirecting to login...",
       "error": "Registration failed. Please try again."
+    },
+    "portal": {
+      "name": "Proxima Portal",
+      "tagline": "Your connection. Your freedom.",
+      "language": "Language",
+      "carouselLabel": "Service highlights",
+      "slideLabel": "{{current}} of {{total}}",
+      "goToSlide": "Show highlight {{index}}",
+      "pause": "Pause automatic rotation",
+      "play": "Resume automatic rotation",
+      "features": {
+        "fast": {
+          "title": "Fast, stable connection",
+          "body": "Enjoy a smooth network experience anywhere, anytime."
+        },
+        "secure": {
+          "title": "Secure by design",
+          "body": "Your connection is encrypted so your privacy stays protected."
+        },
+        "devices": {
+          "title": "One account, many devices",
+          "body": "Connect all your devices with a single account."
+        },
+        "usage": {
+          "title": "Your usage at a glance",
+          "body": "See your remaining data and expiry date right in the portal."
+        }
+      }
+    },
+    "forgot": {
+      "title": "Forgot password",
+      "description": "Enter the email you signed up with and we will send you a link to set a new password.",
+      "email": "Email",
+      "submit": "Send reset link",
+      "backToLogin": "Back to sign in",
+      "sentTitle": "Check your email",
+      "sentBody": "If an account exists for that address, we have sent a password reset link. It is valid for 30 minutes.",
+      "sentHint": "If it does not arrive, check your spam folder or try again in a few minutes.",
+      "retry": "Try a different email",
+      "invalidEmail": "Enter a valid email address.",
+      "unavailable": "Password reset email is not available right now. Please contact the administrator.",
+      "tooMany": "Too many requests. Please try again later.",
+      "error": "We could not process your request. Please try again later."
+    },
+    "reset": {
+      "title": "Set a new password",
+      "newPassword": "New password",
+      "confirmPassword": "Confirm new password",
+      "submit": "Change password",
+      "mismatch": "Passwords do not match.",
+      "tooShort": "Password must be at least 8 characters.",
+      "tooLong": "Password must be at most 72 bytes.",
+      "success": "Your password has been changed. Redirecting to sign in...",
+      "invalidTitle": "This link cannot be used",
+      "invalidBody": "The link has expired or was already used. Please start the password reset again.",
+      "requestNew": "Get a new link",
+      "error": "We could not change your password. Please try again later.",
+      "tooMany": "Too many requests. Please try again later."
     }
   }
 }

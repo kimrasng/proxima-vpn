@@ -34,6 +34,8 @@ const SubscriptionDomains = lazy(() => import("./pages/admin/SubscriptionDomains
 const Login = lazy(() => import("./pages/auth/Login"));
 const AdminLogin = lazy(() => import("./pages/auth/AdminLogin"));
 const Register = lazy(() => import("./pages/auth/Register"));
+const ForgotPassword = lazy(() => import("./pages/auth/ForgotPassword"));
+const ResetPassword = lazy(() => import("./pages/auth/ResetPassword"));
 
 const Devices = lazy(() => import("./pages/user/Devices"));
 const UserDashboard = lazy(() => import("./pages/user/Dashboard"));
@@ -53,6 +55,8 @@ export const router = createBrowserRouter([
     children: [
       { path: "/login", element: <Login /> },
       { path: "/register", element: <Register /> },
+      { path: "/forgot-password", element: <ForgotPassword /> },
+      { path: "/reset-password", element: <ResetPassword /> },
       { path: "/admin/login", element: <AdminLogin /> },
     ],
   },

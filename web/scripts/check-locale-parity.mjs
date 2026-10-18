@@ -107,6 +107,8 @@ const requiredDynamicKeys = {
   "user.plan.order.status.*": ["pending", "paid", "cancelled", "expired"],
   "admin.userDetail.window.*": ["today", "week", "month"],
   "admin.uuidEvictions.*": ["pending", "confirmed"],
+  "auth.portal.features.*.title": ["fast", "secure", "devices", "usage"],
+  "auth.portal.features.*.body": ["fast", "secure", "devices", "usage"],
 };
 
 // Open-ended server values retain an explicit fallback in the UI. These

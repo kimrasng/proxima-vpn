@@ -1,42 +1,47 @@
 import { Outlet } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { SpaceBetween, Button } from "@cloudscape-design/components";
+import { ButtonDropdown, Icon } from "@cloudscape-design/components";
+import { colorBackgroundLayoutMain } from "@cloudscape-design/design-tokens";
+import { resolveLanguage } from "../utils/language";
 import "./authLayout.css";
 
-export default function AuthLayout() {
-  const { i18n } = useTranslation();
+const LANGUAGES = [
+  { id: "ko", text: "한국어" },
+  { id: "en", text: "English" },
+  { id: "zh", text: "中文" },
+] as const;
 
-  const changeLanguage = (lng: string) => {
-    void i18n.changeLanguage(lng);
-  };
+export default function AuthLayout() {
+  const { t, i18n } = useTranslation();
+  const current = resolveLanguage(i18n.resolvedLanguage ?? i18n.language);
+  const currentLabel = LANGUAGES.find((language) => language.id === current)?.text ?? LANGUAGES[0].text;
 
   return (
-    <div className="auth-layout">
+    <div className="auth-layout" style={{ background: colorBackgroundLayoutMain }}>
       <div className="auth-layout__languages">
-        <SpaceBetween direction="horizontal" size="xs">
-          <Button
-            variant={i18n.language === "ko" ? "primary" : "normal"}
-            onClick={() => changeLanguage("ko")}
-          >
-            한국어
-          </Button>
-          <Button
-            variant={i18n.language === "en" ? "primary" : "normal"}
-            onClick={() => changeLanguage("en")}
-          >
-            English
-          </Button>
-          <Button
-            variant={i18n.language === "zh" ? "primary" : "normal"}
-            onClick={() => changeLanguage("zh")}
-          >
-            中文
-          </Button>
-        </SpaceBetween>
+        <ButtonDropdown
+          variant="normal"
+          ariaLabel={`${t("auth.portal.language")}: ${currentLabel}`}
+          expandToViewport
+          items={LANGUAGES.map((language) => ({
+            id: language.id,
+            text: language.text,
+            disabled: language.id === current,
+          }))}
+          onItemClick={({ detail }) => {
+            void i18n.changeLanguage(detail.id);
+          }}
+        >
+          <span className="auth-layout__lang-label">
+            <Icon name="globe" />
+            <span>{currentLabel}</span>
+          </span>
+        </ButtonDropdown>
       </div>
-      <div className="auth-layout__form">
+
+      <main className="auth-layout__main">
         <Outlet />
-      </div>
+      </main>
     </div>
   );
 }

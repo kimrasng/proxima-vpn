@@ -22,6 +22,22 @@ export function userRegister(req: RegisterRequest): Promise<RegisterResponse> {
   return post<RegisterResponse>('/api/v1/auth/register', req);
 }
 
+export type ResetLanguage = 'ko' | 'en' | 'zh';
+
+export interface MessageResponse {
+  message: string;
+}
+
+// The server answers 200 whether or not the address belongs to an account, so
+// callers must not infer account existence from the result.
+export function forgotPassword(req: { email: string; language: ResetLanguage }): Promise<MessageResponse> {
+  return post<MessageResponse>('/api/v1/auth/forgot-password', req);
+}
+
+export function resetPassword(req: { token: string; password: string }): Promise<MessageResponse> {
+  return post<MessageResponse>('/api/v1/auth/reset-password', req);
+}
+
 export interface SignupPolicy {
   restricted: boolean;
   allowed_domains: string[];

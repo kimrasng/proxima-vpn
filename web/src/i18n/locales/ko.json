@@ -346,6 +346,7 @@
       "event": {
         "user.login": "VPN에 로그인했습니다.",
         "user.registered": "사용자 가입 요청이 접수되었습니다.",
+        "user.password_reset": "이메일 링크로 비밀번호를 재설정했습니다.",
         "user.created": "사용자가 생성되었습니다.",
         "user.deleted": "사용자가 삭제되었습니다.",
         "admin.login": "관리자 콘솔에 로그인했습니다.",
@@ -1947,6 +1948,7 @@
       "password": "비밀번호",
       "submit": "로그인",
       "registerLink": "계정이 없으신가요? 회원가입",
+      "forgotPassword": "비밀번호 찾기",
       "error": "로그인에 실패했습니다. 인증 정보를 확인해주세요."
     },
     "adminLogin": {
@@ -1974,6 +1976,64 @@
       "allowedDomainsBody": "아래 도메인의 이메일로만 가입할 수 있어요.",
       "success": "회원가입이 완료되었습니다! 로그인 페이지로 이동합니다...",
       "error": "회원가입에 실패했습니다. 다시 시도해주세요."
+    },
+    "portal": {
+      "name": "Proxima Portal",
+      "tagline": "Your connection. Your freedom.",
+      "language": "언어 선택",
+      "carouselLabel": "서비스 장점",
+      "slideLabel": "{{current}} / {{total}}",
+      "goToSlide": "{{index}}번째 장점 보기",
+      "pause": "자동 전환 멈춤",
+      "play": "자동 전환 재생",
+      "features": {
+        "fast": {
+          "title": "빠르고 안정적인 연결",
+          "body": "언제 어디서나 쾌적한 네트워크 환경을 경험하세요."
+        },
+        "secure": {
+          "title": "안전한 보호",
+          "body": "연결이 암호화되어 개인 정보가 안전하게 보호돼요."
+        },
+        "devices": {
+          "title": "여러 기기에서 하나의 계정으로",
+          "body": "한 계정으로 여러 기기에서 편하게 연결하세요."
+        },
+        "usage": {
+          "title": "내 사용량을 한눈에",
+          "body": "남은 데이터와 만료일을 포털에서 바로 확인하세요."
+        }
+      }
+    },
+    "forgot": {
+      "title": "비밀번호 찾기",
+      "description": "가입한 이메일을 입력하면 비밀번호를 다시 설정할 수 있는 링크를 보내드려요.",
+      "email": "이메일",
+      "submit": "재설정 링크 보내기",
+      "backToLogin": "로그인으로 돌아가기",
+      "sentTitle": "메일을 확인해주세요",
+      "sentBody": "입력한 주소로 가입된 계정이 있다면 비밀번호 재설정 링크를 보냈어요. 링크는 30분 동안 유효해요.",
+      "sentHint": "메일이 오지 않으면 스팸함을 확인하거나 잠시 후 다시 시도해주세요.",
+      "retry": "다른 이메일로 다시 시도",
+      "invalidEmail": "올바른 이메일 주소를 입력해주세요.",
+      "unavailable": "지금은 비밀번호 재설정 메일을 보낼 수 없어요. 관리자에게 문의해주세요.",
+      "tooMany": "요청이 너무 많아요. 잠시 후 다시 시도해주세요.",
+      "error": "요청을 처리하지 못했어요. 잠시 후 다시 시도해주세요."
+    },
+    "reset": {
+      "title": "새 비밀번호 설정",
+      "newPassword": "새 비밀번호",
+      "confirmPassword": "새 비밀번호 확인",
+      "submit": "비밀번호 변경",
+      "mismatch": "비밀번호가 일치하지 않습니다.",
+      "tooShort": "비밀번호는 8자 이상이어야 합니다.",
+      "tooLong": "비밀번호는 72바이트 이하여야 합니다.",
+      "success": "비밀번호가 변경되었습니다. 로그인 페이지로 이동합니다...",
+      "invalidTitle": "링크를 사용할 수 없어요",
+      "invalidBody": "링크가 만료되었거나 이미 사용되었어요. 비밀번호 찾기를 다시 진행해주세요.",
+      "requestNew": "새 링크 받기",
+      "error": "비밀번호를 변경하지 못했어요. 잠시 후 다시 시도해주세요.",
+      "tooMany": "요청이 너무 많아요. 잠시 후 다시 시도해주세요."
     }
   }
 }

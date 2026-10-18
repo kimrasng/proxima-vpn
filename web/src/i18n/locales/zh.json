@@ -346,6 +346,7 @@
       "event": {
         "user.login": "登录了 VPN。",
         "user.registered": "提交了注册申请。",
+        "user.password_reset": "通过邮件链接重置了密码。",
         "user.created": "已被创建。",
         "user.deleted": "已被删除。",
         "admin.login": "登录了管理后台。",
@@ -1948,6 +1949,7 @@
       "password": "密码",
       "submit": "登录",
       "registerLink": "没有账户？注册",
+      "forgotPassword": "忘记密码？",
       "error": "登录失败，请检查您的凭据。"
     },
     "adminLogin": {
@@ -1975,6 +1977,64 @@
       "allowedDomainsBody": "只能使用以下域名的邮箱注册。",
       "success": "注册成功！正在跳转到登录页面...",
       "error": "注册失败，请重试。"
+    },
+    "portal": {
+      "name": "Proxima Portal",
+      "tagline": "Your connection. Your freedom.",
+      "language": "语言",
+      "carouselLabel": "服务优势",
+      "slideLabel": "第 {{current}} 项，共 {{total}} 项",
+      "goToSlide": "查看第 {{index}} 项优势",
+      "pause": "暂停自动切换",
+      "play": "恢复自动切换",
+      "features": {
+        "fast": {
+          "title": "快速稳定的连接",
+          "body": "随时随地享受流畅的网络体验。"
+        },
+        "secure": {
+          "title": "安全防护",
+          "body": "连接经过加密，您的隐私得到保护。"
+        },
+        "devices": {
+          "title": "一个账户，多台设备",
+          "body": "使用同一个账户轻松连接多台设备。"
+        },
+        "usage": {
+          "title": "用量一目了然",
+          "body": "在门户中直接查看剩余流量和到期日。"
+        }
+      }
+    },
+    "forgot": {
+      "title": "找回密码",
+      "description": "输入注册时使用的邮箱，我们会发送重置密码的链接。",
+      "email": "邮箱",
+      "submit": "发送重置链接",
+      "backToLogin": "返回登录",
+      "sentTitle": "请查收邮件",
+      "sentBody": "如果该地址对应已注册的账户，我们已发送密码重置链接。链接 30 分钟内有效。",
+      "sentHint": "如果没有收到，请检查垃圾邮件箱，或稍后再试。",
+      "retry": "使用其他邮箱重试",
+      "invalidEmail": "请输入有效的邮箱地址。",
+      "unavailable": "目前无法发送密码重置邮件，请联系管理员。",
+      "tooMany": "请求过于频繁，请稍后再试。",
+      "error": "无法处理您的请求，请稍后再试。"
+    },
+    "reset": {
+      "title": "设置新密码",
+      "newPassword": "新密码",
+      "confirmPassword": "确认新密码",
+      "submit": "修改密码",
+      "mismatch": "两次输入的密码不一致。",
+      "tooShort": "密码至少需要 8 个字符。",
+      "tooLong": "密码不能超过 72 个字节。",
+      "success": "密码已修改，正在跳转到登录页面...",
+      "invalidTitle": "此链接无法使用",
+      "invalidBody": "链接已过期或已被使用，请重新申请找回密码。",
+      "requestNew": "获取新链接",
+      "error": "无法修改密码，请稍后再试。",
+      "tooMany": "请求过于频繁，请稍后再试。"
     }
   }
 }
