@@ -275,6 +275,7 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 | `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ZONE_ID` / `ENTRY_DNS_BASE_DOMAIN` | | 입구 노드 DNS 자동 관리 |
 | `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` / `STRIPE_PRODUCT_ID` | | Stripe 결제 |
 | `PAYMENTS_CURRENCY` / `PAYMENTS_PENDING_TTL` | | 결제 통화와 미결제 주문 만료 시간 |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USERNAME` / `SMTP_PASSWORD` / `SMTP_FROM` / `SMTP_TLS` | | 비밀번호 재설정 메일. `SMTP_HOST`를 설정하기 전에는 재설정을 쓸 수 없습니다. 설정하면 `SMTP_FROM`이 필수이고, `SMTP_PORT` 기본값은 `587`, `SMTP_TLS`는 `starttls`(기본) / `tls` / `none`(로그인 정보를 보내지 않음)입니다. 링크는 `PANEL_URL`을 기준으로 만들어집니다 |
 | `S3_ENDPOINT` / `S3_BUCKET` / `S3_ACCESS_KEY` / `S3_SECRET_KEY` / `S3_REGION` | | S3 호환 저장소 |
 | `SWAGGER_ENABLED` | | API 문서 노출 (운영에서는 `false`) |
 

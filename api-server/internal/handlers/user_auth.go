@@ -4,11 +4,13 @@ import (
 	"context"
 	"log"
 	"regexp"
+	"sync"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/proximavpn/proxima-vpn/api-server/internal/mail"
 	"github.com/proximavpn/proxima-vpn/api-server/internal/services"
 	"github.com/proximavpn/proxima-vpn/pkg/crypto"
 )
@@ -29,17 +31,31 @@ type UserAuthHandler struct {
 	telegram  *services.TelegramService
 	activity  *services.ActivityService
 	logins    *services.LoginHistoryService
+
+	// mailer is nil when SMTP is not configured, which disables password reset.
+	mailer mail.Sender
+	// resetBaseURL anchors emailed reset links. It comes from the configured
+	// panel URL only and is empty when that URL is unusable.
+	resetBaseURL string
+	// resetSlots bounds the background work started by ForgotPassword and
+	// resetWG lets tests wait for it.
+	resetSlots chan struct{}
+	resetWG    sync.WaitGroup
 }
 
-// NewUserAuthHandler creates a new UserAuthHandler.
-func NewUserAuthHandler(db *pgxpool.Pool, jwtSecret string, jwtExpiry time.Duration, telegram *services.TelegramService) *UserAuthHandler {
+// NewUserAuthHandler creates a new UserAuthHandler. A nil mailer disables the
+// password reset email; panelURL is the configured server.panel_url.
+func NewUserAuthHandler(db *pgxpool.Pool, jwtSecret string, jwtExpiry time.Duration, telegram *services.TelegramService, mailer mail.Sender, panelURL string) *UserAuthHandler {
 	return &UserAuthHandler{
-		db:        db,
-		jwtSecret: jwtSecret,
-		jwtExpiry: jwtExpiry,
-		telegram:  telegram,
-		activity:  services.NewActivityService(db),
-		logins:    services.NewLoginHistoryService(db),
+		db:           db,
+		jwtSecret:    jwtSecret,
+		jwtExpiry:    jwtExpiry,
+		telegram:     telegram,
+		activity:     services.NewActivityService(db),
+		logins:       services.NewLoginHistoryService(db),
+		mailer:       mailer,
+		resetBaseURL: resetLinkBase(panelURL),
+		resetSlots:   make(chan struct{}, passwordResetMaxInFlight),
 	}
 }
 

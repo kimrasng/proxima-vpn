@@ -426,6 +426,7 @@ Pushing a `v*` tag runs the release workflow, which publishes `ghcr.io/kimrasng/
 | `CLOUDFLARE_API_TOKEN` · `CLOUDFLARE_ZONE_ID` · `ENTRY_DNS_BASE_DOMAIN` | | Managed entry-node DNS |
 | `STRIPE_SECRET_KEY` · `STRIPE_WEBHOOK_SECRET` · `STRIPE_PRODUCT_ID` | | Stripe checkout |
 | `PAYMENTS_CURRENCY` · `PAYMENTS_PENDING_TTL` | | Currency and unpaid-order lifetime |
+| `SMTP_HOST` · `SMTP_PORT` · `SMTP_USERNAME` · `SMTP_PASSWORD` · `SMTP_FROM` · `SMTP_TLS` | | Password reset email. Reset is unavailable until `SMTP_HOST` is set; `SMTP_FROM` is then required, `SMTP_PORT` defaults to `587`, and `SMTP_TLS` is `starttls` (default), `tls` or `none` (no login is sent). Links use `PANEL_URL` |
 | `S3_ENDPOINT` · `S3_BUCKET` · `S3_ACCESS_KEY` · `S3_SECRET_KEY` · `S3_REGION` | | S3-compatible object storage |
 | `SWAGGER_ENABLED` | | API docs (`false` in production) |
 

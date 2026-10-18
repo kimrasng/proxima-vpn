@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"os/signal"
 	"strings"
@@ -16,6 +17,7 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/requestid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/proximavpn/proxima-vpn/api-server/internal/config"
+	"github.com/proximavpn/proxima-vpn/api-server/internal/mail"
 	"github.com/proximavpn/proxima-vpn/api-server/internal/payments"
 	"github.com/proximavpn/proxima-vpn/api-server/internal/services"
 	"github.com/redis/go-redis/v9"
@@ -28,6 +30,8 @@ type Server struct {
 	redis         *redis.Client
 	backupService *services.BackupService
 	payments      payments.Registry
+	// mailer is nil when SMTP is not configured; password reset then answers 503.
+	mailer mail.Sender
 }
 
 // fiberConfig builds the Fiber config, including the trusted-proxy settings
@@ -112,6 +116,16 @@ func NewServer(cfg *config.Config, db *pgxpool.Pool, rdb *redis.Client, backupSv
 		AllowCredentials: cfg.Server.PanelURL != "",
 	}))
 
+	// A bad SMTP configuration disables password reset email instead of
+	// stopping the API, the same stance as managed entry DNS. The error never
+	// includes the password.
+	mailer, err := mail.NewFromConfig(cfg.SMTP)
+	if err != nil {
+		log.Printf("[Mail] disabled: %v", err)
+	} else if mailer != nil {
+		log.Printf("[Mail] password reset email enabled via %s:%d (tls=%s)", cfg.SMTP.Host, cfg.SMTP.Port, cfg.SMTP.TLS)
+	}
+
 	s := &Server{
 		app:           app,
 		config:        cfg,
@@ -119,6 +133,7 @@ func NewServer(cfg *config.Config, db *pgxpool.Pool, rdb *redis.Client, backupSv
 		redis:         rdb,
 		backupService: backupSvc,
 		payments:      paymentProviders,
+		mailer:        mailer,
 	}
 
 	s.registerRoutes()

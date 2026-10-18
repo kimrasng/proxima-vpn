@@ -60,5 +60,17 @@ telegram:
   bot_token: ""
   chat_id: ""
 
+# Outgoing email for password reset links. Leave host empty to disable it: the
+# "forgot password" endpoint then answers 503. Reset links are built from
+# server.panel_url. The password is environment-only (SMTP_PASSWORD); every
+# other value here can also be set with SMTP_HOST, SMTP_PORT, SMTP_USERNAME,
+# SMTP_FROM and SMTP_TLS.
+smtp:
+  host: ""
+  port: 587
+  username: ""
+  from: ""          # required when host is set, e.g. "Proxima <no-reply@example.com>"
+  tls: "starttls"   # starttls | tls (implicit TLS, port 465) | none (never sends credentials)
+
 subscription:
   update_interval: 3600  # seconds

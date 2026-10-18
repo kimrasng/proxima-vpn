@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -24,6 +25,7 @@ type Config struct {
 	Storage         StorageConfig         `yaml:"storage"`
 	Payments        PaymentsConfig        `yaml:"payments"`
 	ManagedEntryDNS ManagedEntryDNSConfig `yaml:"managed_entry_dns" json:"managed_entry_dns"`
+	SMTP            SMTPConfig            `yaml:"smtp" json:"smtp"`
 }
 
 // PaymentsConfig governs every payment provider, not just Stripe: the
@@ -152,6 +154,10 @@ func Load(path string) (*Config, error) {
 			Currency:      "usd",
 			PendingTTLRaw: "24h",
 		},
+		SMTP: SMTPConfig{
+			Port: DefaultSMTPPort,
+			TLS:  SMTPTLSStartTLS,
+		},
 	}
 
 	data, err := os.ReadFile(path)
@@ -168,6 +174,7 @@ func Load(path string) (*Config, error) {
 
 	applyEnvOverrides(cfg)
 	cfg.ManagedEntryDNS.resolve()
+	cfg.SMTP.normalize()
 
 	if cfg.JWT.Secret == "" {
 		// No secret provided: load a persisted one or generate and persist a new
@@ -257,6 +264,30 @@ func applyEnvOverrides(cfg *Config) {
 	}
 	if v := os.Getenv("PAYMENTS_PENDING_TTL"); v != "" {
 		cfg.Payments.PendingTTLRaw = v
+	}
+	if v := os.Getenv("SMTP_HOST"); v != "" {
+		cfg.SMTP.Host = v
+	}
+	if v := os.Getenv("SMTP_PORT"); v != "" {
+		// An unparseable port becomes 0 so SMTPConfig.Validate reports it,
+		// instead of silently falling back to a port the operator did not pick.
+		port, err := strconv.Atoi(strings.TrimSpace(v))
+		if err != nil {
+			port = 0
+		}
+		cfg.SMTP.Port = port
+	}
+	if v := os.Getenv("SMTP_USERNAME"); v != "" {
+		cfg.SMTP.Username = v
+	}
+	if v := os.Getenv("SMTP_PASSWORD"); v != "" {
+		cfg.SMTP.Password = Secret{value: v}
+	}
+	if v := os.Getenv("SMTP_FROM"); v != "" {
+		cfg.SMTP.From = v
+	}
+	if v := os.Getenv("SMTP_TLS"); v != "" {
+		cfg.SMTP.TLS = v
 	}
 }
 
