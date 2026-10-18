@@ -124,7 +124,7 @@ export default function Register() {
     try {
       await requestSignupEmailCode({ name, email, password, referral_code: referralCode.trim() || undefined, language: i18n.resolvedLanguage || i18n.language });
       setVerificationStep(true);
-      setFlash([{ type: "success", content: t("auth.register.codeSent", { email }), dismissible: true, onDismiss: () => setFlash([]) }]);
+      setFlash([]);
     } catch (err) {
       if (err instanceof ApiError) {
         const body = err.body as { error?: string; allowed_domains?: string[] } | undefined;
@@ -175,7 +175,7 @@ export default function Register() {
         >
           <Form
             actions={
-              <Button variant="primary" loading={loading} formAction="submit">
+              <Button variant="primary" loading={loading} disabled={resending} formAction="submit">
                 {verificationStep ? t("auth.register.verifyCode") : t("auth.register.submit")}
               </Button>
             }
@@ -197,7 +197,7 @@ export default function Register() {
                       autoFocus
                     />
                   </FormField>
-                  <Button variant="link" loading={resending} onClick={() => void resendCode()}>
+                  <Button variant="link" formAction="none" disabled={loading} loading={resending} onClick={() => void resendCode()}>
                     {t("auth.register.resendCode")}
                   </Button>
                 </>
@@ -277,7 +277,11 @@ export default function Register() {
           </Form>
         </form>
         <div style={{ marginTop: "1rem", textAlign: "center" }}>
-          <Link to="/login">{verificationStep ? t("auth.register.backToDetails") : t("auth.register.loginLink")}</Link>
+          {verificationStep ? (
+            <Button variant="link" formAction="none" disabled={loading || resending} onClick={() => { setVerificationStep(false); setVerificationCode(""); setFlash([]); }}>
+              {t("auth.register.backToDetails")}
+            </Button>
+          ) : <Link to="/login">{t("auth.register.loginLink")}</Link>}
         </div>
       </Container>
     </SpaceBetween>

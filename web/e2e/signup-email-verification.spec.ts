@@ -12,6 +12,7 @@ test.describe("email verification during sign-up", () => {
     });
     await page.route("**/api/v1/auth/register/verify-code", async (route) => {
       calls.push("verify");
+      expect(route.request().postDataJSON()).toMatchObject({ code: "123456", email: "verify@example.com" });
       await route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ id: "id", email: "verify@example.com", name: "Verify", sub_token: "token" }) });
     });
     await page.route("**/api/v1/auth/register", async (route) => {
@@ -29,8 +30,11 @@ test.describe("email verification during sign-up", () => {
     await expect(page.getByRole("textbox", { name: "6-digit verification code" })).toBeVisible();
     expect(calls).toEqual(["request"]);
     const resending = page.getByRole("button", { name: "Resend code" });
-    expect(resending).toBeTruthy();
+    await expect(resending).toBeVisible();
+    const resent = page.waitForResponse((response) => response.url().endsWith("/auth/register/request-code"));
     await resending.click();
+    await resent;
+    await expect(resending).toBeEnabled();
     await expect(page.getByRole("textbox", { name: "6-digit verification code" })).toHaveValue("");
     await expect(page.locator("form").getByText("We sent a 6-digit code to verify@example.com.")).toBeVisible();
     await page.getByRole("textbox", { name: "6-digit verification code" }).fill("123456");

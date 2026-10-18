@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { signupCode } from "./signup-fixture";
 
 const uniq = () => Math.random().toString(36).slice(2, 9);
 const password = "PasskeyE2E-Pass123!";
@@ -15,11 +16,7 @@ test.describe("passkey authentication", () => {
       data: { name: "Passkey E2E", email, password, language: "en" },
     });
     expect(registered.status()).toBe(200);
-    const login = await page.request.post("/api/v1/admin/auth/login", { data: { email: process.env.E2E_ADMIN_EMAIL, password: process.env.E2E_ADMIN_PASSWORD } });
-    const admin = await login.json() as { token: string };
-    const mailer = await page.request.get(`/api/v1/__test__/signup-email-code?email=${encodeURIComponent(email)}`, { headers: { Authorization: `Bearer ${admin.token}` } });
-    expect(mailer.ok()).toBe(true);
-    const { code } = await mailer.json() as { code: string };
+    const code = await signupCode(page.request, email);
     const verified = await page.request.post("/api/v1/auth/register/verify-code", { data: { email, code } });
     expect(verified.status()).toBe(201);
     const userLogin = await page.request.post("/api/v1/auth/login", { data: { email, password } });

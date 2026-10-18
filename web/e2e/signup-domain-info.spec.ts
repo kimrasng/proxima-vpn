@@ -34,11 +34,12 @@ test.describe("referral code", () => {
       status: 200, contentType: "application/json",
       body: JSON.stringify({ restricted: false, allowed_domains: [] }),
     }));
-    await page.route("**/api/v1/auth/register", async (route) => {
-      const request = route.request();
-      expect(request.postDataJSON()).toMatchObject({ referral_code: "FRIEND-42" });
+    await page.route("**/api/v1/auth/register/request-code", async (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ message: "sent", expires_in_seconds: 600 }) }));
+    await page.route("**/api/v1/auth/register/verify-code", async (route) => {
+      expect(route.request().postDataJSON()).toMatchObject({ referral_code: "FRIEND-42", code: "123456" });
       await route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ id: "id", email: "new@example.com", name: "New", sub_token: "token" }) });
     });
+
     await page.goto("/login?ref=FRIEND-42");
     await page.getByRole("link", { name: "Don't have an account? Register" }).click();
     const referral = page.getByRole("textbox", { name: "Referral code (optional)" });
@@ -48,6 +49,8 @@ test.describe("referral code", () => {
     await page.getByRole("textbox", { name: "Password", exact: true }).fill("Passw0rd!test42");
     await page.getByRole("textbox", { name: "Confirm Password" }).fill("Passw0rd!test42");
     await page.getByRole("button", { name: "Create Account" }).click();
+    await page.getByRole("textbox", { name: "6-digit verification code" }).fill("123456");
+    await page.getByRole("button", { name: "Verify and create account" }).click();
     await expect(page.getByText(/Registration successful/i)).toBeVisible();
   });
 

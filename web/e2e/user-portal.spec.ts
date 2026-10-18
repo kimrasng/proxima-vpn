@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { confirmSignup } from "./signup-fixture";
 
 // Browser e2e for the end-user portal: register -> log in -> see the portal.
 // Device creation is asserted separately because it depends on the account
@@ -25,14 +26,6 @@ test.describe("user authentication", () => {
     const email = `e2e-ui-${uniq()}@example.com`;
     const password = "E2EUiPass123!";
 
-    await page.route("**/api/v1/auth/register/request-code", async (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ message: "sent", expires_in_seconds: 600 }) }));
-    await page.route("**/api/v1/auth/register/verify-code", async (route) => route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ id: "test-user", email, name: "E2E UI User", sub_token: "test-sub-token" }) }));
-    await page.route("**/api/v1/auth/login", async (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ token: "test-user-token" }) }));
-    await page.route("**/api/v1/auth/register", async (route) => {
-      const body = route.request().postDataJSON() as { code?: string };
-      if (!body.code) return route.fulfill({ status: 400, body: "verification code required" });
-      await route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ id: "test-user", email, name: "E2E UI User", sub_token: "test-sub-token" }) });
-    });
 
     await page.goto("/register");
     await page.getByRole("textbox", { name: "Name" }).fill("E2E UI User");
@@ -41,9 +34,7 @@ test.describe("user authentication", () => {
     await page.getByRole("textbox", { name: "Confirm Password" }).fill(password);
     await page.getByRole("button", { name: "Create Account" }).click();
 
-    await expect(page.getByRole("textbox", { name: "6-digit verification code" })).toBeVisible();
-    await page.getByRole("textbox", { name: "6-digit verification code" }).fill("123456");
-    await page.getByRole("button", { name: "Verify and create account" }).click();
+    await confirmSignup(page, email);
     await expect(page.getByText(/Registration successful/i)).toBeVisible();
 
     // The app redirects to login after a successful registration.
@@ -93,10 +84,6 @@ test.describe("user portal pages", () => {
     const email = `e2e-ui-nav-${uniq()}@example.com`;
     const password = "E2EUiPass123!";
 
-    await page.route("**/api/v1/auth/register/request-code", async (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ message: "sent", expires_in_seconds: 600 }) }));
-    await page.route("**/api/v1/auth/register/verify-code", async (route) => route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ id: "test-user", email, name: "E2E Nav User", sub_token: "test-sub-token" }) }));
-    await page.route("**/api/v1/auth/login", async (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ token: "test-user-token" }) }));
-    await page.route("**/api/v1/auth/register", async (route) => route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ id: "test-user", email, name: "E2E Nav User", sub_token: "test-sub-token" }) }));
 
     await page.goto("/register");
     await page.getByRole("textbox", { name: "Name" }).fill("E2E Nav User");
@@ -104,9 +91,7 @@ test.describe("user portal pages", () => {
     await page.getByRole("textbox", { name: "Password", exact: true }).fill(password);
     await page.getByRole("textbox", { name: "Confirm Password" }).fill(password);
     await page.getByRole("button", { name: "Create Account" }).click();
-    await expect(page.getByRole("textbox", { name: "6-digit verification code" })).toBeVisible();
-    await page.getByRole("textbox", { name: "6-digit verification code" }).fill("123456");
-    await page.getByRole("button", { name: "Verify and create account" }).click();
+    await confirmSignup(page, email);
     await expect(page).toHaveURL(/\/login/, { timeout: 20_000 });
 
     await page.getByRole("textbox", { name: "Email" }).fill(email);
