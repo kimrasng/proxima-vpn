@@ -16,7 +16,9 @@
 .auth-layout__lang-label {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  /* The button's own caret sits ~12px from the text once its internal padding is
+     counted; match that here so globe-text and text-caret read as even. */
+  gap: 10px;
   white-space: nowrap;
 }
 
