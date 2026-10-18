@@ -116,16 +116,18 @@ for (const expiredType of ['user', 'admin']) {
   });
 }
 
-test('login 401 does not delete sessions or redirect', async (t) => {
-  const requests = interceptFetch(t);
-  client.setClientTokenType('user');
-  const loginRequest = client.post('/api/v1/auth/login', {});
-  const rejection = assert.rejects(loginRequest, assertUnauthorized);
-  client.setClientTokenType('admin');
+for (const loginPath of ['/api/v1/auth/login', '/api/v1/auth/passkey/login/finish']) {
+  test(`${loginPath} 401 does not delete sessions or redirect`, async (t) => {
+    const requests = interceptFetch(t);
+    client.setClientTokenType('user');
+    const loginRequest = client.post(loginPath, {});
+    const rejection = assert.rejects(loginRequest, assertUnauthorized);
+    client.setClientTokenType('admin');
 
-  requests[0].resolve(new Response(JSON.stringify({ error: 'invalid credentials' }), { status: 401 }));
-  await rejection;
-  assert.equal(storage.get('proxima_admin_token'), 'admin-token');
-  assert.equal(storage.get('proxima_user_token'), 'user-token');
-  assert.equal(location.href, '/current-page');
-});
+    requests[0].resolve(new Response(JSON.stringify({ error: 'invalid credentials' }), { status: 401 }));
+    await rejection;
+    assert.equal(storage.get('proxima_admin_token'), 'admin-token');
+    assert.equal(storage.get('proxima_user_token'), 'user-token');
+    assert.equal(location.href, '/current-page');
+  });
+}
