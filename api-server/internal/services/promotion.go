@@ -92,12 +92,10 @@ func NewPromotionService(db *pgxpool.Pool) *PromotionService {
 // (redeemed_count = redeemed_count + 1 WHERE redeemed_count < max_redemptions
 // OR max_redemptions IS NULL) - Postgres's row lock on that UPDATE is what
 // makes two concurrent Reserve calls for the same code serialize on this one
-// row rather than both reading a stale count and both proceeding. The
-// per-user cap is checked immediately before, inside the same transaction,
-// by counting non-released promotion_redemptions rows for (promotion_id,
-// user_id) FOR UPDATE - the FOR UPDATE is needed because a second concurrent
-// order from the same user must not read the count before the first one's
-// insert commits.
+// row rather than both reading a stale count and both proceeding. The same
+// promotion-row lock also serializes per-user checks, including the case where
+// no prior redemption exists yet (row locks on redemptions alone cannot protect
+// that empty result). The per-user count and ledger mutation share this tx.
 func (s *PromotionService) Reserve(ctx context.Context, code string, userID, orderID, planID string, durationDays int, orderCents int64, isFirstPurchase bool) (*PromotionReservation, error) {
 	tx, err := s.db.Begin(ctx)
 	if err != nil {
@@ -105,10 +103,24 @@ func (s *PromotionService) Reserve(ctx context.Context, code string, userID, ord
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
+	reservation, err := s.ReserveTx(ctx, tx, code, userID, orderID, planID, durationDays, orderCents, isFirstPurchase)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("commit reserve: %w", err)
+	}
+	return reservation, nil
+}
+
+// ReserveTx reserves a code inside the caller's transaction, so an order's
+// eligibility check, reservation and price snapshot can commit atomically.
+// Callers changing an existing order must lock that order before calling.
+func (s *PromotionService) ReserveTx(ctx context.Context, tx pgx.Tx, code string, userID, orderID, planID string, durationDays int, orderCents int64, isFirstPurchase bool) (*PromotionReservation, error) {
 	var p PromotionCode
 	var planIDs, allowedUserIDs []string
 	var durationDaysArr []int
-	err = tx.QueryRow(ctx,
+	err := tx.QueryRow(ctx,
 		`SELECT id, discount_type, discount_value, valid_from, valid_until,
 		        min_order_cents, max_redemptions, max_redemptions_per_user,
 		        first_purchase_only, COALESCE(plan_ids, '{}'), COALESCE(duration_days, '{}'),
@@ -177,20 +189,23 @@ func (s *PromotionService) Reserve(ctx context.Context, code string, userID, ord
 		return nil, &PromotionRejectError{Reason: RejectOverallCapReached}
 	}
 
-	if _, err := tx.Exec(ctx,
+	tag, err = tx.Exec(ctx,
 		`INSERT INTO promotion_redemptions (promotion_id, user_id, order_id, status)
-		 VALUES ($1, $2, $3, 'reserved')`,
+		 VALUES ($1, $2, $3, 'reserved')
+		 ON CONFLICT (order_id) DO UPDATE
+		 SET promotion_id = EXCLUDED.promotion_id, user_id = EXCLUDED.user_id,
+		     status = 'reserved', created_at = NOW()
+		 WHERE promotion_redemptions.status = 'released'`,
 		p.ID, userID, orderID,
-	); err != nil {
+	)
+	if err != nil {
 		return nil, fmt.Errorf("insert redemption: %w", err)
+	}
+	if tag.RowsAffected() != 1 {
+		return nil, fmt.Errorf("order already has an active promotion reservation")
 	}
 
 	discountCents := computeDiscountCents(p.DiscountType, p.DiscountValue, orderCents)
-
-	if err := tx.Commit(ctx); err != nil {
-		return nil, fmt.Errorf("commit reserve: %w", err)
-	}
-
 	return &PromotionReservation{PromotionID: p.ID, DiscountCents: discountCents}, nil
 }
 
@@ -206,38 +221,47 @@ func (s *PromotionService) Release(ctx context.Context, orderID string) error {
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
+	if err := s.ReleaseTx(ctx, tx, orderID); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
+// ReleaseTx releases a reservation in the caller's transaction. Lock promotion
+// rows before redemption rows, matching ReserveTx's lock order.
+func (s *PromotionService) ReleaseTx(ctx context.Context, tx pgx.Tx, orderID string) error {
 	var promotionID string
+	err := tx.QueryRow(ctx,
+		`SELECT p.id FROM promotion_codes p
+		 JOIN promotion_redemptions r ON r.promotion_id = p.id
+		 WHERE r.order_id = $1 AND r.status = 'reserved'
+		 FOR UPDATE OF p`, orderID,
+	).Scan(&promotionID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("lock released promotion: %w", err)
+	}
+
 	tag, err := tx.Exec(ctx,
 		`UPDATE promotion_redemptions SET status = 'released'
-		 WHERE order_id = $1 AND status = 'reserved'`,
-		orderID,
+		 WHERE order_id = $1 AND promotion_id = $2 AND status = 'reserved'`,
+		orderID, promotionID,
 	)
 	if err != nil {
 		return fmt.Errorf("release redemption: %w", err)
 	}
 	if tag.RowsAffected() == 0 {
-		// No reserved redemption for this order - either it never used a
-		// code, or this order was already released/confirmed. Both are a
-		// no-op, not an error: Cancel and the expiry sweep can both call
-		// Release for the same order without coordinating.
-		return tx.Commit(ctx)
+		return nil
 	}
-
-	if err := tx.QueryRow(ctx,
-		`SELECT promotion_id FROM promotion_redemptions WHERE order_id = $1`,
-		orderID,
-	).Scan(&promotionID); err != nil {
-		return fmt.Errorf("load released redemption: %w", err)
-	}
-
 	if _, err := tx.Exec(ctx,
 		`UPDATE promotion_codes SET redeemed_count = redeemed_count - 1 WHERE id = $1`,
 		promotionID,
 	); err != nil {
 		return fmt.Errorf("return redemption slot: %w", err)
 	}
-
-	return tx.Commit(ctx)
+	return nil
 }
 
 // Confirm marks orderID's reservation 'confirmed' once its order is paid,

@@ -164,7 +164,11 @@ func (s *PaymentService) Settle(ctx context.Context, conf payments.Confirmation)
 	// own snapshotted price exactly. The order claim above already flipped
 	// this row to 'paid' inside the same transaction, so a mismatch has to
 	// explicitly revert it here - otherwise it would commit paid regardless.
-	if (conf.Provider == payments.ProviderStripe && conf.AmountCents == 0 && priceCents != 0) ||
+	// A promotion settlement is free only while the locked order is still
+	// zero-total. A concurrent coupon replacement may have changed its price
+	// since Create decided to settle it locally.
+	if (conf.Provider == "promotion" && priceCents != 0) ||
+		(conf.Provider == payments.ProviderStripe && conf.AmountCents == 0 && priceCents != 0) ||
 		(conf.Provider == payments.ProviderStripe && conf.AmountCents != priceCents) ||
 		(conf.AmountCents > 0 && conf.AmountCents != priceCents) {
 		if _, err := tx.Exec(ctx,

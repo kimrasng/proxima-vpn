@@ -189,6 +189,8 @@ func (h *UserOrderHandler) Create(c *fiber.Ctx) error {
 			var reject *services.PromotionRejectError
 			if errors.As(applyErr, &reject) {
 				promotionWarning = string(reject.Reason)
+			} else if errors.Is(applyErr, errOrderNotPending) {
+				return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "order state changed; reload the order"})
 			} else {
 				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 					"error": "internal server error",
@@ -204,6 +206,9 @@ func (h *UserOrderHandler) Create(c *fiber.Ctx) error {
 	// through the app's authenticated settlement.
 	if resp.PriceCents == 0 && (!stripeCheckoutAvailable || req.PromotionCode != "") {
 		if err := h.settleZeroCostOrder(ctx, resp.ID, userID); err != nil {
+			if errors.Is(err, errOrderNotPending) {
+				return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "order state or price changed; reload the order"})
+			}
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 				"error": "internal server error",
 			})
@@ -221,33 +226,87 @@ func (h *UserOrderHandler) Create(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusCreated).JSON(resp)
 }
 
-// applyPromotion reserves code against an order that already exists (so the
-// per-order uniqueness on promotion_redemptions.order_id has something to
-// reference), and on success snapshots the reservation onto plan_orders and
-// mutates resp in place so the caller returns the discounted total. A
-// rejection updates nothing and is returned as-is for Create/ApplyPromotion
-// to translate into the caller-facing reason string.
+// errOrderNotPending distinguishes a resolved or inaccessible order from a
+// coupon eligibility rejection.
+var errOrderNotPending = errors.New("order not found, not yours, or already resolved")
+
+// applyPromotion serializes every promotion change on the order row. The
+// reservation ledger and the order's price snapshot commit together, so cancel,
+// expiry and payment settlement cannot interleave between check and mutation.
 func (h *UserOrderHandler) applyPromotion(ctx context.Context, resp *orderResponse, userID, code string) error {
-	isFirstPurchase, err := h.isFirstPurchase(ctx, userID)
+	tx, err := h.db.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin promotion change: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	var updated orderResponse
+	var originalCents int64
+	err = tx.QueryRow(ctx,
+		`SELECT o.id, o.plan_id, p.name, o.duration_days,
+		        o.price_cents + o.discount_cents, o.status, o.created_at, o.expires_at
+		 FROM plan_orders o
+		 JOIN plans p ON p.id = o.plan_id
+		 WHERE o.id = $1 AND o.user_id = $2 AND o.status = 'pending'
+		 FOR UPDATE OF o`,
+		resp.ID, userID,
+	).Scan(&updated.ID, &updated.PlanID, &updated.PlanName, &updated.DurationDays,
+		&originalCents, &updated.Status, &updated.CreatedAt, &updated.ExpiresAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return errOrderNotPending
+	}
+	if err != nil {
+		return fmt.Errorf("lock promotion order: %w", err)
+	}
+
+	// Replacing A with B must lock both codes in the same order as replacing
+	// B with A on another order, rather than deadlocking on opposite swaps.
+	rows, err := tx.Query(ctx,
+		`SELECT id FROM promotion_codes
+		 WHERE code = $2 OR id = (
+		   SELECT promotion_id FROM promotion_redemptions WHERE order_id = $1
+		 ) ORDER BY id FOR UPDATE`, updated.ID, code,
+	)
+	if err != nil {
+		return fmt.Errorf("lock replacement promotions: %w", err)
+	}
+	for rows.Next() {
+		// Drain the result so every applicable promotion row is locked.
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("lock replacement promotions: %w", err)
+	}
+
+	var hasPaid bool
+	if err := tx.QueryRow(ctx,
+		`SELECT EXISTS(SELECT 1 FROM plan_orders WHERE user_id = $1 AND status = 'paid')`,
+		userID,
+	).Scan(&hasPaid); err != nil {
+		return fmt.Errorf("check first purchase: %w", err)
+	}
+	if err := h.promotion.ReleaseTx(ctx, tx, updated.ID); err != nil {
+		return err
+	}
+	reservation, err := h.promotion.ReserveTx(ctx, tx, code, userID, updated.ID,
+		updated.PlanID, updated.DurationDays, originalCents, !hasPaid)
 	if err != nil {
 		return err
 	}
 
-	reservation, err := h.promotion.Reserve(ctx, code, userID, resp.ID, resp.PlanID, resp.DurationDays, resp.PriceCents, isFirstPurchase)
-	if err != nil {
-		return err
-	}
-
-	finalCents := resp.PriceCents - reservation.DiscountCents
-	if _, err := h.db.Exec(ctx,
-		`UPDATE plan_orders SET promotion_id = $2, discount_cents = $3, price_cents = $4 WHERE id = $1`,
-		resp.ID, reservation.PromotionID, reservation.DiscountCents, finalCents,
+	updated.DiscountCents = reservation.DiscountCents
+	updated.PriceCents = originalCents - reservation.DiscountCents
+	if _, err := tx.Exec(ctx,
+		`UPDATE plan_orders SET promotion_id = $2, discount_cents = $3, price_cents = $4
+		 WHERE id = $1 AND status = 'pending'`,
+		updated.ID, reservation.PromotionID, updated.DiscountCents, updated.PriceCents,
 	); err != nil {
 		return fmt.Errorf("snapshot promotion onto order: %w", err)
 	}
-
-	resp.DiscountCents = reservation.DiscountCents
-	resp.PriceCents = finalCents
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit promotion change: %w", err)
+	}
+	*resp = updated
 
 	h.activity.Log(ctx, services.Record{
 		EventType:  services.EventPromotionApplied,
@@ -261,22 +320,7 @@ func (h *UserOrderHandler) applyPromotion(ctx context.Context, resp *orderRespon
 			"discount_cents": reservation.DiscountCents,
 		},
 	})
-
 	return nil
-}
-
-// isFirstPurchase reports whether userID has never had a paid order, which is
-// what a first_purchase_only code checks against - a cancelled or expired
-// order does not count as a purchase.
-func (h *UserOrderHandler) isFirstPurchase(ctx context.Context, userID string) (bool, error) {
-	var hasPaid bool
-	if err := h.db.QueryRow(ctx,
-		`SELECT EXISTS(SELECT 1 FROM plan_orders WHERE user_id = $1 AND status = 'paid')`,
-		userID,
-	).Scan(&hasPaid); err != nil {
-		return false, fmt.Errorf("check first purchase: %w", err)
-	}
-	return !hasPaid, nil
 }
 
 // settleZeroCostOrder grants a plan whose order was discounted to nothing
@@ -285,14 +329,20 @@ func (h *UserOrderHandler) isFirstPurchase(ctx context.Context, userID string) (
 // through the identical PaymentService.Settle state machine (idempotent
 // event ledger, order claim, plan grant) rather than a separate code path.
 func (h *UserOrderHandler) settleZeroCostOrder(ctx context.Context, orderID, userID string) error {
-	_, err := h.payment.Settle(ctx, payments.Confirmation{
+	result, err := h.payment.Settle(ctx, payments.Confirmation{
 		Provider:   "promotion",
 		ExternalID: "order:" + orderID,
 		OrderID:    orderID,
 		ActorType:  "user",
 		ActorID:    userID,
 	})
-	return err
+	if err != nil {
+		return err
+	}
+	if result.Outcome == services.SettleIgnored {
+		return errOrderNotPending
+	}
+	return nil
 }
 
 // List handles GET /api/v1/user/orders.
@@ -396,10 +446,9 @@ type applyPromotionRequest struct {
 // user attach or replace a promotion code on their own still-pending order -
 // the "apply now or apply later" case createOrderRequest.PromotionCode alone
 // cannot cover, since a code the user did not have yet at order creation is
-// still usable up until checkout starts. Replacing first releases whatever
-// code (if any) is already reserved on the order and restores its original
-// price, so re-validating the new code checks it against the undiscounted
-// total rather than compounding onto an already-discounted one.
+// still usable up until checkout starts. Replacement validates against the
+// undiscounted total. If the replacement is rejected, the previous reservation
+// and price remain intact; no partial change is committed.
 // @Summary Apply a promotion code to my pending order
 // @Description Attaches or replaces a promotion code on one of the authenticated user's own pending orders
 // @Tags user-orders
@@ -426,36 +475,11 @@ func (h *UserOrderHandler) ApplyPromotion(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "promotion_code is required"})
 	}
 
-	var resp orderResponse
-	var originalCents int64
-	err := h.db.QueryRow(ctx,
-		`SELECT o.id, o.plan_id, p.name, o.duration_days, o.price_cents + o.discount_cents, o.status
-		 FROM plan_orders o
-		 JOIN plans p ON p.id = o.plan_id
-		 WHERE o.id = $1 AND o.user_id = $2 AND o.status = 'pending'`,
-		orderID, userID,
-	).Scan(&resp.ID, &resp.PlanID, &resp.PlanName, &resp.DurationDays, &originalCents, &resp.Status)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-				"error": "order not found, not yours, or already resolved",
-			})
-		}
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "internal server error"})
-	}
-	resp.PriceCents = originalCents
-
-	if err := h.promotion.Release(ctx, orderID); err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "internal server error"})
-	}
-	if _, err := h.db.Exec(ctx,
-		`UPDATE plan_orders SET promotion_id = NULL, discount_cents = 0, price_cents = $2 WHERE id = $1`,
-		orderID, originalCents,
-	); err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "internal server error"})
-	}
-
+	resp := orderResponse{ID: orderID}
 	if err := h.applyPromotion(ctx, &resp, userID, req.PromotionCode); err != nil {
+		if errors.Is(err, errOrderNotPending) {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": errOrderNotPending.Error()})
+		}
 		var reject *services.PromotionRejectError
 		if errors.As(err, &reject) {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
