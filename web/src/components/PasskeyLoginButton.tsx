@@ -28,10 +28,10 @@ export default function PasskeyLoginButton({ onMessage, onLoadingChange, disable
     } catch (error) {
       const cancelled = error instanceof WebAuthnError && ["ERROR_CEREMONY_ABORTED", "ERROR_NOT_ALLOWED"].includes(error.code as string);
       if (cancelled || (error instanceof Error && error.name === "NotAllowedError")) {
-        onMessage({ type: "info", content: t("auth.passkey.cancelled"), dismissible: true });
+        onMessage({ type: "info", content: t("auth.passkey.cancelled"), dismissible: true, dismissLabel: t("common.close") });
       } else {
         const body = error instanceof ApiError ? error.body as { error?: string } | undefined : undefined;
-        onMessage({ type: "error", content: body?.error || t("auth.passkey.loginError"), dismissible: true });
+        onMessage({ type: "error", content: body?.error || t("auth.passkey.loginError"), dismissible: true, dismissLabel: t("common.close") });
       }
     } finally { setLoading(false); onLoadingChange(false); }
   };

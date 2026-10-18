@@ -61,7 +61,10 @@ test.describe("passkey authentication", () => {
     await page.goto("/login");
     await page.getByRole("button", { name: "Sign in with a passkey" }).click();
     await expect(page).toHaveURL(/\/login/);
-    await expect(page.getByText(/Passkey sign-in|passkey authentication/i)).toBeVisible({ timeout: 15_000 });
+    const failure = page.getByText(/Passkey sign-in|passkey authentication/i);
+    await expect(failure).toBeVisible({ timeout: 15_000 });
+    await page.getByRole("button", { name: "Close" }).click();
+    await expect(failure).toHaveCount(0);
     await cdp.detach();
   });
 

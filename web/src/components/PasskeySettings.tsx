@@ -45,10 +45,10 @@ export default function PasskeySettings({ onMessage }: Props) {
     } catch (error) {
       if (error instanceof ApiError && error.status === 403) setPasswordError(t("user.passkey.incorrectPassword"));
       else if (error instanceof WebAuthnError && ["ERROR_CEREMONY_ABORTED", "ERROR_NOT_ALLOWED", "ERROR_AUTHENTICATOR_PREVIOUSLY_REGISTERED"].includes(error.code)) {
-        onMessage({ type: "info", content: error.code === "ERROR_AUTHENTICATOR_PREVIOUSLY_REGISTERED" ? t("user.passkey.alreadyRegistered") : t("user.passkey.cancelled"), dismissible: true });
+        onMessage({ type: "info", content: error.code === "ERROR_AUTHENTICATOR_PREVIOUSLY_REGISTERED" ? t("user.passkey.alreadyRegistered") : t("user.passkey.cancelled"), dismissible: true, dismissLabel: t("common.close") });
       } else {
         const body = error instanceof ApiError ? error.body as { error?: string } | undefined : undefined;
-        onMessage({ type: "error", content: body?.error || t("user.passkey.addError"), dismissible: true });
+        onMessage({ type: "error", content: body?.error || t("user.passkey.addError"), dismissible: true, dismissLabel: t("common.close") });
       }
     } finally { setSaving(false); }
   };

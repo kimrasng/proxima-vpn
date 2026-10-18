@@ -76,7 +76,7 @@ export default function Login() {
       </Box>
 
       <SpaceBetween size="l">
-        {flash.length > 0 && <Flashbar items={flash} />}
+        {flash.length > 0 && <Flashbar items={flash} i18nStrings={{ ariaLabel: t("admin.notifications.title") }} />}
         <div className="auth-layout__card">
         <Container header={<Header variant="h1">{t("auth.login.title")}</Header>}>
           <Box padding={{ vertical: "l" }}>
@@ -115,7 +115,7 @@ export default function Login() {
                 <Button variant="primary" loading={loading} disabled={passkeyLoading} formAction="submit" fullWidth>
                   {t("auth.login.submit")}
                 </Button>
-                <PasskeyLoginButton disabled={passkeyLoading || loading} onMessage={(message) => setFlash([message])} onLoadingChange={setPasskeyLoading} />
+                <PasskeyLoginButton disabled={passkeyLoading || loading} onMessage={(message) => setFlash([{ ...message, id: "passkey-message", onDismiss: () => setFlash([]) }])} onLoadingChange={setPasskeyLoading} />
               </SpaceBetween>
             </Form>
           </form>
