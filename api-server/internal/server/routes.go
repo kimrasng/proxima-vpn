@@ -211,14 +211,16 @@ func (s *Server) registerRoutes() {
 		userAuthHandler.SetPasskeyServices(s.redis, wa, strings.HasPrefix(s.config.Server.PanelURL, "https://"))
 	}
 	if s.testMailerCodeLookup {
-		if s.mailer != nil {
+		// Only the explicitly enabled fake sender can expose codes, never SMTP.
+		if fakeMailer, ok := s.mailer.(*testSignupMailer); ok {
 			adminTest := api.Group("/__test__", middleware.AdminJWTMiddleware(s.config.JWT.Secret, s.db))
 			adminTest.Get("/signup-email-code", func(c *fiber.Ctx) error {
-				email := strings.TrimSpace(c.Query("email"))
+				c.Set(fiber.HeaderCacheControl, "no-store")
+				email := strings.ToLower(strings.TrimSpace(c.Query("email")))
 				if email == "" {
 					return c.SendStatus(fiber.StatusBadRequest)
 				}
-				code, found := s.mailer.LatestSignupCode(c.UserContext(), email)
+				code, found := fakeMailer.LatestSignupCode(c.UserContext(), email)
 				if !found {
 					return c.SendStatus(fiber.StatusNotFound)
 				}
@@ -232,8 +234,12 @@ func (s *Server) registerRoutes() {
 		return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{"error": "too many verification code requests; try again later"})
 	}})
 	auth.Post("/register/request-code", signupCodeLimiter, userAuthHandler.RequestSignupEmailCode)
-	auth.Post("/register/verify-code", signupCodeLimiter, userAuthHandler.VerifySignupEmailCode)
-	auth.Post("/register", signupCodeLimiter, userAuthHandler.VerifySignupEmailCode)
+	// Sending and verifying have independent budgets so requesting a code does
+	// not consume the attempts needed to verify it. Both verification aliases
+	// share the same limiter; the database also bounds guesses per challenge.
+	signupVerifyLimiter := limiter.New(limiter.Config{Max: 10, Expiration: 15 * time.Minute, KeyGenerator: func(c *fiber.Ctx) string { return c.IP() }})
+	auth.Post("/register/verify-code", signupVerifyLimiter, userAuthHandler.VerifySignupEmailCode)
+	auth.Post("/register", signupVerifyLimiter, userAuthHandler.Register)
 	auth.Get("/signup-policy", userAuthHandler.SignupPolicy)
 	auth.Post("/login", loginLimiter, userAuthHandler.Login)
 	auth.Post("/passkey/login/begin", loginLimiter, userAuthHandler.BeginPasskeyLogin)

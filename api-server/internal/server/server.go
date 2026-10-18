@@ -38,7 +38,8 @@ type Server struct {
 	payments      payments.Registry
 	// mailer is nil when SMTP is not configured; password reset then answers 503.
 	mailer mailerCodeLookup
-	// testMailerCodeLookup is nil unless explicitly enabled for automated e2e.
+	// testMailerCodeLookup is false unless explicitly enabled for automated e2e.
+	// Enabling it replaces SMTP with a fake sender; real mail is never exposed.
 	testMailerCodeLookup bool
 }
 
@@ -150,6 +151,7 @@ func NewServer(cfg *config.Config, db *pgxpool.Pool, rdb *redis.Client, backupSv
 		db:                   db,
 		redis:                rdb,
 		backupService:        backupSvc,
+		payments:             paymentProviders,
 		mailer:               mailer,
 		testMailerCodeLookup: testMailerCodeLookup,
 	}

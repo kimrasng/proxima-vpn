@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math/big"
 	netmail "net/mail"
 	"regexp"
 	"strings"
@@ -23,10 +24,9 @@ import (
 )
 
 const (
-	signupCodeTTL              = 10 * time.Minute
-	signupCodeResendCooldown   = 60 * time.Second
-	signupCodeMaxAttempts      = 5
-	signupCodeMaxRequestsPerIP = 5
+	signupCodeTTL            = 10 * time.Minute
+	signupCodeResendCooldown = 60 * time.Second
+	signupCodeMaxAttempts    = 5
 )
 
 var signupCodePattern = regexp.MustCompile(`^[0-9]{6}$`)
@@ -54,36 +54,53 @@ func (h *UserAuthHandler) signupCodeHash(email, code string) string {
 	return hex.EncodeToString(mac.Sum(nil))
 }
 
-func signupCode(ctx context.Context) (string, error) {
-	b := make([]byte, 4)
-	if _, err := rand.Read(b); err != nil {
+func signupCode() (string, error) {
+	v, err := rand.Int(rand.Reader, big.NewInt(1000000))
+	if err != nil {
 		return "", err
 	}
-	v := uint32(b[0])<<24 | uint32(b[1])<<16 | uint32(b[2])<<8 | uint32(b[3])
-	return fmt.Sprintf("%06d", v%1000000), nil
+	return fmt.Sprintf("%06d", v.Int64()), nil
 }
 
-func validateSignupInput(c *fiber.Ctx, h *UserAuthHandler, email, password, name string) error {
+func validateSignupInput(email, password, name string) error {
 	if email == "" || password == "" || name == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "email, password, and name are required"})
+		return fiber.NewError(fiber.StatusBadRequest, "email, password, and name are required")
 	}
 	if !emailRegex.MatchString(email) {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid email format"})
+		return fiber.NewError(fiber.StatusBadRequest, "invalid email format")
 	}
-	if on, allowed := loadSignupPolicy(c.UserContext(), h.db); !signupDomainAllowed(email, on, allowed) {
-		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "this email domain is not allowed to register", "allowed_domains": allowed})
+	if len(password) < 8 || len(password) > 72 {
+		return fiber.NewError(fiber.StatusBadRequest, "password must be 8-72 characters")
 	}
-	var exists bool
-	if err := h.db.QueryRow(c.UserContext(), `SELECT EXISTS(SELECT 1 FROM users WHERE lower(email)=lower($1))`, email).Scan(&exists); err != nil {
-		return c.SendStatus(fiber.StatusInternalServerError)
+	if len(name) > 128 {
+		return fiber.NewError(fiber.StatusBadRequest, "name is too long")
 	}
-	if exists {
-		return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "email already registered"})
-	}
-	if h.mailer == nil {
-		return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{"error": "email verification is unavailable"})
+	if _, err := netmail.ParseAddress(email); err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, "invalid email format")
 	}
 	return nil
+}
+
+// The boolean is explicit: JSON responses usually return nil, which must never
+// be mistaken for permission to continue. Read policy through the current
+// transaction when verifying, and fail closed on database errors.
+func checkSignupPolicy(c *fiber.Ctx, db settingsQuerier, email string) (bool, error) {
+	var registration, restriction, domains string
+	err := db.QueryRow(c.UserContext(), `SELECT
+		COALESCE((SELECT value FROM settings WHERE key='self_registration'), 'true'),
+		COALESCE((SELECT value FROM settings WHERE key=$1), 'false'),
+		COALESCE((SELECT value FROM settings WHERE key=$2), '')`, settingSignupDomainRestriction, settingSignupEmailDomains).Scan(&registration, &restriction, &domains)
+	if err != nil {
+		return false, c.SendStatus(fiber.StatusInternalServerError)
+	}
+	if strings.EqualFold(strings.TrimSpace(registration), "false") {
+		return false, c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "self-registration is disabled"})
+	}
+	allowed := normalizeEmailDomains(domains)
+	if !signupDomainAllowed(email, strings.EqualFold(strings.TrimSpace(restriction), "true"), allowed) {
+		return false, c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "this email domain is not allowed to register", "allowed_domains": allowed})
+	}
+	return true, nil
 }
 
 // RequestSignupEmailCode validates the registration details, stores a short-lived
@@ -92,40 +109,32 @@ func (h *UserAuthHandler) RequestSignupEmailCode(c *fiber.Ctx) error {
 	if h.db == nil {
 		return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{"error": "email verification is unavailable"})
 	}
-	var disabled bool
-	if err := h.db.QueryRow(c.UserContext(), `SELECT value='false' FROM settings WHERE key='self_registration'`).Scan(&disabled); err == nil && disabled {
-		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "self-registration is disabled"})
-	}
 	var req signupVerificationRequest
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
 	}
-	req.Email = strings.TrimSpace(req.Email)
+	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
 	req.Name = strings.TrimSpace(req.Name)
-	if err := validateSignupInput(c, h, req.Email, req.Password, req.Name); err != nil {
+	if err := validateSignupInput(req.Email, req.Password, req.Name); err != nil {
 		return err
 	}
-	if len(req.Password) < 8 || len(req.Password) > 72 {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "password must be 8-72 characters"})
+	if ok, err := checkSignupPolicy(c, h.db, req.Email); !ok {
+		return err
 	}
-	if len(req.Name) > 128 {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "name is too long"})
+	var exists bool
+	if err := h.db.QueryRow(c.UserContext(), `SELECT EXISTS(SELECT 1 FROM users WHERE lower(email)=$1)`, req.Email).Scan(&exists); err != nil {
+		return c.SendStatus(fiber.StatusInternalServerError)
 	}
-	if _, err := netmail.ParseAddress(req.Email); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid email format"})
+	if exists {
+		return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "email already registered"})
+	}
+	if h.mailer == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{"error": "email verification is unavailable"})
 	}
 	if req.ReferralCode != "" && len(req.ReferralCode) > 128 {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "referral code is too long"})
 	}
-	var sentAt time.Time
-	err := h.db.QueryRow(c.UserContext(), `SELECT sent_at FROM signup_email_verifications WHERE lower(email)=lower($1)`, req.Email).Scan(&sentAt)
-	if err == nil && time.Since(sentAt) < signupCodeResendCooldown {
-		return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{"error": "please wait before requesting another code"})
-	}
-	if err != nil && err != pgx.ErrNoRows {
-		return c.SendStatus(fiber.StatusInternalServerError)
-	}
-	code, err := signupCode(c.UserContext())
+	code, err := signupCode()
 	if err != nil {
 		return c.SendStatus(fiber.StatusInternalServerError)
 	}
@@ -142,9 +151,12 @@ func (h *UserAuthHandler) RequestSignupEmailCode(c *fiber.Ctx) error {
 		return c.SendStatus(fiber.StatusInternalServerError)
 	}
 	defer func() { _ = tx.Rollback(c.UserContext()) }()
-	_, err = tx.Exec(c.UserContext(), `INSERT INTO signup_email_verifications(email,code_hash,payload,expires_at,sent_at,attempts) VALUES($1,$2,$3,$4,NOW(),0) ON CONFLICT(email) DO UPDATE SET code_hash=EXCLUDED.code_hash,payload=EXCLUDED.payload,expires_at=EXCLUDED.expires_at,sent_at=NOW(),attempts=0`, req.Email, h.signupCodeHash(req.Email, code), string(payload), time.Now().Add(signupCodeTTL))
+	result, err := tx.Exec(c.UserContext(), `INSERT INTO signup_email_verifications(email,code_hash,payload,expires_at,sent_at,attempts) VALUES($1,$2,$3,$4,NOW(),0) ON CONFLICT(email) DO UPDATE SET code_hash=EXCLUDED.code_hash,payload=EXCLUDED.payload,expires_at=EXCLUDED.expires_at,sent_at=NOW(),attempts=0 WHERE signup_email_verifications.sent_at <= NOW() - $5 * INTERVAL '1 second'`, req.Email, h.signupCodeHash(req.Email, code), string(payload), time.Now().Add(signupCodeTTL), int(signupCodeResendCooldown.Seconds()))
 	if err != nil {
 		return c.SendStatus(fiber.StatusInternalServerError)
+	}
+	if result.RowsAffected() == 0 {
+		return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{"error": "please wait before requesting another code"})
 	}
 	if err = h.mailer.Send(c.UserContext(), mail.Message{To: req.Email, Subject: signupVerificationSubject(req.Language), Body: signupVerificationBody(req.Language, code)}); err != nil {
 		log.Printf("signup verification email failed: %v", err)
@@ -166,7 +178,7 @@ func (h *UserAuthHandler) VerifySignupEmailCode(c *fiber.Ctx) error {
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
 	}
-	req.Email = strings.TrimSpace(req.Email)
+	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
 	req.Code = strings.TrimSpace(req.Code)
 	if req.Email == "" || !signupCodePattern.MatchString(req.Code) {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "enter the 6-digit verification code"})
@@ -187,9 +199,13 @@ func (h *UserAuthHandler) VerifySignupEmailCode(c *fiber.Ctx) error {
 	if err != nil {
 		return c.SendStatus(fiber.StatusInternalServerError)
 	}
-	if time.Now().After(expires) {
-		_, _ = tx.Exec(c.UserContext(), `DELETE FROM signup_email_verifications WHERE lower(email)=lower($1)`, req.Email)
-		_ = tx.Commit(c.UserContext())
+	if !time.Now().Before(expires) {
+		if _, err = tx.Exec(c.UserContext(), `DELETE FROM signup_email_verifications WHERE lower(email)=lower($1)`, req.Email); err != nil {
+			return c.SendStatus(fiber.StatusInternalServerError)
+		}
+		if err = tx.Commit(c.UserContext()); err != nil {
+			return c.SendStatus(fiber.StatusInternalServerError)
+		}
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "verification code expired; request a new one"})
 	}
 	if attempts >= signupCodeMaxAttempts {
@@ -197,20 +213,20 @@ func (h *UserAuthHandler) VerifySignupEmailCode(c *fiber.Ctx) error {
 	}
 	expected := h.signupCodeHash(req.Email, req.Code)
 	if subtle.ConstantTimeCompare([]byte(storedHash), []byte(expected)) != 1 {
-		_, _ = tx.Exec(c.UserContext(), `UPDATE signup_email_verifications SET attempts=attempts+1 WHERE lower(email)=lower($1)`, req.Email)
-		_ = tx.Commit(c.UserContext())
+		if _, err = tx.Exec(c.UserContext(), `UPDATE signup_email_verifications SET attempts=attempts+1 WHERE lower(email)=lower($1)`, req.Email); err != nil {
+			return c.SendStatus(fiber.StatusInternalServerError)
+		}
+		if err = tx.Commit(c.UserContext()); err != nil {
+			return c.SendStatus(fiber.StatusInternalServerError)
+		}
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "incorrect verification code"})
 	}
 	var pending pendingSignup
 	if err = json.Unmarshal(payloadRaw, &pending); err != nil {
 		return c.SendStatus(fiber.StatusInternalServerError)
 	}
-	var disabled bool
-	if err := tx.QueryRow(c.UserContext(), `SELECT value='false' FROM settings WHERE key='self_registration'`).Scan(&disabled); err == nil && disabled {
-		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "self-registration is disabled"})
-	}
-	if on, allowed := loadSignupPolicy(c.UserContext(), h.db); !signupDomainAllowed(pending.Email, on, allowed) {
-		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "this email domain is not allowed to register", "allowed_domains": allowed})
+	if ok, err := checkSignupPolicy(c, tx, pending.Email); !ok {
+		return err
 	}
 	var exists bool
 	if err = tx.QueryRow(c.UserContext(), `SELECT EXISTS(SELECT 1 FROM users WHERE lower(email)=lower($1))`, pending.Email).Scan(&exists); err != nil {

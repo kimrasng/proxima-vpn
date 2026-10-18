@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	"log"
 	"regexp"
 	"sync"
 	"time"
@@ -86,124 +85,9 @@ type registerResponse struct {
 	SubToken string `json:"sub_token"`
 }
 
-// Register handles user self-registration.
-// @Summary User registration
-// @Description Register a new user account
-// @Tags user-auth
-// @Accept json
-// @Produce json
-// @Param body body registerRequest true "Registration details"
-// @Success 201 {object} registerResponse
-// @Failure 400 {object} map[string]string
-// @Failure 409 {object} map[string]string
-// @Router /auth/register [post]
+// Register retains the legacy endpoint without allowing unverified accounts.
 func (h *UserAuthHandler) Register(c *fiber.Ctx) error {
-	// self_registration defaults to enabled (matching the admin Settings UI's
-	// default, web/src/pages/admin/Settings.tsx) when the key hasn't been set
-	// yet; only an explicit "false" blocks registration. Previously this
-	// setting was saved by the admin panel but never read anywhere, so
-	// disabling it had no effect - registration stayed open regardless.
-	var selfRegDisabled bool
-	if err := h.db.QueryRow(
-		context.Background(),
-		`SELECT value = 'false' FROM settings WHERE key = 'self_registration'`,
-	).Scan(&selfRegDisabled); err == nil && selfRegDisabled {
-		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
-			"error": "self-registration is disabled",
-		})
-	}
-
-	var req registerRequest
-	if err := c.BodyParser(&req); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "invalid request body",
-		})
-	}
-
-	if req.Email == "" || req.Password == "" || req.Name == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "email, password, and name are required",
-		})
-	}
-
-	if !emailRegex.MatchString(req.Email) {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "invalid email format",
-		})
-	}
-
-	// Admin-configurable allow-list of email domains (Settings > Registration).
-	// Off unless an admin turns it on, so existing installs keep working.
-	if on, allowed := loadSignupPolicy(c.UserContext(), h.db); !signupDomainAllowed(req.Email, on, allowed) {
-		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
-			"error":           "this email domain is not allowed to register",
-			"allowed_domains": allowed,
-		})
-	}
-
-	var exists bool
-	err := h.db.QueryRow(
-		context.Background(),
-		`SELECT EXISTS(SELECT 1 FROM users WHERE email = $1)`,
-		req.Email,
-	).Scan(&exists)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "internal server error",
-		})
-	}
-	if exists {
-		return c.Status(fiber.StatusConflict).JSON(fiber.Map{
-			"error": "email already registered",
-		})
-	}
-
-	passwordHash, err := crypto.HashPassword(req.Password)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "internal server error",
-		})
-	}
-
-	subToken := crypto.NewUUID()
-
-	var id string
-	err = h.db.QueryRow(
-		context.Background(),
-		`INSERT INTO users (email, password_hash, name, sub_token, status)
-		 VALUES ($1, $2, $3, $4, 'pending')
-		 RETURNING id`,
-		req.Email, passwordHash, req.Name, subToken,
-	).Scan(&id)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "internal server error",
-		})
-	}
-
-	h.activity.Log(context.Background(), services.Record{
-		EventType:  services.EventUserRegistered,
-		Severity:   services.SeverityInfo,
-		ActorType:  "user",
-		ActorID:    id,
-		ActorLabel: req.Name,
-		TargetType: "user",
-		TargetID:   id,
-		Detail:     map[string]any{"email": req.Email},
-	})
-
-	go func() {
-		if err := h.telegram.NotifyNewRegistration(context.Background(), req.Email); err != nil {
-			log.Printf("telegram registration alert: %v", err)
-		}
-	}()
-
-	return c.Status(fiber.StatusCreated).JSON(registerResponse{
-		ID:       id,
-		Email:    req.Email,
-		Name:     req.Name,
-		SubToken: subToken,
-	})
+	return h.VerifySignupEmailCode(c)
 }
 
 type userLoginRequest struct {

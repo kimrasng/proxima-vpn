@@ -1,4 +1,4 @@
-package handlers_test
+package handlers
 
 import (
 	"context"
@@ -8,20 +8,29 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/proximavpn/proxima-vpn/api-server/internal/config"
-	"github.com/proximavpn/proxima-vpn/api-server/internal/handlers"
 	"github.com/proximavpn/proxima-vpn/api-server/internal/mail"
 	"github.com/proximavpn/proxima-vpn/api-server/internal/services"
 )
 
-type signupCodeMailer struct{ messages []mail.Message }
+type signupCodeMailer struct {
+	mu       sync.Mutex
+	messages []mail.Message
+	err      error
+}
 
 func (m *signupCodeMailer) Send(_ context.Context, msg mail.Message) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.err != nil {
+		return m.err
+	}
 	m.messages = append(m.messages, msg)
 	return nil
 }
@@ -48,8 +57,9 @@ func signupVerificationDB(t *testing.T) *pgxpool.Pool {
 func TestSignupEmailCodeMustBeVerifiedBeforeAccountCreation(t *testing.T) {
 	pool := signupVerificationDB(t)
 	ctx := context.Background()
+	setSignupSettings(t, pool, "false", "")
 	mailer := &signupCodeMailer{}
-	h := handlers.NewUserAuthHandler(pool, "signup-code-test-secret", time.Hour, services.NewTelegramService(pool, config.TelegramConfig{}), mailer, "https://panel.example.test")
+	h := NewUserAuthHandler(pool, "signup-code-test-secret", time.Hour, services.NewTelegramService(pool, config.TelegramConfig{}), mailer, "https://panel.example.test")
 	app := fiber.New()
 	app.Post("/request", h.RequestSignupEmailCode)
 	app.Post("/verify", h.VerifySignupEmailCode)

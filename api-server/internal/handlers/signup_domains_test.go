@@ -139,9 +139,9 @@ func setSignupSettings(t *testing.T, pool *pgxpool.Pool, restriction, domains st
 func registerStatus(t *testing.T, pool *pgxpool.Pool, email string) (int, map[string]any) {
 	t.Helper()
 	// A real (disabled) Telegram service: a successful signup notifies it in the background.
-	h := NewUserAuthHandler(pool, "test-secret", 0, services.NewTelegramService(pool, config.TelegramConfig{}), nil, "")
+	h := NewUserAuthHandler(pool, "test-secret", 0, services.NewTelegramService(pool, config.TelegramConfig{}), &signupCodeMailer{}, "")
 	app := fiber.New()
-	app.Post("/register", h.Register)
+	app.Post("/register", h.RequestSignupEmailCode)
 	body, _ := json.Marshal(map[string]string{"email": email, "password": "Passw0rd!xyz", "name": "T"})
 	req := httptest.NewRequest("POST", "/register", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
@@ -159,7 +159,9 @@ func TestRegister_DomainRestriction(t *testing.T) {
 	pool := signupTestDB(t)
 	ctx := context.Background()
 	uniq := fmt.Sprintf("%d", os.Getpid())
-	cleanup := func(email string) { _, _ = pool.Exec(ctx, `DELETE FROM users WHERE email = $1`, email) }
+	cleanup := func(email string) {
+		_, _ = pool.Exec(ctx, `DELETE FROM signup_email_verifications WHERE email = $1`, email)
+	}
 
 	t.Run("restriction on: listed domain registers, others are refused with the allow-list", func(t *testing.T) {
 		setSignupSettings(t, pool, "true", "gmail.com, qq.com")
@@ -167,8 +169,8 @@ func TestRegister_DomainRestriction(t *testing.T) {
 		badEmail := "dom-bad-" + uniq + "@company.example"
 		t.Cleanup(func() { cleanup(okEmail); cleanup(badEmail) })
 
-		if code, _ := registerStatus(t, pool, okEmail); code != fiber.StatusCreated {
-			t.Fatalf("listed domain: status %d, want 201", code)
+		if code, _ := registerStatus(t, pool, okEmail); code != fiber.StatusOK {
+			t.Fatalf("listed domain: status %d, want 200", code)
 		}
 		code, body := registerStatus(t, pool, badEmail)
 		if code != fiber.StatusForbidden {
@@ -189,8 +191,8 @@ func TestRegister_DomainRestriction(t *testing.T) {
 		setSignupSettings(t, pool, "false", "gmail.com")
 		email := "dom-off-" + uniq + "@company.example"
 		t.Cleanup(func() { cleanup(email) })
-		if code, _ := registerStatus(t, pool, email); code != fiber.StatusCreated {
-			t.Fatalf("status %d, want 201", code)
+		if code, _ := registerStatus(t, pool, email); code != fiber.StatusOK {
+			t.Fatalf("status %d, want 200", code)
 		}
 	})
 
@@ -208,8 +210,8 @@ func TestRegister_DomainRestriction(t *testing.T) {
 		_, _ = pool.Exec(ctx, `DELETE FROM settings WHERE key IN ($1,$2)`, settingSignupDomainRestriction, settingSignupEmailDomains)
 		email := "dom-unset-" + uniq + "@company.example"
 		t.Cleanup(func() { cleanup(email) })
-		if code, _ := registerStatus(t, pool, email); code != fiber.StatusCreated {
-			t.Fatalf("status %d, want 201", code)
+		if code, _ := registerStatus(t, pool, email); code != fiber.StatusOK {
+			t.Fatalf("status %d, want 200", code)
 		}
 	})
 }
