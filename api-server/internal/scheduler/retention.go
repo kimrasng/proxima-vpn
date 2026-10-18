@@ -40,6 +40,11 @@ const (
 	updateBatchSize = 20000
 )
 
+// passwordResetRetention keeps a password reset token row for a week after it
+// expires, enough to answer "did my link expire or get used?" before the sweep
+// drops it.
+const passwordResetRetention = 7 * 24 * time.Hour
+
 // RetentionScheduler trims append-only telemetry tables to a bounded window.
 type RetentionScheduler struct {
 	db     *pgxpool.Pool
@@ -89,6 +94,9 @@ func (s *RetentionScheduler) run(ctx context.Context) {
 	// grows without a sweep. Kept longer than the activity feed because it is the
 	// audit trail an operator reaches for after the fact.
 	s.prune(ctx, "login_history", "created_at", loginHistoryRetention)
+	// Reset tokens are single-use and short-lived, so an expired row is dead
+	// weight; this table is also fed by an unauthenticated endpoint.
+	s.prune(ctx, "password_reset_tokens", "expires_at", passwordResetRetention)
 	// plan_orders tracking fields (checkout audit) are NULLed rather than deleted
 	// to preserve all financial evidence (order status, payment events, grant timestamps).
 	s.purgeColumns(ctx)

@@ -1,19 +1,23 @@
 import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
+  Box,
   Button,
   Container,
   Flashbar,
   Form,
   FormField,
   Header,
+  Icon,
   Input,
   SpaceBetween,
 } from "@cloudscape-design/components";
 import type { FlashbarProps } from "@cloudscape-design/components";
 import { userLogin, setToken } from "../../api/auth";
 import { ApiError } from "../../api/client";
+import PortalHighlights from "../../components/PortalHighlights";
+import AuthLink from "../../components/AuthLink";
 
 export default function Login() {
   const { t } = useTranslation();
@@ -41,26 +45,15 @@ export default function Login() {
       setToken("user", res.token);
       navigate("/portal/dashboard", { replace: true });
     } catch (err) {
-      if (err instanceof ApiError) {
-        const body = err.body as { error?: string } | undefined;
-        setFlash([
-          {
-            type: "error",
-            content: body?.error || t("auth.login.error"),
-            dismissible: true,
-            onDismiss: () => setFlash([]),
-          },
-        ]);
-      } else {
-        setFlash([
-          {
-            type: "error",
-            content: t("auth.login.error"),
-            dismissible: true,
-            onDismiss: () => setFlash([]),
-          },
-        ]);
-      }
+      const body = err instanceof ApiError ? (err.body as { error?: string } | undefined) : undefined;
+      setFlash([
+        {
+          type: "error",
+          content: body?.error || t("auth.login.error"),
+          dismissible: true,
+          onDismiss: () => setFlash([]),
+        },
+      ]);
     } finally {
       setLoading(false);
     }
@@ -68,47 +61,70 @@ export default function Login() {
 
   return (
     <SpaceBetween size="l">
-      <Flashbar items={flash} />
-      <Container header={<Header variant="h1">{t("auth.login.title")}</Header>}>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            void handleSubmit();
-          }}
-        >
-          <Form
-            actions={
-              <SpaceBetween direction="horizontal" size="xs">
-                <Button variant="primary" loading={loading} formAction="submit">
+      <Box textAlign="center">
+        <SpaceBetween size="xxs" alignItems="center">
+          <span className="auth-layout__brand">
+            <Icon name="lock-private" size="medium" />
+            <Box variant="div" fontSize="heading-xl" fontWeight="bold" padding="n">
+              {t("auth.portal.name")}
+            </Box>
+          </span>
+          <Box color="text-body-secondary">{t("auth.portal.tagline")}</Box>
+        </SpaceBetween>
+      </Box>
+
+      <SpaceBetween size="l">
+        {flash.length > 0 && <Flashbar items={flash} />}
+        <div className="auth-layout__card">
+        <Container header={<Header variant="h1">{t("auth.login.title")}</Header>}>
+          <Box padding={{ vertical: "l" }}>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              void handleSubmit();
+            }}
+          >
+            <Form>
+              <SpaceBetween size="xl">
+                <FormField label={t("auth.login.email")} errorText={showErrors ? errors.email : undefined}>
+                  <Input
+                    value={email}
+                    onChange={({ detail }) => setEmail(detail.value)}
+                    type="email"
+                    placeholder="name@example.com"
+                    autoComplete="email"
+                    autoFocus
+                  />
+                </FormField>
+                <div className="auth-layout__field-with-link">
+                  <FormField label={t("auth.login.password")} errorText={showErrors ? errors.password : undefined}>
+                    <Input
+                      value={password}
+                      onChange={({ detail }) => setPassword(detail.value)}
+                      type="password"
+                      autoComplete="current-password"
+                    />
+                  </FormField>
+                  {/* Outside the <label> so it does not become part of the input's accessible name. */}
+                  <div className="auth-layout__field-link">
+                    <AuthLink to="/forgot-password">{t("auth.login.forgotPassword")}</AuthLink>
+                  </div>
+                </div>
+                <Button variant="primary" loading={loading} formAction="submit" fullWidth>
                   {t("auth.login.submit")}
                 </Button>
               </SpaceBetween>
-            }
-          >
-            <SpaceBetween size="m">
-              <FormField label={t("auth.login.email")} errorText={showErrors ? errors.email : undefined}>
-                <Input
-                  value={email}
-                  onChange={({ detail }) => setEmail(detail.value)}
-                  type="email"
-                  placeholder="user@example.com"
-                  autoFocus
-                />
-              </FormField>
-              <FormField label={t("auth.login.password")} errorText={showErrors ? errors.password : undefined}>
-                <Input
-                  value={password}
-                  onChange={({ detail }) => setPassword(detail.value)}
-                  type="password"
-                />
-              </FormField>
-            </SpaceBetween>
-          </Form>
-        </form>
-        <div style={{ marginTop: "1rem", textAlign: "center" }}>
-          <Link to="/register">{t("auth.login.registerLink")}</Link>
+            </Form>
+          </form>
+          </Box>
+          <Box textAlign="center" margin={{ top: "l" }}>
+            <AuthLink to="/register">{t("auth.login.registerLink")}</AuthLink>
+          </Box>
+        </Container>
         </div>
-      </Container>
+      </SpaceBetween>
+
+      <PortalHighlights />
     </SpaceBetween>
   );
 }

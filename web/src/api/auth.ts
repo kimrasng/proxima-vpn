@@ -1,4 +1,4 @@
-import { post, setClientTokenType } from './client';
+import { get, post, setClientTokenType } from './client';
 import {
   getAdminToken,
   getUserToken,
@@ -20,6 +20,32 @@ export function userLogin(req: LoginRequest): Promise<LoginResponse> {
 
 export function userRegister(req: RegisterRequest): Promise<RegisterResponse> {
   return post<RegisterResponse>('/api/v1/auth/register', req);
+}
+
+export type ResetLanguage = 'ko' | 'en' | 'zh';
+
+export interface MessageResponse {
+  message: string;
+}
+
+// The server answers 200 whether or not the address belongs to an account, so
+// callers must not infer account existence from the result.
+export function forgotPassword(req: { email: string; language: ResetLanguage }): Promise<MessageResponse> {
+  return post<MessageResponse>('/api/v1/auth/forgot-password', req);
+}
+
+export function resetPassword(req: { token: string; password: string }): Promise<MessageResponse> {
+  return post<MessageResponse>('/api/v1/auth/reset-password', req);
+}
+
+export interface SignupPolicy {
+  restricted: boolean;
+  allowed_domains: string[];
+}
+
+// Public: lets the sign-up page show the allowed email domains before anyone types.
+export function getSignupPolicy(): Promise<SignupPolicy> {
+  return get<SignupPolicy>('/api/v1/auth/signup-policy');
 }
 
 export function getToken(type: 'admin' | 'user'): string | null {

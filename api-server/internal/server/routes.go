@@ -203,10 +203,42 @@ func (s *Server) registerRoutes() {
 	nodeAgent.Get("/update/download", nodeAgentHandler.DownloadUpdate)
 	nodeAgent.Get("/xray-update", nodeAgentHandler.CheckXrayUpdate)
 
-	userAuthHandler := handlers.NewUserAuthHandler(s.db, s.config.JWT.Secret, s.parseUserExpiry(), services.NewTelegramService(s.db, s.config.Telegram))
+	userAuthHandler := handlers.NewUserAuthHandler(s.db, s.config.JWT.Secret, s.parseUserExpiry(), services.NewTelegramService(s.db, s.config.Telegram), s.mailer, s.config.Server.PanelURL)
 	auth := api.Group("/auth")
 	auth.Post("/register", userAuthHandler.Register)
+	auth.Get("/signup-policy", userAuthHandler.SignupPolicy)
 	auth.Post("/login", loginLimiter, userAuthHandler.Login)
+
+	// Password reset is stricter than login: each accepted request can send an
+	// email, and the reset endpoint guesses at 256-bit tokens. Both are keyed
+	// by client address (c.IP(), which only honours the proxy header from a
+	// trusted proxy) on top of the global 100 req/min limiter.
+	forgotPasswordLimiter := limiter.New(limiter.Config{
+		Max:        5,
+		Expiration: 15 * time.Minute,
+		KeyGenerator: func(c *fiber.Ctx) string {
+			return c.IP()
+		},
+		LimitReached: func(c *fiber.Ctx) error {
+			return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
+				"error": "too many password reset requests, try again later",
+			})
+		},
+	})
+	resetPasswordLimiter := limiter.New(limiter.Config{
+		Max:        10,
+		Expiration: 15 * time.Minute,
+		KeyGenerator: func(c *fiber.Ctx) string {
+			return c.IP()
+		},
+		LimitReached: func(c *fiber.Ctx) error {
+			return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
+				"error": "too many password reset attempts, try again later",
+			})
+		},
+	})
+	auth.Post("/forgot-password", forgotPasswordLimiter, userAuthHandler.ForgotPassword)
+	auth.Post("/reset-password", resetPasswordLimiter, userAuthHandler.ResetPassword)
 
 	user := api.Group("/user")
 	user.Use(middleware.UserJWTMiddleware(s.config.JWT.Secret, s.db))

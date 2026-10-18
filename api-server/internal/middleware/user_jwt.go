@@ -3,6 +3,7 @@ package middleware
 import (
 	"context"
 	"strings"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/golang-jwt/jwt/v5"
@@ -55,12 +56,23 @@ func UserJWTMiddleware(secret string, db *pgxpool.Pool) fiber.Handler {
 		// already does the equivalent check for admin accounts.
 		var isActive bool
 		var status string
+		var passwordChangedAt *time.Time
 		err = db.QueryRow(context.Background(),
-			"SELECT is_active, status FROM users WHERE id = $1", claims.UserID,
-		).Scan(&isActive, &status)
+			"SELECT is_active, status, password_changed_at FROM users WHERE id = $1", claims.UserID,
+		).Scan(&isActive, &status, &passwordChangedAt)
 		if err != nil || !isActive || status == "suspended" {
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 				"error": "account not found or suspended",
+			})
+		}
+
+		// A password reset ends every session that predates it. iat has
+		// one-second resolution, so compare whole seconds: a login performed
+		// right after the reset (same second) must keep working.
+		if passwordChangedAt != nil &&
+			(claims.IssuedAt == nil || claims.IssuedAt.Unix() < passwordChangedAt.Unix()) {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"error": "session expired, please sign in again",
 			})
 		}
 

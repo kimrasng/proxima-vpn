@@ -182,7 +182,30 @@ CREATE TABLE IF NOT EXISTS inbounds (
 );
 CREATE INDEX IF NOT EXISTS idx_inbounds_node_id ON inbounds(node_id);
 
+-- Single-use password reset links. Only the SHA-256 of the emailed token is
+-- stored, so a database read cannot be turned into working reset links. The
+-- retention sweep drops rows a week after they expire.
+CREATE TABLE IF NOT EXISTS password_reset_tokens (
+    id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token_hash TEXT NOT NULL UNIQUE,
+    expires_at TIMESTAMPTZ NOT NULL,
+    used_at    TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    request_ip TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_user_id ON password_reset_tokens(user_id);
+
 INSERT INTO settings (key, value) VALUES ('subscription_update_interval', '3600')
+ON CONFLICT (key) DO NOTHING;
+
+-- Signup email-domain allow-list (Admin > Settings > Registration). Seeded OFF so
+-- an existing install keeps accepting every address until an admin enables it.
+-- DO NOTHING keeps whatever an admin has already saved.
+INSERT INTO settings (key, value) VALUES ('signup_email_domain_restriction', 'false')
+ON CONFLICT (key) DO NOTHING;
+INSERT INTO settings (key, value) VALUES ('signup_email_domains',
+  'gmail.com, qq.com, 163.com, yahoo.com, sina.com, 126.com, outlook.com, yeah.net, foxmail.com, icloud.com, hotmail.com, aliyun.com, sohu.com, mail.com, live.com, protonmail.com')
 ON CONFLICT (key) DO NOTHING;
 `
 
@@ -525,6 +548,10 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) (migrateErr error) {
 
 		// Empty means the panel default, so existing users keep their output.
 		`ALTER TABLE users ADD COLUMN IF NOT EXISTS language TEXT NOT NULL DEFAULT ''`,
+
+		// Set when a password reset completes. UserJWTMiddleware rejects a token
+		// issued before it, so a reset ends every session that predates it.
+		`ALTER TABLE users ADD COLUMN IF NOT EXISTS password_changed_at TIMESTAMPTZ`,
 
 		// Separate from nodes.name so that name survives as the fallback.
 		`CREATE TABLE IF NOT EXISTS node_labels (

@@ -54,6 +54,8 @@ const (
 	EventNodeInboundToggled      = "node.inbound_toggled"
 
 	EventSessionTerminated = "session.terminated"
+
+	EventUserPasswordReset = "user.password_reset"
 )
 
 // NodeEventTypes enumerates the events recorded against a node target and backs

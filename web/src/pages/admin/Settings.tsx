@@ -12,6 +12,7 @@ import {
   SpaceBetween,
   Spinner,
   Table,
+  Textarea,
   Toggle,
 } from "@cloudscape-design/components";
 import { getSettings, updateSettings, triggerBackup, listBackups, getBackupDownloadUrl } from "../../api/admin";
@@ -29,6 +30,8 @@ interface SettingsForm {
   telegram_chat_id: string;
   session_timeout: string;
   self_registration: boolean;
+  signup_email_domain_restriction: boolean;
+  signup_email_domains: string;
   subscription_update_interval: string;
 }
 
@@ -44,8 +47,25 @@ const defaultForm: SettingsForm = {
   telegram_chat_id: "",
   session_timeout: "3600",
   self_registration: true,
+  signup_email_domain_restriction: false,
+  // Same list the server seeds, so the field is never empty-looking before the first load.
+  signup_email_domains:
+    "gmail.com, qq.com, 163.com, yahoo.com, sina.com, 126.com, outlook.com, yeah.net, foxmail.com, icloud.com, hotmail.com, aliyun.com, sohu.com, mail.com, live.com, protonmail.com",
   subscription_update_interval: "60",
 };
+
+// Mirrors the server's normalisation so the admin sees exactly what will be stored.
+function parseDomains(raw: string): string[] {
+  const seen = new Set<string>();
+  for (const part of raw.split(/[\s,;]+/)) {
+    let d = part.trim().toLowerCase();
+    const at = d.lastIndexOf("@");
+    if (at >= 0) d = d.slice(at + 1);
+    d = d.replace(/^\.+|\.+$/g, "");
+    if (/^(?=.{3,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/.test(d)) seen.add(d);
+  }
+  return [...seen];
+}
 
 export default function Settings() {
   const { t } = useTranslation();
@@ -117,11 +137,23 @@ export default function Settings() {
     }
   };
 
+  const domainList = parseDomains(form.signup_email_domains);
+
   const handleSave = async () => {
+    if (form.signup_email_domain_restriction && domainList.length === 0) {
+      // Saving this would lock every new user out of registration.
+      setError(t("admin.settings.signupDomainsEmpty"));
+      return;
+    }
     setSaving(true);
     setSuccess(false);
     try {
-      await updateSettings(form as unknown as Record<string, unknown>);
+      // Store the cleaned list, not the raw text, so what the server enforces is what the admin saw.
+      await updateSettings({
+        ...(form as unknown as Record<string, unknown>),
+        signup_email_domains: domainList.join(", "),
+      });
+      setForm((current) => ({ ...current, signup_email_domains: domainList.join(", ") }));
       setSuccess(true);
       setError(null);
     } catch {
@@ -247,12 +279,39 @@ export default function Settings() {
         </Container>
 
         <Container header={<Header variant="h2">{t("admin.settings.registration")}</Header>}>
-          <Toggle
-            checked={form.self_registration}
-            onChange={({ detail }) => setForm({ ...form, self_registration: detail.checked })}
-          >
-            {t("admin.settings.selfRegistration")}
-          </Toggle>
+          <SpaceBetween size="m">
+            <Toggle
+              checked={form.self_registration}
+              onChange={({ detail }) => setForm({ ...form, self_registration: detail.checked })}
+            >
+              {t("admin.settings.selfRegistration")}
+            </Toggle>
+            <Toggle
+              checked={form.signup_email_domain_restriction}
+              onChange={({ detail }) => setForm({ ...form, signup_email_domain_restriction: detail.checked })}
+              description={t("admin.settings.signupDomainRestrictionHint")}
+            >
+              {t("admin.settings.signupDomainRestriction")}
+            </Toggle>
+            <FormField
+              label={t("admin.settings.signupDomains")}
+              description={t("admin.settings.signupDomainsHint")}
+              errorText={
+                form.signup_email_domain_restriction && domainList.length === 0
+                  ? t("admin.settings.signupDomainsEmpty")
+                  : undefined
+              }
+              constraintText={t("admin.settings.signupDomainsCount", { count: domainList.length })}
+            >
+              <Textarea
+                value={form.signup_email_domains}
+                rows={5}
+                disabled={!form.signup_email_domain_restriction}
+                placeholder="gmail.com, qq.com"
+                onChange={({ detail }) => setForm({ ...form, signup_email_domains: detail.value })}
+              />
+            </FormField>
+          </SpaceBetween>
         </Container>
 
         <Container header={<Header variant="h2">{t("admin.settings.subscription")}</Header>}>

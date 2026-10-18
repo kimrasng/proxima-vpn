@@ -4,9 +4,7 @@
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 24px;
+  gap: 16px;
   padding: 24px;
 }
 
@@ -14,15 +12,73 @@
   align-self: flex-end;
 }
 
-.auth-layout__form {
+/* Icon, text and the dropdown caret must stay on one line. */
+.auth-layout__lang-label {
+  display: inline-flex;
+  align-items: center;
+  /* The button's own caret sits ~12px from the text once its internal padding is
+     counted; match that here so globe-text and text-caret read as even. */
+  gap: 10px;
+  white-space: nowrap;
+}
+
+/*
+ * Content is anchored near the top instead of vertically centred. Centring made
+ * the whole column shift whenever its height changed (validation errors, an
+ * error banner, a language switch); anchored content only grows downwards.
+ */
+.auth-layout__main {
+  flex: 1 1 auto;
   width: 100%;
-  max-width: 360px;
+  max-width: 400px;
   min-width: 0;
-  margin-block: auto;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  padding-top: clamp(0px, 3vh, 32px);
+  padding-bottom: 16px;
+}
+
+.auth-layout__main > * {
+  min-width: 0;
+}
+
+/*
+ * Auth cards get their height from their content (field spacing and inner
+ * padding), never from a fixed minimum: a minimum leaves an empty band under
+ * the last element, and error banners can still grow the card.
+ */
+.auth-layout__card {
+  display: block;
+}
+
+.auth-layout__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  white-space: nowrap;
+}
+
+/* A FormField whose label row carries a link on its right ("Forgot password?"). */
+.auth-layout__field-with-link {
+  position: relative;
+}
+
+.auth-layout__field-link {
+  position: absolute;
+  top: 0;
+  right: 0;
+  line-height: 20px;
 }
 
 @media (max-width: 600px) {
   .auth-layout {
     padding: 16px;
+    gap: 8px;
+  }
+
+  .auth-layout__main {
+    padding-top: 0;
   }
 }
