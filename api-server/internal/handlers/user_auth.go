@@ -120,6 +120,15 @@ func (h *UserAuthHandler) Register(c *fiber.Ctx) error {
 		})
 	}
 
+	// Admin-configurable allow-list of email domains (Settings > Registration).
+	// Off unless an admin turns it on, so existing installs keep working.
+	if on, allowed := loadSignupPolicy(c.UserContext(), h.db); !signupDomainAllowed(req.Email, on, allowed) {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+			"error":           "this email domain is not allowed to register",
+			"allowed_domains": allowed,
+		})
+	}
+
 	var exists bool
 	err := h.db.QueryRow(
 		context.Background(),

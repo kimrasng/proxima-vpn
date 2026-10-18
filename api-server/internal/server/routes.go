@@ -206,6 +206,7 @@ func (s *Server) registerRoutes() {
 	userAuthHandler := handlers.NewUserAuthHandler(s.db, s.config.JWT.Secret, s.parseUserExpiry(), services.NewTelegramService(s.db, s.config.Telegram), s.mailer, s.config.Server.PanelURL)
 	auth := api.Group("/auth")
 	auth.Post("/register", userAuthHandler.Register)
+	auth.Get("/signup-policy", userAuthHandler.SignupPolicy)
 	auth.Post("/login", loginLimiter, userAuthHandler.Login)
 
 	// Password reset is stricter than login: each accepted request can send an

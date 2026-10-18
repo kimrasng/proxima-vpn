@@ -1028,6 +1028,12 @@
       "secondsHint": "초 단위",
       "registration": "회원가입",
       "selfRegistration": "자가 회원가입 허용",
+      "signupDomainRestriction": "가입 이메일 도메인 제한",
+      "signupDomainRestrictionHint": "켜면 아래 목록에 있는 도메인의 이메일로만 회원가입할 수 있어요.",
+      "signupDomains": "허용할 이메일 도메인",
+      "signupDomainsHint": "쉼표, 공백, 줄바꿈으로 구분해요. 예: gmail.com, qq.com (저장할 때 소문자로 정리돼요)",
+      "signupDomainsEmpty": "제한을 켜려면 도메인을 하나 이상 입력해야 해요. 비워 두면 아무도 가입할 수 없어요.",
+      "signupDomainsCount": "{{count}}개 도메인",
       "subscription": "구독",
       "updateInterval": "업데이트 간격",
       "runBackup": "지금 백업 실행",
@@ -1963,6 +1969,9 @@
       "submit": "계정 만들기",
       "loginLink": "이미 계정이 있으신가요? 로그인",
       "passwordMismatch": "비밀번호가 일치하지 않습니다.",
+      "domainNotAllowed": "이 이메일 도메인으로는 가입할 수 없어요. 사용 가능한 도메인: {{domains}}",
+      "allowedDomainsTitle": "가입 가능한 이메일 도메인",
+      "allowedDomainsBody": "아래 도메인의 이메일로만 가입할 수 있어요.",
       "success": "회원가입이 완료되었습니다! 로그인 페이지로 이동합니다...",
       "error": "회원가입에 실패했습니다. 다시 시도해주세요."
     }

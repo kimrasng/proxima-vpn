@@ -198,6 +198,15 @@ CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_user_id ON password_reset_t
 
 INSERT INTO settings (key, value) VALUES ('subscription_update_interval', '3600')
 ON CONFLICT (key) DO NOTHING;
+
+-- Signup email-domain allow-list (Admin > Settings > Registration). Seeded OFF so
+-- an existing install keeps accepting every address until an admin enables it.
+-- DO NOTHING keeps whatever an admin has already saved.
+INSERT INTO settings (key, value) VALUES ('signup_email_domain_restriction', 'false')
+ON CONFLICT (key) DO NOTHING;
+INSERT INTO settings (key, value) VALUES ('signup_email_domains',
+  'gmail.com, qq.com, 163.com, yahoo.com, sina.com, 126.com, outlook.com, yeah.net, foxmail.com, icloud.com, hotmail.com, aliyun.com, sohu.com, mail.com, live.com, protonmail.com')
+ON CONFLICT (key) DO NOTHING;
 `
 
 func Migrate(ctx context.Context, pool *pgxpool.Pool) (migrateErr error) {

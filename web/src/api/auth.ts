@@ -1,4 +1,4 @@
-import { post, setClientTokenType } from './client';
+import { get, post, setClientTokenType } from './client';
 import {
   getAdminToken,
   getUserToken,
@@ -20,6 +20,16 @@ export function userLogin(req: LoginRequest): Promise<LoginResponse> {
 
 export function userRegister(req: RegisterRequest): Promise<RegisterResponse> {
   return post<RegisterResponse>('/api/v1/auth/register', req);
+}
+
+export interface SignupPolicy {
+  restricted: boolean;
+  allowed_domains: string[];
+}
+
+// Public: lets the sign-up page show the allowed email domains before anyone types.
+export function getSignupPolicy(): Promise<SignupPolicy> {
+  return get<SignupPolicy>('/api/v1/auth/signup-policy');
 }
 
 export function getToken(type: 'admin' | 'user'): string | null {

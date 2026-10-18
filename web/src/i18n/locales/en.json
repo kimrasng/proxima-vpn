@@ -1028,6 +1028,12 @@
       "secondsHint": "Value in seconds",
       "registration": "Registration",
       "selfRegistration": "Allow Self-Registration",
+      "signupDomainRestriction": "Restrict sign-up email domains",
+      "signupDomainRestrictionHint": "When on, only addresses at the domains listed below can register.",
+      "signupDomains": "Allowed email domains",
+      "signupDomainsHint": "Separate with commas, spaces or new lines, e.g. gmail.com, qq.com (saved in lower case).",
+      "signupDomainsEmpty": "Enter at least one domain to turn the restriction on. An empty list would block everyone from registering.",
+      "signupDomainsCount": "{{count}} domain(s)",
       "subscription": "Subscription",
       "updateInterval": "Update Interval",
       "runBackup": "Run Backup Now",
@@ -1963,6 +1969,9 @@
       "submit": "Create Account",
       "loginLink": "Already have an account? Sign in",
       "passwordMismatch": "Passwords do not match.",
+      "domainNotAllowed": "This email domain cannot be used to register. Allowed domains: {{domains}}",
+      "allowedDomainsTitle": "Allowed email domains",
+      "allowedDomainsBody": "You can only sign up with an email address at one of these domains.",
       "success": "Registration successful! Redirecting to login...",
       "error": "Registration failed. Please try again."
     }

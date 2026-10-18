@@ -1023,6 +1023,12 @@
       "saveSuccess": "设置已保存",
       "registration": "注册",
       "selfRegistration": "允许自助注册",
+      "signupDomainRestriction": "限制注册邮箱域名",
+      "signupDomainRestrictionHint": "开启后，只有下方列表中的域名邮箱才能注册。",
+      "signupDomains": "允许的邮箱域名",
+      "signupDomainsHint": "用逗号、空格或换行分隔，例如 gmail.com, qq.com（保存时会转为小写）。",
+      "signupDomainsEmpty": "开启限制前至少需要填写一个域名，列表为空会导致所有人都无法注册。",
+      "signupDomainsCount": "{{count}} 个域名",
       "security": "安全",
       "sessionTimeout": "会话超时",
       "secondsHint": "以秒为单位",
@@ -1964,6 +1970,9 @@
       "submit": "创建账户",
       "loginLink": "已有账户？登录",
       "passwordMismatch": "两次输入的密码不一致。",
+      "domainNotAllowed": "该邮箱域名不能用于注册。允许的域名：{{domains}}",
+      "allowedDomainsTitle": "可用于注册的邮箱域名",
+      "allowedDomainsBody": "只能使用以下域名的邮箱注册。",
       "success": "注册成功！正在跳转到登录页面...",
       "error": "注册失败，请重试。"
     }
