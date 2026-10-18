@@ -65,7 +65,10 @@ async function request<T>(
   path: string,
   body?: unknown,
 ): Promise<T> {
-  const token = getToken(currentTokenType);
+  // Keep response handling bound to this request even if another API call
+  // switches the shared client while fetch is pending.
+  const tokenType = currentTokenType;
+  const token = getToken(tokenType);
 
   const headers: Record<string, string> = {};
 
@@ -92,8 +95,8 @@ async function request<T>(
   if (response.status === 401) {
     const isLoginEndpoint = path.includes('/auth/login');
     if (!isLoginEndpoint) {
-      removeToken(currentTokenType);
-      window.location.href = currentTokenType === 'admin' ? '/admin/login' : '/login';
+      removeToken(tokenType);
+      window.location.href = tokenType === 'admin' ? '/admin/login' : '/login';
       throw new ApiError(401, 'Unauthorized');
     }
   }

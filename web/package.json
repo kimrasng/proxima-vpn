@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "check:locales": "node scripts/check-locale-parity.mjs",
     "preview": "vite preview",
+    "test:unit": "node --test tests/*.test.mjs",
     "test:e2e": "playwright test"
   },
   "dependencies": {
