@@ -2004,6 +2004,7 @@
       "domainNotAllowed": "This email domain cannot be used to register. Allowed domains: {{domains}}",
       "allowedDomainsTitle": "Allowed email domains",
       "allowedDomainsBody": "You can only sign up with an email address at one of these domains.",
+      "allowedDomainsButton": "Show allowed email domains",
       "success": "Registration successful! Redirecting to login...",
       "error": "Registration failed. Please try again."
     },

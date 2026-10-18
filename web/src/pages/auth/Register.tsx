@@ -11,6 +11,7 @@ import {
   FormField,
   Header,
   Input,
+  Modal,
   SpaceBetween,
   StatusIndicator,
 } from "@cloudscape-design/components";
@@ -31,6 +32,7 @@ export default function Register() {
   const [flash, setFlash] = useState<FlashbarProps.MessageDefinition[]>([]);
   const [showErrors, setShowErrors] = useState(false);
   const [policy, setPolicy] = useState<SignupPolicy | null>(null);
+  const [showAllowedDomains, setShowAllowedDomains] = useState(false);
 
   // Show the allowed email domains up front. If the lookup fails the form still
   // works: the server enforces the policy either way and explains a refusal.
@@ -165,7 +167,20 @@ export default function Register() {
                 />
               </FormField>
               <FormField
-                label={t("auth.register.email")}
+                label={
+                  <span className="register__email-label" style={{ display: "inline-flex", alignItems: "center", gap: "0.375rem" }}>
+                    <span>{t("auth.register.email")}</span>
+                    {allowedDomains.length > 0 && (
+                      <Button
+                        variant="link"
+                        ariaLabel={t("auth.register.allowedDomainsButton")}
+                        onClick={() => setShowAllowedDomains(true)}
+                      >
+                        !
+                      </Button>
+                    )}
+                  </span>
+                }
                 errorText={showErrors ? errors.email : undefined}
                 constraintText={
                   domainChecked ? (
@@ -203,6 +218,19 @@ export default function Register() {
             </SpaceBetween>
           </Form>
         </form>
+        <Modal
+          visible={showAllowedDomains}
+          onDismiss={() => setShowAllowedDomains(false)}
+          header={t("auth.register.allowedDomainsTitle")}
+          footer={<Box float="right"><Button variant="primary" onClick={() => setShowAllowedDomains(false)}>{t("common.close")}</Button></Box>}
+        >
+          <SpaceBetween size="s">
+            <span>{t("auth.register.allowedDomainsBody")}</span>
+            <Box variant="code" data-testid="allowed-domains-modal">
+              {allowedDomains.join("  ·  ")}
+            </Box>
+          </SpaceBetween>
+        </Modal>
         <div style={{ marginTop: "1rem", textAlign: "center" }}>
           <Link to="/login">{t("auth.register.loginLink")}</Link>
         </div>

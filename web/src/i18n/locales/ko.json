@@ -2004,6 +2004,7 @@
       "domainNotAllowed": "이 이메일 도메인으로는 가입할 수 없어요. 사용 가능한 도메인: {{domains}}",
       "allowedDomainsTitle": "가입 가능한 이메일 도메인",
       "allowedDomainsBody": "아래 도메인의 이메일로만 가입할 수 있어요.",
+      "allowedDomainsButton": "허용된 이메일 도메인 보기",
       "success": "회원가입이 완료되었습니다! 로그인 페이지로 이동합니다...",
       "error": "회원가입에 실패했습니다. 다시 시도해주세요."
     },

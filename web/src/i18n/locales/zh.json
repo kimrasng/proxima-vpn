@@ -2004,6 +2004,7 @@
       "domainNotAllowed": "该邮箱域名不能用于注册。允许的域名：{{domains}}",
       "allowedDomainsTitle": "可用于注册的邮箱域名",
       "allowedDomainsBody": "只能使用以下域名的邮箱注册。",
+      "allowedDomainsButton": "查看允许的邮箱域名",
       "success": "注册成功！正在跳转到登录页面...",
       "error": "注册失败，请重试。"
     },
