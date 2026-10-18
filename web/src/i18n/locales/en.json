@@ -369,7 +369,9 @@
         "node.inbound_created": "added an inbound",
         "node.inbound_updated": "updated an inbound",
         "node.inbound_deleted": "deleted an inbound",
-        "node.inbound_toggled": "enabled or disabled an inbound"
+        "node.inbound_toggled": "enabled or disabled an inbound",
+        "user.passkey_added": "added a passkey.",
+        "user.passkey_removed": "removed a passkey."
       },
       "shareOfTotal": "{{share}}% of total",
       "nodeSummaryCounts": "Healthy {{healthy}} · Warning {{warning}} · Offline {{offline}}",
@@ -1409,7 +1411,8 @@
         "unknown_email": "Unknown account",
         "bad_password": "Wrong password",
         "suspended": "Account suspended",
-        "bad_totp": "Invalid two-factor code"
+        "bad_totp": "Invalid two-factor code",
+        "bad_passkey": "Passkey verification failed"
       },
       "resetTraffic": "Reset traffic",
       "suspend": "Suspend",
@@ -1932,6 +1935,31 @@
       "offline": "Offline",
       "empty": "No nodes are available on your plan yet.",
       "loadError": "Failed to load nodes"
+    },
+    "passkey": {
+      "title": "Passkeys",
+      "add": "Add a passkey",
+      "addTitle": "Add a passkey",
+      "nameLabel": "Passkey name",
+      "namePlaceholder": "e.g. MacBook Touch ID",
+      "passwordLabel": "Current password",
+      "passwordRequired": "Enter your current password.",
+      "incorrectPassword": "Current password is incorrect.",
+      "empty": "No passkeys have been added.",
+      "unsupported": "Passkeys require HTTPS (or localhost) and a modern browser. Existing passkeys can still be removed.",
+      "created": "Added {{date}}",
+      "lastUsed": "Last used: {{date}}",
+      "never": "Never",
+      "remove": "Remove",
+      "removeTitle": "Remove passkey",
+      "removeConfirm": "Remove “{{name}}”? You will no longer be able to sign in with it.",
+      "added": "Passkey added.",
+      "removed": "Passkey removed.",
+      "cancelled": "Passkey setup was cancelled.",
+      "alreadyRegistered": "This passkey is already registered.",
+      "addError": "Could not add the passkey.",
+      "removeError": "Could not remove the passkey.",
+      "loadError": "Could not load passkeys."
     }
   },
   "notFound": {
@@ -1941,7 +1969,9 @@
     "goHome": "Go to Dashboard"
   },
   "auth": {
-    "validation": { "required": "This field is required." },
+    "validation": {
+      "required": "This field is required."
+    },
     "login": {
       "title": "Login",
       "email": "Email",
@@ -2034,6 +2064,12 @@
       "requestNew": "Get a new link",
       "error": "We could not change your password. Please try again later.",
       "tooMany": "Too many requests. Please try again later."
+    },
+    "passkey": {
+      "or": "or",
+      "loginButton": "Sign in with a passkey",
+      "cancelled": "Passkey sign-in was cancelled.",
+      "loginError": "Passkey sign-in failed."
     }
   }
 }

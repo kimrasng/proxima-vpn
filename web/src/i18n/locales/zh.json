@@ -369,7 +369,9 @@
         "node.inbound_created": "添加了入站",
         "node.inbound_updated": "修改了入站",
         "node.inbound_deleted": "删除了入站",
-        "node.inbound_toggled": "启用或停用了入站"
+        "node.inbound_toggled": "启用或停用了入站",
+        "user.passkey_added": "添加了通行密钥。",
+        "user.passkey_removed": "删除了通行密钥。"
       },
       "shareOfTotal": "占总量 {{share}}%",
       "nodeSummaryCounts": "正常 {{healthy}} · 注意 {{warning}} · 离线 {{offline}}",
@@ -780,7 +782,7 @@
     },
     "plans": {
       "title": "套餐管理",
-      "unlimited": "不限",
+      "unlimited": "无限制",
       "editor": {
         "planId": "套餐 ID",
         "idHint": "UUID 为选填项；留空则自动生成。",
@@ -834,7 +836,6 @@
         "discard": "放弃更改"
       },
       "empty": "暂无套餐",
-      "unlimited": "无限制",
       "form": {
         "maxConcurrent": "并发连接数",
         "maxConcurrentHint": "同时在线的 UUID 槽位数；留空则沿用登记设备上限。",
@@ -1410,7 +1411,8 @@
         "unknown_email": "账户不存在",
         "bad_password": "密码错误",
         "suspended": "账户已停用",
-        "bad_totp": "两步验证码无效"
+        "bad_totp": "两步验证码无效",
+        "bad_passkey": "通行密钥验证失败"
       },
       "resetTraffic": "重置流量",
       "suspend": "停用",
@@ -1933,6 +1935,31 @@
       "offline": "离线",
       "empty": "您的套餐暂无可用节点。",
       "loadError": "加载节点失败"
+    },
+    "passkey": {
+      "title": "通行密钥",
+      "add": "添加通行密钥",
+      "addTitle": "添加通行密钥",
+      "nameLabel": "通行密钥名称",
+      "namePlaceholder": "例如：MacBook Touch ID",
+      "passwordLabel": "当前密码",
+      "passwordRequired": "请输入当前密码。",
+      "incorrectPassword": "当前密码不正确。",
+      "empty": "尚未添加通行密钥。",
+      "unsupported": "通行密钥需要 HTTPS（或 localhost）和较新的浏览器。您仍可删除已有通行密钥。",
+      "created": "添加于 {{date}}",
+      "lastUsed": "上次使用：{{date}}",
+      "never": "从未使用",
+      "remove": "删除",
+      "removeTitle": "删除通行密钥",
+      "removeConfirm": "删除“{{name}}”？删除后将无法再使用它登录。",
+      "added": "已添加通行密钥。",
+      "removed": "已删除通行密钥。",
+      "cancelled": "已取消通行密钥设置。",
+      "alreadyRegistered": "此通行密钥已注册。",
+      "addError": "无法添加通行密钥。",
+      "removeError": "无法删除通行密钥。",
+      "loadError": "无法加载通行密钥。"
     }
   },
   "notFound": {
@@ -1942,7 +1969,9 @@
     "goHome": "前往概览"
   },
   "auth": {
-    "validation": { "required": "请填写必填项。" },
+    "validation": {
+      "required": "请填写必填项。"
+    },
     "login": {
       "title": "登录",
       "email": "邮箱",
@@ -2035,6 +2064,12 @@
       "requestNew": "获取新链接",
       "error": "无法修改密码，请稍后再试。",
       "tooMany": "请求过于频繁，请稍后再试。"
+    },
+    "passkey": {
+      "or": "或",
+      "loginButton": "使用通行密钥登录",
+      "cancelled": "已取消通行密钥登录。",
+      "loginError": "通行密钥登录失败。"
     }
   }
 }

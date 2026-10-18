@@ -7,12 +7,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/go-webauthn/webauthn/webauthn"
 	"github.com/gofiber/fiber/v2"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/proximavpn/proxima-vpn/api-server/internal/mail"
 	"github.com/proximavpn/proxima-vpn/api-server/internal/services"
 	"github.com/proximavpn/proxima-vpn/pkg/crypto"
+	"github.com/redis/go-redis/v9"
 )
 
 // UserClaims defines the JWT claims for user tokens.
@@ -34,6 +36,10 @@ type UserAuthHandler struct {
 
 	// mailer is nil when SMTP is not configured, which disables password reset.
 	mailer mail.Sender
+	// Redis backs short-lived, one-time WebAuthn ceremony sessions.
+	redis         *redis.Client
+	webauthn      *webauthn.WebAuthn
+	passkeySecure bool
 	// resetBaseURL anchors emailed reset links. It comes from the configured
 	// panel URL only and is empty when that URL is unusable.
 	resetBaseURL string
@@ -57,6 +63,12 @@ func NewUserAuthHandler(db *pgxpool.Pool, jwtSecret string, jwtExpiry time.Durat
 		resetBaseURL: resetLinkBase(panelURL),
 		resetSlots:   make(chan struct{}, passwordResetMaxInFlight),
 	}
+}
+
+func (h *UserAuthHandler) SetPasskeyServices(rdb *redis.Client, wa *webauthn.WebAuthn, secure bool) {
+	h.redis = rdb
+	h.webauthn = wa
+	h.passkeySecure = secure
 }
 
 var emailRegex = regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$`)

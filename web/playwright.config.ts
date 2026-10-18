@@ -45,7 +45,7 @@ export default defineConfig({
     // from a clean, unauthenticated context.
     {
       name: "user-portal",
-      testMatch: /(?:user-portal|portal-login|user-subscription-domains|user-dashboard)\.spec\.ts/,
+      testMatch: /(?:user-portal|portal-login|user-subscription-domains|user-dashboard|passkey)\.spec\.ts/,
       use: { ...devices["Desktop Chrome"] },
     },
   ],

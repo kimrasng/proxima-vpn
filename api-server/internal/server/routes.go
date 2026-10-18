@@ -2,6 +2,7 @@ package server
 
 import (
 	"os"
+	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -204,10 +205,15 @@ func (s *Server) registerRoutes() {
 	nodeAgent.Get("/xray-update", nodeAgentHandler.CheckXrayUpdate)
 
 	userAuthHandler := handlers.NewUserAuthHandler(s.db, s.config.JWT.Secret, s.parseUserExpiry(), services.NewTelegramService(s.db, s.config.Telegram), s.mailer, s.config.Server.PanelURL)
+	if wa := passkeyWebAuthn(s.config.Server.PanelURL); wa != nil {
+		userAuthHandler.SetPasskeyServices(s.redis, wa, strings.HasPrefix(s.config.Server.PanelURL, "https://"))
+	}
 	auth := api.Group("/auth")
 	auth.Post("/register", userAuthHandler.Register)
 	auth.Get("/signup-policy", userAuthHandler.SignupPolicy)
 	auth.Post("/login", loginLimiter, userAuthHandler.Login)
+	auth.Post("/passkey/login/begin", loginLimiter, userAuthHandler.BeginPasskeyLogin)
+	auth.Post("/passkey/login/finish", loginLimiter, userAuthHandler.FinishPasskeyLogin)
 
 	// Password reset is stricter than login: each accepted request can send an
 	// email, and the reset endpoint guesses at 256-bit tokens. Both are keyed
@@ -240,6 +246,14 @@ func (s *Server) registerRoutes() {
 	auth.Post("/forgot-password", forgotPasswordLimiter, userAuthHandler.ForgotPassword)
 	auth.Post("/reset-password", resetPasswordLimiter, userAuthHandler.ResetPassword)
 
+	passkeyRegistrationLimiter := limiter.New(limiter.Config{
+		Max: 10, Expiration: time.Minute,
+		KeyGenerator: func(c *fiber.Ctx) string { return c.IP() },
+		LimitReached: func(c *fiber.Ctx) error {
+			return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{"error": "too many passkey requests, try again later"})
+		},
+	})
+
 	user := api.Group("/user")
 	user.Use(middleware.UserJWTMiddleware(s.config.JWT.Secret, s.db))
 
@@ -269,6 +283,10 @@ func (s *Server) registerRoutes() {
 	userPortalHandler := handlers.NewUserPortalHandler(s.db, s.redis)
 	user.Get("/summary", userPortalHandler.GetSummary)
 	user.Get("/profile", userPortalHandler.GetProfile)
+	user.Get("/passkeys", userAuthHandler.ListPasskeys)
+	user.Post("/passkeys/register/begin", passkeyRegistrationLimiter, userAuthHandler.BeginPasskeyRegistration)
+	user.Post("/passkeys/register/finish", passkeyRegistrationLimiter, userAuthHandler.FinishPasskeyRegistration)
+	user.Delete("/passkeys/:id", userAuthHandler.DeletePasskey)
 	user.Put("/profile", userPortalHandler.UpdateProfile)
 	user.Get("/traffic", userPortalHandler.GetTrafficStats)
 	user.Post("/sub-token/regenerate", userPortalHandler.RegenerateSubToken)

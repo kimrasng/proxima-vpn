@@ -196,6 +196,19 @@ CREATE TABLE IF NOT EXISTS password_reset_tokens (
 );
 CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_user_id ON password_reset_tokens(user_id);
 
+-- WebAuthn credentials are kept separately so password accounts remain the
+-- primary identity and users can register multiple passkeys.
+CREATE TABLE IF NOT EXISTS user_passkeys (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    credential_id BYTEA NOT NULL UNIQUE,
+    credential JSONB NOT NULL,
+    name TEXT NOT NULL DEFAULT '',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    last_used_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_user_passkeys_user_created ON user_passkeys(user_id, created_at);
+
 INSERT INTO settings (key, value) VALUES ('subscription_update_interval', '3600')
 ON CONFLICT (key) DO NOTHING;
 

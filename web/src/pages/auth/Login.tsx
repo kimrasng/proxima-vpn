@@ -18,6 +18,7 @@ import { userLogin, setToken } from "../../api/auth";
 import { ApiError } from "../../api/client";
 import PortalHighlights from "../../components/PortalHighlights";
 import AuthLink from "../../components/AuthLink";
+import PasskeyLoginButton from "../../components/PasskeyLoginButton";
 
 export default function Login() {
   const { t } = useTranslation();
@@ -26,6 +27,7 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [passkeyLoading, setPasskeyLoading] = useState(false);
   const [flash, setFlash] = useState<FlashbarProps.MessageDefinition[]>([]);
   const [showErrors, setShowErrors] = useState(false);
   const required = t("auth.validation.required", { defaultValue: "This field is required." });
@@ -110,9 +112,10 @@ export default function Login() {
                     <AuthLink to="/forgot-password">{t("auth.login.forgotPassword")}</AuthLink>
                   </div>
                 </div>
-                <Button variant="primary" loading={loading} formAction="submit" fullWidth>
+                <Button variant="primary" loading={loading} disabled={passkeyLoading} formAction="submit" fullWidth>
                   {t("auth.login.submit")}
                 </Button>
+                <PasskeyLoginButton disabled={passkeyLoading || loading} onMessage={(message) => setFlash([message])} onLoadingChange={setPasskeyLoading} />
               </SpaceBetween>
             </Form>
           </form>

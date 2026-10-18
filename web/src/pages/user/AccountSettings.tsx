@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   ContentLayout,
@@ -19,12 +19,14 @@ import {
 import type { UserProfile } from "../../api/types";
 import * as userApi from "../../api/user";
 import { focusFirstInvalid, hasFieldErrors } from "../../utils/formValidation";
+import PasskeySettings from "../../components/PasskeySettings";
 
 export default function AccountSettings() {
   const { t } = useTranslation();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [flash, setFlash] = useState<FlashbarProps.MessageDefinition[]>([]);
+  const handlePasskeyMessage = useCallback((message: FlashbarProps.MessageDefinition) => setFlash([message]), []);
 
   const [name, setName] = useState("");
   const [savingProfile, setSavingProfile] = useState(false);
@@ -139,6 +141,7 @@ export default function AccountSettings() {
           </SpaceBetween>
         </Container>
 
+        <PasskeySettings onMessage={handlePasskeyMessage} />
         <Container header={<Header variant="h2">{t("user.account.passwordSection")}</Header>}>
           <SpaceBetween size="m">
             <FormField label={t("user.account.currentPassword")} errorText={visiblePasswordErrors.currentPassword}>
