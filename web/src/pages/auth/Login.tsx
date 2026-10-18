@@ -87,7 +87,7 @@ export default function Login() {
             }}
           >
             <Form>
-              <SpaceBetween size="xl">
+              <SpaceBetween size="l">
                 <FormField label={t("auth.login.email")} errorText={showErrors ? errors.email : undefined}>
                   <Input
                     value={email}

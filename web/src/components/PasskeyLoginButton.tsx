@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { Box, Button, SpaceBetween } from "@cloudscape-design/components";
+import { Box, Button } from "@cloudscape-design/components";
 import { browserSupportsWebAuthn, startAuthentication, WebAuthnError } from "@simplewebauthn/browser";
 import { ApiError } from "../api/client";
 import { beginPasskeyLogin, finishPasskeyLogin } from "../api/passkey";
@@ -36,10 +36,10 @@ export default function PasskeyLoginButton({ onMessage, onLoadingChange, disable
     } finally { setLoading(false); onLoadingChange(false); }
   };
 
-  return <SpaceBetween size="s">
+  return <div className="passkey-login">
     <Box textAlign="center" color="text-body-secondary">{t("auth.passkey.or")}</Box>
-    <Button fullWidth variant="normal" iconName="lock-private" loading={loading} disabled={disabled} onClick={() => void login()}>
+    <Button fullWidth formAction="none" variant="normal" iconName="lock-private" loading={loading} disabled={disabled} onClick={() => void login()}>
       {t("auth.passkey.loginButton")}
     </Button>
-  </SpaceBetween>;
+  </div>;
 }

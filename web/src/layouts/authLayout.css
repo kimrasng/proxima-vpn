@@ -44,6 +44,14 @@
   min-width: 0;
 }
 
+/* Keep the alternative sign-in close to the primary action. */
+.passkey-login {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: -20px;
+}
+
 /*
  * Auth cards get their height from their content (field spacing and inner
  * padding), never from a fixed minimum: a minimum leaves an empty band under
