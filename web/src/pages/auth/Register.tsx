@@ -2,8 +2,6 @@ import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
-  Alert,
-  Box,
   Button,
   Container,
   Flashbar,
@@ -11,7 +9,6 @@ import {
   FormField,
   Header,
   Input,
-  Modal,
   SpaceBetween,
   StatusIndicator,
 } from "@cloudscape-design/components";
@@ -28,11 +25,18 @@ export default function Register() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
+  const [referralCode, setReferralCode] = useState(() => {
+    const query = new URLSearchParams(window.location.search).get("ref")?.trim() ?? "";
+    if (query) {
+      window.localStorage.setItem("proxima_referral_code", query);
+      return query;
+    }
+    return window.localStorage.getItem("proxima_referral_code") ?? "";
+  });
   const [loading, setLoading] = useState(false);
   const [flash, setFlash] = useState<FlashbarProps.MessageDefinition[]>([]);
   const [showErrors, setShowErrors] = useState(false);
   const [policy, setPolicy] = useState<SignupPolicy | null>(null);
-  const [showAllowedDomains, setShowAllowedDomains] = useState(false);
 
   // Show the allowed email domains up front. If the lookup fails the form still
   // works: the server enforces the policy either way and explains a refusal.
@@ -82,7 +86,8 @@ export default function Register() {
     setLoading(true);
 
     try {
-      await userRegister({ name, email, password });
+      await userRegister({ name, email, password, referral_code: referralCode.trim() || undefined });
+      window.localStorage.removeItem("proxima_referral_code");
       setFlash([
         {
           type: "success",
@@ -149,14 +154,16 @@ export default function Register() {
           >
             <SpaceBetween size="m">
               {allowedDomains.length > 0 && (
-                <Alert type="info" header={t("auth.register.allowedDomainsTitle")}>
-                  <SpaceBetween size="xs">
-                    <span>{t("auth.register.allowedDomainsBody")}</span>
-                    <Box variant="code" data-testid="allowed-domains">
-                      {allowedDomains.join("  ·  ")}
-                    </Box>
-                  </SpaceBetween>
-                </Alert>
+                <div className="register__domain-notice" role="note">
+                  <div className="register__domain-notice-icon" aria-hidden="true">i</div>
+                  <div className="register__domain-notice-content">
+                    <div className="register__domain-notice-title">{t("auth.register.allowedDomainsTitle")}</div>
+                    <div className="register__domain-notice-body">{t("auth.register.allowedDomainsBody")}</div>
+                    <div className="register__domain-list" data-testid="allowed-domains">
+                      {allowedDomains.map((domain) => <span className="register__domain-chip" key={domain}>{domain}</span>)}
+                    </div>
+                  </div>
+                </div>
               )}
               <FormField label={t("auth.register.name")} errorText={showErrors ? errors.name : undefined}>
                 <Input
@@ -167,20 +174,7 @@ export default function Register() {
                 />
               </FormField>
               <FormField
-                label={
-                  <span className="register__email-label" style={{ display: "inline-flex", alignItems: "center", gap: "0.375rem" }}>
-                    <span>{t("auth.register.email")}</span>
-                    {allowedDomains.length > 0 && (
-                      <Button
-                        variant="link"
-                        ariaLabel={t("auth.register.allowedDomainsButton")}
-                        onClick={() => setShowAllowedDomains(true)}
-                      >
-                        !
-                      </Button>
-                    )}
-                  </span>
-                }
+                label={t("auth.register.email")}
                 errorText={showErrors ? errors.email : undefined}
                 constraintText={
                   domainChecked ? (
@@ -201,6 +195,18 @@ export default function Register() {
                   placeholder="user@example.com"
                 />
               </FormField>
+              <FormField label={t("auth.register.referralCode")}>
+                <Input
+                  value={referralCode}
+                  onChange={({ detail }) => {
+                    setReferralCode(detail.value);
+                    if (detail.value.trim()) window.localStorage.setItem("proxima_referral_code", detail.value.trim());
+                    else window.localStorage.removeItem("proxima_referral_code");
+                  }}
+                  placeholder={t("auth.register.referralCodePlaceholder")}
+                  autoComplete="off"
+                />
+              </FormField>
               <FormField label={t("auth.register.password")} errorText={showErrors ? errors.password : undefined}>
                 <Input
                   value={password}
@@ -218,19 +224,6 @@ export default function Register() {
             </SpaceBetween>
           </Form>
         </form>
-        <Modal
-          visible={showAllowedDomains}
-          onDismiss={() => setShowAllowedDomains(false)}
-          header={t("auth.register.allowedDomainsTitle")}
-          footer={<Box float="right"><Button variant="primary" onClick={() => setShowAllowedDomains(false)}>{t("common.close")}</Button></Box>}
-        >
-          <SpaceBetween size="s">
-            <span>{t("auth.register.allowedDomainsBody")}</span>
-            <Box variant="code" data-testid="allowed-domains-modal">
-              {allowedDomains.join("  ·  ")}
-            </Box>
-          </SpaceBetween>
-        </Modal>
         <div style={{ marginTop: "1rem", textAlign: "center" }}>
           <Link to="/login">{t("auth.register.loginLink")}</Link>
         </div>

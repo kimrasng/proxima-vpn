@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 
-test.describe("signup allowed-domain info popup", () => {
-  test("shows the full allow-list in a popup when the restriction is on", async ({ page }) => {
+test.describe("signup allowed-domain notice", () => {
+  test("shows a compact list of allowed domains when restriction is on", async ({ page }) => {
     await page.addInitScript(() => localStorage.setItem("i18nextLng", "en"));
     await page.route("**/api/v1/auth/signup-policy", (route) => route.fulfill({
       status: 200,
@@ -9,18 +9,13 @@ test.describe("signup allowed-domain info popup", () => {
       body: JSON.stringify({ restricted: true, allowed_domains: ["gmail.com", "qq.com", "163.com"] }),
     }));
     await page.goto("/register");
-    const info = page.getByRole("button", { name: "Show allowed email domains" });
-    await expect(info).toBeVisible();
-    await expect(page.getByTestId("allowed-domains")).toContainText("gmail.com");
-    await info.click();
-    const dialog = page.getByRole("dialog", { name: "Allowed email domains" });
-    await expect(dialog).toBeVisible();
-    await expect(dialog.getByTestId("allowed-domains-modal")).toHaveText("gmail.com  ·  qq.com  ·  163.com");
-    await dialog.getByRole("button", { name: "Close" }).click();
-    await expect(dialog).toHaveCount(0);
+    const notice = page.locator(".register__domain-notice");
+    await expect(notice).toBeVisible();
+    await expect(notice.getByText("Allowed email domains")).toBeVisible();
+    await expect(notice.locator(".register__domain-chip")).toHaveText(["gmail.com", "qq.com", "163.com"]);
   });
 
-  test("hides the info popup button when the restriction is off", async ({ page }) => {
+  test("hides the domain notice when restriction is off", async ({ page }) => {
     await page.addInitScript(() => localStorage.setItem("i18nextLng", "en"));
     await page.route("**/api/v1/auth/signup-policy", (route) => route.fulfill({
       status: 200,
@@ -28,6 +23,43 @@ test.describe("signup allowed-domain info popup", () => {
       body: JSON.stringify({ restricted: false, allowed_domains: [] }),
     }));
     await page.goto("/register");
-    await expect(page.getByRole("button", { name: "Show allowed email domains" })).toHaveCount(0);
+    await expect(page.locator(".register__domain-notice")).toHaveCount(0);
+  });
+});
+
+test.describe("referral code", () => {
+  test("captures ref from login URL, prefills optional field, and submits it", async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem("i18nextLng", "en"));
+    await page.route("**/api/v1/auth/signup-policy", (route) => route.fulfill({
+      status: 200, contentType: "application/json",
+      body: JSON.stringify({ restricted: false, allowed_domains: [] }),
+    }));
+    await page.route("**/api/v1/auth/register", async (route) => {
+      const request = route.request();
+      expect(request.postDataJSON()).toMatchObject({ referral_code: "FRIEND-42" });
+      await route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ id: "id", email: "new@example.com", name: "New", sub_token: "token" }) });
+    });
+    await page.goto("/login?ref=FRIEND-42");
+    await page.getByRole("link", { name: "Don't have an account? Register" }).click();
+    const referral = page.getByRole("textbox", { name: "Referral code (optional)" });
+    await expect(referral).toHaveValue("FRIEND-42");
+    await page.getByRole("textbox", { name: "Name" }).fill("New");
+    await page.getByRole("textbox", { name: "Email" }).fill("new@example.com");
+    await page.getByRole("textbox", { name: "Password", exact: true }).fill("Passw0rd!test42");
+    await page.getByRole("textbox", { name: "Confirm Password" }).fill("Passw0rd!test42");
+    await page.getByRole("button", { name: "Create Account" }).click();
+    await expect(page.getByText(/Registration successful/i)).toBeVisible();
+  });
+
+  test("captures ref from the root URL and restores it on a later registration visit", async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem("i18nextLng", "en"));
+    await page.route("**/api/v1/auth/signup-policy", (route) => route.fulfill({
+      status: 200, contentType: "application/json",
+      body: JSON.stringify({ restricted: false, allowed_domains: [] }),
+    }));
+    await page.goto("/?ref=ROOT-9");
+    await expect(page).toHaveURL(/\/login\?ref=ROOT-9/);
+    await page.goto("/register");
+    await expect(page.getByRole("textbox", { name: "Referral code (optional)" })).toHaveValue("ROOT-9");
   });
 });

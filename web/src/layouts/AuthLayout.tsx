@@ -1,4 +1,5 @@
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
+import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { ButtonDropdown, Icon } from "@cloudscape-design/components";
 import { colorBackgroundLayoutMain } from "@cloudscape-design/design-tokens";
@@ -12,6 +13,11 @@ const LANGUAGES = [
 ] as const;
 
 export default function AuthLayout() {
+  const location = useLocation();
+  useEffect(() => {
+    const code = new URLSearchParams(location.search).get("ref")?.trim();
+    if (code) window.localStorage.setItem("proxima_referral_code", code);
+  }, [location.search]);
   const { t, i18n } = useTranslation();
   const current = resolveLanguage(i18n.resolvedLanguage ?? i18n.language);
   const currentLabel = LANGUAGES.find((language) => language.id === current)?.text ?? LANGUAGES[0].text;

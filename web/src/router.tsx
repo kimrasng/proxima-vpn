@@ -1,7 +1,8 @@
 // Each route is loaded on demand rather than shipping every admin and portal
 // screen to users before they sign in. Shared UI/i18n still loads normally.
 import { lazy } from "react";
-import { createBrowserRouter, Navigate } from "react-router-dom";
+import { createBrowserRouter } from "react-router-dom";
+import CaptureReferralRoute from "./components/CaptureReferralRoute";
 import AdminAuthGuard from "./components/AdminAuthGuard";
 import UserAuthGuard from "./components/UserAuthGuard";
 
@@ -48,7 +49,7 @@ const UserAnnouncements = lazy(() => import("./pages/user/Announcements"));
 export const router = createBrowserRouter([
   {
     path: "/",
-    element: <Navigate to="/portal/dashboard" replace />,
+    element: <CaptureReferralRoute />,
   },
   {
     element: <AuthLayout />,
