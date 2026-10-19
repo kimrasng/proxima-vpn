@@ -13,6 +13,7 @@ export interface RegisterRequest {
   email: string;
   password: string;
   name: string;
+  referral_code?: string;
 }
 
 export interface RegisterResponse {

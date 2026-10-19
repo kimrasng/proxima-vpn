@@ -93,7 +93,7 @@ async function request<T>(
   const response = await fetch(`${BASE_URL}${path}`, config);
 
   if (response.status === 401) {
-    const isLoginEndpoint = path.includes('/auth/login');
+    const isLoginEndpoint = path.includes('/auth/login') || path.includes('/auth/passkey/login');
     if (!isLoginEndpoint) {
       removeToken(tokenType);
       window.location.href = tokenType === 'admin' ? '/admin/login' : '/login';

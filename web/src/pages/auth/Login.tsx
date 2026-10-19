@@ -18,6 +18,7 @@ import { userLogin, setToken } from "../../api/auth";
 import { ApiError } from "../../api/client";
 import PortalHighlights from "../../components/PortalHighlights";
 import AuthLink from "../../components/AuthLink";
+import PasskeyLoginButton from "../../components/PasskeyLoginButton";
 
 export default function Login() {
   const { t } = useTranslation();
@@ -26,6 +27,7 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [passkeyLoading, setPasskeyLoading] = useState(false);
   const [flash, setFlash] = useState<FlashbarProps.MessageDefinition[]>([]);
   const [showErrors, setShowErrors] = useState(false);
   const required = t("auth.validation.required", { defaultValue: "This field is required." });
@@ -74,7 +76,7 @@ export default function Login() {
       </Box>
 
       <SpaceBetween size="l">
-        {flash.length > 0 && <Flashbar items={flash} />}
+        {flash.length > 0 && <Flashbar items={flash} i18nStrings={{ ariaLabel: t("admin.notifications.title") }} />}
         <div className="auth-layout__card">
         <Container header={<Header variant="h1">{t("auth.login.title")}</Header>}>
           <Box padding={{ vertical: "l" }}>
@@ -85,7 +87,7 @@ export default function Login() {
             }}
           >
             <Form>
-              <SpaceBetween size="xl">
+              <SpaceBetween size="l">
                 <FormField label={t("auth.login.email")} errorText={showErrors ? errors.email : undefined}>
                   <Input
                     value={email}
@@ -110,9 +112,10 @@ export default function Login() {
                     <AuthLink to="/forgot-password">{t("auth.login.forgotPassword")}</AuthLink>
                   </div>
                 </div>
-                <Button variant="primary" loading={loading} formAction="submit" fullWidth>
+                <Button variant="primary" loading={loading} disabled={passkeyLoading} formAction="submit" fullWidth>
                   {t("auth.login.submit")}
                 </Button>
+                <PasskeyLoginButton disabled={passkeyLoading || loading} onMessage={(message) => setFlash([{ ...message, id: "passkey-message", onDismiss: () => setFlash([]) }])} onLoadingChange={setPasskeyLoading} />
               </SpaceBetween>
             </Form>
           </form>

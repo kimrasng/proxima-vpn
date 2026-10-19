@@ -25,6 +25,7 @@ const (
 	LoginFailureBadPassword  = "bad_password"
 	LoginFailureSuspended    = "suspended"
 	LoginFailureBadTOTP      = "bad_totp"
+	LoginFailureBadPasskey   = "bad_passkey"
 )
 
 // LoginAttempt describes one authentication attempt to persist.

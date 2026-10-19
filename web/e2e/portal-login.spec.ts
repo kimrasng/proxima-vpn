@@ -144,7 +144,7 @@ test.describe("portal sign-in screen", () => {
 
     // Submitting empty fields adds error text under the inputs; the card grows
     // downwards but nothing above it may move.
-    await page.locator("main form").getByRole("button", { name: "로그인" }).click();
+    await page.locator("main form").getByRole("button", { name: "로그인", exact: true }).click();
     await expect(page.getByText("필수 항목을 입력하세요.").first()).toBeVisible();
     expect(await top(title)).toBe(titleY);
     expect(await top(form)).toBe(formY);

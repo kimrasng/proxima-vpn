@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { confirmSignup } from "./signup-fixture";
 
 // Browser e2e for the end-user portal: register -> log in -> see the portal.
 // Device creation is asserted separately because it depends on the account
@@ -25,6 +26,7 @@ test.describe("user authentication", () => {
     const email = `e2e-ui-${uniq()}@example.com`;
     const password = "E2EUiPass123!";
 
+
     await page.goto("/register");
     await page.getByRole("textbox", { name: "Name" }).fill("E2E UI User");
     await page.getByRole("textbox", { name: "Email" }).fill(email);
@@ -32,6 +34,7 @@ test.describe("user authentication", () => {
     await page.getByRole("textbox", { name: "Confirm Password" }).fill(password);
     await page.getByRole("button", { name: "Create Account" }).click();
 
+    await confirmSignup(page, email);
     await expect(page.getByText(/Registration successful/i)).toBeVisible();
 
     // The app redirects to login after a successful registration.
@@ -39,7 +42,7 @@ test.describe("user authentication", () => {
 
     await page.getByRole("textbox", { name: "Email" }).fill(email);
     await page.getByRole("textbox", { name: "Password" }).fill(password);
-    await page.getByRole("button", { name: "Sign In" }).click();
+    await page.getByRole("button", { name: "Sign In", exact: true }).click();
 
     await expect(page).toHaveURL(/\/portal\//);
   });
@@ -53,7 +56,6 @@ test.describe("user authentication", () => {
     await page.getByRole("textbox", { name: "Password", exact: true }).fill("Password123!");
     await page.getByRole("textbox", { name: "Confirm Password" }).fill("Different123!");
     await page.getByRole("button", { name: "Create Account" }).click();
-
     await expect(page.getByText(/Passwords do not match/i)).toBeVisible();
     await expect(page).toHaveURL(/\/register/);
   });
@@ -64,7 +66,7 @@ test.describe("user authentication", () => {
 
     await page.getByRole("textbox", { name: "Email" }).fill("nobody-e2e@example.com");
     await page.getByRole("textbox", { name: "Password" }).fill("wrong-password");
-    await page.getByRole("button", { name: "Sign In" }).click();
+    await page.getByRole("button", { name: "Sign In", exact: true }).click();
 
     // Login.tsx surfaces the API's own error text when present, falling back
     // to the translated message.
@@ -82,17 +84,19 @@ test.describe("user portal pages", () => {
     const email = `e2e-ui-nav-${uniq()}@example.com`;
     const password = "E2EUiPass123!";
 
+
     await page.goto("/register");
     await page.getByRole("textbox", { name: "Name" }).fill("E2E Nav User");
     await page.getByRole("textbox", { name: "Email" }).fill(email);
     await page.getByRole("textbox", { name: "Password", exact: true }).fill(password);
     await page.getByRole("textbox", { name: "Confirm Password" }).fill(password);
     await page.getByRole("button", { name: "Create Account" }).click();
+    await confirmSignup(page, email);
     await expect(page).toHaveURL(/\/login/, { timeout: 20_000 });
 
     await page.getByRole("textbox", { name: "Email" }).fill(email);
     await page.getByRole("textbox", { name: "Password" }).fill(password);
-    await page.getByRole("button", { name: "Sign In" }).click();
+    await page.getByRole("button", { name: "Sign In", exact: true }).click();
     await expect(page).toHaveURL(/\/portal\//);
 
     // Each portal page fetches its own data on mount; a 4xx/5xx or a render

@@ -2,6 +2,7 @@ package server
 
 import (
 	"os"
+	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -13,6 +14,8 @@ import (
 	"github.com/proximavpn/proxima-vpn/api-server/internal/middleware"
 	"github.com/proximavpn/proxima-vpn/api-server/internal/services"
 )
+
+const signupCodeMaxRequestsPerIP = 5
 
 func (s *Server) registerRoutes() {
 	if os.Getenv("SWAGGER_ENABLED") != "false" {
@@ -204,10 +207,43 @@ func (s *Server) registerRoutes() {
 	nodeAgent.Get("/xray-update", nodeAgentHandler.CheckXrayUpdate)
 
 	userAuthHandler := handlers.NewUserAuthHandler(s.db, s.config.JWT.Secret, s.parseUserExpiry(), services.NewTelegramService(s.db, s.config.Telegram), s.mailer, s.config.Server.PanelURL)
+	if wa := passkeyWebAuthn(s.config.Server.PanelURL); wa != nil {
+		userAuthHandler.SetPasskeyServices(s.redis, wa, strings.HasPrefix(s.config.Server.PanelURL, "https://"))
+	}
+	if s.testMailerCodeLookup {
+		// Only the explicitly enabled fake sender can expose codes, never SMTP.
+		if fakeMailer, ok := s.mailer.(*testSignupMailer); ok {
+			adminTest := api.Group("/__test__", middleware.AdminJWTMiddleware(s.config.JWT.Secret, s.db))
+			adminTest.Get("/signup-email-code", func(c *fiber.Ctx) error {
+				c.Set(fiber.HeaderCacheControl, "no-store")
+				email := strings.ToLower(strings.TrimSpace(c.Query("email")))
+				if email == "" {
+					return c.SendStatus(fiber.StatusBadRequest)
+				}
+				code, found := fakeMailer.LatestSignupCode(c.UserContext(), email)
+				if !found {
+					return c.SendStatus(fiber.StatusNotFound)
+				}
+				return c.JSON(fiber.Map{"code": code})
+			})
+		}
+	}
+
 	auth := api.Group("/auth")
-	auth.Post("/register", userAuthHandler.Register)
+	signupCodeLimiter := limiter.New(limiter.Config{Max: signupCodeMaxRequestsPerIP, Expiration: 15 * time.Minute, KeyGenerator: func(c *fiber.Ctx) string { return c.IP() }, LimitReached: func(c *fiber.Ctx) error {
+		return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{"error": "too many verification code requests; try again later"})
+	}})
+	auth.Post("/register/request-code", signupCodeLimiter, userAuthHandler.RequestSignupEmailCode)
+	// Sending and verifying have independent budgets so requesting a code does
+	// not consume the attempts needed to verify it. Both verification aliases
+	// share the same limiter; the database also bounds guesses per challenge.
+	signupVerifyLimiter := limiter.New(limiter.Config{Max: 10, Expiration: 15 * time.Minute, KeyGenerator: func(c *fiber.Ctx) string { return c.IP() }})
+	auth.Post("/register/verify-code", signupVerifyLimiter, userAuthHandler.VerifySignupEmailCode)
+	auth.Post("/register", signupVerifyLimiter, userAuthHandler.Register)
 	auth.Get("/signup-policy", userAuthHandler.SignupPolicy)
 	auth.Post("/login", loginLimiter, userAuthHandler.Login)
+	auth.Post("/passkey/login/begin", loginLimiter, userAuthHandler.BeginPasskeyLogin)
+	auth.Post("/passkey/login/finish", loginLimiter, userAuthHandler.FinishPasskeyLogin)
 
 	// Password reset is stricter than login: each accepted request can send an
 	// email, and the reset endpoint guesses at 256-bit tokens. Both are keyed
@@ -240,6 +276,14 @@ func (s *Server) registerRoutes() {
 	auth.Post("/forgot-password", forgotPasswordLimiter, userAuthHandler.ForgotPassword)
 	auth.Post("/reset-password", resetPasswordLimiter, userAuthHandler.ResetPassword)
 
+	passkeyRegistrationLimiter := limiter.New(limiter.Config{
+		Max: 10, Expiration: time.Minute,
+		KeyGenerator: func(c *fiber.Ctx) string { return c.IP() },
+		LimitReached: func(c *fiber.Ctx) error {
+			return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{"error": "too many passkey requests, try again later"})
+		},
+	})
+
 	user := api.Group("/user")
 	user.Use(middleware.UserJWTMiddleware(s.config.JWT.Secret, s.db))
 
@@ -269,6 +313,10 @@ func (s *Server) registerRoutes() {
 	userPortalHandler := handlers.NewUserPortalHandler(s.db, s.redis)
 	user.Get("/summary", userPortalHandler.GetSummary)
 	user.Get("/profile", userPortalHandler.GetProfile)
+	user.Get("/passkeys", userAuthHandler.ListPasskeys)
+	user.Post("/passkeys/register/begin", passkeyRegistrationLimiter, userAuthHandler.BeginPasskeyRegistration)
+	user.Post("/passkeys/register/finish", passkeyRegistrationLimiter, userAuthHandler.FinishPasskeyRegistration)
+	user.Delete("/passkeys/:id", userAuthHandler.DeletePasskey)
 	user.Put("/profile", userPortalHandler.UpdateProfile)
 	user.Get("/traffic", userPortalHandler.GetTrafficStats)
 	user.Post("/sub-token/regenerate", userPortalHandler.RegenerateSubToken)

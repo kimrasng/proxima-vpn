@@ -1,3 +1,70 @@
+/* Compact allow-list notice on the registration form. */
+.register__domain-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid #0972d3;
+  border-radius: 12px;
+  background: #f2f8fd;
+}
+
+.register__domain-notice-icon {
+  display: flex;
+  flex: 0 0 19px;
+  align-items: center;
+  justify-content: center;
+  width: 19px;
+  height: 19px;
+  margin-top: 1px;
+  border: 2px solid #0972d3;
+  border-radius: 50%;
+  color: #0972d3;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.register__domain-notice-content {
+  min-width: 0;
+}
+
+.register__domain-notice-title {
+  margin-bottom: 2px;
+  font-weight: 700;
+}
+
+.register__domain-notice-body {
+  margin-bottom: 8px;
+  color: #414d5c;
+  font-size: 0.9em;
+}
+
+.register__domain-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 6px;
+}
+
+.register__domain-chip {
+  display: inline-block;
+  padding: 2px 7px;
+  border: 1px solid #c6d9e8;
+  border-radius: 999px;
+  background: #fff;
+  color: #263746;
+  font-family: var(--font-family-monospace, monospace);
+  font-size: 0.82em;
+  line-height: 1.45;
+  white-space: nowrap;
+}
+
+@media (max-width: 600px) {
+  .register__domain-notice {
+    padding: 10px 11px;
+  }
+}
+
 .auth-layout {
   box-sizing: border-box;
   min-height: 100vh;
@@ -42,6 +109,14 @@
 
 .auth-layout__main > * {
   min-width: 0;
+}
+
+/* Keep the alternative sign-in close to the primary action. */
+.passkey-login {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: -8px;
 }
 
 /*
