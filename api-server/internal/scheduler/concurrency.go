@@ -48,7 +48,7 @@ type ConcurrencyScheduler struct {
 func NewConcurrencyScheduler(db *pgxpool.Pool, rdb *redis.Client) *ConcurrencyScheduler {
 	return &ConcurrencyScheduler{
 		db: db, tracker: services.NewOnlineTracker(rdb),
-		enforce: os.Getenv("ENFORCE_CONCURRENCY") == "1",
+		enforce: services.ConcurrencyEnforcementEnabled(),
 		grace:   nonnegativeEnv("CONCURRENCY_GRACE", 0), threshold: positiveEnv("CONCURRENCY_STRIKES", 2),
 		strikes: map[string]int{}, sessionStrikes: map[string]int{}, sessionReconcileAt: map[string]time.Time{},
 		reconcileTunnelSessions: func(ctx context.Context, account string) (services.TunnelSessionObservation, []string, error) {

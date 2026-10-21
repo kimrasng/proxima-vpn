@@ -877,7 +877,8 @@
         "maxConcurrent": "Concurrent connections",
         "maxConcurrentHint": "Concurrent online UUID slots. Blank inherits registered device cap.",
         "maxDevicesHint": "Registered device limit; not the number currently online.",
-        "observationHint": "Observation mode: online UUID slots are monitored, not actively blocked when the cap is reached."
+        "observationHint": "Observation mode: online UUID slots are monitored, not actively blocked when the cap is reached.",
+        "enforcementHint": "Blocking mode: when online UUID slots exceed the cap, the newest connection is disconnected."
       },
       "purchasableYes": "Purchasable",
       "purchasableNo": "No pricing",

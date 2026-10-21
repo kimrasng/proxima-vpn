@@ -841,6 +841,7 @@
         "maxConcurrentHint": "同时在线的 UUID 槽位数；留空则沿用登记设备上限。",
         "maxDevicesHint": "可登记设备数量，并非当前在线数量。",
         "observationHint": "观察模式：监测在线 UUID 槽位，达到上限时不会主动阻断连接。",
+        "enforcementHint": "阻断模式：在线 UUID 槽位超过上限时，将断开最新接入的连接。",
         "name": "套餐名称",
         "trafficLimit": "流量限制（GB）",
         "trafficHint": "留空表示无限制",

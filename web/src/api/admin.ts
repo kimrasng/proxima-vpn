@@ -103,6 +103,12 @@ export function listUUIDEvictions(): Promise<UUIDEvictionStatus[]> {
   return get<UUIDEvictionStatus[]>('/api/v1/admin/uuid-evictions');
 }
 
+// Whether the scheduler evicts over-cap online UUID slots (server-side switch).
+export function getConcurrencyEnforcement(): Promise<{ enforced: boolean }> {
+  applyAdminClient();
+  return get<{ enforced: boolean }>('/api/v1/admin/concurrency-enforcement');
+}
+
 export function retryUUIDEviction(uuid: string): Promise<{state:string;message:string}> {
   applyAdminClient();
   return post<{state:string;message:string}>(`/api/v1/admin/uuid-evictions/${encodeURIComponent(uuid)}/retry`);

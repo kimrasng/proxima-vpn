@@ -1,6 +1,6 @@
 # Guarded UUID concurrency enforcement increment
 
-Status: implemented behind `ENFORCE_CONCURRENCY=1`, not deployed. Phase 2 remains open pending DB-backed integrated verification and operator rollout evidence.
+Status: **on by default**. `ENFORCE_CONCURRENCY` is a kill switch: set it to `0`, `false`, `off` or `no` to fall back to observation only. Any other value, including a typo, keeps enforcement on. The admin panel reads the same switch via `GET /api/v1/admin/concurrency-enforcement` and labels plans as blocking or observation mode accordingly. The guards below still apply: no eviction happens on incomplete or ambiguous observations or while any Exit is stale or incompatible.
 
 ## Enforcement path
 
