@@ -29,15 +29,18 @@ func TestTieIsStable(t *testing.T) {
 		t.Fatalf("ambiguous same-second arrival must not select a victim: %s", got)
 	}
 }
-func TestEnforcementFlagRequiresExplicitOptInAndFleetChecks(t *testing.T) {
-	t.Setenv("ENFORCE_CONCURRENCY", "")
-	if NewConcurrencyScheduler(nil, nil).enforce {
-		t.Fatal("default must observe")
+func TestConcurrencyEnforcementIsOnByDefaultWithKillSwitch(t *testing.T) {
+	for _, on := range []string{"", "1", "true", "flase"} {
+		t.Setenv("ENFORCE_CONCURRENCY", on)
+		if !NewConcurrencyScheduler(nil, nil).enforce {
+			t.Fatalf("ENFORCE_CONCURRENCY=%q must keep guarded enforcement on", on)
+		}
 	}
-	t.Setenv("ENFORCE_CONCURRENCY", "1")
-	s := NewConcurrencyScheduler(nil, nil)
-	if !s.enforce {
-		t.Fatal("explicit opt-in did not activate guarded enforcement")
+	for _, off := range []string{"0", "false", "OFF", " no "} {
+		t.Setenv("ENFORCE_CONCURRENCY", off)
+		if NewConcurrencyScheduler(nil, nil).enforce {
+			t.Fatalf("ENFORCE_CONCURRENCY=%q must fall back to observation", off)
+		}
 	}
 }
 
@@ -348,7 +351,7 @@ func assertNoFixtureAddresses(t *testing.T, logs *bytes.Buffer) {
 
 func TestClientAddressEnforcementIsOnByDefaultWithKillSwitch(t *testing.T) {
 	t.Setenv("ENFORCE_CLIENT_ADDRESS_LIMIT", "")
-	t.Setenv("ENFORCE_CONCURRENCY", "")
+	t.Setenv("ENFORCE_CONCURRENCY", "0")
 	s := NewConcurrencyScheduler(nil, nil)
 	if !s.enforceAddresses {
 		t.Fatal("address enforcement must default on")

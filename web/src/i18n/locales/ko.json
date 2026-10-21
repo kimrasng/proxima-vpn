@@ -877,7 +877,8 @@
         "maxConcurrent": "동시 접속 수",
         "maxConcurrentHint": "동시 온라인 UUID 슬롯 수입니다. 비워두면 등록 기기 수 제한을 따릅니다.",
         "maxDevicesHint": "등록 가능한 기기 수이며 현재 온라인 수가 아닙니다.",
-        "observationHint": "관찰 모드: 온라인 UUID 슬롯을 모니터링하지만 상한에 도달해도 접속을 차단하지 않습니다."
+        "observationHint": "관찰 모드: 온라인 UUID 슬롯을 모니터링하지만 상한에 도달해도 접속을 차단하지 않습니다.",
+        "enforcementHint": "차단 모드: 온라인 UUID 슬롯이 상한을 넘으면 가장 최근에 접속한 연결을 끊습니다."
       },
       "purchasableYes": "구매 가능",
       "purchasableNo": "가격 미설정",

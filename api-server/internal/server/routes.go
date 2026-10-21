@@ -153,6 +153,7 @@ func (s *Server) registerRoutes() {
 	admin.Get("/online-users", adminStatsHandler.GetOnlineUsers)
 	adminEvictions := handlers.NewAdminUUIDEvictionHandler(s.db)
 	admin.Get("/uuid-evictions", adminEvictions.List)
+	admin.Get("/concurrency-enforcement", handlers.GetConcurrencyEnforcement)
 	admin.Post("/uuid-evictions/:uuid/retry", adminEvictions.Retry)
 	admin.Post("/devices/:id/terminate", adminStatsHandler.TerminateSession)
 

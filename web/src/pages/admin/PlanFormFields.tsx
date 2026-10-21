@@ -16,6 +16,7 @@ import {
   Tabs,
 } from "@cloudscape-design/components";
 import PlanDurationInput from "./PlanDurationInput";
+import ConcurrencyModeHint from "./ConcurrencyModeHint";
 import type { NodeGroup } from "../../api/types";
 import { featureLanguages, type PlanForm, type PlanFormErrors, type PriceRow, type FeatureRow } from "./planFormModel";
 
@@ -143,7 +144,7 @@ export default function PlanFormFields({
           </FormField>
         </Box>
       </ColumnLayout>
-      <Box variant="small" color="text-body-secondary">{t("admin.plans.form.observationHint")}</Box>
+      <ConcurrencyModeHint />
 
       </Container>
 

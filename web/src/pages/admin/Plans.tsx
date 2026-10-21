@@ -31,6 +31,7 @@ import type {
   PlanRoutesResponse,
 } from "../../api/types";
 import PlanFormFields from "./PlanFormFields";
+import ConcurrencyModeHint from "./ConcurrencyModeHint";
 import PlanPreview from "./PlanPreview";
 import PlanRoutesPanel from "./PlanRoutesPanel";
 import { adminError } from "../../utils/adminError";
@@ -313,7 +314,7 @@ export default function Plans() {
   return (
     <ContentLayout header={<Header variant="h1">{t("admin.plans.title")}</Header>}>
       <SpaceBetween size="l">
-        <Box variant="small" color="text-body-secondary">{t("admin.plans.form.observationHint")}</Box>
+        <ConcurrencyModeHint />
         {error && (
           <Flashbar items={[{ type: "error", content: error, dismissible: true, onDismiss: () => setError(null) }]} />
         )}
