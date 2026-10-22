@@ -1695,7 +1695,9 @@
       "darkMode": "Switch to dark mode",
       "navigation": "User navigation",
       "openNavigation": "Open navigation",
-      "closeNavigation": "Close navigation"
+      "closeNavigation": "Close navigation",
+      "groupService": "Plan & subscription",
+      "groupUsage": "Usage"
     },
     "dashboard": {
       "title": "Overview",
@@ -1911,6 +1913,19 @@
           "overall_cap_reached": "That promotion code has reached its redemption limit.",
           "user_cap_reached": "You have already used that promotion code the maximum number of times."
         }
+      },
+      "savePercent": "Save {{percent}}%",
+      "checkoutModal": {
+        "title": "Checkout",
+        "provider": "Payment method",
+        "providerStripe": "Card",
+        "providerStripeHint": "Pay now on the Stripe checkout page.",
+        "providerAdmin": "Bank transfer · manual",
+        "providerAdminHint": "Your order is placed and the plan starts once payment is confirmed.",
+        "promoOptional": "Optional.",
+        "confirm": "Continue to payment",
+        "noProviders": "No payment method is available. Please contact support.",
+        "paid": "Payment complete. Your plan is active."
       }
     },
     "account": {

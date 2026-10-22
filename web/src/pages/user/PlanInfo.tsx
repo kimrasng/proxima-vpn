@@ -22,13 +22,14 @@ import {
   Alert,
   Tiles,
 } from "@cloudscape-design/components";
-import { borderRadiusItem, colorBackgroundCellShaded, colorBorderDividerDefault } from "@cloudscape-design/design-tokens";
+import {
+  borderRadiusInput, borderRadiusItem, colorBackgroundCellShaded, colorBackgroundInputDefault,
+  colorBackgroundItemSelected, colorBorderDividerDefault, colorBorderInputDefault, colorBorderItemSelected,
+} from "@cloudscape-design/design-tokens";
 import "./planInfo.css";
-import { focusFirstInvalid } from "../../utils/formValidation";
 import type {
   UserProfile,
   UserPlanItem,
-  UserPlanPrice,
   OrderResponse,
   OrderStatus,
   PaymentProviderItem,
@@ -86,6 +87,17 @@ function orderStatusIndicatorType(status: OrderStatus): StatusIndicatorProps.Typ
   }
 }
 
+// What the checkout modal is paying for: a fresh plan/duration pick, or an
+// order that already exists (pending, or just created with a refused code).
+type CheckoutTarget = {
+  planId: string;
+  planName: string;
+  durationDays: number;
+  priceCents: number;
+  discountCents: number;
+  order: OrderResponse | null;
+};
+
 const STATUS_LABEL_KEYS: Record<string, string> = {
   active: "user.dashboard.statusActive",
   suspended: "user.dashboard.statusSuspended",
@@ -101,17 +113,14 @@ export default function PlanInfo() {
   const [loading, setLoading] = useState(true);
   const [flash, setFlash] = useState<FlashbarProps.MessageDefinition[]>([]);
   const [submitting, setSubmitting] = useState(false);
-  const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<OrderReceipt | null>(null);
   const [receiptLoading, setReceiptLoading] = useState<string | null>(null);
   const [selectedDurations, setSelectedDurations] = useState<Record<string, number>>({});
-  const [orderReview, setOrderReview] = useState<{ plan: UserPlanItem; price: UserPlanPrice } | null>(null);
-  const [orderReviewError, setOrderReviewError] = useState<string | null>(null);
-  const [orderingPlanId, setOrderingPlanId] = useState<string | null>(null);
+  const [checkout, setCheckout] = useState<CheckoutTarget | null>(null);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
+  const [providerName, setProviderName] = useState<string | undefined>();
   const [cancelModal, setCancelModal] = useState<OrderResponse | null>(null);
   const [promotionCode, setPromotionCode] = useState("");
-  const [promotionLoading, setPromotionLoading] = useState(false);
-  const [showPromotionError, setShowPromotionError] = useState(false);
 
   const loadData = async () => {
     try {
@@ -159,82 +168,107 @@ export default function PlanInfo() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const showRejection = (reason: PromotionRejectReason) => {
-    setFlash([
-      {
-        type: "error",
-        content: t(`user.plan.promotion.rejected.${reason}`),
-        dismissible: true,
-        onDismiss: () => setFlash([]),
-      },
-    ]);
+  const openCheckout = (target: CheckoutTarget) => {
+    setCheckout(target);
+    setCheckoutError(null);
+    setPromotionCode("");
+    setProviderName((current) =>
+      current && providers.some((provider) => provider.name === current)
+        ? current
+        : (providers.find((provider) => provider.mode === "redirect") ?? providers[0])?.name,
+    );
   };
 
-  const handleOrder = async (planId: string, durationDays: number) => {
-    if (submitting || pendingOrder) return;
+  const openOrderCheckout = (order: OrderResponse) =>
+    openCheckout({
+      planId: order.plan_id,
+      planName: order.plan_name,
+      durationDays: order.duration_days,
+      priceCents: order.price_cents,
+      discountCents: order.discount_cents ?? 0,
+      order,
+    });
+
+  const closeCheckout = () => {
+    setCheckout(null);
+    setCheckoutError(null);
+    setPromotionCode("");
+  };
+
+  // Hands an existing pending order to the chosen provider. A redirect provider
+  // (Stripe) leaves the SPA; a manual one only records the choice, so the order
+  // waits for an admin to confirm the transfer.
+  const payWithProvider = async (orderId: string) => {
+    const provider = providers.find((item) => item.name === providerName);
+    if (!provider) throw new Error("no payment provider selected");
+    const session = await userApi.startCheckout(orderId, provider.name);
+    if (session.mode === "redirect") {
+      if (!session.redirect_url) throw new Error("checkout returned no redirect URL");
+      window.location.href = session.redirect_url;
+      return;
+    }
+    closeCheckout();
+    setFlash([{ type: "success", content: t("user.plan.order.placed"), dismissible: true, onDismiss: () => setFlash([]) }]);
+    await loadData();
+  };
+
+  const handleConfirmCheckout = async () => {
+    if (!checkout || submitting) return;
     const code = promotionCode.trim();
+    setSubmitting(true);
+    setCheckoutError(null);
     try {
-      setSubmitting(true);
-      setOrderingPlanId(planId);
-      setOrderReviewError(null);
-      const result = await userApi.createOrder({
-        plan_id: planId,
-        duration_days: durationDays,
-        ...(code ? { promotion_code: code } : {}),
-      });
-      if (result.promotion_rejected) {
-        showRejection(result.promotion_rejected);
-      } else if (result.order.status === "pending" && redirectProvider) {
-        // Place order goes straight to hosted checkout; the order already
-        // exists, so a failed handoff leaves it payable from My Orders.
-        setOrderReview(null);
-        setPromotionCode("");
-        const redirected = await redirectToCheckout(result.order.id);
-        if (redirected) return;
-        await loadData();
-        return;
+      let order = checkout.order;
+      if (order) {
+        if (code) {
+          try {
+            await userApi.applyPromotionToOrder(order.id, code);
+          } catch (err) {
+            const reason = rejectionFromError(err);
+            if (!reason) throw err;
+            setCheckoutError(t(`user.plan.promotion.rejected.${reason}`));
+            return;
+          }
+        }
       } else {
-        setFlash([{ type: "success", content: t("user.plan.order.placed"), dismissible: true, onDismiss: () => setFlash([]) }]);
-        setPromotionCode("");
+        const result = await userApi.createOrder({
+          plan_id: checkout.planId,
+          duration_days: checkout.durationDays,
+          ...(code ? { promotion_code: code } : {}),
+        });
+        order = result.order;
+        if (result.promotion_rejected) {
+          // The order now exists without the discount. Keep the modal on it so the
+          // user can fix the code or pay the full price; reloading the whole page
+          // here would unmount the modal mid-decision.
+          setCheckout({ ...checkout, order, priceCents: order.price_cents, discountCents: order.discount_cents ?? 0 });
+          setCheckoutError(t(`user.plan.promotion.rejected.${result.promotion_rejected}`));
+          setOrders(await userApi.listMyOrders());
+          return;
+        }
+        if (order.status === "paid") {
+          closeCheckout();
+          setFlash([{ type: "success", content: t("user.plan.checkoutModal.paid"), dismissible: true, onDismiss: () => setFlash([]) }]);
+          await loadData();
+          return;
+        }
       }
-      setOrderReview(null);
-      await loadData();
+      await payWithProvider(order.id);
     } catch (err) {
-      // 409 is the one-pending-order rule, not a failure worth a generic message.
-      const content =
-        err instanceof ApiError && err.status === 409
-          ? t("user.plan.order.conflict")
-          : t("user.plan.order.error");
-      setFlash([{ type: "error", content, dismissible: true, onDismiss: () => setFlash([]) }]);
-      setOrderReviewError(content);
+      setCheckoutError(
+        err instanceof ApiError && err.status === 409 ? t("user.plan.order.conflict") : t("user.plan.order.error"),
+      );
     } finally {
       setSubmitting(false);
-      setOrderingPlanId(null);
     }
   };
 
-  const handleApplyPromotion = async (orderId: string) => {
-    const code = promotionCode.trim();
-    setShowPromotionError(true);
-    if (!code) { focusFirstInvalid(); return; }
-    try {
-      setPromotionLoading(true);
-      await userApi.applyPromotionToOrder(orderId, code);
-      setFlash([{ type: "success", content: t("user.plan.promotion.applied"), dismissible: true, onDismiss: () => setFlash([]) }]);
-      setPromotionCode("");
-      setShowPromotionError(false);
-      await loadData();
-    } catch (err) {
-      const reason = rejectionFromError(err);
-      if (reason) {
-        showRejection(reason);
-      } else {
-        setFlash([{ type: "error", content: t("user.plan.promotion.error"), dismissible: true, onDismiss: () => setFlash([]) }]);
-      }
-    } finally {
-      setPromotionLoading(false);
-    }
-  };
+  const providerLabel = (name: string) =>
+    name === "stripe" ? t("user.plan.checkoutModal.providerStripe")
+      : name === "admin" ? t("user.plan.checkoutModal.providerAdmin") : name;
+  const providerHint = (name: string) =>
+    name === "stripe" ? t("user.plan.checkoutModal.providerStripeHint")
+      : name === "admin" ? t("user.plan.checkoutModal.providerAdminHint") : undefined;
 
   const handleCancelOrder = async () => {
     if (!cancelModal) return;
@@ -249,34 +283,6 @@ export default function PlanInfo() {
     } finally {
       setSubmitting(false);
     }
-  };
-
-  // At most one redirect provider exists today (stripe), so the button needs no picker.
-  const redirectProvider = providers.find((p) => p.mode === "redirect") ?? null;
-
-  // Returns true once the browser is leaving for the hosted checkout page.
-  const redirectToCheckout = async (orderId: string): Promise<boolean> => {
-    if (!redirectProvider) return false;
-    try {
-      setCheckoutLoading(orderId);
-      const session = await userApi.startCheckout(orderId, redirectProvider.name);
-      if (!session.redirect_url) {
-        setFlash([{ type: "error", content: t("user.plan.order.checkout.error"), dismissible: true, onDismiss: () => setFlash([]) }]);
-        return false;
-      }
-      // Checkout lives on Stripe's domain, so this must leave the SPA entirely.
-      window.location.href = session.redirect_url;
-      return true;
-    } catch {
-      setFlash([{ type: "error", content: t("user.plan.order.checkout.error"), dismissible: true, onDismiss: () => setFlash([]) }]);
-      return false;
-    } finally {
-      setCheckoutLoading(null);
-    }
-  };
-
-  const handleStartCheckout = async (orderId: string) => {
-    await redirectToCheckout(orderId);
   };
 
   const handleViewReceipt = async (orderId: string) => {
@@ -310,6 +316,7 @@ export default function PlanInfo() {
 
   return (
     <ContentLayout header={<Header variant="h1" description={t("user.plan.subtitle")}>{t("user.plan.title")}</Header>}>
+      <div className="plan-info__page">
       <SpaceBetween size="l">
         <Flashbar items={flash} />
 
@@ -343,27 +350,9 @@ export default function PlanInfo() {
         )}
 
         {!hasPlan && (
-          <div className="plan-info__top">
-            <Container fitHeight>
-              <SpaceBetween size="xs">
-                <StatusIndicator type={isExpired ? "warning" : "info"}>
-                  <Box variant="strong" tagOverride="span">{isExpired ? t("user.plan.expired") : t("user.plan.noPlan")}</Box>
-                </StatusIndicator>
-                <Box color="text-body-secondary">{t("user.plan.noPlanHint")}</Box>
-              </SpaceBetween>
-            </Container>
-            {plans.length > 0 && !pendingOrder && (
-              <Container fitHeight>
-                <FormField label={t("user.plan.promotion.label")} description={t("user.plan.promotion.beforeOrderHint")} stretch>
-                  <Input
-                    value={promotionCode}
-                    placeholder={t("user.plan.promotion.placeholder")}
-                    onChange={({ detail }) => setPromotionCode(detail.value)}
-                  />
-                </FormField>
-              </Container>
-            )}
-          </div>
+          <Alert type={isExpired ? "warning" : "info"} header={isExpired ? t("user.plan.expired") : t("user.plan.noPlan")}>
+            {t("user.plan.noPlanHint")}
+          </Alert>
         )}
 
         {pendingOrder && (
@@ -380,68 +369,20 @@ export default function PlanInfo() {
                 <SpaceBetween direction="horizontal" size="xs" alignItems="center">
                   <Box variant="awsui-key-label">{t("user.plan.promotion.discountApplied")}</Box>
                   <Box color="text-status-inactive">
-                    <s>
-                      {formatPriceCents(
-                        pendingOrder.price_cents + (pendingOrder.discount_cents ?? 0),
-                      )}
-                    </s>
+                    <s>{formatPriceCents(pendingOrder.price_cents + (pendingOrder.discount_cents ?? 0))}</s>
                   </Box>
                   <Badge color="green">{formatPriceCents(pendingOrder.price_cents)}</Badge>
-                  <Box variant="small" color="text-body-secondary">
-                    {t("user.plan.promotion.savedAmount", {
-                      amount: formatPriceCents(pendingOrder.discount_cents ?? 0),
-                    })}
-                  </Box>
                 </SpaceBetween>
               )}
-              <FormField
-                label={t("user.plan.promotion.label")}
-                description={t("user.plan.promotion.pendingHint")}
-                errorText={showPromotionError && !promotionCode.trim() ? t("user.plan.promotion.codeRequired") : undefined}
-              >
-                <SpaceBetween direction="horizontal" size="xs">
-                  <Input
-                    value={promotionCode}
-                    placeholder={t("user.plan.promotion.placeholder")}
-                    onChange={({ detail }) => setPromotionCode(detail.value)}
-                  />
-                  <Button
-                    loading={promotionLoading}
-                    disabled={promotionLoading}
-                    onClick={() => void handleApplyPromotion(pendingOrder.id)}
-                  >
-                    {t("user.plan.promotion.apply")}
-                  </Button>
-                </SpaceBetween>
-              </FormField>
-              {redirectProvider && (
-                <SpaceBetween size="xxs">
-                  <Button
-                    variant="primary"
-                    loading={checkoutLoading === pendingOrder.id}
-                    disabled={checkoutLoading !== null}
-                    onClick={() => void handleStartCheckout(pendingOrder.id)}
-                  >
+              <SpaceBetween direction="horizontal" size="xs">
+                {providers.length > 0 && (
+                  <Button variant="primary" onClick={() => openOrderCheckout(pendingOrder)}>
                     {t("user.plan.order.checkout.payNow")}
                   </Button>
-                  <Box variant="small" color="text-body-secondary">
-                    {t("user.plan.order.checkout.hint")}
-                  </Box>
-                </SpaceBetween>
-              )}
+                )}
+                <Button onClick={() => setCancelModal(pendingOrder)}>{t("user.plan.order.cancel")}</Button>
+              </SpaceBetween>
             </SpaceBetween>
-          </Container>
-        )}
-
-        {hasPlan && plans.length > 0 && !pendingOrder && (
-          <Container>
-            <FormField label={t("user.plan.promotion.label")} description={t("user.plan.promotion.beforeOrderHint")}>
-              <Input
-                value={promotionCode}
-                placeholder={t("user.plan.promotion.placeholder")}
-                onChange={({ detail }) => setPromotionCode(detail.value)}
-              />
-            </FormField>
           </Container>
         )}
 
@@ -477,26 +418,46 @@ export default function PlanInfo() {
                         </Box>
                       ) : null}
 
-                      {item.purchasable && item.prices.length > 0 && (
+                      {item.purchasable && selectedPrice && item.prices.length > 1 && (
                         <FormField label={t("user.plan.order.chooseDuration")} stretch>
-                          <Tiles
-                            columns={Math.min(3, item.prices.length)}
-                            value={selectedPrice ? String(selectedPrice.duration_days) : null}
-                            onChange={({ detail }) =>
-                              setSelectedDurations((current) => ({ ...current, [item.id]: Number(detail.value) }))
-                            }
-                            items={item.prices.map((price) => {
+                          <div
+                            className="plan-info__durations"
+                            role="radiogroup"
+                            aria-label={t("user.plan.order.chooseDuration")}
+                            style={{ gridTemplateColumns: `repeat(${item.prices.length <= 4 ? item.prices.length : 3}, minmax(0, 1fr))` }}
+                          >
+                            {item.prices.map((price) => {
+                              const selected = price.duration_days === selectedPrice.duration_days;
                               const priceSavings = planSavings(item.prices, price.duration_days);
-                              return {
-                                value: String(price.duration_days),
-                                label: t("user.plan.daysLabel", { days: price.duration_days }),
-                                description: priceSavings
-                                  ? `${formatPriceCents(price.price_cents)} · ${t("user.plan.order.savings", { percent: priceSavings.percent })}`
-                                  : formatPriceCents(price.price_cents),
-                                disabled: submitting || pendingOrder !== null,
-                              };
+                              return (
+                                <button
+                                  key={price.duration_days}
+                                  type="button"
+                                  role="radio"
+                                  aria-checked={selected}
+                                  className="plan-info__duration"
+                                  disabled={submitting || pendingOrder !== null}
+                                  style={{
+                                    borderColor: selected ? colorBorderItemSelected : colorBorderInputDefault,
+                                    background: selected ? colorBackgroundItemSelected : colorBackgroundInputDefault,
+                                    boxShadow: selected ? `inset 0 0 0 1px ${colorBorderItemSelected}` : undefined,
+                                    borderRadius: borderRadiusInput,
+                                  }}
+                                  onClick={() =>
+                                    setSelectedDurations((current) => ({ ...current, [item.id]: price.duration_days }))
+                                  }
+                                >
+                                  <Box fontWeight="bold" fontSize="body-s">{t("user.plan.daysLabel", { days: price.duration_days })}</Box>
+                                  <Box fontSize="body-s">{formatPriceCents(price.price_cents)}</Box>
+                                  {priceSavings && (
+                                    <Box fontSize="body-s" color="text-status-success">
+                                      {t("user.plan.savePercent", { percent: priceSavings.percent })}
+                                    </Box>
+                                  )}
+                                </button>
+                              );
                             })}
-                          />
+                          </div>
                         </FormField>
                       )}
 
@@ -536,12 +497,17 @@ export default function PlanInfo() {
                               fullWidth
                               iconName="add-plus"
                               ariaLabel={`${t("user.plan.order.placeOrder")} ${item.name}`}
-                              loading={orderingPlanId === item.id}
                               disabled={submitting || pendingOrder !== null}
-                              onClick={() => {
-                                setOrderReviewError(null);
-                                setOrderReview({ plan: item, price: selectedPrice });
-                              }}
+                              onClick={() =>
+                                openCheckout({
+                                  planId: item.id,
+                                  planName: item.name,
+                                  durationDays: selectedPrice.duration_days,
+                                  priceCents: selectedPrice.price_cents,
+                                  discountCents: 0,
+                                  order: null,
+                                })
+                              }
                             >
                               {t("user.plan.order.placeOrder")}
                             </Button>
@@ -616,13 +582,8 @@ export default function PlanInfo() {
                 cell: (item) =>
                   item.status === "pending" ? (
                     <SpaceBetween direction="horizontal" size="xs">
-                      {redirectProvider && (
-                        <Button
-                          variant="inline-link"
-                          loading={checkoutLoading === item.id}
-                          disabled={checkoutLoading !== null}
-                          onClick={() => void handleStartCheckout(item.id)}
-                        >
+                      {providers.length > 0 && (
+                        <Button variant="inline-link" onClick={() => openOrderCheckout(item)}>
                           {t("user.plan.order.checkout.payNow")}
                         </Button>
                       )}
@@ -649,58 +610,87 @@ export default function PlanInfo() {
         )}
 
         <Modal
-          size="small"
+          size="medium"
           closeAriaLabel={t("user.announcements.close")}
-          visible={orderReview !== null}
+          visible={checkout !== null}
           onDismiss={() => {
-            if (!submitting) setOrderReview(null);
+            if (!submitting) closeCheckout();
           }}
-          header={t("user.plan.order.reviewTitle")}
+          header={t("user.plan.checkoutModal.title")}
           footer={
             <Box float="right">
               <SpaceBetween direction="horizontal" size="xs">
-                <Button disabled={submitting} onClick={() => setOrderReview(null)}>
+                <Button disabled={submitting} onClick={closeCheckout}>
                   {t("user.plan.order.dismiss")}
                 </Button>
                 <Button
                   variant="primary"
-                  loading={orderingPlanId !== null}
-                  disabled={submitting || pendingOrder !== null}
-                  onClick={() => {
-                    if (orderReview) {
-                      void handleOrder(orderReview.plan.id, orderReview.price.duration_days);
-                    }
-                  }}
+                  loading={submitting}
+                  disabled={!providerName || (checkout?.order === null && pendingOrder !== null)}
+                  onClick={() => void handleConfirmCheckout()}
                 >
-                  {t("user.plan.order.confirmOrder")}
+                  {t("user.plan.checkoutModal.confirm")}
                 </Button>
               </SpaceBetween>
             </Box>
           }
         >
-          {orderReview && (
-            <SpaceBetween size="s">
-              <Box>{t("user.plan.order.reviewHint")}</Box>
-              <SpaceBetween size="xxs">
-                <Box variant="awsui-key-label">{t("user.plan.planName")}</Box>
-                <Box>{orderReview.plan.name}</Box>
-              </SpaceBetween>
-              <SpaceBetween size="xxs">
-                <Box variant="awsui-key-label">{t("user.plan.duration")}</Box>
-                <Box>{orderReview.price.duration_days} {t("user.plan.durationDays")}</Box>
-              </SpaceBetween>
-              <SpaceBetween size="xxs">
-                <Box variant="awsui-key-label">{t("user.plan.order.col.price")}</Box>
-                <Box>{formatPriceCents(orderReview.price.price_cents)}</Box>
-              </SpaceBetween>
-              {promotionCode.trim() && (
+          {checkout && (
+            <SpaceBetween size="l">
+              <div className="plan-info__summary">
                 <SpaceBetween size="xxs">
-                  <Box variant="awsui-key-label">{t("user.plan.promotion.label")}</Box>
-                  <Box>{promotionCode.trim()}</Box>
+                  <Box variant="awsui-key-label">{t("user.plan.planName")}</Box>
+                  <Box>{checkout.planName}</Box>
                 </SpaceBetween>
-              )}
-              {pendingOrder && <Alert type="warning">{t("user.plan.order.blockedByPending")}</Alert>}
-              {orderReviewError && <Alert type="error">{orderReviewError}</Alert>}
+                <SpaceBetween size="xxs">
+                  <Box variant="awsui-key-label">{t("user.plan.duration")}</Box>
+                  <Box>{t("user.plan.daysLabel", { days: checkout.durationDays })}</Box>
+                </SpaceBetween>
+                <SpaceBetween size="xxs">
+                  <Box variant="awsui-key-label">{t("user.plan.order.col.price")}</Box>
+                  <SpaceBetween direction="horizontal" size="xxs" alignItems="center">
+                    {checkout.discountCents > 0 && (
+                      <Box color="text-status-inactive"><s>{formatPriceCents(checkout.priceCents + checkout.discountCents)}</s></Box>
+                    )}
+                    <Box fontWeight="bold">{formatPriceCents(checkout.priceCents)}</Box>
+                  </SpaceBetween>
+                </SpaceBetween>
+              </div>
+
+              <FormField label={t("user.plan.checkoutModal.provider")} stretch>
+                {providers.length === 0 ? (
+                  <Alert type="warning">{t("user.plan.checkoutModal.noProviders")}</Alert>
+                ) : (
+                  <Tiles
+                    columns={Math.min(2, providers.length)}
+                    value={providerName ?? null}
+                    onChange={({ detail }) => setProviderName(detail.value)}
+                    items={[...providers].sort((a, b) => Number(b.mode === "redirect") - Number(a.mode === "redirect")).map((provider) => ({
+                      value: provider.name,
+                      label: providerLabel(provider.name),
+                      description: providerHint(provider.name),
+                      disabled: submitting,
+                    }))}
+                  />
+                )}
+              </FormField>
+
+              <FormField
+                label={t("user.plan.promotion.label")}
+                constraintText={t("user.plan.checkoutModal.promoOptional")}
+                description={checkout.order ? t("user.plan.promotion.pendingHint") : undefined}
+                stretch
+              >
+                <Input
+                  value={promotionCode}
+                  disabled={submitting}
+                  placeholder={t("user.plan.promotion.placeholder")}
+                  onChange={({ detail }) => setPromotionCode(detail.value)}
+                />
+              </FormField>
+
+              {checkout.order === null && pendingOrder && <Alert type="warning">{t("user.plan.order.blockedByPending")}</Alert>}
+              {checkoutError && <Alert type="error">{checkoutError}</Alert>}
             </SpaceBetween>
           )}
         </Modal>
@@ -790,6 +780,7 @@ export default function PlanInfo() {
           })}
         </Modal>
       </SpaceBetween>
+      </div>
     </ContentLayout>
   );
 }

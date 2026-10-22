@@ -17,14 +17,29 @@ export default function UserLayout() {
   const navigate = useNavigate();
   const { theme, toggle: toggleTheme } = useTheme();
 
+  // Ordered by how often a customer needs each page: what they pay for and how
+  // they connect first, usage next, housekeeping last.
   const navItems: SideNavigationProps.Item[] = [
     { type: "link", text: t("user.nav.dashboard"), href: "/portal/dashboard" },
-    { type: "link", text: t("user.nav.devices"), href: "/portal/devices" },
-    { type: "link", text: t("user.nav.nodes"), href: "/portal/nodes" },
-    { type: "link", text: t("user.nav.traffic"), href: "/portal/traffic" },
-    { type: "link", text: t("user.nav.plan"), href: "/portal/plan" },
-    { type: "link", text: t("user.nav.account"), href: "/portal/account" },
+    {
+      type: "section-group",
+      title: t("user.nav.groupService"),
+      items: [
+        { type: "link", text: t("user.nav.plan"), href: "/portal/plan" },
+        { type: "link", text: t("user.nav.devices"), href: "/portal/devices" },
+      ],
+    },
+    {
+      type: "section-group",
+      title: t("user.nav.groupUsage"),
+      items: [
+        { type: "link", text: t("user.nav.nodes"), href: "/portal/nodes" },
+        { type: "link", text: t("user.nav.traffic"), href: "/portal/traffic" },
+      ],
+    },
+    { type: "divider" },
     { type: "link", text: t("user.nav.announcements"), href: "/portal/announcements" },
+    { type: "link", text: t("user.nav.account"), href: "/portal/account" },
   ];
 
   const changeLanguage = (lng: string) => {

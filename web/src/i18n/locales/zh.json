@@ -1695,7 +1695,9 @@
       "darkMode": "切换到深色模式",
       "navigation": "用户菜单",
       "openNavigation": "打开菜单",
-      "closeNavigation": "关闭菜单"
+      "closeNavigation": "关闭菜单",
+      "groupService": "套餐 · 订阅",
+      "groupUsage": "使用情况"
     },
     "dashboard": {
       "title": "概览",
@@ -1911,6 +1913,19 @@
           "overall_cap_reached": "该促销码的兑换次数已用完。",
           "user_cap_reached": "你已达到该促销码的可用次数上限。"
         }
+      },
+      "savePercent": "节省 {{percent}}%",
+      "checkoutModal": {
+        "title": "结账",
+        "provider": "支付方式",
+        "providerStripe": "银行卡",
+        "providerStripeHint": "前往 Stripe 结账页面立即付款。",
+        "providerAdmin": "银行转账 · 人工确认",
+        "providerAdminHint": "订单提交后，确认收款即开通套餐。",
+        "promoOptional": "可选。",
+        "confirm": "继续付款",
+        "noProviders": "暂无可用的支付方式，请联系客服。",
+        "paid": "付款完成，套餐已生效。"
       }
     },
     "account": {

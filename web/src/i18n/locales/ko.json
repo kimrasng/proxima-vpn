@@ -1695,7 +1695,9 @@
       "darkMode": "다크 모드로 전환",
       "navigation": "유저 메뉴",
       "openNavigation": "메뉴 열기",
-      "closeNavigation": "메뉴 닫기"
+      "closeNavigation": "메뉴 닫기",
+      "groupService": "플랜 · 구독",
+      "groupUsage": "이용 현황"
     },
     "dashboard": {
       "title": "대시보드",
@@ -1911,6 +1913,19 @@
           "overall_cap_reached": "프로모션 코드의 사용 한도가 모두 소진되었습니다.",
           "user_cap_reached": "이 프로모션 코드를 사용할 수 있는 횟수를 이미 모두 사용했습니다."
         }
+      },
+      "savePercent": "{{percent}}% 절약",
+      "checkoutModal": {
+        "title": "결제하기",
+        "provider": "결제 수단",
+        "providerStripe": "카드 결제",
+        "providerStripeHint": "Stripe 결제 페이지로 이동해 바로 결제합니다.",
+        "providerAdmin": "계좌이체 · 수동 확인",
+        "providerAdminHint": "주문을 접수하고, 입금이 확인되면 플랜이 적용됩니다.",
+        "promoOptional": "선택 사항입니다.",
+        "confirm": "결제 진행",
+        "noProviders": "사용할 수 있는 결제 수단이 없습니다. 관리자에게 문의해 주세요.",
+        "paid": "결제가 완료되어 플랜이 적용되었습니다."
       }
     },
     "account": {
