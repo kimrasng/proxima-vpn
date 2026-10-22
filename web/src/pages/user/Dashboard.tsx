@@ -52,27 +52,29 @@ export default function Dashboard() {
         <SpaceBetween direction="horizontal" size="xs">
           <Button iconName="refresh" loading={summary.loading || nodes.loading || announcements.loading}
             onClick={() => { summary.refresh(); nodes.refresh(); announcements.refresh(); setConnectionRefresh((value) => value + 1); }}>{t("user.dashboard.refresh")}</Button>
-          <Button variant={hasPlan ? "normal" : "primary"} onClick={() => navigate("/portal/plan")}>
-            {t(hasPlan ? "user.dashboard.renewPlan" : "user.dashboard.browsePlans")}
-          </Button>
+          {hasPlan && <Button onClick={() => navigate("/portal/plan")}>{t("user.dashboard.renewPlan")}</Button>}
         </SpaceBetween>
       }>{t("user.dashboard.title")}</Header>
     }>
-      <SpaceBetween size="l">
+      <div style={{ maxWidth: 1040 }}>
+      <SpaceBetween size="m">
         {summary.loading ? <Container><Spinner size="large" /></Container> : summary.error ? (
           <Alert type="error" action={<Button onClick={summary.refresh}>{t("user.dashboard.retry")}</Button>}>
             {t("user.dashboard.loadError")}
           </Alert>
         ) : data && (
-          <Container header={<Header variant="h2" description={t("user.dashboard.planSection")}>
-            {hasPlan ? data.plan_name : t("user.dashboard.noPlanTitle")}
+          <Container header={!hasPlan ? undefined : <Header variant="h2" description={t("user.dashboard.planSection")}>
+            {data.plan_name}
           </Header>}>
             <SpaceBetween size="m">
               {!hasPlan ? (
-                <SpaceBetween size="s">
-                  <Box variant="p">{t("user.dashboard.noPlanDescription")}</Box>
-                  <Button variant="primary" onClick={() => navigate("/portal/plan")}>{t("user.dashboard.browsePlans")}</Button>
-                </SpaceBetween>
+                <Box>
+                  <SpaceBetween size="xs">
+                    <Box variant="h2" padding="n">{t("user.dashboard.noPlanTitle")}</Box>
+                    <Box color="text-body-secondary">{t("user.dashboard.noPlanDescription")}</Box>
+                    <Button variant="primary" onClick={() => navigate("/portal/plan")}>{t("user.dashboard.browsePlans")}</Button>
+                  </SpaceBetween>
+                </Box>
               ) : (
                 <>
                   <StatusIndicator type={data.status === "active" && !expired ? "success" : "warning"}>
@@ -122,14 +124,25 @@ export default function Dashboard() {
           </Container>
         )}
 
-        <Grid gridDefinition={[{ colspan: { default: 12, m: 7 } }, { colspan: { default: 12, m: 5 } }]}>
+        {data && !hasPlan && (
+          <Container header={<Header variant="h2" actions={
+            <Button variant="link" onClick={() => navigate("/portal/devices")}>{t("user.dashboard.guideLink")}</Button>
+          }>{t("user.dashboard.guideTitle")}</Header>}>
+            <ColumnLayout columns={3} variant="text-grid">
+              {[t("user.dashboard.guideStep1"), t("user.dashboard.guideStep2"), t("user.dashboard.guideStep3")].map((label, index) => (
+                <Box key={index}><Box variant="awsui-key-label">{index + 1}</Box>{label}</Box>
+              ))}
+            </ColumnLayout>
+          </Container>
+        )}
+
+        <Grid gridDefinition={[{ colspan: { default: 12, m: 6 } }, { colspan: { default: 12, m: 6 } }]}>
           <DeviceQuickConnect summary={data} refreshKey={connectionRefresh} />
-          <SpaceBetween size="l">
             <Container header={<Header variant="h2" description={t("user.dashboard.serverScope")} actions={
               <Button variant="link" onClick={() => navigate("/portal/nodes")}>{t("user.dashboard.viewAll")}</Button>
             }>{t("user.dashboard.serverStatus")}</Header>}>
               <SpaceBetween size="s">
-                {nodes.error ? <Alert type="error" action={<Button onClick={nodes.refresh}>{t("user.dashboard.retry")}</Button>}>
+                {!hasPlan && !summary.loading ? <Box color="text-body-secondary">{t("user.dashboard.serverNeedsPlan")}</Box> : nodes.error ? <Alert type="error" action={<Button onClick={nodes.refresh}>{t("user.dashboard.retry")}</Button>}>
                   {t("user.nodes.loadError")}
                 </Alert> : nodes.loading ? <Spinner /> : (
                   <>
@@ -154,6 +167,7 @@ export default function Dashboard() {
                 )}
               </SpaceBetween>
             </Container>
+        </Grid>
             <Container header={<Header variant="h2" actions={
               <Button variant="link" onClick={() => navigate("/portal/announcements")}>{t("user.dashboard.viewAll")}</Button>
             }>{t("user.announcements.title")}</Header>}>
@@ -169,9 +183,8 @@ export default function Dashboard() {
                 </SpaceBetween>)}
               </SpaceBetween>}
             </Container>
-          </SpaceBetween>
-        </Grid>
       </SpaceBetween>
+      </div>
       <Modal visible={selectedAnnouncement !== null} closeAriaLabel={t("user.announcements.close")} onDismiss={() => setSelectedAnnouncement(null)}
         header={selectedAnnouncement?.title} footer={<Box float="right">
           <Button onClick={() => setSelectedAnnouncement(null)}>{t("user.announcements.close")}</Button>

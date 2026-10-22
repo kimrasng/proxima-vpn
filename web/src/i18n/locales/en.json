@@ -1727,7 +1727,7 @@
       "renewPlan": "Extend or change plan",
       "browsePlans": "Explore and buy plans",
       "noPlanTitle": "You do not have a plan yet",
-      "noPlanDescription": "Compare data allowances, device limits and durations to find your plan. Connect devices once your payment is confirmed.",
+      "noPlanDescription": "Choose a plan to start using the VPN.",
       "monthlyTraffic": "Monthly data usage",
       "trafficAllowance": "{{limit}} per month",
       "trafficRemaining": "{{remaining}} remaining",
@@ -1741,7 +1741,7 @@
       "quickConnect": "Connect your VPN app",
       "connectDescription": "Import your account subscription URL into your VPN app. Your app is recognized automatically.",
       "subscriptionDetails": "Subscription details",
-      "connectNeedsPlan": "You need an active plan to connect.",
+      "connectNeedsPlan": "You can connect a VPN app after purchasing a plan.",
       "subscriptionDomain": "Subscription domain",
       "domainFallback": "Could not load subscription domains. Showing the URL on the default address instead.",
       "importHint": "Copy this URL into your VPN app’s Add subscription or Import from URL option. Do not share this URL with others.",
@@ -1752,7 +1752,14 @@
       "serversOnline": "{{online}} of {{total}} online",
       "viewAll": "View all",
       "accountUnavailable": "Your subscription URL will be available once your account status is confirmed.",
-      "urlUnavailable": "Your subscription URL is unavailable. Please retry."
+      "urlUnavailable": "Your subscription URL is unavailable. Please retry.",
+      "serverNeedsPlan": "Purchase a plan to see the servers available to you.",
+      "supportedApps": "View supported apps",
+      "guideTitle": "Getting started",
+      "guideStep1": "Choose and purchase a plan",
+      "guideStep2": "Install a VPN app",
+      "guideStep3": "Add your subscription URL and connect",
+      "guideLink": "View connection guide"
     },
     "devices": {
       "accountUrl": "Account subscription URL",

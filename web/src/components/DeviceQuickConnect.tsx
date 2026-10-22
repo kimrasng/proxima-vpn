@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import {
   Alert, Box, Button, Container, CopyToClipboard, FormField, Header,
-  Input, Modal, Select, SpaceBetween, Spinner,
+  Input, Link, Modal, Select, SpaceBetween, Spinner,
 } from "@cloudscape-design/components";
 import { QRCodeSVG } from "qrcode.react";
 import type { UserSummary } from "../api/types";
@@ -38,16 +38,17 @@ export default function DeviceQuickConnect({
       <SpaceBetween size="m">
         {summary === null && <Box color="text-body-secondary">{t("user.dashboard.accountUnavailable")}</Box>}
         {summary !== null && !usable && (
-          <Alert type="info" action={summary?.status === "suspended" ? undefined :
-            <Button onClick={() => navigate("/portal/plan")}>{t("user.dashboard.browsePlans")}</Button>
-          }>{t(summary?.status === "suspended" ? "user.dashboard.suspendedHint" : "user.dashboard.connectNeedsPlan")}</Alert>
+          <SpaceBetween size="xs">
+            <Box color="text-body-secondary">{t(summary.status === "suspended" ? "user.dashboard.suspendedHint" : "user.dashboard.connectNeedsPlan")}</Box>
+            <Link onFollow={(event) => { event.preventDefault(); navigate("/portal/devices"); }} href="/portal/devices">{t("user.dashboard.supportedApps")}</Link>
+          </SpaceBetween>
         )}
-        {profile.loading || domains.loading ? <Spinner /> : profile.error ? (
+        {summary !== null && !usable ? null : profile.loading || domains.loading ? <Spinner /> : profile.error ? (
           <Alert type="error" action={<Button onClick={profile.refresh}>{t("user.dashboard.retry")}</Button>}>
             {t("user.devices.loadError")}
           </Alert>
         ) : !url ? (
-          summary !== null && !usable ? null : <Alert type="warning" action={<Button onClick={profile.refresh}>{t("user.dashboard.retry")}</Button>}>
+          <Alert type="warning" action={<Button onClick={profile.refresh}>{t("user.dashboard.retry")}</Button>}>
             {t("user.dashboard.urlUnavailable")}
           </Alert>
         ) : (
