@@ -22,11 +22,11 @@ export function userRegister(req: RegisterRequest): Promise<RegisterResponse> {
   return post<RegisterResponse>('/api/v1/auth/register', req);
 }
 
-export interface SignupCodeResponse { message: string; expires_in_seconds: number }
-export function requestSignupEmailCode(req: RegisterRequest & { language?: string }): Promise<SignupCodeResponse> {
+export interface SignupCodeResponse { message: string; expires_in_seconds: number; signup_token: string }
+export function requestSignupEmailCode(req: RegisterRequest & { language?: string; signup_token?: string }): Promise<SignupCodeResponse> {
   return post('/api/v1/auth/register/request-code', req);
 }
-export function verifySignupEmailCode(req: RegisterRequest & { code: string; language?: string }): Promise<RegisterResponse> {
+export function verifySignupEmailCode(req: RegisterRequest & { code: string; signup_token: string; language?: string }): Promise<RegisterResponse> {
   return post('/api/v1/auth/register/verify-code', req);
 }
 

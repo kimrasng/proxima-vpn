@@ -53,7 +53,7 @@ func (h *UserPortalHandler) GetProfile(c *fiber.Ctx) error {
 	err := h.db.QueryRow(context.Background(), `
 		SELECT u.email, u.name, u.status, u.traffic_used,
 		       p.name, p.traffic_limit, u.plan_expires_at, u.plan_started_at,
-		       u.language, u.sub_token
+		       u.language, COALESCE(u.sub_token, '')
 		FROM users u
 		LEFT JOIN plans p ON u.plan_id = p.id
 		WHERE u.id = $1
@@ -260,13 +260,18 @@ func (h *UserPortalHandler) RegenerateSubToken(c *fiber.Ctx) error {
 	userID := c.Locals("user_id").(string)
 	newToken := crypto.NewUUID()
 
-	_, err := h.db.Exec(context.Background(),
-		`UPDATE users SET sub_token = $1, updated_at = NOW() WHERE id = $2`,
+	tag, err := h.db.Exec(context.Background(),
+		`UPDATE users SET sub_token = $1, updated_at = NOW() WHERE id = $2 AND sub_token IS NOT NULL`,
 		newToken, userID,
 	)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to regenerate subscription token",
+		})
+	}
+	if tag.RowsAffected() == 0 {
+		return c.Status(fiber.StatusConflict).JSON(fiber.Map{
+			"error": "no subscription yet; choose a plan first",
 		})
 	}
 

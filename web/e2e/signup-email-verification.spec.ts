@@ -7,13 +7,16 @@ test.describe("email verification during sign-up", () => {
     await page.route("**/api/v1/auth/signup-policy", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ restricted: false, allowed_domains: [] }) }));
     await page.route("**/api/v1/auth/register/request-code", async (route) => {
       calls.push("request");
-      expect(route.request().postDataJSON()).toMatchObject({ language: "en" });
-      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ message: "verification code sent", expires_in_seconds: 600 }) });
+      const sent = route.request().postDataJSON() as { signup_token?: string };
+      if (calls.length === 1) expect(sent.signup_token).toBeUndefined();
+      else expect(sent.signup_token).toBe("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+      expect(sent).toMatchObject({ language: "en" });
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ message: "verification code sent", expires_in_seconds: 600, signup_token: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }) });
     });
     await page.route("**/api/v1/auth/register/verify-code", async (route) => {
       calls.push("verify");
-      expect(route.request().postDataJSON()).toMatchObject({ code: "123456", email: "verify@example.com" });
-      await route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ id: "id", email: "verify@example.com", name: "Verify", sub_token: "token" }) });
+      expect(route.request().postDataJSON()).toMatchObject({ code: "123456", email: "verify@example.com", signup_token: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" });
+      await route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ id: "id", email: "verify@example.com", name: "Verify", token: "signup-session-fixture" }) });
     });
     await page.route("**/api/v1/auth/register", async (route) => {
       calls.push("direct-register");
@@ -40,7 +43,8 @@ test.describe("email verification during sign-up", () => {
     await page.getByRole("textbox", { name: "6-digit verification code" }).fill("123456");
     await expect(page.getByRole("textbox", { name: "6-digit verification code" })).toHaveValue("123456");
     await page.getByRole("button", { name: "Verify and create account" }).click();
-    await expect(page.getByText(/Registration successful/i)).toBeVisible();
+    await expect(page).toHaveURL(/\/portal\/dashboard$/);
+    await expect.poll(() => page.evaluate(() => localStorage.getItem("proxima_user_token"))).toBe("signup-session-fixture");
     expect(calls).toEqual(["request", "request", "verify"]);
   });
 });

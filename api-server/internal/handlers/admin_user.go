@@ -283,7 +283,7 @@ func (h *AdminUserHandler) Get(c *fiber.Ctx) error {
 	var u userDetailResponse
 	err := h.db.QueryRow(
 		context.Background(),
-		`SELECT u.id, u.email, u.name, u.sub_token, u.plan_id, p.name,
+		`SELECT u.id, u.email, u.name, COALESCE(u.sub_token, ''), u.plan_id, p.name,
 		        u.plan_started_at, u.plan_expires_at, u.traffic_used, p.traffic_limit,
 		        u.traffic_reset_at, u.is_active, u.status, u.created_at
 		 FROM users u
@@ -407,6 +407,7 @@ func (h *AdminUserHandler) Update(c *fiber.Ctx) error {
 		setClauses = append(setClauses, fmt.Sprintf("plan_id = $%d", argIdx))
 		args = append(args, *req.PlanID)
 		argIdx++
+		setClauses = append(setClauses, "sub_token = COALESCE(sub_token, gen_random_uuid()::text)")
 	}
 	if req.PlanStartedAt != nil {
 		setClauses = append(setClauses, fmt.Sprintf("plan_started_at = $%d", argIdx))

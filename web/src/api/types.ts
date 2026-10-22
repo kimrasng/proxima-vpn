@@ -20,7 +20,7 @@ export interface RegisterResponse {
   id: string;
   email: string;
   name: string;
-  sub_token: string;
+  token?: string;
 }
 
 // Admin - Nodes

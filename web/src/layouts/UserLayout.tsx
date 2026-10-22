@@ -9,6 +9,7 @@ import {
 import { useTheme } from "../hooks/useTheme";
 import { getUserToken, removeUserToken } from "../api/client";
 import { updateProfile } from "../api/user";
+import "./userLayout.css";
 
 export default function UserLayout() {
   const { t, i18n } = useTranslation();
@@ -86,7 +87,7 @@ export default function UserLayout() {
             }}
           />
         }
-        content={<Outlet />}
+        content={<div className="user-portal-content"><Outlet /></div>}
         toolsHide
       />
     </>

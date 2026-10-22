@@ -284,3 +284,44 @@ func TestGrantPlanWithDuration_RenewalStillExtendsFromOldExpiry(t *testing.T) {
 		t.Errorf("PlanExpiresAt = %v, want ~%v (old expiry + ordered 90 days)", result.PlanExpiresAt, wantExpiry)
 	}
 }
+
+func TestGrantPlan_IssuesSubTokenOnFirstGrantOnly(t *testing.T) {
+	pool := testDB(t)
+	ctx := context.Background()
+	planID := seedPlan(t, pool, ctx, "subtoken-plan", 30, nil)
+
+	var userID string
+	email := fmt.Sprintf("subtoken-%d@example.test", time.Now().UnixNano())
+	if err := pool.QueryRow(ctx,
+		`INSERT INTO users (email, password_hash, name, status) VALUES ($1, 'x', 'x', 'pending') RETURNING id::text`,
+		email,
+	).Scan(&userID); err != nil {
+		t.Fatalf("seed user without token: %v", err)
+	}
+	t.Cleanup(func() { _, _ = pool.Exec(context.Background(), `DELETE FROM users WHERE id = $1`, userID) })
+
+	read := func() *string {
+		var token *string
+		if err := pool.QueryRow(ctx, `SELECT sub_token FROM users WHERE id = $1`, userID).Scan(&token); err != nil {
+			t.Fatalf("read sub_token: %v", err)
+		}
+		return token
+	}
+	if read() != nil {
+		t.Fatal("precondition: a fresh account must have no subscription token")
+	}
+	svc := services.NewPlanService(pool)
+	if _, err := svc.GrantPlan(ctx, userID, planID); err != nil {
+		t.Fatalf("first grant: %v", err)
+	}
+	first := read()
+	if first == nil || *first == "" {
+		t.Fatal("first grant did not issue a subscription token")
+	}
+	if _, err := svc.GrantPlan(ctx, userID, planID); err != nil {
+		t.Fatalf("renewal: %v", err)
+	}
+	if again := read(); again == nil || *again != *first {
+		t.Fatal("renewal must keep the existing subscription token")
+	}
+}

@@ -171,7 +171,7 @@ func (h *UserDeviceHandler) List(c *fiber.Ctx) error {
 	var subToken string
 	err := h.db.QueryRow(
 		context.Background(),
-		`SELECT sub_token FROM users WHERE id = $1`,
+		`SELECT COALESCE(sub_token, '') FROM users WHERE id = $1`,
 		userID,
 	).Scan(&subToken)
 	if err != nil {
@@ -201,7 +201,9 @@ func (h *UserDeviceHandler) List(c *fiber.Ctx) error {
 				"error": "internal server error",
 			})
 		}
-		d.SubscriptionURL = fmt.Sprintf("/sub/%s/%s", subToken, d.ID)
+		if subToken != "" {
+			d.SubscriptionURL = fmt.Sprintf("/sub/%s/%s", subToken, d.ID)
+		}
 		results = append(results, d)
 	}
 

@@ -16,8 +16,9 @@ test.describe("passkey authentication", () => {
       data: { name: "Passkey E2E", email, password, language: "en" },
     });
     expect(registered.status()).toBe(200);
+    const { signup_token } = (await registered.json()) as { signup_token: string };
     const code = await signupCode(page.request, email);
-    const verified = await page.request.post("/api/v1/auth/register/verify-code", { data: { email, code } });
+    const verified = await page.request.post("/api/v1/auth/register/verify-code", { data: { email, code, signup_token } });
     expect(verified.status()).toBe(201);
     const userLogin = await page.request.post("/api/v1/auth/login", { data: { email, password } });
     const { token } = (await userLogin.json()) as { token: string };

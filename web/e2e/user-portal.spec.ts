@@ -35,11 +35,14 @@ test.describe("user authentication", () => {
     await page.getByRole("button", { name: "Create Account" }).click();
 
     await confirmSignup(page, email);
-    await expect(page.getByText(/Registration successful/i)).toBeVisible();
 
-    // The app redirects to login after a successful registration.
-    await expect(page).toHaveURL(/\/login/, { timeout: 20_000 });
+    // A verified sign-up is signed in straight away and lands on the dashboard.
+    await expect(page).toHaveURL(/\/portal\/dashboard/, { timeout: 20_000 });
+    expect(await page.evaluate(() => localStorage.getItem("proxima_user_token"))).toBeTruthy();
 
+    // A fresh session can still sign in with the credentials it just created.
+    await page.evaluate(() => localStorage.removeItem("proxima_user_token"));
+    await page.goto("/login");
     await page.getByRole("textbox", { name: "Email" }).fill(email);
     await page.getByRole("textbox", { name: "Password" }).fill(password);
     await page.getByRole("button", { name: "Sign In", exact: true }).click();
@@ -92,12 +95,7 @@ test.describe("user portal pages", () => {
     await page.getByRole("textbox", { name: "Confirm Password" }).fill(password);
     await page.getByRole("button", { name: "Create Account" }).click();
     await confirmSignup(page, email);
-    await expect(page).toHaveURL(/\/login/, { timeout: 20_000 });
-
-    await page.getByRole("textbox", { name: "Email" }).fill(email);
-    await page.getByRole("textbox", { name: "Password" }).fill(password);
-    await page.getByRole("button", { name: "Sign In", exact: true }).click();
-    await expect(page).toHaveURL(/\/portal\//);
+    await expect(page).toHaveURL(/\/portal\/dashboard/, { timeout: 20_000 });
 
     // Each portal page fetches its own data on mount; a 4xx/5xx or a render
     // crash surfaces as a missing heading here.

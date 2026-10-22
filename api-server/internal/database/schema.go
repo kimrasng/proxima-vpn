@@ -580,6 +580,14 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) (migrateErr error) {
 		// issued before it, so a reset ends every session that predates it.
 		`ALTER TABLE users ADD COLUMN IF NOT EXISTS password_changed_at TIMESTAMPTZ`,
 
+		// A self-registered account has no subscription URL until it first receives
+		// a plan, so the token is issued then. UNIQUE still holds across non-NULLs.
+		`ALTER TABLE users ALTER COLUMN sub_token DROP NOT NULL`,
+
+		// Binds a pending signup to the browser that requested the code, so a
+		// third party cannot overwrite or complete it for the same address.
+		`ALTER TABLE signup_email_verifications ADD COLUMN IF NOT EXISTS token_hash TEXT`,
+
 		// Separate from nodes.name so that name survives as the fallback.
 		`CREATE TABLE IF NOT EXISTS node_labels (
 			node_id  UUID NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,

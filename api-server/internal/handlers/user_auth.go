@@ -73,10 +73,25 @@ func (h *UserAuthHandler) SetPasskeyServices(rdb *redis.Client, wa *webauthn.Web
 var emailRegex = regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$`)
 
 type registerResponse struct {
-	ID       string `json:"id"`
-	Email    string `json:"email"`
-	Name     string `json:"name"`
-	SubToken string `json:"sub_token"`
+	ID    string `json:"id"`
+	Email string `json:"email"`
+	Name  string `json:"name"`
+	Token string `json:"token,omitempty"`
+}
+
+func (h *UserAuthHandler) signUserToken(ctx context.Context, id, email, status string) (string, error) {
+	now := time.Now()
+	expiry := resolveSessionExpiry(ctx, h.db, h.jwtExpiry)
+	claims := UserClaims{
+		UserID: id,
+		Email:  email,
+		Status: status,
+		RegisteredClaims: jwt.RegisteredClaims{
+			IssuedAt:  jwt.NewNumericDate(now),
+			ExpiresAt: jwt.NewNumericDate(now.Add(expiry)),
+		},
+	}
+	return jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(h.jwtSecret))
 }
 
 // Register retains the legacy endpoint without allowing unverified accounts.

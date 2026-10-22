@@ -14,7 +14,7 @@ import {
   StatusIndicator,
 } from "@cloudscape-design/components";
 import type { FlashbarProps } from "@cloudscape-design/components";
-import { getSignupPolicy, requestSignupEmailCode, verifySignupEmailCode } from "../../api/auth";
+import { getSignupPolicy, requestSignupEmailCode, setToken, verifySignupEmailCode } from "../../api/auth";
 import type { SignupPolicy } from "../../api/auth";
 import { ApiError } from "../../api/client";
 
@@ -74,11 +74,17 @@ export default function Register() {
         : undefined,
   };
 
+  const tokenKey = `proxima_signup_token:${email.trim().toLowerCase()}`;
+  const requestCode = async () => {
+    const issued = await requestSignupEmailCode({ name, email, password, referral_code: referralCode.trim() || undefined, language: i18n.resolvedLanguage || i18n.language, signup_token: window.sessionStorage.getItem(tokenKey) || undefined });
+    window.sessionStorage.setItem(tokenKey, issued.signup_token);
+  };
+
   const resendCode = async () => {
     setResending(true);
     setFlash([]);
     try {
-      await requestSignupEmailCode({ name, email, password, referral_code: referralCode.trim() || undefined, language: i18n.resolvedLanguage || i18n.language });
+      await requestCode();
       setVerificationCode("");
       setFlash([{ type: "success", content: t("auth.register.codeSent", { email }), dismissible: true, onDismiss: () => setFlash([]) }]);
     } catch (err) {
@@ -97,10 +103,15 @@ export default function Register() {
       }
       setLoading(true);
       try {
-        await verifySignupEmailCode({ name, email, password, referral_code: referralCode.trim() || undefined, code: verificationCode, language: i18n.resolvedLanguage || i18n.language });
+        const created = await verifySignupEmailCode({ name, email, password, referral_code: referralCode.trim() || undefined, code: verificationCode, signup_token: window.sessionStorage.getItem(tokenKey) || "", language: i18n.resolvedLanguage || i18n.language });
+        window.sessionStorage.removeItem(tokenKey);
         window.localStorage.removeItem("proxima_referral_code");
-        setFlash([{ type: "success", content: t("auth.register.success"), dismissible: true, onDismiss: () => setFlash([]) }]);
-        setTimeout(() => navigate("/login", { replace: true }), 1500);
+        if (created.token) {
+          setToken("user", created.token);
+          navigate("/portal/dashboard", { replace: true });
+        } else {
+          navigate("/login", { replace: true });
+        }
       } catch (err) {
         const body = err instanceof ApiError ? err.body as { error?: string } | undefined : undefined;
         setFlash([{ type: "error", content: body?.error || t("auth.register.codeVerifyError"), dismissible: true, onDismiss: () => setFlash([]) }]);
@@ -122,7 +133,7 @@ export default function Register() {
     setLoading(true);
 
     try {
-      await requestSignupEmailCode({ name, email, password, referral_code: referralCode.trim() || undefined, language: i18n.resolvedLanguage || i18n.language });
+      await requestCode();
       setVerificationStep(true);
       setFlash([]);
     } catch (err) {

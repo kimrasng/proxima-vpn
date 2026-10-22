@@ -368,7 +368,7 @@ function UserDetailPage() {
                     ? formatAbsoluteTime(user.plan_expires_at)
                     : t("admin.userDetail.none"),
                 },
-                { label: t("admin.userDetail.subToken"), value: user.sub_token },
+                { label: t("admin.userDetail.subToken"), value: user.sub_token || t("admin.userDetail.none") },
               ]}
             />
           </Container>

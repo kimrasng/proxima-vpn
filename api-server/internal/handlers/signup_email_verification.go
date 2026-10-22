@@ -30,6 +30,7 @@ const (
 )
 
 var signupCodePattern = regexp.MustCompile(`^[0-9]{6}$`)
+var signupTokenPattern = regexp.MustCompile(`^[0-9a-f]{64}$`)
 
 type signupVerificationRequest struct {
 	Email        string `json:"email"`
@@ -38,6 +39,7 @@ type signupVerificationRequest struct {
 	ReferralCode string `json:"referral_code"`
 	Language     string `json:"language"`
 	Code         string `json:"code"`
+	SignupToken  string `json:"signup_token"`
 }
 
 type pendingSignup struct {
@@ -52,6 +54,22 @@ func (h *UserAuthHandler) signupCodeHash(email, code string) string {
 	mac := hmac.New(sha256.New, []byte(h.jwtSecret))
 	_, _ = mac.Write([]byte(strings.ToLower(strings.TrimSpace(email)) + ":" + code))
 	return hex.EncodeToString(mac.Sum(nil))
+}
+
+// The signup token ties a pending signup to the browser that started it. Only
+// its HMAC is stored, under a prefix that keeps it apart from code hashes.
+func (h *UserAuthHandler) signupTokenHash(token string) string {
+	mac := hmac.New(sha256.New, []byte(h.jwtSecret))
+	_, _ = mac.Write([]byte("signup-token:" + token))
+	return hex.EncodeToString(mac.Sum(nil))
+}
+
+func newSignupToken() (string, error) {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(b), nil
 }
 
 func signupCode() (string, error) {
@@ -105,6 +123,9 @@ func checkSignupPolicy(c *fiber.Ctx, db settingsQuerier, email string) (bool, er
 
 // RequestSignupEmailCode validates the registration details, stores a short-lived
 // verification challenge, and emails a six-digit code. No account is created yet.
+// The response carries a signup_token that the verify step must present; a live
+// challenge can only be replaced by the holder of its token (after the cooldown)
+// or once it has expired.
 func (h *UserAuthHandler) RequestSignupEmailCode(c *fiber.Ctx) error {
 	if h.db == nil {
 		return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{"error": "email verification is unavailable"})
@@ -117,6 +138,9 @@ func (h *UserAuthHandler) RequestSignupEmailCode(c *fiber.Ctx) error {
 	req.Name = strings.TrimSpace(req.Name)
 	if err := validateSignupInput(req.Email, req.Password, req.Name); err != nil {
 		return err
+	}
+	if req.SignupToken != "" && !signupTokenPattern.MatchString(req.SignupToken) {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid signup token"})
 	}
 	if ok, err := checkSignupPolicy(c, h.db, req.Email); !ok {
 		return err
@@ -138,6 +162,12 @@ func (h *UserAuthHandler) RequestSignupEmailCode(c *fiber.Ctx) error {
 	if err != nil {
 		return c.SendStatus(fiber.StatusInternalServerError)
 	}
+	token := req.SignupToken
+	if token == "" {
+		if token, err = newSignupToken(); err != nil {
+			return c.SendStatus(fiber.StatusInternalServerError)
+		}
+	}
 	hash, err := crypto.HashPassword(req.Password)
 	if err != nil {
 		return c.SendStatus(fiber.StatusInternalServerError)
@@ -151,11 +181,14 @@ func (h *UserAuthHandler) RequestSignupEmailCode(c *fiber.Ctx) error {
 		return c.SendStatus(fiber.StatusInternalServerError)
 	}
 	defer func() { _ = tx.Rollback(c.UserContext()) }()
-	result, err := tx.Exec(c.UserContext(), `INSERT INTO signup_email_verifications(email,code_hash,payload,expires_at,sent_at,attempts) VALUES($1,$2,$3,$4,NOW(),0) ON CONFLICT(email) DO UPDATE SET code_hash=EXCLUDED.code_hash,payload=EXCLUDED.payload,expires_at=EXCLUDED.expires_at,sent_at=NOW(),attempts=0 WHERE signup_email_verifications.sent_at <= NOW() - $5 * INTERVAL '1 second'`, req.Email, h.signupCodeHash(req.Email, code), string(payload), time.Now().Add(signupCodeTTL), int(signupCodeResendCooldown.Seconds()))
+	result, err := tx.Exec(c.UserContext(), `INSERT INTO signup_email_verifications(email,code_hash,payload,expires_at,sent_at,attempts,token_hash) VALUES($1,$2,$3,$4,NOW(),0,$6) ON CONFLICT(email) DO UPDATE SET code_hash=EXCLUDED.code_hash,payload=EXCLUDED.payload,expires_at=EXCLUDED.expires_at,sent_at=NOW(),attempts=0,token_hash=EXCLUDED.token_hash WHERE signup_email_verifications.expires_at <= NOW() OR (signup_email_verifications.token_hash = $6 AND signup_email_verifications.sent_at <= NOW() - $5 * INTERVAL '1 second')`, req.Email, h.signupCodeHash(req.Email, code), string(payload), time.Now().Add(signupCodeTTL), int(signupCodeResendCooldown.Seconds()), h.signupTokenHash(token))
 	if err != nil {
 		return c.SendStatus(fiber.StatusInternalServerError)
 	}
 	if result.RowsAffected() == 0 {
+		if req.SignupToken == "" {
+			return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "a verification for this email is already in progress; finish it or wait for it to expire"})
+		}
 		return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{"error": "please wait before requesting another code"})
 	}
 	if err = h.mailer.Send(c.UserContext(), mail.Message{To: req.Email, Subject: signupVerificationSubject(req.Language), Body: signupVerificationBody(req.Language, code)}); err != nil {
@@ -165,7 +198,7 @@ func (h *UserAuthHandler) RequestSignupEmailCode(c *fiber.Ctx) error {
 	if err = tx.Commit(c.UserContext()); err != nil {
 		return c.SendStatus(fiber.StatusInternalServerError)
 	}
-	return c.JSON(fiber.Map{"message": "verification code sent", "expires_in_seconds": int(signupCodeTTL.Seconds())})
+	return c.JSON(fiber.Map{"message": "verification code sent", "expires_in_seconds": int(signupCodeTTL.Seconds()), "signup_token": token})
 }
 
 // VerifySignupEmailCode checks the one-time code and creates the account only
@@ -192,12 +225,18 @@ func (h *UserAuthHandler) VerifySignupEmailCode(c *fiber.Ctx) error {
 	var payloadRaw []byte
 	var expires time.Time
 	var attempts int
-	err = tx.QueryRow(c.UserContext(), `SELECT code_hash,payload,expires_at,attempts FROM signup_email_verifications WHERE lower(email)=lower($1) FOR UPDATE`, req.Email).Scan(&storedHash, &payloadRaw, &expires, &attempts)
+	var storedToken *string
+	err = tx.QueryRow(c.UserContext(), `SELECT code_hash,payload,expires_at,attempts,token_hash FROM signup_email_verifications WHERE lower(email)=lower($1) FOR UPDATE`, req.Email).Scan(&storedHash, &payloadRaw, &expires, &attempts, &storedToken)
 	if err == pgx.ErrNoRows {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "verification code expired; request a new one"})
 	}
 	if err != nil {
 		return c.SendStatus(fiber.StatusInternalServerError)
+	}
+	// Checked before attempts are counted so a third party cannot burn the
+	// owner's guesses, and answered like a missing row so it leaks nothing.
+	if storedToken == nil || req.SignupToken == "" || subtle.ConstantTimeCompare([]byte(*storedToken), []byte(h.signupTokenHash(req.SignupToken))) != 1 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "verification code expired; request a new one"})
 	}
 	if !time.Now().Before(expires) {
 		if _, err = tx.Exec(c.UserContext(), `DELETE FROM signup_email_verifications WHERE lower(email)=lower($1)`, req.Email); err != nil {
@@ -235,9 +274,8 @@ func (h *UserAuthHandler) VerifySignupEmailCode(c *fiber.Ctx) error {
 	if exists {
 		return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "email already registered"})
 	}
-	subToken := crypto.NewUUID()
 	var id string
-	err = tx.QueryRow(c.UserContext(), `INSERT INTO users(email,password_hash,name,sub_token,status) VALUES($1,$2,$3,$4,'pending') RETURNING id::text`, pending.Email, pending.PasswordHash, pending.Name, subToken).Scan(&id)
+	err = tx.QueryRow(c.UserContext(), `INSERT INTO users(email,password_hash,name,status) VALUES($1,$2,$3,'pending') RETURNING id::text`, pending.Email, pending.PasswordHash, pending.Name).Scan(&id)
 	if err != nil {
 		return c.SendStatus(fiber.StatusInternalServerError)
 	}
@@ -255,5 +293,11 @@ func (h *UserAuthHandler) VerifySignupEmailCode(c *fiber.Ctx) error {
 			}
 		}(pending.Email)
 	}
-	return c.Status(fiber.StatusCreated).JSON(registerResponse{ID: id, Email: pending.Email, Name: pending.Name, SubToken: subToken})
+	// The code just proved ownership of the address, which is what a login proves,
+	// so the new account gets its session now instead of a second sign-in step.
+	session, err := h.signUserToken(c.UserContext(), id, pending.Email, "pending")
+	if err != nil {
+		log.Printf("signup session token: %v", err)
+	}
+	return c.Status(fiber.StatusCreated).JSON(registerResponse{ID: id, Email: pending.Email, Name: pending.Name, Token: session})
 }

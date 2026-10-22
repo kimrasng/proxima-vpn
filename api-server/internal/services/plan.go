@@ -128,6 +128,7 @@ func (s *PlanService) grantPlan(ctx context.Context, userID, planID string, dura
 	err = tx.QueryRow(ctx,
 		`UPDATE users u
 		 SET plan_id          = p.id,
+		     sub_token        = COALESCE(u.sub_token, gen_random_uuid()::text),
 		     plan_started_at  = CASE WHEN $3::bool THEN u.plan_started_at ELSE NOW() END,
 		     plan_expires_at  = GREATEST(COALESCE(u.plan_expires_at, NOW()), NOW())
 		                        + make_interval(days => COALESCE($4::int, p.duration_days)),

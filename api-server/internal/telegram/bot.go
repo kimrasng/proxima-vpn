@@ -245,11 +245,15 @@ func (s *BotService) handleMySub(msg *tgbotapi.Message) {
 	var subToken string
 	var deviceID *string
 	err := s.db.QueryRow(ctx,
-		`SELECT u.sub_token, d.id FROM users u LEFT JOIN devices d ON d.user_id = u.id WHERE u.telegram_id = $1 LIMIT 1`,
+		`SELECT COALESCE(u.sub_token, ''), d.id FROM users u LEFT JOIN devices d ON d.user_id = u.id WHERE u.telegram_id = $1 LIMIT 1`,
 		msg.Chat.ID,
 	).Scan(&subToken, &deviceID)
 	if err != nil {
 		s.sendReply(msg.Chat.ID, "Use /link &lt;sub_token&gt; to connect your account.")
+		return
+	}
+	if subToken == "" {
+		s.sendReply(msg.Chat.ID, "No plan yet. Choose a plan in the web panel first.")
 		return
 	}
 	if deviceID == nil {

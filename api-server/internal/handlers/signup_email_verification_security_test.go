@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/proximavpn/proxima-vpn/pkg/crypto"
 )
 
 func TestSignupEmailCodeSecurity(t *testing.T) {
@@ -53,11 +54,28 @@ func TestSignupEmailCodeSecurity(t *testing.T) {
 		})
 		return email
 	}
+	tokens := map[string]string{}
+	withToken := func(email string) map[string]string {
+		body := payload(email)
+		body["signup_token"] = tokens[strings.ToLower(strings.TrimSpace(email))]
+		return body
+	}
+	verifyBody := func(email, code string) map[string]string {
+		return map[string]string{"email": email, "code": code, "signup_token": tokens[strings.ToLower(strings.TrimSpace(email))]}
+	}
 	challenge := func(t *testing.T, email string) string {
 		t.Helper()
-		if got := request("/request", payload(email)); got.code != 200 {
+		got := request("/request", payload(email))
+		if got.code != 200 {
 			t.Fatalf("request: %+v", got)
 		}
+		var issued struct {
+			SignupToken string `json:"signup_token"`
+		}
+		if err := json.Unmarshal([]byte(got.body), &issued); err != nil || issued.SignupToken == "" {
+			t.Fatalf("request returned no signup_token: %+v err=%v", got, err)
+		}
+		tokens[strings.ToLower(strings.TrimSpace(email))] = issued.SignupToken
 		mailer.mu.Lock()
 		defer mailer.mu.Unlock()
 		return regexp.MustCompile(`\b[0-9]{6}\b`).FindString(mailer.messages[len(mailer.messages)-1].Body)
@@ -101,23 +119,27 @@ func TestSignupEmailCodeSecurity(t *testing.T) {
 		if storedEmail != email || storedHash != hex.EncodeToString(mac.Sum(nil)) || storedHash == code {
 			t.Fatal("challenge not normalized/HMAC protected")
 		}
-		if got := request("/request", payload(strings.ToUpper(email))); got.code != 429 {
+		if got := request("/request", withToken(strings.ToUpper(email))); got.code != 429 {
 			t.Fatalf("cooldown: %+v", got)
 		}
 		assertNoAccount(t, email)
-		if got := request("/legacy", map[string]string{"email": strings.ToUpper(email), "code": code}); got.code != 201 {
+		if got := request("/legacy", verifyBody(strings.ToUpper(email), code)); got.code != 201 {
 			t.Fatalf("verify: %+v", got)
 		}
-		if got := request("/verify", map[string]string{"email": email, "code": code}); got.code != 400 {
+		if got := request("/verify", verifyBody(email, code)); got.code != 400 {
 			t.Fatalf("replay: %+v", got)
 		}
 	})
 	t.Run("concurrent first send and resend cooldown", func(t *testing.T) {
 		email := address(t)
 		for round := 0; round < 2; round++ {
+			wantLoser := 409
+			if round == 1 {
+				wantLoser = 429
+			}
 			before := len(mailer.messages)
 			var wg sync.WaitGroup
-			results := make(chan int, 4)
+			results := make(chan signupHTTPResponse, 4)
 			for i := 0; i < 4; i++ {
 				wg.Add(1)
 				go func(i int) {
@@ -126,17 +148,28 @@ func TestSignupEmailCodeSecurity(t *testing.T) {
 					if i%2 == 0 {
 						e = strings.ToUpper(e)
 					}
-					results <- request("/request", payload(e)).code
+					body := payload(e)
+					if round == 1 {
+						body = withToken(e)
+					}
+					results <- request("/request", body)
 				}(i)
 			}
 			wg.Wait()
 			close(results)
 			successes := 0
-			for status := range results {
-				if status == 200 {
+			for res := range results {
+				if res.code == 200 {
 					successes++
-				} else if status != 429 {
-					t.Fatalf("unexpected status %d", status)
+					if round == 0 {
+						var issued struct {
+							SignupToken string `json:"signup_token"`
+						}
+						_ = json.Unmarshal([]byte(res.body), &issued)
+						tokens[email] = issued.SignupToken
+					}
+				} else if res.code != wantLoser {
+					t.Fatalf("round %d: unexpected status %d, want %d", round, res.code, wantLoser)
 				}
 			}
 			if successes != 1 || len(mailer.messages)-before != 1 {
@@ -147,13 +180,73 @@ func TestSignupEmailCodeSecurity(t *testing.T) {
 			}
 		}
 	})
+	t.Run("live challenge cannot be overwritten or completed by someone without its token", func(t *testing.T) {
+		email := address(t)
+		code := challenge(t, email)
+		owner := tokens[email]
+		before := len(mailer.messages)
+		attacker := payload(email)
+		attacker["password"] = "AttackerPass!99"
+		if got := request("/request", attacker); got.code != 409 {
+			t.Fatalf("overwrite without token: %+v", got)
+		}
+		if _, err := pool.Exec(ctx, `UPDATE signup_email_verifications SET sent_at=NOW()-INTERVAL '61 seconds' WHERE email=$1`, email); err != nil {
+			t.Fatal(err)
+		}
+		attacker["signup_token"] = strings.Repeat("a", 64)
+		if got := request("/request", attacker); got.code != 429 {
+			t.Fatalf("overwrite with foreign token after cooldown: %+v", got)
+		}
+		if len(mailer.messages) != before {
+			t.Fatal("rejected overwrite sent mail")
+		}
+		for _, token := range []string{"", strings.Repeat("a", 64)} {
+			if got := request("/verify", map[string]string{"email": email, "code": code, "signup_token": token}); got.code != 400 {
+				t.Fatalf("verify with token %q: %+v", token, got)
+			}
+		}
+		var attempts int
+		if err := pool.QueryRow(ctx, `SELECT attempts FROM signup_email_verifications WHERE email=$1`, email).Scan(&attempts); err != nil || attempts != 0 {
+			t.Fatalf("foreign verify burned attempts=%d err=%v", attempts, err)
+		}
+		tokens[email] = owner
+		if got := request("/verify", verifyBody(email, code)); got.code != 201 {
+			t.Fatalf("owner verify: %+v", got)
+		}
+		var hash string
+		if err := pool.QueryRow(ctx, `SELECT password_hash FROM users WHERE email=$1`, email).Scan(&hash); err != nil {
+			t.Fatal(err)
+		}
+		if !crypto.CheckPassword(hash, "SignupPass!42") {
+			t.Fatal("account does not carry the owner's password")
+		}
+	})
+	t.Run("expired challenge can be replaced by a new signup", func(t *testing.T) {
+		email := address(t)
+		challenge(t, email)
+		if _, err := pool.Exec(ctx, `UPDATE signup_email_verifications SET expires_at=NOW()-INTERVAL '1 second' WHERE email=$1`, email); err != nil {
+			t.Fatal(err)
+		}
+		code := challenge(t, email)
+		if got := request("/verify", verifyBody(email, code)); got.code != 201 {
+			t.Fatalf("verify after replacement: %+v", got)
+		}
+	})
+	t.Run("malformed signup_token is rejected before storing", func(t *testing.T) {
+		email := address(t)
+		body := payload(email)
+		body["signup_token"] = "short"
+		if got := request("/request", body); got.code != 400 {
+			t.Fatalf("malformed token: %+v", got)
+		}
+	})
 	t.Run("expired code is consumed without account creation", func(t *testing.T) {
 		email := address(t)
 		code := challenge(t, email)
 		if _, err := pool.Exec(ctx, `UPDATE signup_email_verifications SET expires_at=NOW()-INTERVAL '1 second' WHERE email=$1`, email); err != nil {
 			t.Fatal(err)
 		}
-		if got := request("/verify", map[string]string{"email": email, "code": code}); got.code != 400 {
+		if got := request("/verify", verifyBody(email, code)); got.code != 400 {
 			t.Fatalf("expired: %+v", got)
 		}
 		var count int
@@ -170,11 +263,11 @@ func TestSignupEmailCodeSecurity(t *testing.T) {
 			wrong = "000001"
 		}
 		for i := 0; i < signupCodeMaxAttempts; i++ {
-			if got := request("/verify", map[string]string{"email": email, "code": wrong}); got.code != 400 {
+			if got := request("/verify", verifyBody(email, wrong)); got.code != 400 {
 				t.Fatalf("attempt %d: %+v", i, got)
 			}
 		}
-		if got := request("/verify", map[string]string{"email": email, "code": code}); got.code != 429 {
+		if got := request("/verify", verifyBody(email, code)); got.code != 429 {
 			t.Fatalf("locked: %+v", got)
 		}
 		assertNoAccount(t, email)
@@ -210,7 +303,7 @@ func TestSignupEmailCodeSecurity(t *testing.T) {
 			t.Fatalf("nil mailer: %+v", got)
 		}
 		code := challenge(t, email)
-		if got := request("/verify", map[string]string{"email": email, "code": code}); got.code != 201 {
+		if got := request("/verify", verifyBody(email, code)); got.code != 201 {
 			t.Fatalf("verify: %+v", got)
 		}
 		if got := request("/request", payload(strings.ToUpper(email))); got.code != 409 {
@@ -237,7 +330,7 @@ func TestSignupEmailCodeSecurity(t *testing.T) {
 				}
 			}
 			before := len(mailer.messages)
-			if got := request("/verify", map[string]string{"email": email, "code": code}); got.code != 403 {
+			if got := request("/verify", verifyBody(email, code)); got.code != 403 {
 				t.Fatalf("policy recheck: %+v", got)
 			}
 			if got := request("/request", payload(address(t))); got.code != 403 {

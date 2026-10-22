@@ -47,7 +47,7 @@ export default function DeviceQuickConnect({
             {t("user.devices.loadError")}
           </Alert>
         ) : !url ? (
-          <Alert type="warning" action={<Button onClick={profile.refresh}>{t("user.dashboard.retry")}</Button>}>
+          summary !== null && !usable ? null : <Alert type="warning" action={<Button onClick={profile.refresh}>{t("user.dashboard.retry")}</Button>}>
             {t("user.dashboard.urlUnavailable")}
           </Alert>
         ) : (

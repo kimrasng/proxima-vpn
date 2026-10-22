@@ -34,10 +34,10 @@ test.describe("referral code", () => {
       status: 200, contentType: "application/json",
       body: JSON.stringify({ restricted: false, allowed_domains: [] }),
     }));
-    await page.route("**/api/v1/auth/register/request-code", async (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ message: "sent", expires_in_seconds: 600 }) }));
+    await page.route("**/api/v1/auth/register/request-code", async (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ message: "sent", expires_in_seconds: 600, signup_token: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }) }));
     await page.route("**/api/v1/auth/register/verify-code", async (route) => {
-      expect(route.request().postDataJSON()).toMatchObject({ referral_code: "FRIEND-42", code: "123456" });
-      await route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ id: "id", email: "new@example.com", name: "New", sub_token: "token" }) });
+      expect(route.request().postDataJSON()).toMatchObject({ referral_code: "FRIEND-42", code: "123456", signup_token: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" });
+      await route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ id: "id", email: "new@example.com", name: "New", token: "signup-session-fixture" }) });
     });
 
     await page.goto("/login?ref=FRIEND-42");
@@ -51,7 +51,7 @@ test.describe("referral code", () => {
     await page.getByRole("button", { name: "Create Account" }).click();
     await page.getByRole("textbox", { name: "6-digit verification code" }).fill("123456");
     await page.getByRole("button", { name: "Verify and create account" }).click();
-    await expect(page.getByText(/Registration successful/i)).toBeVisible();
+    await expect(page).toHaveURL(/\/portal\/dashboard$/);
   });
 
   test("captures ref from the root URL and restores it on a later registration visit", async ({ page }) => {

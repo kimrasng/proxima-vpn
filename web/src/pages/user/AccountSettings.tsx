@@ -159,7 +159,7 @@ export default function AccountSettings() {
           </SpaceBetween>
         </Container>
 
-        <Container header={<Header variant="h2">{t("user.account.subscriptionSection")}</Header>}>
+        {(profile?.sub_token || subToken) && <Container header={<Header variant="h2">{t("user.account.subscriptionSection")}</Header>}>
           <SpaceBetween size="m">
             <FormField label={t("user.account.subToken")}>
               <CopyToClipboard
@@ -172,7 +172,7 @@ export default function AccountSettings() {
             </FormField>
             <Button onClick={() => setShowRegenModal(true)}>{t("user.account.regenerate")}</Button>
           </SpaceBetween>
-        </Container>
+        </Container>}
       </SpaceBetween>
 
       <Modal

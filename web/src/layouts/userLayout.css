@@ -1,0 +1,5 @@
+/* Cloudscape's AppLayout content area has no top padding when the page header
+   sits flush against the top navigation, so the first heading touched the bar. */
+.user-portal-content {
+  padding-block-start: 24px;
+}

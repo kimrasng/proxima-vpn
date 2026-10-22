@@ -81,6 +81,12 @@ func TestSignupEmailCodeMustBeVerifiedBeforeAccountCreation(t *testing.T) {
 	if res.code != 200 || len(mailer.messages) != 1 {
 		t.Fatalf("request: status=%d sent=%d body=%s", res.code, len(mailer.messages), res.body)
 	}
+	var challenge struct {
+		SignupToken string `json:"signup_token"`
+	}
+	if err := json.Unmarshal([]byte(res.body), &challenge); err != nil || challenge.SignupToken == "" {
+		t.Fatalf("request returned no signup_token: body=%s err=%v", res.body, err)
+	}
 	var before int
 	if err := pool.QueryRow(ctx, `SELECT count(*) FROM users WHERE email=$1`, email).Scan(&before); err != nil {
 		t.Fatal(err)
@@ -96,11 +102,11 @@ func TestSignupEmailCodeMustBeVerifiedBeforeAccountCreation(t *testing.T) {
 	if match == bad {
 		bad = "000001"
 	}
-	res = request("/verify", map[string]any{"email": email, "code": bad})
+	res = request("/verify", map[string]any{"email": email, "code": bad, "signup_token": challenge.SignupToken})
 	if res.code != 400 {
 		t.Fatalf("wrong code status=%d", res.code)
 	}
-	res = request("/verify", map[string]any{"email": email, "code": match})
+	res = request("/verify", map[string]any{"email": email, "code": match, "signup_token": challenge.SignupToken})
 	if res.code != fiber.StatusCreated {
 		t.Fatalf("verify status=%d body=%s", res.code, res.body)
 	}
@@ -111,7 +117,24 @@ func TestSignupEmailCodeMustBeVerifiedBeforeAccountCreation(t *testing.T) {
 	if after != 1 {
 		t.Fatalf("created accounts=%d, want 1", after)
 	}
-	res = request("/verify", map[string]any{"email": email, "code": match})
+	var created struct {
+		Token    string `json:"token"`
+		SubToken string `json:"sub_token"`
+	}
+	if err := json.Unmarshal([]byte(res.body), &created); err != nil {
+		t.Fatalf("decode verify response: %v", err)
+	}
+	if created.Token == "" {
+		t.Fatal("verify response carries no session token")
+	}
+	if created.SubToken != "" {
+		t.Fatal("verify response must not carry a subscription token")
+	}
+	var issued bool
+	if err := pool.QueryRow(ctx, `SELECT sub_token IS NOT NULL FROM users WHERE email=$1`, email).Scan(&issued); err != nil || issued {
+		t.Fatalf("new account has a subscription token: issued=%v err=%v", issued, err)
+	}
+	res = request("/verify", map[string]any{"email": email, "code": match, "signup_token": challenge.SignupToken})
 	if res.code != 400 {
 		t.Fatalf("replay status=%d, want 400", res.code)
 	}
