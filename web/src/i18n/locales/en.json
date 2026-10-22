@@ -1823,6 +1823,12 @@
       "availablePlans": "Available Plans",
       "selectPlan": "Select",
       "loadError": "Failed to load plan information",
+      "subtitle": "Choose a plan and billing period.",
+      "noPlanHint": "Pick a plan below; you can use the VPN as soon as payment completes.",
+      "noPlansAvailable": "No plans are available for purchase right now.",
+      "perDays": "/ {{days}} days",
+      "daysLabel": "{{days}} days",
+      "unlimited": "Unlimited",
       "features": {
         "title": "What's included"
       },

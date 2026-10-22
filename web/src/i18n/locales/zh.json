@@ -1823,6 +1823,12 @@
       "availablePlans": "可用套餐",
       "selectPlan": "选择",
       "loadError": "加载套餐信息失败",
+      "subtitle": "选择套餐和使用期限。",
+      "noPlanHint": "在下方选择套餐，付款完成后即可使用 VPN。",
+      "noPlansAvailable": "目前没有可购买的套餐。",
+      "perDays": "/ {{days}} 天",
+      "daysLabel": "{{days}} 天",
+      "unlimited": "不限",
       "features": {
         "title": "包含功能"
       },

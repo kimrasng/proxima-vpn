@@ -6,7 +6,6 @@ import {
   Container,
   SpaceBetween,
   Box,
-  Cards,
   Button,
   Spinner,
   Flashbar,
@@ -20,9 +19,11 @@ import {
   FormField,
   Table,
   Modal,
-  Select,
   Alert,
+  Tiles,
 } from "@cloudscape-design/components";
+import { borderRadiusItem, colorBackgroundCellShaded, colorBorderDividerDefault } from "@cloudscape-design/design-tokens";
+import "./planInfo.css";
 import { focusFirstInvalid } from "../../utils/formValidation";
 import type {
   UserProfile,
@@ -293,7 +294,7 @@ export default function PlanInfo() {
 
   if (loading) {
     return (
-      <ContentLayout header={<Header variant="h1">{t("user.plan.title")}</Header>}>
+      <ContentLayout header={<Header variant="h1" description={t("user.plan.subtitle")}>{t("user.plan.title")}</Header>}>
         <Box textAlign="center" padding="xl">
           <Spinner size="large" />
         </Box>
@@ -308,7 +309,7 @@ export default function PlanInfo() {
   const hasPlan = !!profile?.plan_name && !isExpired;
 
   return (
-    <ContentLayout header={<Header variant="h1">{t("user.plan.title")}</Header>}>
+    <ContentLayout header={<Header variant="h1" description={t("user.plan.subtitle")}>{t("user.plan.title")}</Header>}>
       <SpaceBetween size="l">
         <Flashbar items={flash} />
 
@@ -342,13 +343,27 @@ export default function PlanInfo() {
         )}
 
         {!hasPlan && (
-          <Container>
-            <Box textAlign="center" padding="l">
-              <StatusIndicator type="warning">
-                {isExpired ? t("user.plan.expired") : t("user.plan.noPlan")}
-              </StatusIndicator>
-            </Box>
-          </Container>
+          <div className="plan-info__top">
+            <Container fitHeight>
+              <SpaceBetween size="xs">
+                <StatusIndicator type={isExpired ? "warning" : "info"}>
+                  <Box variant="strong" tagOverride="span">{isExpired ? t("user.plan.expired") : t("user.plan.noPlan")}</Box>
+                </StatusIndicator>
+                <Box color="text-body-secondary">{t("user.plan.noPlanHint")}</Box>
+              </SpaceBetween>
+            </Container>
+            {plans.length > 0 && !pendingOrder && (
+              <Container fitHeight>
+                <FormField label={t("user.plan.promotion.label")} description={t("user.plan.promotion.beforeOrderHint")} stretch>
+                  <Input
+                    value={promotionCode}
+                    placeholder={t("user.plan.promotion.placeholder")}
+                    onChange={({ detail }) => setPromotionCode(detail.value)}
+                  />
+                </FormField>
+              </Container>
+            )}
+          </div>
         )}
 
         {pendingOrder && (
@@ -418,9 +433,9 @@ export default function PlanInfo() {
           </Container>
         )}
 
-        {plans.length > 0 && !pendingOrder && (
-          <Container header={<Header variant="h3">{t("user.plan.promotion.label")}</Header>}>
-            <FormField description={t("user.plan.promotion.beforeOrderHint")}>
+        {hasPlan && plans.length > 0 && !pendingOrder && (
+          <Container>
+            <FormField label={t("user.plan.promotion.label")} description={t("user.plan.promotion.beforeOrderHint")}>
               <Input
                 value={promotionCode}
                 placeholder={t("user.plan.promotion.placeholder")}
@@ -430,131 +445,121 @@ export default function PlanInfo() {
           </Container>
         )}
 
-        {plans.length > 0 && (
-          <Cards
-            cardsPerRow={[{ cards: 1 }, { cards: 2, minWidth: 700 }]}
-            cardDefinition={{
-              header: (item) => item.name,
-              sections: [
-                {
-                  id: "traffic",
-                  header: t("user.plan.trafficLimit"),
-                  content: (item) => item.traffic_limit ? formatBytes(item.traffic_limit) : "∞",
-                },
-                {
-                  id: "devices",
-                  header: t("user.plan.maxDevices"),
-                  content: (item) => String(item.max_devices),
-                },
-                {
-                  id: "speed",
-                  header: t("user.plan.speedLimit"),
-                  content: (item) => item.speed_limit ? `${item.speed_limit} Mbps` : "∞",
-                },
-                {
-                  id: "features",
-                  header: t("user.plan.features.title"),
-                  content: (item) =>
-                    item.features.length === 0 ? (
-                      <Box color="text-status-inactive">—</Box>
-                    ) : (
-                      <SpaceBetween size="xxs">
-                        {item.features.map((feature, index) => (
-                          <SpaceBetween key={index} direction="horizontal" size="xs" alignItems="center">
-                            <Icon
-                              name={feature.included ? "status-positive" : "status-negative"}
-                              variant={feature.included ? "success" : "disabled"}
-                            />
-                            <Box color={feature.included ? undefined : "text-status-inactive"}>
-                              {feature.text}
-                            </Box>
-                          </SpaceBetween>
-                        ))}
-                      </SpaceBetween>
-                    ),
-                },
-                {
-                  id: "action",
-                  content: (item) => {
-                    const selectedPrice =
-                      item.prices.find((price) => price.duration_days === selectedDurations[item.id]) ??
-                      item.prices[0];
-                    if (!item.purchasable || !selectedPrice) {
-                      return (
-                        <StatusIndicator type="info">
-                          {t("user.plan.order.notPurchasable")}
-                        </StatusIndicator>
-                      );
-                    }
-                    const durationOptions = item.prices.map((price) => ({
-                      value: String(price.duration_days),
-                      label: t("user.plan.order.durationPrice", {
-                        days: price.duration_days,
-                        price: formatPriceCents(price.price_cents),
-                      }),
-                    }));
-                    const savings = planSavings(item.prices, selectedPrice.duration_days);
-                    return (
-                      <SpaceBetween size="s">
-                        <FormField label={t("user.plan.order.chooseDuration")}>
-                          <Select
-                            selectedOption={durationOptions.find(
-                              (option) => option.value === String(selectedPrice.duration_days),
-                            ) ?? null}
-                            options={durationOptions}
-                            disabled={submitting || pendingOrder !== null}
-                            onChange={({ detail }) => {
-                              if (detail.selectedOption.value) {
-                                const durationDays = Number(detail.selectedOption.value);
-                                setSelectedDurations((current) => ({
-                                  ...current,
-                                  [item.id]: durationDays,
-                                }));
-                              }
-                            }}
-                          />
-                        </FormField>
-                        <SpaceBetween size="xxs">
-                          <Box variant="awsui-key-label">{t("user.plan.order.col.price")}</Box>
-                          <Box>
-                            {t("user.plan.order.durationPrice", {
-                              days: selectedPrice.duration_days,
-                              price: formatPriceCents(selectedPrice.price_cents),
-                            })}
+        <SpaceBetween size="m">
+          <Header variant="h2" counter={plans.length > 0 ? `(${plans.length})` : undefined}>{t("user.plan.availablePlans")}</Header>
+          {plans.length === 0 ? (
+            <Container>
+              <Box textAlign="center" color="text-body-secondary" padding="l">{t("user.plan.noPlansAvailable")}</Box>
+            </Container>
+          ) : (
+            <div className="plan-info__grid">
+              {plans.map((item) => {
+                const selectedPrice =
+                  item.prices.find((price) => price.duration_days === selectedDurations[item.id]) ?? item.prices[0];
+                const savings = selectedPrice ? planSavings(item.prices, selectedPrice.duration_days) : null;
+                const stats = [
+                  { label: t("user.plan.trafficLimit"), value: item.traffic_limit ? formatBytes(item.traffic_limit) : t("user.plan.unlimited") },
+                  { label: t("user.plan.speedLimit"), value: item.speed_limit ? `${item.speed_limit} Mbps` : t("user.plan.unlimited") },
+                  { label: t("user.plan.maxDevices"), value: String(item.max_devices) },
+                ];
+                return (
+                  <Container key={item.id} fitHeight header={<Header variant="h2">{item.name}</Header>}>
+                    <div className="plan-info__card">
+                      {selectedPrice ? (
+                        <Box textAlign="center">
+                          <Box tagOverride="span" fontSize="display-l" fontWeight="bold">{formatPriceCents(selectedPrice.price_cents)}</Box>
+                          <Box tagOverride="span" color="text-body-secondary">
+                            {" "}{t("user.plan.perDays", { days: selectedPrice.duration_days })}
                           </Box>
                           {savings && (
-                            <Badge color="green">
-                              {t("user.plan.order.savings", { percent: savings.percent })}
-                            </Badge>
+                            <Box margin={{ top: "xxs" }}><Badge color="green">{t("user.plan.order.savings", { percent: savings.percent })}</Badge></Box>
                           )}
-                        </SpaceBetween>
-                        <Button
-                          variant="primary"
-                          ariaLabel={`${t("user.plan.order.placeOrder")} ${item.name}`}
-                          loading={orderingPlanId === item.id}
-                          disabled={submitting || pendingOrder !== null}
-                          onClick={() => {
-                            setOrderReviewError(null);
-                            setOrderReview({ plan: item, price: selectedPrice });
-                          }}
-                        >
-                          {t("user.plan.order.placeOrder")}
-                        </Button>
-                        {pendingOrder && (
-                          <Box variant="small" color="text-status-inactive">
-                            {t("user.plan.order.blockedByPending")}
-                          </Box>
+                        </Box>
+                      ) : null}
+
+                      {item.purchasable && item.prices.length > 0 && (
+                        <FormField label={t("user.plan.order.chooseDuration")} stretch>
+                          <Tiles
+                            columns={Math.min(3, item.prices.length)}
+                            value={selectedPrice ? String(selectedPrice.duration_days) : null}
+                            onChange={({ detail }) =>
+                              setSelectedDurations((current) => ({ ...current, [item.id]: Number(detail.value) }))
+                            }
+                            items={item.prices.map((price) => {
+                              const priceSavings = planSavings(item.prices, price.duration_days);
+                              return {
+                                value: String(price.duration_days),
+                                label: t("user.plan.daysLabel", { days: price.duration_days }),
+                                description: priceSavings
+                                  ? `${formatPriceCents(price.price_cents)} · ${t("user.plan.order.savings", { percent: priceSavings.percent })}`
+                                  : formatPriceCents(price.price_cents),
+                                disabled: submitting || pendingOrder !== null,
+                              };
+                            })}
+                          />
+                        </FormField>
+                      )}
+
+                      {item.features.length > 0 && (
+                        <div className="plan-info__divided" style={{ borderBlockStart: `1px solid ${colorBorderDividerDefault}` }}>
+                          <SpaceBetween size="xs">
+                            {item.features.map((feature, index) => (
+                              <div key={index} className="plan-info__feature">
+                                <Icon
+                                  name={feature.included ? "status-positive" : "status-negative"}
+                                  variant={feature.included ? "success" : "disabled"}
+                                />
+                                <Box color={feature.included ? undefined : "text-status-inactive"}>{feature.text}</Box>
+                              </div>
+                            ))}
+                          </SpaceBetween>
+                        </div>
+                      )}
+
+                      <div className="plan-info__stats">
+                        {stats.map((stat) => (
+                          <div key={stat.label} className="plan-info__stat"
+                            style={{ background: colorBackgroundCellShaded, borderRadius: borderRadiusItem }}>
+                            <Box fontWeight="bold" fontSize="heading-s">{stat.value}</Box>
+                            <Box variant="small" color="text-body-secondary">{stat.label}</Box>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="plan-info__action">
+                        {!item.purchasable || !selectedPrice ? (
+                          <StatusIndicator type="info">{t("user.plan.order.notPurchasable")}</StatusIndicator>
+                        ) : (
+                          <SpaceBetween size="xs">
+                            <Button
+                              variant="primary"
+                              fullWidth
+                              iconName="add-plus"
+                              ariaLabel={`${t("user.plan.order.placeOrder")} ${item.name}`}
+                              loading={orderingPlanId === item.id}
+                              disabled={submitting || pendingOrder !== null}
+                              onClick={() => {
+                                setOrderReviewError(null);
+                                setOrderReview({ plan: item, price: selectedPrice });
+                              }}
+                            >
+                              {t("user.plan.order.placeOrder")}
+                            </Button>
+                            {pendingOrder && (
+                              <Box variant="small" color="text-status-inactive" textAlign="center">
+                                {t("user.plan.order.blockedByPending")}
+                              </Box>
+                            )}
+                          </SpaceBetween>
                         )}
-                      </SpaceBetween>
-                    );
-                  },
-                },
-              ],
-            }}
-            items={plans}
-            header={<Header variant="h2">{t("user.plan.availablePlans")}</Header>}
-          />
-        )}
+                      </div>
+                    </div>
+                  </Container>
+                );
+              })}
+            </div>
+          )}
+        </SpaceBetween>
 
         {orders.length > 0 && (
           <Table

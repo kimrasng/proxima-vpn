@@ -1,0 +1,49 @@
+/* Plan purchase page layout. Colors and radii come from Cloudscape tokens inline;
+   this file only owns grid structure. */
+.plan-info__top {
+  display: grid;
+  gap: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  max-width: 1100px;
+}
+
+.plan-info__grid {
+  display: grid;
+  gap: 20px;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  max-width: 1100px;
+}
+
+.plan-info__card {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  height: 100%;
+}
+
+.plan-info__divided {
+  padding-block-start: 16px;
+}
+
+.plan-info__feature {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.plan-info__stats {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.plan-info__stat {
+  padding: 12px 8px;
+  text-align: center;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.plan-info__action {
+  margin-block-start: auto;
+}
