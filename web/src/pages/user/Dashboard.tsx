@@ -3,9 +3,12 @@ import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import {
   Alert, Box, Button, ColumnLayout, Container, ContentLayout,
-  ExpandableSection, Grid, Header, Modal, ProgressBar, SpaceBetween,
+  ExpandableSection, Grid, Header, Icon, Modal, ProgressBar, SpaceBetween,
   Spinner, StatusIndicator, Table,
 } from "@cloudscape-design/components";
+import {
+  borderRadiusContainer, colorBackgroundStatusInfo, colorBorderStatusInfo, colorBackgroundNotificationBlue,
+} from "@cloudscape-design/design-tokens";
 import type { Announcement } from "../../api/types";
 import * as userApi from "../../api/user";
 import DeviceQuickConnect from "../../components/DeviceQuickConnect";
@@ -57,26 +60,65 @@ export default function Dashboard() {
       }>{t("user.dashboard.title")}</Header>
     }>
       <div style={{ maxWidth: 1040 }}>
-      <SpaceBetween size="m">
+      <SpaceBetween size="l">
         {summary.loading ? <Container><Spinner size="large" /></Container> : summary.error ? (
           <Alert type="error" action={<Button onClick={summary.refresh}>{t("user.dashboard.retry")}</Button>}>
             {t("user.dashboard.loadError")}
           </Alert>
+        ) : data && !hasPlan ? (
+          <>
+            <div style={{
+              background: colorBackgroundStatusInfo, border: `1px solid ${colorBorderStatusInfo}`,
+              borderRadius: borderRadiusContainer, padding: "20px 24px",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 24, flexWrap: "wrap" }}>
+                <svg width="96" height="96" viewBox="0 0 96 96" role="img" aria-hidden="true">
+                  <circle cx="48" cy="48" r="46" fill="#fff" opacity="0.7" />
+                  <rect x="20" y="26" width="48" height="38" rx="4" fill="#fff" stroke="#5f6b7a" strokeWidth="2" />
+                  <path d="M20 36h48" stroke="#5f6b7a" strokeWidth="2" />
+                  <path d="M28 46h24M28 53h16" stroke="#aab4c0" strokeWidth="2" strokeLinecap="round" />
+                  <path d="M62 52l12 4v8c0 7-5 11-12 14-7-3-12-7-12-14v-8z" fill={colorBackgroundNotificationBlue} />
+                  <path d="M57 64l4 4 7-8" stroke="#fff" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                <SpaceBetween size="xs">
+                  <Box variant="h2" padding="n">{t("user.dashboard.noPlanTitle")}</Box>
+                  <Box variant="p" padding="n">{t("user.dashboard.heroDescription")}</Box>
+                  <Button variant="primary" onClick={() => navigate("/portal/plan")}>{t("user.dashboard.viewPlans")}</Button>
+                </SpaceBetween>
+              </div>
+            </div>
+            <Container header={<Header variant="h2" description={t("user.dashboard.guideSubtitle")}>{t("user.dashboard.guideTitle")}</Header>}>
+              <SpaceBetween size="m">
+                <ColumnLayout columns={3}>
+                  {([
+                    ["file", t("user.dashboard.step1Title"), t("user.dashboard.step1Description")],
+                    ["download", t("user.dashboard.step2Title"), t("user.dashboard.step2Description")],
+                    ["share", t("user.dashboard.step3Title"), t("user.dashboard.step3Description")],
+                  ] as const).map(([icon, title, description], index) => (
+                    <div key={icon} style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+                      <Box variant="h3" color="text-status-info" padding="n">{index + 1}</Box>
+                      <SpaceBetween size="xxs">
+                        <Box variant="h4" padding="n"><SpaceBetween direction="horizontal" size="xs">
+                          <Icon name={icon} /><span>{title}</span>
+                        </SpaceBetween></Box>
+                        <Box color="text-body-secondary">{description}</Box>
+                      </SpaceBetween>
+                    </div>
+                  ))}
+                </ColumnLayout>
+                <Alert type="info" action={<Button variant="link" iconName="external" iconAlign="right"
+                  onClick={() => navigate("/portal/devices")}>{t("user.dashboard.guideLink")}</Button>}>
+                  {t("user.dashboard.guideNote")}
+                </Alert>
+              </SpaceBetween>
+            </Container>
+          </>
         ) : data && (
-          <Container header={!hasPlan ? undefined : <Header variant="h2" description={t("user.dashboard.planSection")}>
+          <Container header={<Header variant="h2" description={t("user.dashboard.planSection")}>
             {data.plan_name}
           </Header>}>
             <SpaceBetween size="m">
-              {!hasPlan ? (
-                <Box>
-                  <SpaceBetween size="xs">
-                    <Box variant="h2" padding="n">{t("user.dashboard.noPlanTitle")}</Box>
-                    <Box color="text-body-secondary">{t("user.dashboard.noPlanDescription")}</Box>
-                    <Button variant="primary" onClick={() => navigate("/portal/plan")}>{t("user.dashboard.browsePlans")}</Button>
-                  </SpaceBetween>
-                </Box>
-              ) : (
-                <>
+              <>
                   <StatusIndicator type={data.status === "active" && !expired ? "success" : "warning"}>
                     {t(expired ? "user.dashboard.statusExpired" : STATUS_LABEL_KEYS[data.status] ?? "user.dashboard.statusUnknown")}
                   </StatusIndicator>
@@ -118,31 +160,19 @@ export default function Dashboard() {
                       </StatusIndicator>}
                     </SpaceBetween>
                   </ExpandableSection>
-                </>
-              )}
+              </>
             </SpaceBetween>
           </Container>
         )}
 
-        {data && !hasPlan && (
-          <Container header={<Header variant="h2" actions={
-            <Button variant="link" onClick={() => navigate("/portal/devices")}>{t("user.dashboard.guideLink")}</Button>
-          }>{t("user.dashboard.guideTitle")}</Header>}>
-            <ColumnLayout columns={3} variant="text-grid">
-              {[t("user.dashboard.guideStep1"), t("user.dashboard.guideStep2"), t("user.dashboard.guideStep3")].map((label, index) => (
-                <Box key={index}><Box variant="awsui-key-label">{index + 1}</Box>{label}</Box>
-              ))}
-            </ColumnLayout>
-          </Container>
-        )}
-
-        <Grid gridDefinition={[{ colspan: { default: 12, m: 6 } }, { colspan: { default: 12, m: 6 } }]}>
+        <Grid gridDefinition={[{ colspan: { default: 12, m: 7 } }, { colspan: { default: 12, m: 5 } }]}>
           <DeviceQuickConnect summary={data} refreshKey={connectionRefresh} />
+          <SpaceBetween size="l">
             <Container header={<Header variant="h2" description={t("user.dashboard.serverScope")} actions={
               <Button variant="link" onClick={() => navigate("/portal/nodes")}>{t("user.dashboard.viewAll")}</Button>
             }>{t("user.dashboard.serverStatus")}</Header>}>
               <SpaceBetween size="s">
-                {!hasPlan && !summary.loading ? <Box color="text-body-secondary">{t("user.dashboard.serverNeedsPlan")}</Box> : nodes.error ? <Alert type="error" action={<Button onClick={nodes.refresh}>{t("user.dashboard.retry")}</Button>}>
+                {nodes.error ? <Alert type="error" action={<Button onClick={nodes.refresh}>{t("user.dashboard.retry")}</Button>}>
                   {t("user.nodes.loadError")}
                 </Alert> : nodes.loading ? <Spinner /> : (
                   <>
@@ -167,7 +197,6 @@ export default function Dashboard() {
                 )}
               </SpaceBetween>
             </Container>
-        </Grid>
             <Container header={<Header variant="h2" actions={
               <Button variant="link" onClick={() => navigate("/portal/announcements")}>{t("user.dashboard.viewAll")}</Button>
             }>{t("user.announcements.title")}</Header>}>
@@ -183,6 +212,8 @@ export default function Dashboard() {
                 </SpaceBetween>)}
               </SpaceBetween>}
             </Container>
+          </SpaceBetween>
+        </Grid>
       </SpaceBetween>
       </div>
       <Modal visible={selectedAnnouncement !== null} closeAriaLabel={t("user.announcements.close")} onDismiss={() => setSelectedAnnouncement(null)}
