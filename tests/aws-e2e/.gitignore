@@ -1,0 +1,7 @@
+.state/
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+crash.log
+evidence/
