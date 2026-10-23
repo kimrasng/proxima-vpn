@@ -1940,7 +1940,18 @@
         "confirmAmount": "支付 {{amount}}",
         "viewPlans": "查看套餐",
         "promoPlaceholder": "优惠码（可选）",
-        "replaceCode": "更换优惠码"
+        "replaceCode": "更换优惠码",
+        "placedTitle": "订单已提交",
+        "placedHeading": "订单已提交",
+        "placedHint": "确认收款后套餐将立即生效。",
+        "amountDue": "应付金额",
+        "manualNext": "管理员会另行告知转账信息并确认收款。您可以随时在订单记录中查看或取消订单。",
+        "goOrders": "查看订单",
+        "done": "确定",
+        "stripeOpened": "已在新标签页打开 Stripe 支付页面。付款完成后套餐将自动生效。",
+        "openStripe": "打开 Stripe 支付页面",
+        "popupBlockedTitle": "新标签页被拦截",
+        "popupBlocked": "浏览器拦截了支付标签页。请点击下方按钮打开 Stripe 支付页面。"
       }
     },
     "account": {

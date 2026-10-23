@@ -1940,7 +1940,18 @@
         "confirmAmount": "Pay {{amount}}",
         "viewPlans": "View plans",
         "promoPlaceholder": "Promotion code (optional)",
-        "replaceCode": "Use a different code"
+        "replaceCode": "Use a different code",
+        "placedTitle": "Order placed",
+        "placedHeading": "Your order has been placed",
+        "placedHint": "Your plan starts as soon as the payment is confirmed.",
+        "amountDue": "Amount to pay",
+        "manualNext": "An admin will send you the transfer details and confirm the payment. You can check or cancel the order any time from Orders.",
+        "goOrders": "View orders",
+        "done": "Done",
+        "stripeOpened": "Stripe checkout opened in a new tab. Your plan is applied automatically once payment completes.",
+        "openStripe": "Open Stripe checkout",
+        "popupBlockedTitle": "New tab was blocked",
+        "popupBlocked": "Your browser blocked the checkout tab. Use the button below to open Stripe checkout."
       }
     },
     "account": {

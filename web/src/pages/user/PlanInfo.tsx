@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
 import {
   ContentLayout,
   Header,
@@ -87,6 +88,7 @@ const STATUS_LABEL_KEYS: Record<string, string> = {
 
 export default function PlanInfo() {
   const { t, i18n } = useTranslation();
+  const navigate = useNavigate();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [plans, setPlans] = useState<UserPlanItem[]>([]);
   const [orders, setOrders] = useState<OrderResponse[]>([]);
@@ -102,6 +104,10 @@ export default function PlanInfo() {
   const [promotionCode, setPromotionCode] = useState("");
   const [appliedCode, setAppliedCode] = useState<string | null>(null);
   const [applying, setApplying] = useState(false);
+  // After a manual (bank transfer) order the modal stays open on a receipt
+  // instead of collapsing into a page banner, so the user sees what was ordered.
+  const [placedOrder, setPlacedOrder] = useState<OrderResponse | null>(null);
+  const [stripeTabBlocked, setStripeTabBlocked] = useState<string | null>(null);
 
   const loadData = async () => {
     try {
@@ -172,6 +178,9 @@ export default function PlanInfo() {
     });
 
   const closeCheckout = () => {
+    if (placedOrder || stripeTabBlocked) void loadData();
+    setPlacedOrder(null);
+    setStripeTabBlocked(null);
     setCheckout(null);
     setCheckoutError(null);
     setPromotionCode("");
@@ -228,23 +237,37 @@ export default function PlanInfo() {
   // Hands an existing pending order to the chosen provider. A redirect provider
   // (Stripe) leaves the SPA; a manual one only records the choice, so the order
   // waits for an admin to confirm the transfer.
-  const payWithProvider = async (orderId: string) => {
+  // Hands an existing pending order to the chosen provider. Stripe opens in a
+  // new tab that was reserved synchronously on click (a tab opened after an
+  // await is treated as a popup and blocked); a manual provider only records
+  // the choice, so the order waits for an admin to confirm the transfer.
+  const payWithProvider = async (orderId: string, stripeTab: Window | null) => {
     const provider = providers.find((item) => item.name === providerName);
     if (!provider) throw new Error("no payment provider selected");
     const session = await userApi.startCheckout(orderId, provider.name);
     if (session.mode === "redirect") {
       if (!session.redirect_url) throw new Error("checkout returned no redirect URL");
-      window.location.href = session.redirect_url;
+      if (stripeTab && !stripeTab.closed) {
+        stripeTab.location.href = session.redirect_url;
+        closeCheckout();
+        setFlash([{ type: "info", content: t("user.plan.checkoutModal.stripeOpened"), dismissible: true, onDismiss: () => setFlash([]) }]);
+        await loadData();
+      } else {
+        setStripeTabBlocked(session.redirect_url);
+      }
       return;
     }
-    closeCheckout();
-    setFlash([{ type: "success", content: t("user.plan.order.placed"), dismissible: true, onDismiss: () => setFlash([]) }]);
-    await loadData();
+    stripeTab?.close();
+    const orderList = await userApi.listMyOrders();
+    setOrders(orderList);
+    setPlacedOrder(orderList.find((order) => order.id === orderId) ?? null);
   };
 
   const handleConfirmCheckout = async () => {
     if (!checkout || submitting) return;
     const code = promotionCode.trim();
+    const provider = providers.find((item) => item.name === providerName);
+    const stripeTab = provider?.mode === "redirect" ? window.open("about:blank", "_blank") : null;
     setSubmitting(true);
     setCheckoutError(null);
     try {
@@ -257,6 +280,7 @@ export default function PlanInfo() {
             const reason = rejectionFromError(err);
             if (!reason) throw err;
             setCheckoutError(t(`user.plan.promotion.rejected.${reason}`));
+            stripeTab?.close();
             return;
           }
         }
@@ -274,17 +298,20 @@ export default function PlanInfo() {
           setCheckout({ ...checkout, order, priceCents: order.price_cents, discountCents: order.discount_cents ?? 0 });
           setCheckoutError(t(`user.plan.promotion.rejected.${result.promotion_rejected}`));
           setOrders(await userApi.listMyOrders());
+          stripeTab?.close();
           return;
         }
         if (order.status === "paid") {
           closeCheckout();
+          stripeTab?.close();
           setFlash([{ type: "success", content: t("user.plan.checkoutModal.paid"), dismissible: true, onDismiss: () => setFlash([]) }]);
           await loadData();
           return;
         }
       }
-      await payWithProvider(order.id);
+      await payWithProvider(order.id, stripeTab);
     } catch (err) {
+      stripeTab?.close();
       setCheckoutError(
         err instanceof ApiError && err.status === 409 ? t("user.plan.order.conflict") : t("user.plan.order.error"),
       );
@@ -367,7 +394,7 @@ export default function PlanInfo() {
           </Container>
         )}
 
-        {!hasPlan && (
+        {!hasPlan && !pendingOrder && (
           <Alert type={isExpired ? "warning" : "info"} header={isExpired ? t("user.plan.expired") : t("user.plan.noPlan")}>
             {t("user.plan.noPlanHint")}
           </Alert>
@@ -552,8 +579,20 @@ export default function PlanInfo() {
           onDismiss={() => {
             if (!submitting) closeCheckout();
           }}
-          header={t("user.plan.checkoutModal.title")}
-          footer={
+          header={placedOrder ? t("user.plan.checkoutModal.placedTitle") : t("user.plan.checkoutModal.title")}
+          footer={placedOrder || stripeTabBlocked ? (
+            <Box float="right">
+              <SpaceBetween direction="horizontal" size="xs">
+                {placedOrder && <Button onClick={() => { closeCheckout(); navigate("/portal/orders"); }}>{t("user.plan.checkoutModal.goOrders")}</Button>}
+                {stripeTabBlocked && (
+                  <Button variant="primary" href={stripeTabBlocked} target="_blank" iconName="external" iconAlign="right" onClick={() => closeCheckout()}>
+                    {t("user.plan.checkoutModal.openStripe")}
+                  </Button>
+                )}
+                {placedOrder && <Button variant="primary" onClick={closeCheckout}>{t("user.plan.checkoutModal.done")}</Button>}
+              </SpaceBetween>
+            </Box>
+          ) : (
             <Box float="right">
               <SpaceBetween direction="horizontal" size="xs">
                 <Button disabled={submitting} onClick={closeCheckout}>
@@ -569,9 +608,44 @@ export default function PlanInfo() {
                 </Button>
               </SpaceBetween>
             </Box>
-          }
+          )}
         >
-          {checkout && (
+          {placedOrder ? (
+            <SpaceBetween size="l">
+              <Box textAlign="center" padding={{ top: "s" }}>
+                <SpaceBetween size="xs" alignItems="center">
+                  <Icon name="status-positive" variant="success" size="big" />
+                  <Box variant="h2" padding="n">{t("user.plan.checkoutModal.placedHeading")}</Box>
+                  <Box color="text-body-secondary">{t("user.plan.checkoutModal.placedHint")}</Box>
+                </SpaceBetween>
+              </Box>
+              <div className="plan-info__receipt" style={{ background: colorBackgroundCellShaded, borderRadius: borderRadiusItem }}>
+                <div className="plan-info__receipt-lines">
+                  <div className="plan-info__receipt-line">
+                    <Box color="text-body-secondary">{t("user.plan.checkoutModal.item")}</Box>
+                    <Box>{placedOrder.plan_name} · {t("user.plan.daysLabel", { days: placedOrder.duration_days })}</Box>
+                  </div>
+                  <div className="plan-info__receipt-line">
+                    <Box color="text-body-secondary">{t("user.plan.checkoutModal.provider")}</Box>
+                    <Box>{providerLabel(placedOrder.provider ?? "admin")}</Box>
+                  </div>
+                  <div className="plan-info__receipt-line">
+                    <Box color="text-body-secondary">{t("user.plan.order.col.status")}</Box>
+                    <StatusIndicator type="pending">{t("user.plan.order.status.pending")}</StatusIndicator>
+                  </div>
+                </div>
+                <div className="plan-info__receipt-total" style={{ borderBlockStart: `1px solid ${colorBorderDividerDefault}` }}>
+                  <Box variant="h3" padding="n">{t("user.plan.checkoutModal.amountDue")}</Box>
+                  <Box fontSize="heading-xl" fontWeight="bold">{formatPriceCents(placedOrder.price_cents)}</Box>
+                </div>
+              </div>
+              <Alert type="info">{t("user.plan.checkoutModal.manualNext")}</Alert>
+            </SpaceBetween>
+          ) : stripeTabBlocked ? (
+            <Alert type="warning" header={t("user.plan.checkoutModal.popupBlockedTitle")}>
+              {t("user.plan.checkoutModal.popupBlocked")}
+            </Alert>
+          ) : checkout && (
             <SpaceBetween size="l">
               <div className="plan-info__receipt" style={{ background: colorBackgroundCellShaded, borderRadius: borderRadiusItem }}>
                 <div className="plan-info__receipt-item">

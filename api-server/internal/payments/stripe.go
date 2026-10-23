@@ -39,6 +39,29 @@ func NewStripeProvider(cfg config.StripeConfig, panelURL, currency string) *Stri
 	}
 }
 
+// genericProductName labels the line item when no pre-created Stripe product
+// is configured. It stays a neutral balance descriptor for the same reason the
+// configured product does: the item must never read as a VPN service.
+const genericProductName = "Account balance"
+
+// priceData references the configured Stripe product, or describes a generic
+// one inline when STRIPE_PRODUCT_ID is unset - Stripe rejects an empty product
+// id outright, which would fail every checkout.
+func (p *StripeProvider) priceData(priceCents int64) *stripe.CheckoutSessionCreateLineItemPriceDataParams {
+	data := &stripe.CheckoutSessionCreateLineItemPriceDataParams{
+		Currency:   stripe.String(p.currency),
+		UnitAmount: stripe.Int64(priceCents),
+	}
+	if p.productID != "" {
+		data.Product = stripe.String(p.productID)
+	} else {
+		data.ProductData = &stripe.CheckoutSessionCreateLineItemPriceDataProductDataParams{
+			Name: stripe.String(genericProductName),
+		}
+	}
+	return data
+}
+
 func (p *StripeProvider) Name() string {
 	return ProviderStripe
 }
@@ -72,11 +95,7 @@ func (p *StripeProvider) StartCheckout(ctx context.Context, req CheckoutRequest)
 				Quantity: stripe.Int64(1),
 				// The Stripe product is a generic balance descriptor; never label the
 				// item as a VPN service on Stripe.
-				PriceData: &stripe.CheckoutSessionCreateLineItemPriceDataParams{
-					Currency:   stripe.String(p.currency),
-					UnitAmount: stripe.Int64(req.PriceCents),
-					Product:    stripe.String(p.productID),
-				},
+				PriceData: p.priceData(req.PriceCents),
 			},
 		},
 	}
