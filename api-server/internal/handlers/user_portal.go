@@ -42,6 +42,7 @@ func (h *UserPortalHandler) GetProfile(c *fiber.Ctx) error {
 		name          string
 		status        string
 		trafficUsed   int64
+		planID        *string
 		planName      *string
 		trafficLimit  *int64
 		planExpiresAt *time.Time
@@ -52,13 +53,13 @@ func (h *UserPortalHandler) GetProfile(c *fiber.Ctx) error {
 
 	err := h.db.QueryRow(context.Background(), `
 		SELECT u.email, u.name, u.status, u.traffic_used,
-		       p.name, p.traffic_limit, u.plan_expires_at, u.plan_started_at,
+		       p.id::text, p.name, p.traffic_limit, u.plan_expires_at, u.plan_started_at,
 		       u.language, COALESCE(u.sub_token, '')
 		FROM users u
 		LEFT JOIN plans p ON u.plan_id = p.id
 		WHERE u.id = $1
 	`, userID).Scan(&email, &name, &status, &trafficUsed,
-		&planName, &trafficLimit, &planExpiresAt, &planStartedAt, &language, &subToken)
+		&planID, &planName, &trafficLimit, &planExpiresAt, &planStartedAt, &language, &subToken)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to fetch profile",
@@ -72,6 +73,7 @@ func (h *UserPortalHandler) GetProfile(c *fiber.Ctx) error {
 		"language":        language,
 		"status":          status,
 		"traffic_used":    trafficUsed,
+		"plan_id":         planID,
 		"plan_name":       planName,
 		"traffic_limit":   trafficLimit,
 		"plan_expires_at": planExpiresAt,

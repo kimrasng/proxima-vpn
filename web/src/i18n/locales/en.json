@@ -1954,6 +1954,15 @@
         "popupBlocked": "Your browser blocked the checkout tab. Use the button below to open Stripe checkout.",
         "confirming": "Checking your payment…",
         "confirmFailed": "Couldn't verify the payment yet. Check Orders again in a moment."
+      },
+      "extend": {
+        "button": "Extend this plan",
+        "cardHint": "Pay now to keep it until {{date}}",
+        "itemLabel": "Plan to extend",
+        "title": "Extend plan",
+        "detail": "This is your current plan, so the new term is added on top. Your expiry moves from {{from}} to {{to}}; data usage and the reset date stay as they are.",
+        "confirmAmount": "Pay {{amount}} and extend",
+        "done": "Payment complete. Your plan has been extended."
       }
     },
     "account": {

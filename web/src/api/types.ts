@@ -589,10 +589,12 @@ export interface UserProfile {
   email: string;
   name: string;
   status: string;
+  plan_id?: string;
   plan_name?: string;
   traffic_used: number;
   traffic_limit?: number;
   plan_expires_at?: string;
+  plan_started_at?: string;
   language: string;
 }
 

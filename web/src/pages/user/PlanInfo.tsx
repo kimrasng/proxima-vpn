@@ -161,9 +161,22 @@ export default function PlanInfo() {
     void (async () => {
       try {
         const result = await userApi.confirmCheckout(orderId, sessionId);
+        // An extension keeps plan_started_at; a new term starts at the grant.
+        // Comparing it to the order's own time stays right even when the
+        // webhook settled the order before this page loaded.
+        let wasActive = false;
+        if (result.status === "paid") {
+          const [after, orderList] = await Promise.all([userApi.getProfile(), userApi.listMyOrders()]);
+          const order = orderList.find((item) => item.id === orderId);
+          wasActive = !!after.plan_started_at && !!order && new Date(after.plan_started_at) < new Date(order.created_at);
+        }
         show(
           result.status === "paid" ? "success" : "info",
-          result.status === "paid" ? t("user.plan.checkoutModal.paid") : t("user.plan.order.checkout.successPending"),
+          result.status === "paid"
+            ? wasActive
+              ? t("user.plan.extend.done")
+              : t("user.plan.checkoutModal.paid")
+            : t("user.plan.order.checkout.successPending"),
         );
       } catch {
         show("warning", t("user.plan.checkoutModal.confirmFailed"));
@@ -391,6 +404,14 @@ export default function PlanInfo() {
     : false;
 
   const hasPlan = !!profile?.plan_name && !isExpired;
+  // Buying the plan the user already holds extends it: the server adds the new
+  // term on top of the current expiry and keeps usage and the reset date.
+  const isExtension = (planId: string) => hasPlan && profile?.plan_id === planId;
+  const formatDate = (value: Date) => value.toLocaleDateString(i18n.resolvedLanguage ?? i18n.language);
+  const extendedUntil = (days: number) => {
+    const base = profile?.plan_expires_at ? new Date(profile.plan_expires_at) : new Date();
+    return new Date(Math.max(base.getTime(), Date.now()) + days * 86400000);
+  };
 
   return (
     <ContentLayout header={<Header variant="h1" description={t("user.plan.subtitle")}>{t("user.plan.title")}</Header>}>
@@ -572,8 +593,8 @@ export default function PlanInfo() {
                             <Button
                               variant="primary"
                               fullWidth
-                              iconName="add-plus"
-                              ariaLabel={`${t("user.plan.order.placeOrder")} ${item.name}`}
+                              iconName={isExtension(item.id) ? "redo" : "add-plus"}
+                              ariaLabel={`${isExtension(item.id) ? t("user.plan.extend.button") : t("user.plan.order.placeOrder")} ${item.name}`}
                               disabled={submitting || pendingOrder !== null}
                               onClick={() =>
                                 openCheckout({
@@ -586,8 +607,13 @@ export default function PlanInfo() {
                                 })
                               }
                             >
-                              {t("user.plan.order.placeOrder")}
+                              {isExtension(item.id) ? t("user.plan.extend.button") : t("user.plan.order.placeOrder")}
                             </Button>
+                            {isExtension(item.id) && !pendingOrder && (
+                              <Box variant="small" color="text-body-secondary" textAlign="center">
+                                {t("user.plan.extend.cardHint", { date: formatDate(extendedUntil(selectedPrice.duration_days)) })}
+                              </Box>
+                            )}
                             {pendingOrder && (
                               <Box variant="small" color="text-status-inactive" textAlign="center">
                                 {t("user.plan.order.blockedByPending")}
@@ -611,7 +637,7 @@ export default function PlanInfo() {
           onDismiss={() => {
             if (!submitting) closeCheckout();
           }}
-          header={placedOrder ? t("user.plan.checkoutModal.placedTitle") : t("user.plan.checkoutModal.title")}
+          header={placedOrder ? t("user.plan.checkoutModal.placedTitle") : checkout && isExtension(checkout.planId) ? t("user.plan.extend.title") : t("user.plan.checkoutModal.title")}
           footer={placedOrder || stripeTabBlocked ? (
             <Box float="right">
               <SpaceBetween direction="horizontal" size="xs">
@@ -636,7 +662,9 @@ export default function PlanInfo() {
                   disabled={!providerName || applying || (checkout?.order === null && pendingOrder !== null)}
                   onClick={() => void handleConfirmCheckout()}
                 >
-                  {checkout ? t("user.plan.checkoutModal.confirmAmount", { amount: formatPriceCents(checkout.priceCents) }) : t("user.plan.checkoutModal.confirm")}
+                  {checkout
+                    ? t(isExtension(checkout.planId) ? "user.plan.extend.confirmAmount" : "user.plan.checkoutModal.confirmAmount", { amount: formatPriceCents(checkout.priceCents) })
+                    : t("user.plan.checkoutModal.confirm")}
                 </Button>
               </SpaceBetween>
             </Box>
@@ -682,7 +710,9 @@ export default function PlanInfo() {
               <div className="plan-info__receipt" style={{ background: colorBackgroundCellShaded, borderRadius: borderRadiusItem }}>
                 <div className="plan-info__receipt-item">
                   <div>
-                    <Box variant="awsui-key-label">{t("user.plan.checkoutModal.item")}</Box>
+                    <Box variant="awsui-key-label">
+                      {isExtension(checkout.planId) ? t("user.plan.extend.itemLabel") : t("user.plan.checkoutModal.item")}
+                    </Box>
                     <Box variant="h3" padding="n">{checkout.planName}</Box>
                   </div>
                   <Badge>{t("user.plan.daysLabel", { days: checkout.durationDays })}</Badge>
@@ -735,6 +765,15 @@ export default function PlanInfo() {
                   <Box fontSize="heading-xl" fontWeight="bold">{formatPriceCents(checkout.priceCents)}</Box>
                 </div>
               </div>
+
+              {isExtension(checkout.planId) && (
+                <Alert type="info" header={t("user.plan.extend.title")}>
+                  {t("user.plan.extend.detail", {
+                    from: profile?.plan_expires_at ? formatDate(new Date(profile.plan_expires_at)) : "-",
+                    to: formatDate(extendedUntil(checkout.durationDays)),
+                  })}
+                </Alert>
+              )}
 
               <FormField label={t("user.plan.checkoutModal.provider")} stretch>
                 {providers.length === 0 ? (

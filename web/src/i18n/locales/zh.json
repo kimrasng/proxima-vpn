@@ -1954,6 +1954,15 @@
         "popupBlocked": "浏览器拦截了支付标签页。请点击下方按钮打开 Stripe 支付页面。",
         "confirming": "正在确认付款结果…",
         "confirmFailed": "暂时无法确认付款结果，请稍后在订单记录中再次查看。"
+      },
+      "extend": {
+        "button": "续期此套餐",
+        "cardHint": "付款后可使用至 {{date}}",
+        "itemLabel": "续期套餐",
+        "title": "续期套餐",
+        "detail": "这是您当前的套餐，新期限会接在现有期限之后。到期日将从 {{from}} 变为 {{to}}，流量用量和重置日期保持不变。",
+        "confirmAmount": "支付 {{amount}} 并续期",
+        "done": "付款完成，套餐已续期。"
       }
     },
     "account": {
