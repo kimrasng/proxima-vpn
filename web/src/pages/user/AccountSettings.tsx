@@ -114,7 +114,7 @@ export default function AccountSettings() {
 
   if (loading) {
     return (
-      <ContentLayout header={<Header variant="h1">{t("user.account.title")}</Header>}>
+      <ContentLayout header={<Header variant="h1" description={t("user.account.description")}>{t("user.account.title")}</Header>}>
         <Box textAlign="center" padding="xl">
           <Spinner size="large" />
         </Box>
@@ -123,7 +123,7 @@ export default function AccountSettings() {
   }
 
   return (
-    <ContentLayout header={<Header variant="h1">{t("user.account.title")}</Header>}>
+    <ContentLayout header={<Header variant="h1" description={t("user.account.description")}>{t("user.account.title")}</Header>}>
       <SpaceBetween size="l">
         <Flashbar items={flash} />
 

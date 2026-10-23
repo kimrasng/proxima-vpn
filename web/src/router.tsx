@@ -43,6 +43,7 @@ const UserDashboard = lazy(() => import("./pages/user/Dashboard"));
 const UserNodes = lazy(() => import("./pages/user/Nodes"));
 const Traffic = lazy(() => import("./pages/user/Traffic"));
 const PlanInfo = lazy(() => import("./pages/user/PlanInfo"));
+const UserOrders = lazy(() => import("./pages/user/Orders"));
 const AccountSettings = lazy(() => import("./pages/user/AccountSettings"));
 const UserAnnouncements = lazy(() => import("./pages/user/Announcements"));
 
@@ -102,6 +103,7 @@ export const router = createBrowserRouter([
       { path: "/portal/nodes", element: <UserNodes /> },
       { path: "/portal/traffic", element: <Traffic /> },
       { path: "/portal/plan", element: <PlanInfo /> },
+      { path: "/portal/orders", element: <UserOrders /> },
       { path: "/portal/account", element: <AccountSettings /> },
       { path: "/portal/announcements", element: <UserAnnouncements /> },
     ],

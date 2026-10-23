@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import PortalEmpty from "../../components/PortalEmpty";
 import { useTranslation } from "react-i18next";
 import {
   ContentLayout,
@@ -10,7 +12,7 @@ import {
   Spinner,
   Flashbar,
   type FlashbarProps,
-  StatusIndicator,
+  Button,
   ColumnLayout,
 } from "@cloudscape-design/components";
 import type { TrafficStats } from "../../api/types";
@@ -24,7 +26,8 @@ function formatBytes(bytes: number): string {
 }
 
 export default function Traffic() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const navigate = useNavigate();
   const [stats, setStats] = useState<TrafficStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [flash, setFlash] = useState<FlashbarProps.MessageDefinition[]>([]);
@@ -46,7 +49,7 @@ export default function Traffic() {
 
   if (loading) {
     return (
-      <ContentLayout header={<Header variant="h1">{t("user.traffic.title")}</Header>}>
+      <ContentLayout header={<Header variant="h1" description={t("user.traffic.description")}>{t("user.traffic.title")}</Header>}>
         <Box textAlign="center" padding="xl">
           <Spinner size="large" />
         </Box>
@@ -56,11 +59,15 @@ export default function Traffic() {
 
   if (!stats || (!stats.traffic_limit && stats.traffic_used === 0)) {
     return (
-      <ContentLayout header={<Header variant="h1">{t("user.traffic.title")}</Header>}>
-        <Flashbar items={flash} />
-        <Box textAlign="center" padding="xl">
-          <StatusIndicator type="info">{t("user.traffic.noPlan")}</StatusIndicator>
-        </Box>
+      <ContentLayout header={<Header variant="h1" description={t("user.traffic.description")}>{t("user.traffic.title")}</Header>}>
+        <SpaceBetween size="l">
+          <Flashbar items={flash} />
+          <PortalEmpty
+            title={t("user.traffic.noPlan")}
+            description={t("user.traffic.noPlanHint")}
+            action={<Button variant="primary" onClick={() => navigate("/portal/plan")}>{t("user.plan.checkoutModal.viewPlans")}</Button>}
+          />
+        </SpaceBetween>
       </ContentLayout>
     );
   }
@@ -70,28 +77,32 @@ export default function Traffic() {
   const percentage = stats.percentage ?? 0;
 
   return (
-    <ContentLayout header={<Header variant="h1">{t("user.traffic.title")}</Header>}>
+    <ContentLayout header={<Header variant="h1" description={t("user.traffic.description")}>{t("user.traffic.title")}</Header>}>
       <SpaceBetween size="l">
         <Flashbar items={flash} />
         <Container header={<Header variant="h2">{t("user.traffic.usage")}</Header>}>
           <SpaceBetween size="l">
             <ProgressBar
               value={percentage}
-              label={t("user.traffic.usageLabel")}
-              description={`${usedFormatted} / ${limitFormatted} (${percentage.toFixed(1)}%)`}
-              status={percentage >= 90 ? "error" : percentage >= 70 ? "in-progress" : "in-progress"}
+              description={`${usedFormatted} / ${limitFormatted}`}
+              additionalInfo={stats.traffic_limit ? t("user.dashboard.trafficRemaining", { remaining: formatBytes(Math.max(0, stats.traffic_limit - stats.traffic_used)) }) : undefined}
+              status={percentage >= 100 ? "error" : "in-progress"}
             />
-            <ColumnLayout columns={2}>
+            <ColumnLayout columns={3} variant="text-grid">
+              <Box>
+                <Box variant="awsui-key-label">{t("user.traffic.usageLabel")}</Box>
+                <Box variant="h2" padding="n">{usedFormatted}</Box>
+              </Box>
               <Box>
                 <Box variant="awsui-key-label">{t("user.traffic.daysRemaining")}</Box>
-                <Box variant="p">
+                <Box variant="h2" padding="n">
                   {stats.days_remaining != null ? `${stats.days_remaining} ${t("user.traffic.days")}` : "-"}
                 </Box>
               </Box>
               <Box>
                 <Box variant="awsui-key-label">{t("user.traffic.expiresAt")}</Box>
-                <Box variant="p">
-                  {stats.plan_expires_at ? new Date(stats.plan_expires_at).toLocaleDateString() : "-"}
+                <Box variant="h2" padding="n">
+                  {stats.plan_expires_at ? new Date(stats.plan_expires_at).toLocaleDateString(i18n.resolvedLanguage ?? i18n.language) : "-"}
                 </Box>
               </Box>
             </ColumnLayout>

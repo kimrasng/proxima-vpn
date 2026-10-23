@@ -11,13 +11,11 @@ import {
   Flashbar,
   type FlashbarProps,
   StatusIndicator,
-  type StatusIndicatorProps,
   ColumnLayout,
   Badge,
   Icon,
   Input,
   FormField,
-  Table,
   Modal,
   Alert,
   Tiles,
@@ -31,10 +29,8 @@ import type {
   UserProfile,
   UserPlanItem,
   OrderResponse,
-  OrderStatus,
   PaymentProviderItem,
   PromotionRejectReason,
-  OrderReceipt,
 } from "../../api/types";
 import * as userApi from "../../api/user";
 import { ApiError } from "../../api/client";
@@ -72,21 +68,6 @@ function rejectionFromError(err: unknown): PromotionRejectReason | null {
 	return error === "promotion_rejected" && isPromotionRejectReason(reason) ? reason : null;
 }
 
-// "expired" borrows the warning severity the user pages already use for a lapsed
-// plan: it needs attention but nothing failed.
-function orderStatusIndicatorType(status: OrderStatus): StatusIndicatorProps.Type {
-  switch (status) {
-    case "paid":
-      return "success";
-    case "cancelled":
-      return "stopped";
-    case "expired":
-      return "warning";
-    default:
-      return "pending";
-  }
-}
-
 // What the checkout modal is paying for: a fresh plan/duration pick, or an
 // order that already exists (pending, or just created with a refused code).
 type CheckoutTarget = {
@@ -113,14 +94,14 @@ export default function PlanInfo() {
   const [loading, setLoading] = useState(true);
   const [flash, setFlash] = useState<FlashbarProps.MessageDefinition[]>([]);
   const [submitting, setSubmitting] = useState(false);
-  const [receipt, setReceipt] = useState<OrderReceipt | null>(null);
-  const [receiptLoading, setReceiptLoading] = useState<string | null>(null);
   const [selectedDurations, setSelectedDurations] = useState<Record<string, number>>({});
   const [checkout, setCheckout] = useState<CheckoutTarget | null>(null);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [providerName, setProviderName] = useState<string | undefined>();
   const [cancelModal, setCancelModal] = useState<OrderResponse | null>(null);
   const [promotionCode, setPromotionCode] = useState("");
+  const [appliedCode, setAppliedCode] = useState<string | null>(null);
+  const [applying, setApplying] = useState(false);
 
   const loadData = async () => {
     try {
@@ -172,6 +153,7 @@ export default function PlanInfo() {
     setCheckout(target);
     setCheckoutError(null);
     setPromotionCode("");
+    setAppliedCode(target.discountCents > 0 ? "" : null);
     setProviderName((current) =>
       current && providers.some((provider) => provider.name === current)
         ? current
@@ -193,6 +175,54 @@ export default function PlanInfo() {
     setCheckout(null);
     setCheckoutError(null);
     setPromotionCode("");
+    setAppliedCode(null);
+  };
+
+  // Applying a code needs a real order: the server alone knows eligibility and
+  // the discount, so the first Apply places the pending order and later ones
+  // replace the code on it. The totals shown are always the server's.
+  const handleApplyCode = async () => {
+    if (!checkout || applying || submitting) return;
+    const code = promotionCode.trim();
+    if (!code) return;
+    setApplying(true);
+    setCheckoutError(null);
+    try {
+      let order: OrderResponse;
+      if (checkout.order) {
+        try {
+          order = await userApi.applyPromotionToOrder(checkout.order.id, code);
+        } catch (err) {
+          const reason = rejectionFromError(err);
+          if (!reason) throw err;
+          setCheckoutError(t(`user.plan.promotion.rejected.${reason}`));
+          return;
+        }
+      } else {
+        const result = await userApi.createOrder({
+          plan_id: checkout.planId,
+          duration_days: checkout.durationDays,
+          promotion_code: code,
+        });
+        order = result.order;
+        if (result.promotion_rejected) {
+          setCheckout({ ...checkout, order, priceCents: order.price_cents, discountCents: order.discount_cents ?? 0 });
+          setCheckoutError(t(`user.plan.promotion.rejected.${result.promotion_rejected}`));
+          setOrders(await userApi.listMyOrders());
+          return;
+        }
+        setOrders(await userApi.listMyOrders());
+      }
+      setCheckout({ ...checkout, order, priceCents: order.price_cents, discountCents: order.discount_cents ?? 0 });
+      setAppliedCode(code);
+      setPromotionCode("");
+    } catch (err) {
+      setCheckoutError(
+        err instanceof ApiError && err.status === 409 ? t("user.plan.order.conflict") : t("user.plan.promotion.error"),
+      );
+    } finally {
+      setApplying(false);
+    }
   };
 
   // Hands an existing pending order to the chosen provider. A redirect provider
@@ -285,17 +315,6 @@ export default function PlanInfo() {
     }
   };
 
-  const handleViewReceipt = async (orderId: string) => {
-    try {
-      setReceiptLoading(orderId);
-      setReceipt(await userApi.getOrderReceipt(orderId));
-    } catch {
-      setFlash([{ type: "error", content: t("user.plan.order.receipt.error"), dismissible: true, onDismiss: () => setFlash([]) }]);
-    } finally {
-      setReceiptLoading(null);
-    }
-  };
-
   const pendingOrder = orders.find((o) => o.status === "pending") ?? null;
 
   if (loading) {
@@ -316,7 +335,6 @@ export default function PlanInfo() {
 
   return (
     <ContentLayout header={<Header variant="h1" description={t("user.plan.subtitle")}>{t("user.plan.title")}</Header>}>
-      <div className="plan-info__page">
       <SpaceBetween size="l">
         <Flashbar items={flash} />
 
@@ -527,88 +545,6 @@ export default function PlanInfo() {
           )}
         </SpaceBetween>
 
-        {orders.length > 0 && (
-          <Table
-            items={orders}
-            trackBy="id"
-            header={
-              <Header variant="h2" counter={`(${orders.length})`}>
-                {t("user.plan.order.myOrders")}
-              </Header>
-            }
-            columnDefinitions={[
-              {
-                id: "plan",
-                header: t("user.plan.order.col.plan"),
-                cell: (item) => item.plan_name,
-              },
-              {
-                id: "duration",
-                header: t("user.plan.order.col.duration"),
-                cell: (item) => `${item.duration_days} ${t("user.plan.durationDays")}`,
-              },
-              {
-                id: "price",
-                header: t("user.plan.order.col.price"),
-                cell: (item) =>
-                  (item.discount_cents ?? 0) > 0 ? (
-                    <SpaceBetween direction="horizontal" size="xxs" alignItems="center">
-                      <Box color="text-status-inactive">
-                        <s>{formatPriceCents(item.price_cents + (item.discount_cents ?? 0))}</s>
-                      </Box>
-                      <Box>{formatPriceCents(item.price_cents)}</Box>
-                    </SpaceBetween>
-                  ) : (
-                    formatPriceCents(item.price_cents)
-                  ),
-              },
-              {
-                id: "status",
-                header: t("user.plan.order.col.status"),
-                cell: (item) => (
-                  <StatusIndicator type={orderStatusIndicatorType(item.status)}>
-                    {t(`user.plan.order.status.${item.status}`)}
-                  </StatusIndicator>
-                ),
-              },
-              {
-                id: "createdAt",
-                header: t("user.plan.order.col.createdAt"),
-                cell: (item) => new Date(item.created_at).toLocaleString(),
-              },
-              {
-                id: "actions",
-                header: t("user.plan.order.col.actions"),
-                cell: (item) =>
-                  item.status === "pending" ? (
-                    <SpaceBetween direction="horizontal" size="xs">
-                      {providers.length > 0 && (
-                        <Button variant="inline-link" onClick={() => openOrderCheckout(item)}>
-                          {t("user.plan.order.checkout.payNow")}
-                        </Button>
-                      )}
-                      <Button variant="inline-link" onClick={() => setCancelModal(item)}>
-                        {t("user.plan.order.cancel")}
-                      </Button>
-                    </SpaceBetween>
-                  ) : item.status === "paid" ? (
-                    <Button
-                      variant="inline-link"
-                      loading={receiptLoading === item.id}
-                      disabled={receiptLoading !== null}
-                      onClick={() => void handleViewReceipt(item.id)}
-                    >
-                      {t("user.plan.order.receipt.view")}
-                    </Button>
-                  ) : (
-                    <Box color="text-status-inactive">—</Box>
-                  ),
-              },
-            ]}
-            empty={<Box textAlign="center">{t("user.plan.order.noOrders")}</Box>}
-          />
-        )}
-
         <Modal
           size="medium"
           closeAriaLabel={t("user.announcements.close")}
@@ -626,10 +562,10 @@ export default function PlanInfo() {
                 <Button
                   variant="primary"
                   loading={submitting}
-                  disabled={!providerName || (checkout?.order === null && pendingOrder !== null)}
+                  disabled={!providerName || applying || (checkout?.order === null && pendingOrder !== null)}
                   onClick={() => void handleConfirmCheckout()}
                 >
-                  {t("user.plan.checkoutModal.confirm")}
+                  {checkout ? t("user.plan.checkoutModal.confirmAmount", { amount: formatPriceCents(checkout.priceCents) }) : t("user.plan.checkoutModal.confirm")}
                 </Button>
               </SpaceBetween>
             </Box>
@@ -637,24 +573,33 @@ export default function PlanInfo() {
         >
           {checkout && (
             <SpaceBetween size="l">
-              <div className="plan-info__summary">
-                <SpaceBetween size="xxs">
-                  <Box variant="awsui-key-label">{t("user.plan.planName")}</Box>
-                  <Box>{checkout.planName}</Box>
-                </SpaceBetween>
-                <SpaceBetween size="xxs">
-                  <Box variant="awsui-key-label">{t("user.plan.duration")}</Box>
-                  <Box>{t("user.plan.daysLabel", { days: checkout.durationDays })}</Box>
-                </SpaceBetween>
-                <SpaceBetween size="xxs">
-                  <Box variant="awsui-key-label">{t("user.plan.order.col.price")}</Box>
-                  <SpaceBetween direction="horizontal" size="xxs" alignItems="center">
-                    {checkout.discountCents > 0 && (
-                      <Box color="text-status-inactive"><s>{formatPriceCents(checkout.priceCents + checkout.discountCents)}</s></Box>
-                    )}
-                    <Box fontWeight="bold">{formatPriceCents(checkout.priceCents)}</Box>
-                  </SpaceBetween>
-                </SpaceBetween>
+              <div className="plan-info__receipt" style={{ background: colorBackgroundCellShaded, borderRadius: borderRadiusItem }}>
+                <div className="plan-info__receipt-item">
+                  <div>
+                    <Box variant="awsui-key-label">{t("user.plan.checkoutModal.item")}</Box>
+                    <Box variant="h3" padding="n">{checkout.planName}</Box>
+                  </div>
+                  <Badge>{t("user.plan.daysLabel", { days: checkout.durationDays })}</Badge>
+                </div>
+                <div className="plan-info__receipt-lines" style={{ borderBlockStart: `1px solid ${colorBorderDividerDefault}` }}>
+                  <div className="plan-info__receipt-line">
+                    <Box color="text-body-secondary">{t("user.plan.checkoutModal.subtotal")}</Box>
+                    <Box>{formatPriceCents(checkout.priceCents + checkout.discountCents)}</Box>
+                  </div>
+                  <div className="plan-info__receipt-line">
+                    <Box color="text-body-secondary">
+                      {t("user.plan.checkoutModal.discount")}
+                      {appliedCode ? ` (${appliedCode})` : ""}
+                    </Box>
+                    <Box color={checkout.discountCents > 0 ? "text-status-success" : undefined}>
+                      {checkout.discountCents > 0 ? `-${formatPriceCents(checkout.discountCents)}` : formatPriceCents(0)}
+                    </Box>
+                  </div>
+                </div>
+                <div className="plan-info__receipt-total" style={{ borderBlockStart: `1px solid ${colorBorderDividerDefault}` }}>
+                  <Box variant="h3" padding="n">{t("user.plan.checkoutModal.total")}</Box>
+                  <Box fontSize="heading-xl" fontWeight="bold">{formatPriceCents(checkout.priceCents)}</Box>
+                </div>
               </div>
 
               <FormField label={t("user.plan.checkoutModal.provider")} stretch>
@@ -677,85 +622,32 @@ export default function PlanInfo() {
 
               <FormField
                 label={t("user.plan.promotion.label")}
-                constraintText={t("user.plan.checkoutModal.promoOptional")}
-                description={checkout.order ? t("user.plan.promotion.pendingHint") : undefined}
+                constraintText={appliedCode ? t("user.plan.checkoutModal.codeApplied", { code: appliedCode }) : t("user.plan.checkoutModal.promoOptional")}
                 stretch
               >
-                <Input
-                  value={promotionCode}
-                  disabled={submitting}
-                  placeholder={t("user.plan.promotion.placeholder")}
-                  onChange={({ detail }) => setPromotionCode(detail.value)}
-                />
+                <div className="plan-info__promo">
+                  <Input
+                    value={promotionCode}
+                    disabled={submitting || applying}
+                    placeholder={t("user.plan.promotion.placeholder")}
+                    onChange={({ detail }) => setPromotionCode(detail.value)}
+                    onKeyDown={({ detail }) => {
+                      if (detail.key === "Enter") void handleApplyCode();
+                    }}
+                  />
+                  <Button
+                    loading={applying}
+                    disabled={!promotionCode.trim() || submitting || (checkout.order === null && pendingOrder !== null)}
+                    onClick={() => void handleApplyCode()}
+                  >
+                    {t("user.plan.promotion.apply")}
+                  </Button>
+                </div>
               </FormField>
 
               {checkout.order === null && pendingOrder && <Alert type="warning">{t("user.plan.order.blockedByPending")}</Alert>}
               {checkoutError && <Alert type="error">{checkoutError}</Alert>}
             </SpaceBetween>
-          )}
-        </Modal>
-
-        <Modal
-          visible={receipt !== null}
-          onDismiss={() => setReceipt(null)}
-          closeAriaLabel={t("user.announcements.close")}
-          header={t("user.plan.order.receipt.title")}
-          footer={
-            <Box float="right">
-              <SpaceBetween direction="horizontal" size="xs">
-                <Button onClick={() => setReceipt(null)}>{t("user.plan.order.dismiss")}</Button>
-                {receipt?.receipt_url && (
-                  <Button
-                    variant="primary"
-                    href={receipt.receipt_url}
-                    target="_blank"
-                    iconName="external"
-                    iconAlign="right"
-                  >
-                    {t("user.plan.order.receipt.openStripe")}
-                  </Button>
-                )}
-              </SpaceBetween>
-            </Box>
-          }
-        >
-          {receipt && (
-            <ColumnLayout columns={2} variant="text-grid">
-              <SpaceBetween size="xxs">
-                <Box variant="awsui-key-label">{t("user.plan.order.receipt.orderId")}</Box>
-                <Box variant="code">{receipt.order_id}</Box>
-              </SpaceBetween>
-              <SpaceBetween size="xxs">
-                <Box variant="awsui-key-label">{t("user.plan.order.receipt.paidAt")}</Box>
-                <Box>{receipt.paid_at ? new Date(receipt.paid_at).toLocaleString(i18n.resolvedLanguage ?? i18n.language) : "-"}</Box>
-              </SpaceBetween>
-              <SpaceBetween size="xxs">
-                <Box variant="awsui-key-label">{t("user.plan.planName")}</Box>
-                <Box>{receipt.plan_name}</Box>
-              </SpaceBetween>
-              <SpaceBetween size="xxs">
-                <Box variant="awsui-key-label">{t("user.plan.duration")}</Box>
-                <Box>{receipt.duration_days} {t("user.plan.durationDays")}</Box>
-              </SpaceBetween>
-              {receipt.discount_cents > 0 && (
-                <SpaceBetween size="xxs">
-                  <Box variant="awsui-key-label">{t("user.plan.promotion.discountApplied")}</Box>
-                  <Box>-{formatPriceCents(receipt.discount_cents)}</Box>
-                </SpaceBetween>
-              )}
-              <SpaceBetween size="xxs">
-                <Box variant="awsui-key-label">{t("user.plan.order.receipt.total")}</Box>
-                <Box fontWeight="bold">{formatPriceCents(receipt.price_cents)}</Box>
-              </SpaceBetween>
-              <SpaceBetween size="xxs">
-                <Box variant="awsui-key-label">{t("user.plan.order.receipt.email")}</Box>
-                <Box>{receipt.email}</Box>
-              </SpaceBetween>
-              <SpaceBetween size="xxs">
-                <Box variant="awsui-key-label">{t("user.plan.order.receipt.method")}</Box>
-                <Box>{receipt.provider === "stripe" ? "Stripe" : t("user.plan.order.receipt.methodPanel")}</Box>
-              </SpaceBetween>
-            </ColumnLayout>
           )}
         </Modal>
 
@@ -780,7 +672,6 @@ export default function PlanInfo() {
           })}
         </Modal>
       </SpaceBetween>
-      </div>
     </ContentLayout>
   );
 }

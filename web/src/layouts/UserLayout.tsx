@@ -27,6 +27,7 @@ export default function UserLayout() {
       items: [
         { type: "link", text: t("user.nav.plan"), href: "/portal/plan" },
         { type: "link", text: t("user.nav.devices"), href: "/portal/devices" },
+        { type: "link", text: t("user.nav.orders"), href: "/portal/orders" },
       ],
     },
     {
@@ -86,7 +87,7 @@ export default function UserLayout() {
       <AppLayout
         headerSelector="#user-top-navigation"
         contentType="default"
-        maxContentWidth={1200}
+        maxContentWidth={1040}
         ariaLabels={{
           navigation: t("user.nav.navigation"),
           navigationToggle: t("user.nav.openNavigation"),

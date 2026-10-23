@@ -40,9 +40,6 @@
   margin-block-start: auto;
 }
 
-.plan-info__page {
-  max-width: 1100px;
-}
 
 .plan-info__durations {
   display: grid;
@@ -66,8 +63,39 @@
   opacity: 0.6;
 }
 
-.plan-info__summary {
+
+.plan-info__receipt {
+  padding: 16px 20px;
+}
+
+.plan-info__receipt-item {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  padding-block-end: 12px;
+}
+
+.plan-info__receipt-lines {
   display: grid;
-  gap: 16px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  padding-block: 12px;
+}
+
+.plan-info__receipt-line,
+.plan-info__receipt-total {
+  align-items: baseline;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.plan-info__receipt-total {
+  padding-block-start: 12px;
+}
+
+.plan-info__promo {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) auto;
 }

@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import PortalEmpty from "../../components/PortalEmpty";
 import { useTranslation } from "react-i18next";
 import {
   ContentLayout,
@@ -210,6 +212,7 @@ function SubscriptionDomainPicker({
 
 export default function Devices() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [flash, setFlash] = useState<FlashbarProps.MessageDefinition[]>([]);
   const [showQrModal, setShowQrModal] = useState(false);
@@ -231,7 +234,7 @@ export default function Devices() {
 
   if (loading) {
     return (
-      <ContentLayout header={<Header variant="h1">{t("user.devices.title")}</Header>}>
+      <ContentLayout header={<Header variant="h1" description={t("user.devices.description")}>{t("user.devices.title")}</Header>}>
         <Box textAlign="center" padding="xl"><Spinner size="large" /></Box>
       </ContentLayout>
     );
@@ -239,11 +242,15 @@ export default function Devices() {
 
   if (!profile?.plan_name) {
     return (
-      <ContentLayout header={<Header variant="h1">{t("user.devices.title")}</Header>}>
-        <Flashbar items={flash} />
-        <Box textAlign="center" padding="xl">
-          <StatusIndicator type="info">{t("user.devices.noPlan")}</StatusIndicator>
-        </Box>
+      <ContentLayout header={<Header variant="h1" description={t("user.devices.description")}>{t("user.devices.title")}</Header>}>
+        <SpaceBetween size="l">
+          <Flashbar items={flash} />
+          <PortalEmpty
+            title={t("user.devices.noPlanTitle")}
+            description={t("user.devices.noPlanHint")}
+            action={<Button variant="primary" onClick={() => navigate("/portal/plan")}>{t("user.plan.checkoutModal.viewPlans")}</Button>}
+          />
+        </SpaceBetween>
       </ContentLayout>
     );
   }
@@ -252,7 +259,7 @@ export default function Devices() {
   const accountUrl = subToken ? getAccountSubscriptionUrl(subToken, domain) : "";
 
   return (
-    <ContentLayout header={<Header variant="h1">{t("user.devices.title")}</Header>}>
+    <ContentLayout header={<Header variant="h1" description={t("user.devices.description")}>{t("user.devices.title")}</Header>}>
       <SpaceBetween size="l">
         <Flashbar items={flash} />
 

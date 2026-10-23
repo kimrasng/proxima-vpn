@@ -59,7 +59,6 @@ export default function Dashboard() {
         </SpaceBetween>
       }>{t("user.dashboard.title")}</Header>
     }>
-      <div style={{ maxWidth: 1040 }}>
       <SpaceBetween size="l">
         {summary.loading ? <Container><Spinner size="large" /></Container> : summary.error ? (
           <Alert type="error" action={<Button onClick={summary.refresh}>{t("user.dashboard.retry")}</Button>}>
@@ -165,7 +164,7 @@ export default function Dashboard() {
           </Container>
         )}
 
-        <Grid gridDefinition={[{ colspan: { default: 12, m: 7 } }, { colspan: { default: 12, m: 5 } }]}>
+        <Grid gridDefinition={[{ colspan: { default: 12, s: 7 } }, { colspan: { default: 12, s: 5 } }]}>
           <DeviceQuickConnect summary={data} refreshKey={connectionRefresh} />
           <SpaceBetween size="l">
             <Container header={<Header variant="h2" description={t("user.dashboard.serverScope")} actions={
@@ -174,7 +173,11 @@ export default function Dashboard() {
               <SpaceBetween size="s">
                 {nodes.error ? <Alert type="error" action={<Button onClick={nodes.refresh}>{t("user.dashboard.retry")}</Button>}>
                   {t("user.nodes.loadError")}
-                </Alert> : nodes.loading ? <Spinner /> : (
+                </Alert> : nodes.loading ? <Spinner /> : !hasPlan ? (
+                  <Box color="text-body-secondary">{t("user.dashboard.serverNeedsPlan")}</Box>
+                ) : (nodes.data?.length ?? 0) === 0 ? (
+                  <Box color="text-body-secondary">{t("user.nodes.empty")}</Box>
+                ) : (
                   <>
                     {(nodes.data?.length ?? 0) > 0 && <StatusIndicator type={onlineNodes === nodes.data?.length ? "success" : "warning"}>
                       {t("user.dashboard.serversOnline", { online: onlineNodes, total: nodes.data?.length })}
@@ -215,7 +218,6 @@ export default function Dashboard() {
           </SpaceBetween>
         </Grid>
       </SpaceBetween>
-      </div>
       <Modal visible={selectedAnnouncement !== null} closeAriaLabel={t("user.announcements.close")} onDismiss={() => setSelectedAnnouncement(null)}
         header={selectedAnnouncement?.title} footer={<Box float="right">
           <Button onClick={() => setSelectedAnnouncement(null)}>{t("user.announcements.close")}</Button>

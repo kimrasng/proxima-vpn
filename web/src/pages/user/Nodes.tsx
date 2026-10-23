@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import PortalEmpty from "../../components/PortalEmpty";
 import { useTranslation } from "react-i18next";
 import {
   ContentLayout,
@@ -61,8 +62,12 @@ export default function Nodes() {
     >
       <SpaceBetween size="l">
         {flash.length > 0 && <Flashbar items={flash} />}
+        {nodes.length === 0 ? (
+          <PortalEmpty title={t("user.nodes.emptyTitle")} description={t("user.nodes.empty")} />
+        ) : (
         <Table
           items={nodes}
+          header={<Header variant="h2" counter={`(${nodes.filter((n) => n.status === "online").length}/${nodes.length})`}>{t("user.nodes.listTitle")}</Header>}
           loadingText={t("user.nodes.title")}
           columnDefinitions={[
             {
@@ -92,6 +97,7 @@ export default function Nodes() {
             </Box>
           }
         />
+        )}
       </SpaceBetween>
     </ContentLayout>
   );

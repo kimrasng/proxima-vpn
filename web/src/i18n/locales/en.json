@@ -1697,7 +1697,8 @@
       "openNavigation": "Open navigation",
       "closeNavigation": "Close navigation",
       "groupService": "Plan & subscription",
-      "groupUsage": "Usage"
+      "groupUsage": "Usage",
+      "orders": "Orders"
     },
     "dashboard": {
       "title": "Overview",
@@ -1768,7 +1769,8 @@
       "guideNote": "The subscription URL created after payment is added to your VPN app. See the connection guide for details.",
       "guideLink": "View connection guide",
       "supportedApps": "View supported apps",
-      "noAnnouncements": "No announcements have been posted."
+      "noAnnouncements": "No announcements have been posted.",
+      "serverNeedsPlan": "Purchase a plan to see the servers available to you."
     },
     "devices": {
       "accountUrl": "Account subscription URL",
@@ -1795,7 +1797,10 @@
       "testDomains": "Test reachability",
       "testingDomains": "Testing domains from this browser…",
       "domainReachable": "Reachable from this browser",
-      "domainUnreachable": "Not reachable from this browser"
+      "domainUnreachable": "Not reachable from this browser",
+      "description": "Get the subscription URL to add to your VPN app.",
+      "noPlanTitle": "No subscription URL yet",
+      "noPlanHint": "Purchase a plan to get a subscription URL for your VPN app."
     },
     "traffic": {
       "title": "Traffic Overview",
@@ -1805,7 +1810,9 @@
       "days": "days",
       "expiresAt": "Expires",
       "noPlan": "No active plan",
-      "loadError": "Failed to load traffic data"
+      "loadError": "Failed to load traffic data",
+      "description": "Data used in this billing period and the time left.",
+      "noPlanHint": "Purchase a plan to see your data usage."
     },
     "plan": {
       "title": "Plan Information",
@@ -1925,7 +1932,14 @@
         "promoOptional": "Optional.",
         "confirm": "Continue to payment",
         "noProviders": "No payment method is available. Please contact support.",
-        "paid": "Payment complete. Your plan is active."
+        "paid": "Payment complete. Your plan is active.",
+        "item": "Item",
+        "subtotal": "Subtotal",
+        "discount": "Discount",
+        "total": "Total due",
+        "codeApplied": "Code {{code}} applied.",
+        "confirmAmount": "Pay {{amount}}",
+        "viewPlans": "View plans"
       }
     },
     "account": {
@@ -1951,7 +1965,8 @@
       "newPasswordRequired": "Enter a new password",
       "tokenRegenerated": "Token regenerated successfully",
       "tokenError": "Failed to regenerate token",
-      "loadError": "Failed to load account information"
+      "loadError": "Failed to load account information",
+      "description": "Manage your profile, sign-in methods and subscription token."
     },
     "announcements": {
       "title": "Announcements",
@@ -1959,10 +1974,12 @@
       "loadError": "Failed to load announcements",
       "close": "Close",
       "dontShowAgain": "Don't show again",
-      "moreAnnouncements": "{{count}} more announcement(s)"
+      "moreAnnouncements": "{{count}} more announcement(s)",
+      "description": "Maintenance notices and service updates.",
+      "emptyHint": "We'll post updates here when there's news."
     },
     "nodes": {
-      "title": "Available Nodes",
+      "title": "Server status",
       "description": "Server locations your plan can connect to.",
       "name": "Name",
       "location": "Location",
@@ -1970,7 +1987,9 @@
       "online": "Online",
       "offline": "Offline",
       "empty": "No nodes are available on your plan yet.",
-      "loadError": "Failed to load nodes"
+      "loadError": "Failed to load nodes",
+      "emptyTitle": "No servers available",
+      "listTitle": "Servers"
     },
     "passkey": {
       "title": "Passkeys",
@@ -1996,6 +2015,12 @@
       "addError": "Could not add the passkey.",
       "removeError": "Could not remove the passkey.",
       "loadError": "Could not load passkeys."
+    },
+    "orders": {
+      "title": "Orders",
+      "description": "Review pending orders and past payments.",
+      "loadError": "Couldn't load your orders.",
+      "emptyHint": "Orders appear here after you purchase a plan."
     }
   },
   "notFound": {

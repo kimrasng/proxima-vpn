@@ -1697,7 +1697,8 @@
       "openNavigation": "메뉴 열기",
       "closeNavigation": "메뉴 닫기",
       "groupService": "플랜 · 구독",
-      "groupUsage": "이용 현황"
+      "groupUsage": "이용 현황",
+      "orders": "주문 내역"
     },
     "dashboard": {
       "title": "대시보드",
@@ -1768,7 +1769,8 @@
       "guideNote": "결제 후 생성되는 구독 URL은 VPN 앱에 등록해 사용합니다. 자세한 방법은 연결 가이드를 참고하세요.",
       "guideLink": "연결 가이드 보기",
       "supportedApps": "지원하는 앱 보기",
-      "noAnnouncements": "등록된 공지사항이 없습니다."
+      "noAnnouncements": "등록된 공지사항이 없습니다.",
+      "serverNeedsPlan": "플랜을 구매하면 이용 가능한 서버를 확인할 수 있습니다."
     },
     "devices": {
       "accountUrl": "계정 구독 URL",
@@ -1795,7 +1797,10 @@
       "testDomains": "접근성 테스트",
       "testingDomains": "이 브라우저에서 도메인을 테스트하는 중…",
       "domainReachable": "이 브라우저에서 접근 가능",
-      "domainUnreachable": "이 브라우저에서 접근 불가"
+      "domainUnreachable": "이 브라우저에서 접근 불가",
+      "description": "VPN 앱에 등록할 구독 URL을 확인합니다.",
+      "noPlanTitle": "구독 URL이 아직 없어요",
+      "noPlanHint": "플랜을 구매하면 VPN 앱에 등록할 구독 URL이 발급됩니다."
     },
     "traffic": {
       "title": "트래픽 현황",
@@ -1805,7 +1810,9 @@
       "days": "일",
       "expiresAt": "만료일",
       "noPlan": "활성 플랜이 없습니다",
-      "loadError": "트래픽 정보를 불러오는데 실패했습니다"
+      "loadError": "트래픽 정보를 불러오는데 실패했습니다",
+      "description": "이번 결제 기간의 데이터 사용량과 남은 기간입니다.",
+      "noPlanHint": "플랜을 구매하면 데이터 사용량을 확인할 수 있습니다."
     },
     "plan": {
       "title": "플랜 정보",
@@ -1925,7 +1932,14 @@
         "promoOptional": "선택 사항입니다.",
         "confirm": "결제 진행",
         "noProviders": "사용할 수 있는 결제 수단이 없습니다. 관리자에게 문의해 주세요.",
-        "paid": "결제가 완료되어 플랜이 적용되었습니다."
+        "paid": "결제가 완료되어 플랜이 적용되었습니다.",
+        "item": "구매 항목",
+        "subtotal": "상품 금액",
+        "discount": "할인",
+        "total": "최종 결제 금액",
+        "codeApplied": "{{code}} 코드가 적용되었습니다.",
+        "confirmAmount": "{{amount}} 결제하기",
+        "viewPlans": "요금제 보기"
       }
     },
     "account": {
@@ -1951,7 +1965,8 @@
       "newPasswordRequired": "새 비밀번호를 입력하세요",
       "tokenRegenerated": "토큰이 재생성되었습니다",
       "tokenError": "토큰 재생성에 실패했습니다",
-      "loadError": "계정 정보를 불러오는데 실패했습니다"
+      "loadError": "계정 정보를 불러오는데 실패했습니다",
+      "description": "프로필, 로그인 수단, 구독 토큰을 관리합니다."
     },
     "announcements": {
       "title": "공지사항",
@@ -1959,10 +1974,12 @@
       "loadError": "공지사항을 불러오는데 실패했습니다",
       "close": "닫기",
       "dontShowAgain": "다시 보지 않기",
-      "moreAnnouncements": "{{count}}개의 공지사항이 더 있습니다"
+      "moreAnnouncements": "{{count}}개의 공지사항이 더 있습니다",
+      "description": "서비스 점검과 변경 사항을 안내합니다.",
+      "emptyHint": "새 소식이 생기면 여기에서 알려 드릴게요."
     },
     "nodes": {
-      "title": "사용 가능한 노드",
+      "title": "서버 상태",
       "description": "현재 요금제로 접속할 수 있는 서버 위치입니다.",
       "name": "이름",
       "location": "위치",
@@ -1970,7 +1987,9 @@
       "online": "온라인",
       "offline": "오프라인",
       "empty": "현재 요금제에 사용 가능한 노드가 없습니다.",
-      "loadError": "노드를 불러오지 못했습니다"
+      "loadError": "노드를 불러오지 못했습니다",
+      "emptyTitle": "이용할 수 있는 서버가 없어요",
+      "listTitle": "서버 목록"
     },
     "passkey": {
       "title": "패스키",
@@ -1996,6 +2015,12 @@
       "addError": "패스키를 추가하지 못했어요.",
       "removeError": "패스키를 삭제하지 못했어요.",
       "loadError": "패스키 목록을 불러오지 못했어요."
+    },
+    "orders": {
+      "title": "주문 내역",
+      "description": "결제 대기 중인 주문과 지난 결제를 확인합니다.",
+      "loadError": "주문 내역을 불러오지 못했습니다.",
+      "emptyHint": "플랜을 구매하면 주문 내역이 여기에 표시됩니다."
     }
   },
   "notFound": {

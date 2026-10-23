@@ -42,12 +42,12 @@ export default function DeviceQuickConnect({
             <Button onClick={() => navigate("/portal/plan")}>{t("user.dashboard.browsePlans")}</Button>
           }>{t(summary?.status === "suspended" ? "user.dashboard.suspendedHint" : "user.dashboard.connectNeedsPlan")}</Alert>
         )}
-        {profile.loading || domains.loading ? <Spinner /> : profile.error ? (
+        {summary !== null && !usable ? null : profile.loading || domains.loading ? <Spinner /> : profile.error ? (
           <Alert type="error" action={<Button onClick={profile.refresh}>{t("user.dashboard.retry")}</Button>}>
             {t("user.devices.loadError")}
           </Alert>
         ) : !url ? (
-          summary !== null && !usable ? null : <Alert type="warning" action={<Button onClick={profile.refresh}>{t("user.dashboard.retry")}</Button>}>
+          <Alert type="warning" action={<Button onClick={profile.refresh}>{t("user.dashboard.retry")}</Button>}>
             {t("user.dashboard.urlUnavailable")}
           </Alert>
         ) : (
