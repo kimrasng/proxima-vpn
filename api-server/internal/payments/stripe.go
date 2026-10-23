@@ -73,7 +73,7 @@ func (p *StripeProvider) Name() string {
 // PaymentIntent, so the webhook (keyed on session/PaymentIntent) and any
 // later refund/dispute event can both resolve back to the order.
 func (p *StripeProvider) StartCheckout(ctx context.Context, req CheckoutRequest) (*CheckoutHandoff, error) {
-	successURL := p.panelURL + "/portal/plan?checkout=success&session_id={CHECKOUT_SESSION_ID}"
+	successURL := p.panelURL + "/portal/plan?checkout=success&order_id=" + req.OrderID + "&session_id={CHECKOUT_SESSION_ID}"
 	cancelURL := p.panelURL + "/portal/plan?checkout=cancelled"
 
 	params := &stripe.CheckoutSessionCreateParams{
@@ -134,6 +134,31 @@ func (p *StripeProvider) VerifyWebhook(rawBody []byte, header func(string) strin
 	if err := json.Unmarshal(event.Data.Raw, &session); err != nil {
 		return nil, fmt.Errorf("unmarshal checkout session: %w", err)
 	}
+	return confirmationFromSession(&session, event.ID, rawBody)
+}
+
+// ConfirmSession reads a Checkout Session back from Stripe and settles it the
+// same way the webhook would. The Stripe API, not the browser, is the source
+// of truth: the caller only supplies an id, and everything the order is
+// granted on (paid status, amount, order_id metadata) comes from Stripe.
+// The session id doubles as the idempotency key, so a webhook arriving later
+// for the same payment still finds the order already claimed and is ignored.
+func (p *StripeProvider) ConfirmSession(ctx context.Context, sessionID string) (*Confirmation, error) {
+	session, err := p.client.V1CheckoutSessions.Retrieve(ctx, sessionID, &stripe.CheckoutSessionRetrieveParams{})
+	if err != nil {
+		return nil, fmt.Errorf("retrieve checkout session: %w", err)
+	}
+	payload, err := json.Marshal(session)
+	if err != nil {
+		return nil, fmt.Errorf("marshal checkout session: %w", err)
+	}
+	return confirmationFromSession(session, "session:"+session.ID, payload)
+}
+
+// confirmationFromSession applies the checks shared by the webhook and the
+// return-from-checkout path. (nil, nil) means the session is authentic but
+// not paid yet (an async method still settling).
+func confirmationFromSession(session *stripe.CheckoutSession, externalID string, payload []byte) (*Confirmation, error) {
 	paid := session.PaymentStatus == stripe.CheckoutSessionPaymentStatusPaid
 	// A free plan completes with nothing to collect; only a zero total counts.
 	freeSession := session.PaymentStatus == stripe.CheckoutSessionPaymentStatusNoPaymentRequired && session.AmountTotal == 0
@@ -141,10 +166,14 @@ func (p *StripeProvider) VerifyWebhook(rawBody []byte, header func(string) strin
 		return nil, nil
 	}
 	customerEmail := strings.TrimSpace(session.CustomerEmail)
-	if customerEmail == "" {
-		customerEmail = strings.TrimSpace(session.CustomerDetails.Email)
+	detailsEmail := ""
+	if session.CustomerDetails != nil {
+		detailsEmail = session.CustomerDetails.Email
 	}
-	if customerEmail == "" || session.CustomerDetails.Email != "" && !strings.EqualFold(session.CustomerDetails.Email, customerEmail) {
+	if customerEmail == "" {
+		customerEmail = strings.TrimSpace(detailsEmail)
+	}
+	if customerEmail == "" || detailsEmail != "" && !strings.EqualFold(detailsEmail, customerEmail) {
 		return nil, fmt.Errorf("checkout session %s customer email is missing or inconsistent", session.ID)
 	}
 
@@ -155,12 +184,12 @@ func (p *StripeProvider) VerifyWebhook(rawBody []byte, header func(string) strin
 
 	return &Confirmation{
 		Provider:    ProviderStripe,
-		ExternalID:  event.ID,
+		ExternalID:  externalID,
 		OrderID:     orderID,
 		AmountCents: session.AmountTotal,
 		Currency:    string(session.Currency),
 		SessionID:   session.ID,
-		Payload:     rawBody,
+		Payload:     payload,
 		ActorType:   "provider",
 		ActorID:     ProviderStripe,
 		ActorLabel:  customerEmail,

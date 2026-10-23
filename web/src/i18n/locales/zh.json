@@ -1951,7 +1951,9 @@
         "stripeOpened": "已在新标签页打开 Stripe 支付页面。付款完成后套餐将自动生效。",
         "openStripe": "打开 Stripe 支付页面",
         "popupBlockedTitle": "新标签页被拦截",
-        "popupBlocked": "浏览器拦截了支付标签页。请点击下方按钮打开 Stripe 支付页面。"
+        "popupBlocked": "浏览器拦截了支付标签页。请点击下方按钮打开 Stripe 支付页面。",
+        "confirming": "正在确认付款结果…",
+        "confirmFailed": "暂时无法确认付款结果，请稍后在订单记录中再次查看。"
       }
     },
     "account": {

@@ -300,6 +300,7 @@ func (s *Server) registerRoutes() {
 
 	userCheckoutHandler := handlers.NewUserCheckoutHandler(s.db, s.payments)
 	user.Post("/orders/:id/checkout", userCheckoutHandler.Start)
+	user.Post("/orders/:id/checkout/confirm", userCheckoutHandler.Confirm)
 	user.Get("/payment-providers", userCheckoutHandler.ListProviders)
 	user.Get("/orders/:id/receipt", userCheckoutHandler.Receipt)
 

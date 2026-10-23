@@ -125,3 +125,13 @@ func (r Registry) Names() []string {
 type ReceiptProvider interface {
 	ReceiptURL(ctx context.Context, sessionID string) (string, error)
 }
+
+// SessionConfirmer is implemented by hosted providers whose checkout outcome
+// can be read back from the provider's own API. It lets the browser's return
+// from checkout settle the order without waiting on a webhook that may never
+// reach this deployment (a local or firewalled panel). The result is the same
+// Confirmation the webhook would produce, and (nil, nil) means the session
+// is not paid yet.
+type SessionConfirmer interface {
+	ConfirmSession(ctx context.Context, sessionID string) (*Confirmation, error)
+}

@@ -1951,7 +1951,9 @@
         "stripeOpened": "Stripe checkout opened in a new tab. Your plan is applied automatically once payment completes.",
         "openStripe": "Open Stripe checkout",
         "popupBlockedTitle": "New tab was blocked",
-        "popupBlocked": "Your browser blocked the checkout tab. Use the button below to open Stripe checkout."
+        "popupBlocked": "Your browser blocked the checkout tab. Use the button below to open Stripe checkout.",
+        "confirming": "Checking your payment…",
+        "confirmFailed": "Couldn't verify the payment yet. Check Orders again in a moment."
       }
     },
     "account": {

@@ -1951,7 +1951,9 @@
         "stripeOpened": "새 탭에서 Stripe 결제 페이지를 열었습니다. 결제가 끝나면 플랜이 자동으로 적용됩니다.",
         "openStripe": "Stripe 결제 페이지 열기",
         "popupBlockedTitle": "새 탭이 차단되었어요",
-        "popupBlocked": "브라우저가 결제 페이지 새 탭을 막았습니다. 아래 버튼을 눌러 Stripe 결제 페이지를 열어 주세요."
+        "popupBlocked": "브라우저가 결제 페이지 새 탭을 막았습니다. 아래 버튼을 눌러 Stripe 결제 페이지를 열어 주세요.",
+        "confirming": "결제 결과를 확인하고 있습니다…",
+        "confirmFailed": "결제 결과를 확인하지 못했습니다. 잠시 후 주문 내역에서 다시 확인해 주세요."
       }
     },
     "account": {

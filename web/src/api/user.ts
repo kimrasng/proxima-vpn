@@ -10,6 +10,7 @@ import type {
   CreateOrderRequest,
   CreateOrderResult,
   OrderResponse,
+  OrderStatus,
   StartCheckoutResponse,
   OrderReceipt,
   PaymentProviderItem,
@@ -94,6 +95,11 @@ export function startCheckout(orderId: string, provider: string): Promise<StartC
 export function getOrderReceipt(orderId: string): Promise<OrderReceipt> {
   applyUserClient();
   return get<OrderReceipt>(`/api/v1/user/orders/${orderId}/receipt`);
+}
+
+export function confirmCheckout(orderId: string, sessionId: string): Promise<{ status: OrderStatus }> {
+  applyUserClient();
+  return post<{ status: OrderStatus }>(`/api/v1/user/orders/${orderId}/checkout/confirm`, { session_id: sessionId });
 }
 
 export function listPaymentProviders(): Promise<PaymentProviderItem[]> {

@@ -136,26 +136,56 @@ export default function PlanInfo() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [i18n.language]);
 
-  // Stripe sends the browser back here, but the plan is granted by the webhook, so
-  // "success" only means the payment went through — the order may still read pending.
+  // Stripe sends the browser back here. The webhook may never reach this
+  // server (a local or firewalled panel), so the return itself asks the API to
+  // read the session back from Stripe and settle the order if it is paid.
   useEffect(() => {
-    const checkout = new URLSearchParams(window.location.search).get("checkout");
-    if (checkout !== "success" && checkout !== "cancelled") return;
-
-    setFlash([
-      {
-        type: "info",
-        content:
-          checkout === "success"
-            ? t("user.plan.order.checkout.successPending")
-            : t("user.plan.order.checkout.cancelled"),
-        dismissible: true,
-        onDismiss: () => setFlash([]),
-      },
-    ]);
+    const params = new URLSearchParams(window.location.search);
+    const checkoutResult = params.get("checkout");
+    if (checkoutResult !== "success" && checkoutResult !== "cancelled") return;
+    const orderId = params.get("order_id");
+    const sessionId = params.get("session_id");
     window.history.replaceState({}, "", window.location.pathname);
+    const show = (type: FlashbarProps.Type, content: string) =>
+      setFlash([{ type, content, dismissible: true, onDismiss: () => setFlash([]) }]);
+
+    if (checkoutResult === "cancelled") {
+      show("info", t("user.plan.order.checkout.cancelled"));
+      return;
+    }
+    if (!orderId || !sessionId) {
+      show("info", t("user.plan.order.checkout.successPending"));
+      return;
+    }
+    show("in-progress", t("user.plan.checkoutModal.confirming"));
+    void (async () => {
+      try {
+        const result = await userApi.confirmCheckout(orderId, sessionId);
+        show(
+          result.status === "paid" ? "success" : "info",
+          result.status === "paid" ? t("user.plan.checkoutModal.paid") : t("user.plan.order.checkout.successPending"),
+        );
+      } catch {
+        show("warning", t("user.plan.checkoutModal.confirmFailed"));
+      } finally {
+        await loadData();
+      }
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Stripe runs in another tab, so this tab learns about the payment only when
+  // the user comes back to it.
+  useEffect(() => {
+    const onFocus = () => {
+      if (document.visibilityState === "visible" && orders.some((order) => order.status === "pending")) {
+        void loadData();
+      }
+    };
+    document.addEventListener("visibilitychange", onFocus);
+    return () => document.removeEventListener("visibilitychange", onFocus);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orders]);
 
   const openCheckout = (target: CheckoutTarget) => {
     setCheckout(target);

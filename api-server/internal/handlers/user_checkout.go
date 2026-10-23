@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/proximavpn/proxima-vpn/api-server/internal/payments"
+	"github.com/proximavpn/proxima-vpn/api-server/internal/services"
 )
 
 // UserCheckoutHandler lets a user start a checkout for one of their own
@@ -22,11 +23,100 @@ import (
 type UserCheckoutHandler struct {
 	db       *pgxpool.Pool
 	registry payments.Registry
+	payments *services.PaymentService
 }
 
 // NewUserCheckoutHandler creates a new UserCheckoutHandler.
 func NewUserCheckoutHandler(db *pgxpool.Pool, registry payments.Registry) *UserCheckoutHandler {
-	return &UserCheckoutHandler{db: db, registry: registry}
+	return &UserCheckoutHandler{db: db, registry: registry, payments: services.NewPaymentService(db)}
+}
+
+type confirmCheckoutRequest struct {
+	SessionID string `json:"session_id"`
+}
+
+type confirmCheckoutResponse struct {
+	Status string `json:"status"`
+}
+
+// Confirm handles POST /api/v1/user/orders/:id/checkout/confirm. The browser
+// calls it when it returns from hosted checkout, so a payment is applied even
+// when the provider's webhook cannot reach this server. Nothing the browser
+// sends is trusted beyond the session id: the provider is asked for the
+// session, its order_id metadata must name this caller's own order, and the
+// grant goes through the same idempotent Settle the webhook uses.
+// @Summary Confirm a returning hosted checkout
+// @Description Reads the checkout session back from the provider and settles the order if it is paid
+// @Tags user-orders
+// @Accept json
+// @Produce json
+// @Param id path string true "Order ID"
+// @Param body body confirmCheckoutRequest true "Checkout session to confirm"
+// @Success 200 {object} confirmCheckoutResponse
+// @Failure 400 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Failure 502 {object} map[string]string
+// @Security BearerAuth
+// @Router /user/orders/{id}/checkout/confirm [post]
+func (h *UserCheckoutHandler) Confirm(c *fiber.Ctx) error {
+	userID := c.Locals("user_id").(string)
+	orderID := c.Params("id")
+
+	var req confirmCheckoutRequest
+	if err := c.BodyParser(&req); err != nil || req.SessionID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "session_id is required"})
+	}
+
+	ctx := context.Background()
+	var providerName, status string
+	err := h.db.QueryRow(ctx,
+		`SELECT COALESCE(provider, ''), status FROM plan_orders WHERE id = $1 AND user_id = $2`,
+		orderID, userID,
+	).Scan(&providerName, &status)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "order not found"})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "internal server error"})
+	}
+	if status == "paid" {
+		return c.JSON(confirmCheckoutResponse{Status: status})
+	}
+
+	provider, ok := h.registry.Get(providerName)
+	if !ok {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "order has no hosted checkout"})
+	}
+	confirmer, ok := provider.(payments.SessionConfirmer)
+	if !ok {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "provider cannot confirm sessions"})
+	}
+
+	conf, err := confirmer.ConfirmSession(ctx, req.SessionID)
+	if err != nil {
+		log.Printf("[payments] %s session confirm failed for order %s: %v", provider.Name(), orderID, err)
+		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{"error": "could not verify the checkout session"})
+	}
+	if conf == nil {
+		return c.JSON(confirmCheckoutResponse{Status: status})
+	}
+	if conf.OrderID != orderID {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "session does not belong to this order"})
+	}
+
+	conf.RequestIP = c.IP()
+	conf.UserAgent = c.Get("User-Agent")
+	requestID, _ := c.Locals("requestid").(string)
+	conf.RequestID = requestID
+
+	if _, err := h.payments.Settle(ctx, *conf); err != nil {
+		log.Printf("[payments] %s session settle failed for order %s: %v", provider.Name(), orderID, err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "internal server error"})
+	}
+	if err := h.db.QueryRow(ctx, `SELECT status FROM plan_orders WHERE id = $1`, orderID).Scan(&status); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "internal server error"})
+	}
+	return c.JSON(confirmCheckoutResponse{Status: status})
 }
 
 type startCheckoutRequest struct {
