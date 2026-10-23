@@ -121,7 +121,9 @@ export default function PlanInfo() {
       setProfile(profileData);
       setPlans(planList);
       setOrders(orderList);
-      setProviders(providerList);
+      // Manual bank transfer is hidden from customers for now; only hosted
+      // checkout (Stripe) is offered. Admins still settle orders manually.
+      setProviders(providerList.filter((provider) => provider.mode === "redirect"));
     } catch {
       setFlash([{ type: "error", content: t("user.plan.loadError"), dismissible: true, onDismiss: () => setFlash([]) }]);
     } finally {
@@ -707,6 +709,11 @@ export default function PlanInfo() {
               <FormField label={t("user.plan.checkoutModal.provider")} stretch>
                 {providers.length === 0 ? (
                   <Alert type="warning">{t("user.plan.checkoutModal.noProviders")}</Alert>
+                ) : providers.length === 1 && providers[0] ? (
+                  <Box>
+                    <Box fontWeight="bold">{providerLabel(providers[0].name)}</Box>
+                    <Box variant="small" color="text-body-secondary">{providerHint(providers[0].name)}</Box>
+                  </Box>
                 ) : (
                   <Tiles
                     columns={Math.min(2, providers.length)}
