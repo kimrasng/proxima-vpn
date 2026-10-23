@@ -1929,7 +1929,6 @@
         "providerStripeHint": "Stripe 결제 페이지로 이동해 바로 결제합니다.",
         "providerAdmin": "계좌이체 · 수동 확인",
         "providerAdminHint": "주문을 접수하고, 입금이 확인되면 플랜이 적용됩니다.",
-        "promoOptional": "선택 사항입니다.",
         "confirm": "결제 진행",
         "noProviders": "사용할 수 있는 결제 수단이 없습니다. 관리자에게 문의해 주세요.",
         "paid": "결제가 완료되어 플랜이 적용되었습니다.",
@@ -1939,7 +1938,9 @@
         "total": "최종 결제 금액",
         "codeApplied": "{{code}} 코드가 적용되었습니다.",
         "confirmAmount": "{{amount}} 결제하기",
-        "viewPlans": "요금제 보기"
+        "viewPlans": "요금제 보기",
+        "promoPlaceholder": "프로모션 코드 (선택)",
+        "replaceCode": "다른 코드로 변경"
       }
     },
     "account": {

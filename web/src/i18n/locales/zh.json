@@ -1929,7 +1929,6 @@
         "providerStripeHint": "前往 Stripe 结账页面立即付款。",
         "providerAdmin": "银行转账 · 人工确认",
         "providerAdminHint": "订单提交后，确认收款即开通套餐。",
-        "promoOptional": "可选。",
         "confirm": "继续付款",
         "noProviders": "暂无可用的支付方式，请联系客服。",
         "paid": "付款完成，套餐已生效。",
@@ -1939,7 +1938,9 @@
         "total": "应付总额",
         "codeApplied": "已应用代码 {{code}}。",
         "confirmAmount": "支付 {{amount}}",
-        "viewPlans": "查看套餐"
+        "viewPlans": "查看套餐",
+        "promoPlaceholder": "优惠码（可选）",
+        "replaceCode": "更换优惠码"
       }
     },
     "account": {

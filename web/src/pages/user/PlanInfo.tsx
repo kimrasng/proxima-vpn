@@ -586,15 +586,43 @@ export default function PlanInfo() {
                     <Box color="text-body-secondary">{t("user.plan.checkoutModal.subtotal")}</Box>
                     <Box>{formatPriceCents(checkout.priceCents + checkout.discountCents)}</Box>
                   </div>
+                  {checkout.discountCents > 0 && (
                   <div className="plan-info__receipt-line">
                     <Box color="text-body-secondary">
                       {t("user.plan.checkoutModal.discount")}
                       {appliedCode ? ` (${appliedCode})` : ""}
                     </Box>
                     <Box color={checkout.discountCents > 0 ? "text-status-success" : undefined}>
-                      {checkout.discountCents > 0 ? `-${formatPriceCents(checkout.discountCents)}` : formatPriceCents(0)}
+                      -{formatPriceCents(checkout.discountCents)}
                     </Box>
                   </div>
+                  )}
+                <div className="plan-info__receipt-promo">
+                  <div className="plan-info__promo">
+                    <Input
+                      value={promotionCode}
+                      disabled={submitting || applying}
+                      placeholder={appliedCode ? t("user.plan.checkoutModal.replaceCode") : t("user.plan.checkoutModal.promoPlaceholder")}
+                      ariaLabel={t("user.plan.promotion.label")}
+                      onChange={({ detail }) => setPromotionCode(detail.value)}
+                      onKeyDown={({ detail }) => {
+                        if (detail.key === "Enter") void handleApplyCode();
+                      }}
+                    />
+                    <Button
+                      loading={applying}
+                      disabled={!promotionCode.trim() || submitting || (checkout.order === null && pendingOrder !== null)}
+                      onClick={() => void handleApplyCode()}
+                    >
+                      {t("user.plan.promotion.apply")}
+                    </Button>
+                  </div>
+                  {appliedCode && (
+                    <Box variant="small" color="text-status-success" margin={{ top: "xxs" }}>
+                      {t("user.plan.checkoutModal.codeApplied", { code: appliedCode })}
+                    </Box>
+                  )}
+                </div>
                 </div>
                 <div className="plan-info__receipt-total" style={{ borderBlockStart: `1px solid ${colorBorderDividerDefault}` }}>
                   <Box variant="h3" padding="n">{t("user.plan.checkoutModal.total")}</Box>
@@ -618,31 +646,6 @@ export default function PlanInfo() {
                     }))}
                   />
                 )}
-              </FormField>
-
-              <FormField
-                label={t("user.plan.promotion.label")}
-                constraintText={appliedCode ? t("user.plan.checkoutModal.codeApplied", { code: appliedCode }) : t("user.plan.checkoutModal.promoOptional")}
-                stretch
-              >
-                <div className="plan-info__promo">
-                  <Input
-                    value={promotionCode}
-                    disabled={submitting || applying}
-                    placeholder={t("user.plan.promotion.placeholder")}
-                    onChange={({ detail }) => setPromotionCode(detail.value)}
-                    onKeyDown={({ detail }) => {
-                      if (detail.key === "Enter") void handleApplyCode();
-                    }}
-                  />
-                  <Button
-                    loading={applying}
-                    disabled={!promotionCode.trim() || submitting || (checkout.order === null && pendingOrder !== null)}
-                    onClick={() => void handleApplyCode()}
-                  >
-                    {t("user.plan.promotion.apply")}
-                  </Button>
-                </div>
               </FormField>
 
               {checkout.order === null && pendingOrder && <Alert type="warning">{t("user.plan.order.blockedByPending")}</Alert>}

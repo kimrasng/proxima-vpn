@@ -1929,7 +1929,6 @@
         "providerStripeHint": "Pay now on the Stripe checkout page.",
         "providerAdmin": "Bank transfer · manual",
         "providerAdminHint": "Your order is placed and the plan starts once payment is confirmed.",
-        "promoOptional": "Optional.",
         "confirm": "Continue to payment",
         "noProviders": "No payment method is available. Please contact support.",
         "paid": "Payment complete. Your plan is active.",
@@ -1939,7 +1938,9 @@
         "total": "Total due",
         "codeApplied": "Code {{code}} applied.",
         "confirmAmount": "Pay {{amount}}",
-        "viewPlans": "View plans"
+        "viewPlans": "View plans",
+        "promoPlaceholder": "Promotion code (optional)",
+        "replaceCode": "Use a different code"
       }
     },
     "account": {
