@@ -73,9 +73,10 @@ type GrantResult struct {
 //     expired/fresh case are the same formula once expired collapses the
 //     GREATEST to NOW().
 //
-// A renewal that reactivates a user still over their (unreset) traffic cap
-// would immediately be re-suspended by ExpiryCheckScheduler; status is set to
-// 'suspended' rather than 'active' in that case to skip the flap.
+// Every grant leaves the account active. A renewal keeps traffic_used, so a
+// user already over the cap stays over it, but the cap is enforced where VPN
+// access is handed out rather than by suspending the account, which would
+// also lock the user out of the portal.
 func (s *PlanService) GrantPlan(ctx context.Context, userID, planID string) (*GrantResult, error) {
 	return s.grantPlan(ctx, userID, planID, nil)
 }
@@ -134,10 +135,7 @@ func (s *PlanService) grantPlan(ctx context.Context, userID, planID string, dura
 		                        + make_interval(days => COALESCE($4::int, p.duration_days)),
 		     traffic_used     = CASE WHEN $3::bool THEN u.traffic_used ELSE 0 END,
 		     traffic_reset_at = CASE WHEN $3::bool THEN u.traffic_reset_at ELSE NOW() END,
-		     status           = CASE WHEN $3::bool
-		                              AND COALESCE(p.traffic_limit, 0) > 0
-		                              AND u.traffic_used >= p.traffic_limit
-		                         THEN 'suspended' ELSE 'active' END,
+		     status           = 'active',
 		     is_active        = true,
 		     updated_at       = NOW()
 		 FROM plans p

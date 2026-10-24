@@ -179,7 +179,7 @@ func TestGrantPlan_ExpiredRepurchaseStartsFreshTermNoCarry(t *testing.T) {
 	}
 }
 
-func TestGrantPlan_RenewalOfCappedOverLimitYieldsSuspended(t *testing.T) {
+func TestGrantPlan_RenewalOfCappedOverLimitStaysActive(t *testing.T) {
 	pool := testDB(t)
 	ctx := context.Background()
 	svc := services.NewPlanService(pool)
@@ -188,7 +188,8 @@ func TestGrantPlan_RenewalOfCappedOverLimitYieldsSuspended(t *testing.T) {
 	planID := seedPlan(t, pool, ctx, fmt.Sprintf("capped-%d", os.Getpid()), 30, &limit)
 	start := time.Now().Add(-10 * 24 * time.Hour)
 	expires := time.Now().Add(5 * 24 * time.Hour)
-	// Over the cap and already suspended by ExpiryCheckScheduler.
+	// Over the cap. An account suspended by the old over-cap rule is reopened
+	// by the renewal; the cap itself is enforced where VPN access is issued.
 	userID := seedUser(t, pool, ctx, fmt.Sprintf("capped-%d@x.test", os.Getpid()), planID, &start, &expires, nil, 2000, "suspended")
 
 	result, err := svc.GrantPlan(ctx, userID, planID)
@@ -198,8 +199,11 @@ func TestGrantPlan_RenewalOfCappedOverLimitYieldsSuspended(t *testing.T) {
 	if result.Kind != services.GrantRenewal {
 		t.Errorf("Kind = %q, want %q", result.Kind, services.GrantRenewal)
 	}
-	if result.Status != "suspended" {
-		t.Errorf("Status = %q, want %q (renewal preserves usage, so the cap violation is still true)", result.Status, "suspended")
+	if result.Status != "active" {
+		t.Errorf("Status = %q, want %q (a capped account must stay able to reach the portal)", result.Status, "active")
+	}
+	if result.TrafficUsed != 2000 {
+		t.Errorf("TrafficUsed = %d, want 2000 (renewal preserves usage)", result.TrafficUsed)
 	}
 }
 

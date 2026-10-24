@@ -335,6 +335,10 @@ type userSummary struct {
 	Online        int        `json:"online"`
 	OnlineIPs     int        `json:"online_ips"`
 	MaxConcurrent int        `json:"max_concurrent"`
+	// NextTrafficResetAt is when TrafficResetScheduler next zeroes usage: the
+	// next monthly anniversary of plan_started_at, or nil when there is none
+	// before the term ends (or no capped plan at all).
+	NextTrafficResetAt *time.Time `json:"next_traffic_reset_at"`
 }
 
 // GetSummary returns the dashboard figures for the authenticated user.
@@ -357,12 +361,22 @@ func (h *UserPortalHandler) GetSummary(c *fiber.Ctx) error {
 	err := h.db.QueryRow(ctx, `
 		SELECT u.status, u.traffic_used, u.plan_expires_at,
 		       p.name, p.traffic_limit, COALESCE(p.max_devices, 0), p.max_concurrent,
-		       (SELECT COUNT(*) FROM devices d WHERE d.user_id = u.id)
+		       (SELECT COUNT(*) FROM devices d WHERE d.user_id = u.id),
+		       -- Same month arithmetic as TrafficResetScheduler: the first
+		       -- anniversary of plan_started_at that is still in the future.
+		       -- make_interval(months) clamps a 31st anchor to the month's end.
+		       (SELECT a.reset_at FROM (
+		          SELECT u.plan_started_at + make_interval(months => m) AS reset_at
+		          FROM generate_series(1, 1 + ((DATE_PART('year', NOW()) - DATE_PART('year', u.plan_started_at))::int * 12
+		                                     + (DATE_PART('month', NOW()) - DATE_PART('month', u.plan_started_at))::int)) m
+		        ) a
+		        WHERE a.reset_at > NOW() AND a.reset_at < u.plan_expires_at
+		        ORDER BY a.reset_at LIMIT 1)
 		FROM users u
 		LEFT JOIN plans p ON u.plan_id = p.id
 		WHERE u.id = $1
 	`, userID).Scan(&s.Status, &s.TrafficUsed, &s.PlanExpiresAt,
-		&s.PlanName, &s.TrafficLimit, &s.MaxDevices, &maxConcurrent, &s.Devices)
+		&s.PlanName, &s.TrafficLimit, &s.MaxDevices, &maxConcurrent, &s.Devices, &s.NextTrafficResetAt)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to fetch summary",

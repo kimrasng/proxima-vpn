@@ -8,7 +8,15 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// ExpiryCheckScheduler disables users whose plan expired or traffic exceeded.
+// ExpiryCheckScheduler disables users whose plan expired.
+//
+// It deliberately does not suspend accounts that used up their data. Every
+// path that hands out VPN access (node configs, WireGuard/Hysteria2 peers,
+// subscriptions) already refuses a user at or over traffic_limit, so the cap
+// is enforced without touching the account. Suspending it as well locked the
+// user out of the portal, where they need to sign in to see their usage, buy
+// more time or spend a reset ticket, and set is_active = false, which also
+// kept TrafficResetScheduler from ever lifting the cap at the monthly reset.
 type ExpiryCheckScheduler struct {
 	db     *pgxpool.Pool
 	cancel context.CancelFunc
@@ -59,24 +67,7 @@ func (s *ExpiryCheckScheduler) run(ctx context.Context) {
 		return
 	}
 
-	suspendedResult, err := s.db.Exec(ctx, `
-		UPDATE users u
-		SET status = 'suspended', is_active = false, updated_at = NOW()
-		FROM plans p
-		WHERE u.plan_id = p.id
-		  AND u.traffic_used >= p.traffic_limit
-		  AND u.status = 'active'
-		  AND u.is_active = true
-		  AND p.traffic_limit > 0
-	`)
-	if err != nil {
-		log.Printf("[ExpiryCheckScheduler] error suspending over-limit users: %v", err)
-		return
-	}
-
-	expired := expiredResult.RowsAffected()
-	suspended := suspendedResult.RowsAffected()
-	if expired > 0 || suspended > 0 {
-		log.Printf("[ExpiryCheckScheduler] expired=%d suspended=%d", expired, suspended)
+	if expired := expiredResult.RowsAffected(); expired > 0 {
+		log.Printf("[ExpiryCheckScheduler] expired=%d", expired)
 	}
 }

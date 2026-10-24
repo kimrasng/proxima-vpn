@@ -233,7 +233,8 @@
       "inbounds": "Inbounds",
       "orders": "Orders",
       "promotions": "Promotions",
-      "subscriptionDomains": "Subscription Domains"
+      "subscriptionDomains": "Subscription Domains",
+      "resetTickets": "Reset tickets"
     },
     "dashboard": {
       "title": "Dashboard",
@@ -1092,7 +1093,8 @@
       "inbounds": "Manage this node's inbounds (protocol and port), issue TLS certificates, and update the Xray core. A node serves one protocol at a time.",
       "orders": "Review plan orders and confirm payment. Marking an order paid applies the plan to the user immediately.",
       "promotions": "Create and manage promotion codes. A code can cap total and per-user redemptions, apply only to selected plans or durations, require a minimum order, or be limited to first purchases.",
-      "subscriptionDomains": "Manage public subscription domains and review service-side DNS, TLS, and certificate health."
+      "subscriptionDomains": "Manage public subscription domains and review service-side DNS, TLS, and certificate health.",
+      "resetTickets": "Grant data reset tickets and review past grants. Tickets can go to one user, everyone currently on a plan, or every account. Users spend a ticket on their dashboard to reset this month's data usage to zero."
     },
     "notifications": {
       "title": "Notifications"
@@ -1679,6 +1681,62 @@
         "failed": "Failed",
         "unknown": "Unknown"
       }
+    },
+    "resetTickets": {
+      "title": "Reset tickets",
+      "subtitle": "Grant tickets that let users reset this month's data usage to zero.",
+      "history": "Grant history",
+      "grant": "Grant tickets",
+      "grantTitle": "Grant reset tickets",
+      "submit": "Grant",
+      "confirmAll": "Grant to every user",
+      "cancel": "Cancel",
+      "empty": "No tickets have been granted yet.",
+      "fetchError": "Couldn't load the grant history.",
+      "grantError": "Couldn't grant the tickets.",
+      "noRecipients": "No account matches this target.",
+      "granted": "Granted '{{name}}' to {{count}} users.",
+      "allWarning": "Every account that isn't deactivated gets one ticket. Press again to grant.",
+      "targetPlan": "Users on {{plan}}",
+      "usage": "{{used}} / {{total}} used",
+      "col": {
+        "name": "Name",
+        "target": "Target",
+        "usage": "Used",
+        "expires": "Expires",
+        "created": "Granted at",
+        "by": "Granted by"
+      },
+      "target": {
+        "user": "A specific user",
+        "plan": "Users on a plan",
+        "planHint": "Only users whose term on this plan is still running.",
+        "all": "Every user",
+        "allHint": "Every account that isn't deactivated."
+      },
+      "field": {
+        "name": "Ticket name",
+        "nameHint": "Shown to users on their dashboard.",
+        "namePlaceholder": "e.g. October thank-you reset",
+        "target": "Grant to",
+        "user": "User",
+        "userHint": "Type at least 2 characters of an email or name.",
+        "userPicked": "Selected: {{email}}",
+        "userPlaceholder": "Search email or name",
+        "userLoading": "Searching…",
+        "userEmpty": "No matching users.",
+        "plan": "Plan",
+        "planPlaceholder": "Choose a plan",
+        "expires": "Expires on",
+        "expiresHint": "Usable through the end of the chosen day."
+      },
+      "errors": {
+        "name": "Enter a ticket name.",
+        "nameLength": "Use 80 characters or fewer.",
+        "user": "Pick a user from the list.",
+        "plan": "Choose a plan.",
+        "expires": "Choose a date from today on."
+      }
     }
   },
   "user": {
@@ -1740,7 +1798,7 @@
       "expiredHint": "Your plan has expired. Purchase a plan to connect again.",
       "suspendedHint": "Your account is suspended. Contact the administrator about your access.",
       "trafficWarning": "You have used at least 80% of your monthly data. Check your remaining allowance.",
-      "trafficExhausted": "You have used all of your monthly data. Check your plan and service availability.",
+      "trafficExhausted": "You've used all of this month's data. Use a reset ticket below to start over now, or wait for the next monthly reset.",
       "quickConnect": "Connect your VPN app",
       "connectDescription": "Import your account subscription URL into your VPN app. Your app is recognized automatically.",
       "subscriptionDetails": "Subscription details",
@@ -1772,7 +1830,9 @@
       "noAnnouncements": "No announcements have been posted.",
       "serverNeedsPlan": "Purchase a plan to see the servers available to you.",
       "monthlyRemaining": "Data left this month",
-      "trafficLeftOfLimit": "{{left}} of {{limit}} left"
+      "trafficLeftOfLimit": "{{left}} of {{limit}} left",
+      "nextResetIn": "Data resets in {{days}}d {{hours}}h ({{date}})",
+      "nextResetInHours": "Data resets in {{hours}}h ({{date}})"
     },
     "devices": {
       "accountUrl": "Account subscription URL",
@@ -2046,6 +2106,27 @@
       "description": "Review pending orders and past payments.",
       "loadError": "Couldn't load your orders.",
       "emptyHint": "Orders appear here after you purchase a plan."
+    },
+    "resetTickets": {
+      "title": "Reset tickets",
+      "description": "Use a ticket to reset this month's data usage to zero.",
+      "empty": "You have no reset tickets.",
+      "loadError": "Couldn't load your reset tickets.",
+      "grantedAt": "Granted",
+      "expiresAt": "Expires",
+      "use": "Use ticket",
+      "needsPlan": "Tickets can only be used on an active plan with a data limit.",
+      "confirmTitle": "Use this reset ticket?",
+      "confirmBody": "One '{{name}}' will be used to reset this month's data usage to zero.",
+      "confirmNote": "A used ticket can't be restored. Your regular monthly reset date stays the same.",
+      "confirm": "Use and reset",
+      "cancel": "Cancel",
+      "redeemed": "Used '{{name}}' and reset {{bytes}} of usage.",
+      "errorUsed": "This ticket has already been used.",
+      "errorExpired": "This ticket has expired.",
+      "errorNoPlan": "You need an active plan with a data limit to use a ticket.",
+      "errorGeneric": "Couldn't use the ticket. Please try again shortly.",
+      "daysLeft": "{{days}} days left"
     }
   },
   "notFound": {

@@ -15,6 +15,8 @@ import type {
   OrderReceipt,
   PaymentProviderItem,
   PublicSubscriptionDomain,
+  ResetTicket,
+  RedeemResetTicketResult,
 } from './types';
 
 function applyUserClient() {
@@ -39,6 +41,16 @@ export function getTrafficStats(): Promise<TrafficStats> {
 export function getSummary(): Promise<UserSummary> {
   applyUserClient();
   return get<UserSummary>('/api/v1/user/summary');
+}
+
+export function listResetTickets(): Promise<ResetTicket[]> {
+  applyUserClient();
+  return get<ResetTicket[]>('/api/v1/user/reset-tickets');
+}
+
+export function redeemResetTicket(id: string): Promise<RedeemResetTicketResult> {
+  applyUserClient();
+  return post<RedeemResetTicketResult>(`/api/v1/user/reset-tickets/${id}/redeem`, {});
 }
 
 export function regenerateSubToken(): Promise<{ sub_token: string }> {

@@ -130,6 +130,10 @@ func (s *Server) registerRoutes() {
 	adminPromotions.Put("/:id", adminPromotionHandler.Update)
 	adminPromotions.Delete("/:id", adminPromotionHandler.Delete)
 
+	resetTicketHandler := handlers.NewResetTicketHandler(s.db)
+	admin.Get("/reset-tickets", resetTicketHandler.ListGrants)
+	admin.Post("/reset-tickets", resetTicketHandler.Grant)
+
 	adminSettingsHandler := handlers.NewAdminSettingsHandler(s.db)
 	admin.Get("/settings", adminSettingsHandler.List)
 	admin.Put("/settings", adminSettingsHandler.Update)
@@ -314,6 +318,8 @@ func (s *Server) registerRoutes() {
 
 	userPortalHandler := handlers.NewUserPortalHandler(s.db, s.redis)
 	user.Get("/summary", userPortalHandler.GetSummary)
+	user.Get("/reset-tickets", resetTicketHandler.ListMine)
+	user.Post("/reset-tickets/:id/redeem", resetTicketHandler.Redeem)
 	user.Get("/profile", userPortalHandler.GetProfile)
 	user.Get("/passkeys", userAuthHandler.ListPasskeys)
 	user.Post("/passkeys/register/begin", passkeyRegistrationLimiter, userAuthHandler.BeginPasskeyRegistration)

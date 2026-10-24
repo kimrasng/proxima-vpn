@@ -233,7 +233,8 @@
       "inbounds": "인바운드 관리",
       "orders": "주문 관리",
       "promotions": "프로모션 코드",
-      "subscriptionDomains": "구독 도메인"
+      "subscriptionDomains": "구독 도메인",
+      "resetTickets": "리셋권"
     },
     "dashboard": {
       "title": "대시보드",
@@ -1092,7 +1093,8 @@
       "inbounds": "이 노드의 인바운드(프로토콜·포트)를 관리하고, TLS 인증서 발급과 Xray 코어 업데이트를 실행합니다. 노드 하나는 한 가지 프로토콜만 운영합니다.",
       "orders": "사용자가 신청한 플랜 주문을 확인하고 입금을 처리합니다. 결제 완료로 표시하면 해당 플랜이 즉시 사용자에게 적용됩니다.",
       "promotions": "프로모션 코드를 만들고 관리합니다. 전체·사용자별 사용 횟수를 제한하거나, 특정 요금제와 기간에만 적용하거나, 최소 주문 금액을 요구하거나, 첫 구매에만 쓰도록 제한할 수 있습니다.",
-      "subscriptionDomains": "사용자에게 공개할 구독 도메인을 관리하고 서비스 측 DNS, TLS 및 인증서 상태를 검토합니다."
+      "subscriptionDomains": "사용자에게 공개할 구독 도메인을 관리하고 서비스 측 DNS, TLS 및 인증서 상태를 검토합니다.",
+      "resetTickets": "데이터 리셋권을 지급하고 지급 이력을 확인합니다. 특정 사용자, 특정 플랜을 이용 중인 사용자, 또는 모든 사용자에게 지급할 수 있습니다. 사용자는 대시보드에서 리셋권을 써서 이번 달 데이터 사용량을 0으로 초기화합니다."
     },
     "notifications": {
       "title": "알림"
@@ -1679,6 +1681,62 @@
         "failed": "실패",
         "unknown": "알 수 없음"
       }
+    },
+    "resetTickets": {
+      "title": "리셋권",
+      "subtitle": "사용자가 이번 달 데이터 사용량을 0으로 초기화할 수 있는 리셋권을 지급합니다.",
+      "history": "지급 이력",
+      "grant": "리셋권 지급",
+      "grantTitle": "리셋권 지급",
+      "submit": "지급하기",
+      "confirmAll": "모든 사용자에게 지급",
+      "cancel": "취소",
+      "empty": "아직 지급한 리셋권이 없습니다.",
+      "fetchError": "리셋권 지급 이력을 불러오지 못했습니다.",
+      "grantError": "리셋권을 지급하지 못했습니다.",
+      "noRecipients": "이 조건에 해당하는 사용자가 없습니다.",
+      "granted": "'{{name}}' 리셋권을 {{count}}명에게 지급했습니다.",
+      "allWarning": "비활성화되지 않은 모든 계정에 1장씩 지급합니다. 한 번 더 누르면 지급합니다.",
+      "targetPlan": "{{plan}} 이용자",
+      "usage": "{{used}} / {{total}}장 사용",
+      "col": {
+        "name": "이름",
+        "target": "대상",
+        "usage": "사용",
+        "expires": "만료일",
+        "created": "지급일시",
+        "by": "지급자"
+      },
+      "target": {
+        "user": "특정 사용자",
+        "plan": "특정 플랜 이용자",
+        "planHint": "지금 이 플랜을 이용 중인(만료되지 않은) 사용자에게만 지급됩니다.",
+        "all": "모든 사용자",
+        "allHint": "비활성화되지 않은 모든 계정에 지급됩니다."
+      },
+      "field": {
+        "name": "리셋권 이름",
+        "nameHint": "사용자 대시보드에 이 이름으로 표시됩니다.",
+        "namePlaceholder": "예: 10월 감사 리셋권",
+        "target": "지급 대상",
+        "user": "사용자",
+        "userHint": "이메일이나 이름을 2글자 이상 입력해 검색하세요.",
+        "userPicked": "선택됨: {{email}}",
+        "userPlaceholder": "이메일 또는 이름 검색",
+        "userLoading": "검색 중…",
+        "userEmpty": "일치하는 사용자가 없습니다.",
+        "plan": "플랜",
+        "planPlaceholder": "플랜 선택",
+        "expires": "만료일",
+        "expiresHint": "선택한 날짜가 끝날 때까지 사용할 수 있습니다."
+      },
+      "errors": {
+        "name": "리셋권 이름을 입력하세요.",
+        "nameLength": "이름은 80자 이하로 입력하세요.",
+        "user": "목록에서 사용자를 선택하세요.",
+        "plan": "플랜을 선택하세요.",
+        "expires": "오늘 이후 날짜를 선택하세요."
+      }
     }
   },
   "user": {
@@ -1740,7 +1798,7 @@
       "expiredHint": "플랜이 만료되었어요. 플랜을 구매한 후 다시 연결할 수 있어요.",
       "suspendedHint": "계정이 정지되어 있어요. 이용 상태는 관리자에게 문의하세요.",
       "trafficWarning": "이번 달 데이터의 80% 이상을 사용했어요. 남은 용량을 확인하세요.",
-      "trafficExhausted": "이번 달 데이터 용량을 모두 사용했어요. 플랜과 이용 가능 상태를 확인하세요.",
+      "trafficExhausted": "이번 달 데이터 용량을 모두 사용했어요. 리셋권이 있으면 아래에서 바로 초기화하거나, 다음 정기 리셋을 기다려 주세요.",
       "quickConnect": "VPN 앱 연결",
       "connectDescription": "계정 구독 URL을 VPN 앱에 가져오세요. 앱 종류는 자동으로 인식됩니다.",
       "subscriptionDetails": "구독 자세히 보기",
@@ -1772,7 +1830,9 @@
       "noAnnouncements": "등록된 공지사항이 없습니다.",
       "serverNeedsPlan": "플랜을 구매하면 이용 가능한 서버를 확인할 수 있습니다.",
       "monthlyRemaining": "이번 달 남은 데이터",
-      "trafficLeftOfLimit": "{{limit}} 중 {{left}} 남음"
+      "trafficLeftOfLimit": "{{limit}} 중 {{left}} 남음",
+      "nextResetIn": "{{days}}일 {{hours}}시간 뒤 데이터 리셋 ({{date}})",
+      "nextResetInHours": "{{hours}}시간 뒤 데이터 리셋 ({{date}})"
     },
     "devices": {
       "accountUrl": "계정 구독 URL",
@@ -2046,6 +2106,27 @@
       "description": "결제 대기 중인 주문과 지난 결제를 확인합니다.",
       "loadError": "주문 내역을 불러오지 못했습니다.",
       "emptyHint": "플랜을 구매하면 주문 내역이 여기에 표시됩니다."
+    },
+    "resetTickets": {
+      "title": "리셋권",
+      "description": "리셋권을 쓰면 이번 달 데이터 사용량이 0으로 초기화돼요.",
+      "empty": "보유한 리셋권이 없어요.",
+      "loadError": "리셋권을 불러오지 못했어요.",
+      "grantedAt": "지급일",
+      "expiresAt": "만료일",
+      "use": "리셋권 사용",
+      "needsPlan": "데이터 제한이 있는 이용 중인 플랜에서만 리셋권을 쓸 수 있어요.",
+      "confirmTitle": "리셋권을 사용할까요?",
+      "confirmBody": "'{{name}}' 1장을 사용해 이번 달 데이터 사용량을 0으로 초기화합니다.",
+      "confirmNote": "사용한 리셋권은 되돌릴 수 없어요. 매월 정기 리셋 날짜는 그대로 유지됩니다.",
+      "confirm": "사용하고 초기화",
+      "cancel": "취소",
+      "redeemed": "'{{name}}'을 사용해 {{bytes}} 사용량을 초기화했어요.",
+      "errorUsed": "이미 사용한 리셋권이에요.",
+      "errorExpired": "만료된 리셋권이에요.",
+      "errorNoPlan": "데이터 제한이 있는 이용 중인 플랜이 없어 사용할 수 없어요.",
+      "errorGeneric": "리셋권을 사용하지 못했어요. 잠시 후 다시 시도해 주세요.",
+      "daysLeft": "{{days}}일 남음"
     }
   },
   "notFound": {

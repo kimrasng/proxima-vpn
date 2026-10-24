@@ -233,7 +233,8 @@
       "inbounds": "入站管理",
       "orders": "订单管理",
       "promotions": "促销码",
-      "subscriptionDomains": "订阅域名"
+      "subscriptionDomains": "订阅域名",
+      "resetTickets": "重置券"
     },
     "dashboard": {
       "title": "仪表盘",
@@ -1092,7 +1093,8 @@
       "inbounds": "管理此节点的入站（协议与端口），签发 TLS 证书并更新 Xray 内核。每个节点同时只运行一种协议。",
       "orders": "查看套餐订单并确认付款。标记为已付款后，套餐会立即生效。",
       "promotions": "创建和管理促销码。可以限制总兑换次数和每位用户的兑换次数、仅适用于指定套餐或时长、要求最低订单金额，或仅限首次购买使用。",
-      "subscriptionDomains": "管理向用户公开的订阅域名，并查看服务端的 DNS、TLS 和证书健康状态。"
+      "subscriptionDomains": "管理向用户公开的订阅域名，并查看服务端的 DNS、TLS 和证书健康状态。",
+      "resetTickets": "发放流量重置券并查看发放记录。可以发给指定用户、正在使用某套餐的用户或所有用户。用户在仪表板使用重置券，将本月流量用量清零。"
     },
     "notifications": {
       "title": "通知"
@@ -1679,6 +1681,62 @@
         "failed": "失败",
         "unknown": "未知"
       }
+    },
+    "resetTickets": {
+      "title": "重置券",
+      "subtitle": "发放可让用户将本月流量用量清零的重置券。",
+      "history": "发放记录",
+      "grant": "发放重置券",
+      "grantTitle": "发放重置券",
+      "submit": "发放",
+      "confirmAll": "发放给所有用户",
+      "cancel": "取消",
+      "empty": "尚未发放任何重置券。",
+      "fetchError": "无法加载发放记录。",
+      "grantError": "无法发放重置券。",
+      "noRecipients": "没有符合条件的用户。",
+      "granted": "已向 {{count}} 位用户发放“{{name}}”。",
+      "allWarning": "将向所有未停用的账户各发放 1 张。再次点击即发放。",
+      "targetPlan": "{{plan}} 用户",
+      "usage": "已用 {{used}} / {{total}} 张",
+      "col": {
+        "name": "名称",
+        "target": "对象",
+        "usage": "使用",
+        "expires": "到期日期",
+        "created": "发放时间",
+        "by": "发放人"
+      },
+      "target": {
+        "user": "指定用户",
+        "plan": "指定套餐用户",
+        "planHint": "仅发给该套餐仍在有效期内的用户。",
+        "all": "所有用户",
+        "allHint": "所有未停用的账户。"
+      },
+      "field": {
+        "name": "重置券名称",
+        "nameHint": "将以此名称显示在用户仪表板上。",
+        "namePlaceholder": "例如：十月感谢重置券",
+        "target": "发放对象",
+        "user": "用户",
+        "userHint": "输入至少 2 个字符的邮箱或名称进行搜索。",
+        "userPicked": "已选择：{{email}}",
+        "userPlaceholder": "搜索邮箱或名称",
+        "userLoading": "搜索中…",
+        "userEmpty": "没有匹配的用户。",
+        "plan": "套餐",
+        "planPlaceholder": "选择套餐",
+        "expires": "到期日期",
+        "expiresHint": "可使用到所选日期结束。"
+      },
+      "errors": {
+        "name": "请输入重置券名称。",
+        "nameLength": "名称不超过 80 个字符。",
+        "user": "请从列表中选择用户。",
+        "plan": "请选择套餐。",
+        "expires": "请选择今天或之后的日期。"
+      }
     }
   },
   "user": {
@@ -1740,7 +1798,7 @@
       "expiredHint": "套餐已到期。购买套餐后可再次连接。",
       "suspendedHint": "账户已暂停。请联系管理员了解访问状态。",
       "trafficWarning": "您已使用本月流量的 80% 以上。请查看剩余额度。",
-      "trafficExhausted": "您已用完本月流量。请查看套餐及服务可用状态。",
+      "trafficExhausted": "本月流量已用完。可以在下方使用重置券立即清零，或等待下一次每月重置。",
       "quickConnect": "连接 VPN 应用",
       "connectDescription": "将账户订阅 URL 导入 VPN 应用，应用类型会被自动识别。",
       "subscriptionDetails": "订阅详情",
@@ -1772,7 +1830,9 @@
       "noAnnouncements": "暂无公告。",
       "serverNeedsPlan": "购买套餐后即可查看可用服务器。",
       "monthlyRemaining": "本月剩余流量",
-      "trafficLeftOfLimit": "共 {{limit}}，剩余 {{left}}"
+      "trafficLeftOfLimit": "共 {{limit}}，剩余 {{left}}",
+      "nextResetIn": "{{days}} 天 {{hours}} 小时后重置流量（{{date}}）",
+      "nextResetInHours": "{{hours}} 小时后重置流量（{{date}}）"
     },
     "devices": {
       "accountUrl": "账户订阅 URL",
@@ -2046,6 +2106,27 @@
       "description": "查看待付款订单和历史付款。",
       "loadError": "无法加载订单记录。",
       "emptyHint": "购买套餐后，订单将显示在这里。"
+    },
+    "resetTickets": {
+      "title": "重置券",
+      "description": "使用重置券可将本月流量用量清零。",
+      "empty": "您没有重置券。",
+      "loadError": "无法加载重置券。",
+      "grantedAt": "发放日期",
+      "expiresAt": "到期日期",
+      "use": "使用重置券",
+      "needsPlan": "只有在有流量限制且正在使用的套餐下才能使用重置券。",
+      "confirmTitle": "要使用这张重置券吗？",
+      "confirmBody": "将使用 1 张“{{name}}”，把本月流量用量清零。",
+      "confirmNote": "重置券使用后无法恢复。每月的固定重置日期保持不变。",
+      "confirm": "使用并重置",
+      "cancel": "取消",
+      "redeemed": "已使用“{{name}}”，清零了 {{bytes}} 用量。",
+      "errorUsed": "这张重置券已被使用。",
+      "errorExpired": "这张重置券已过期。",
+      "errorNoPlan": "没有带流量限制的有效套餐，无法使用。",
+      "errorGeneric": "无法使用重置券，请稍后再试。",
+      "daysLeft": "剩余 {{days}} 天"
     }
   },
   "notFound": {

@@ -1,0 +1,16 @@
+.reset-tickets__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.reset-tickets__card {
+  padding: 14px 16px;
+}
+
+.reset-tickets__dates {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding-block-start: 8px;
+}

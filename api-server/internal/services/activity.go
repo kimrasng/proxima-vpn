@@ -56,6 +56,9 @@ const (
 	EventSessionTerminated = "session.terminated"
 
 	EventUserPasswordReset = "user.password_reset"
+
+	EventResetTicketGranted = "plan.reset_ticket_granted"
+	EventResetTicketUsed    = "plan.reset_ticket_used"
 )
 
 // NodeEventTypes enumerates the events recorded against a node target and backs

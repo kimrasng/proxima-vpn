@@ -863,6 +863,44 @@ export interface UserSummary {
   online: number;
   online_ips: number;
   max_concurrent: number;
+  next_traffic_reset_at: string | null;
+}
+
+export interface ResetTicket {
+  id: string;
+  name: string;
+  granted_at: string;
+  expires_at: string;
+}
+
+export interface RedeemResetTicketResult {
+  name: string;
+  reset_bytes: number;
+}
+
+export type ResetTicketTarget = "user" | "plan" | "all";
+
+export interface ResetTicketGrant {
+  id: string;
+  name: string;
+  target_type: ResetTicketTarget;
+  target_user_id: string | null;
+  target_email: string | null;
+  target_plan_id: string | null;
+  target_plan_name: string | null;
+  expires_at: string;
+  granted_count: number;
+  used_count: number;
+  granted_by: string;
+  created_at: string;
+}
+
+export interface GrantResetTicketRequest {
+  name: string;
+  target_type: ResetTicketTarget;
+  user_id?: string;
+  plan_id?: string;
+  expires_at: string;
 }
 
 export interface TrafficHistoryEntry {

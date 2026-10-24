@@ -12,6 +12,7 @@ import {
 import type { Announcement } from "../../api/types";
 import * as userApi from "../../api/user";
 import DeviceQuickConnect from "../../components/DeviceQuickConnect";
+import ResetTickets from "../../components/ResetTickets";
 import { useUserResource } from "../../hooks/useUserResource";
 
 function formatBytes(bytes: number): string {
@@ -42,6 +43,11 @@ export default function Dashboard() {
   const expired = data?.status === "expired" || (expires !== null && expires.getTime() <= Date.now());
   const trafficLimit = data?.traffic_limit ?? 0;
   const trafficPercentage = trafficLimit > 0 && data ? Math.min(100, data.traffic_used / trafficLimit * 100) : 0;
+  const nextReset = data?.next_traffic_reset_at ? new Date(data.next_traffic_reset_at) : null;
+  const untilReset = nextReset ? Math.max(0, nextReset.getTime() - Date.now()) : 0;
+  const resetDays = Math.floor(untilReset / 86400000);
+  const resetHours = Math.floor((untilReset % 86400000) / 3600000);
+  const canReset = hasPlan && !expired && trafficLimit > 0;
   const dateFormat = (date: string | Date) => new Date(date).toLocaleDateString(i18n.resolvedLanguage ?? i18n.language);
   const onlineNodes = nodes.data?.filter((node) => node.status === "online").length ?? 0;
   const latestAnnouncements = (announcements.data ?? [])
@@ -138,6 +144,10 @@ export default function Dashboard() {
                         label={t("user.dashboard.trafficLeftOfLimit", { left: formatBytes(Math.max(0, trafficLimit - data.traffic_used)), limit: formatBytes(trafficLimit) })}
                         additionalInfo={t("user.dashboard.trafficUsedOfLimit", { used: formatBytes(data.traffic_used), limit: formatBytes(trafficLimit) })}
                         status={trafficPercentage >= 100 ? "error" : "in-progress"} />}
+                      {trafficLimit > 0 && nextReset && <Box variant="small" color="text-body-secondary">
+                        {t(resetDays > 0 ? "user.dashboard.nextResetIn" : "user.dashboard.nextResetInHours",
+                          { days: resetDays, hours: resetHours, date: nextReset.toLocaleString(i18n.resolvedLanguage ?? i18n.language, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) })}
+                      </Box>}
                     </SpaceBetween>
                     <SpaceBetween size="xs">
                       <Box variant="awsui-key-label">{t("user.dashboard.expiresAt")}</Box>
@@ -162,6 +172,8 @@ export default function Dashboard() {
             </SpaceBetween>
           </Container>
         )}
+
+        {data && <ResetTickets canReset={canReset} onRedeemed={summary.refresh} />}
 
         <Grid gridDefinition={[{ colspan: { default: 12, s: 7 } }, { colspan: { default: 12, s: 5 } }]}>
           <DeviceQuickConnect summary={data} refreshKey={connectionRefresh} />
