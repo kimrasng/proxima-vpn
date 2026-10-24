@@ -129,14 +129,13 @@ export default function Dashboard() {
                     )}
                   <ColumnLayout columns={2} variant="text-grid">
                     <SpaceBetween size="xs">
-                      <Box variant="awsui-key-label">{t("user.dashboard.monthlyTraffic")}</Box>
-                      <Box variant="h2">{formatBytes(data.traffic_used)}</Box>
+                      <Box variant="awsui-key-label">{t(trafficLimit > 0 ? "user.dashboard.monthlyRemaining" : "user.dashboard.monthlyTraffic")}</Box>
+                      <Box variant="h2">{formatBytes(trafficLimit > 0 ? Math.max(0, trafficLimit - data.traffic_used) : data.traffic_used)}</Box>
                       <Box color="text-body-secondary">{trafficLimit > 0
                         ? t("user.dashboard.trafficAllowance", { limit: formatBytes(trafficLimit) })
                         : t("user.dashboard.trafficUnlimited")}</Box>
                       {trafficLimit > 0 && <ProgressBar value={trafficPercentage}
                         label={t("user.dashboard.trafficUsedOfLimit", { used: formatBytes(data.traffic_used), limit: formatBytes(trafficLimit) })}
-                        additionalInfo={t("user.dashboard.trafficRemaining", { remaining: formatBytes(Math.max(0, trafficLimit - data.traffic_used)) })}
                         status={trafficPercentage >= 100 ? "error" : "in-progress"} />}
                     </SpaceBetween>
                     <SpaceBetween size="xs">
