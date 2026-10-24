@@ -13,6 +13,7 @@ import {
   Header,
   Input,
   KeyValuePairs,
+  Modal,
   ProgressBar,
   SegmentedControl,
   Select,
@@ -120,6 +121,7 @@ function UserDetailPage() {
   const [loginError, setLoginError] = useState<string | null>(null);
   const [flash, setFlash] = useState<{ type: "success" | "error"; content: string }[]>([]);
   const [activeTab, setActiveTab] = useState("overview");
+  const [confirmReset, setConfirmReset] = useState(false);
 
   usePublishBreadcrumbLeaf(user?.name || user?.email);
 
@@ -237,6 +239,7 @@ function UserDetailPage() {
 
   const handleResetTraffic = async () => {
     if (!userId) return;
+    setConfirmReset(false);
     setSaving(true);
     try {
       await resetUserTraffic(userId);
@@ -293,9 +296,6 @@ function UserDetailPage() {
                 loading={refreshing}
                 onClick={refresh}
               />
-              <Button loading={saving} onClick={() => void handleResetTraffic()}>
-                {t("admin.userDetail.resetTraffic")}
-              </Button>
             </SpaceBetween>
           }
           description={
@@ -421,7 +421,9 @@ function UserDetailPage() {
               label: t("admin.userDetail.tabs.traffic"),
               content: (
                 <SpaceBetween size="l">
-                  <Container header={<Header variant="h2">{t("admin.userDetail.traffic")}</Header>}>
+                  <Container header={<Header variant="h2" actions={
+                    <Button loading={saving} onClick={() => setConfirmReset(true)}>{t("admin.userDetail.resetTraffic")}</Button>
+                  }>{t("admin.userDetail.traffic")}</Header>}>
                     <SpaceBetween size="m">
                       {trafficError && <Alert type="error">{trafficError}</Alert>}
                       <KeyValuePairs
@@ -706,6 +708,24 @@ function UserDetailPage() {
           ]}
         />
       </SpaceBetween>
+      <Modal
+        visible={confirmReset}
+        onDismiss={() => !saving && setConfirmReset(false)}
+        header={t("admin.userDetail.resetConfirmTitle")}
+        footer={
+          <Box float="right">
+            <SpaceBetween direction="horizontal" size="xs">
+              <Button variant="link" disabled={saving} onClick={() => setConfirmReset(false)}>{t("admin.userDetail.resetCancel")}</Button>
+              <Button variant="primary" loading={saving} onClick={() => void handleResetTraffic()}>{t("admin.userDetail.resetConfirm")}</Button>
+            </SpaceBetween>
+          </Box>
+        }
+      >
+        <SpaceBetween size="s">
+          <Box>{t("admin.userDetail.resetConfirmBody", { email: user.email, used: formatBytes(traffic?.traffic_used ?? user.traffic_used) })}</Box>
+          <Box variant="small" color="text-body-secondary">{t("admin.userDetail.resetConfirmNote")}</Box>
+        </SpaceBetween>
+      </Modal>
     </ContentLayout>
   );
 }

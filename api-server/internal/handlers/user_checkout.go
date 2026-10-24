@@ -286,10 +286,32 @@ type orderReceiptResponse struct {
 // @Security BearerAuth
 // @Router /user/orders/{id}/receipt [get]
 func (h *UserCheckoutHandler) Receipt(c *fiber.Ctx) error {
-	userID := c.Locals("user_id").(string)
-	orderID := c.Params("id")
-	ctx := c.Context()
+	return h.writeReceipt(c, c.Params("id"), c.Locals("user_id").(string))
+}
 
+// AdminReceipt handles GET /api/v1/admin/users/:id/orders/:orderId/receipt.
+// It returns the same receipt the user sees, so support can read exactly what
+// the customer was shown.
+// @Summary Read a user's order receipt
+// @Description Receipt of one of the user's paid orders, as the user sees it
+// @Tags admin-users
+// @Produce json
+// @Param id path string true "User ID"
+// @Param orderId path string true "Order ID"
+// @Success 200 {object} orderReceiptResponse
+// @Failure 404 {object} map[string]string
+// @Security BearerAuth
+// @Router /admin/users/{id}/orders/{orderId}/receipt [get]
+func (h *UserCheckoutHandler) AdminReceipt(c *fiber.Ctx) error {
+	userID, orderID := c.Params("id"), c.Params("orderId")
+	if !isUUID(userID) || !isUUID(orderID) {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "paid order not found"})
+	}
+	return h.writeReceipt(c, orderID, userID)
+}
+
+func (h *UserCheckoutHandler) writeReceipt(c *fiber.Ctx, orderID, userID string) error {
+	ctx := c.Context()
 	var r orderReceiptResponse
 	var sessionID string
 	err := h.db.QueryRow(ctx,

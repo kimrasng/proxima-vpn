@@ -21,6 +21,7 @@ import type {
   ResetTicketGrant,
   UserResetTicket,
   AdminUserOrder,
+  OrderReceipt,
   GrantUserPlanRequest,
   GrantResetTicketRequest,
   CreatePlanRequest,
@@ -269,6 +270,11 @@ export function listPromotions(): Promise<PromotionCode[]> {
 export function listUserOrders(userId: string): Promise<AdminUserOrder[]> {
   applyAdminClient();
   return get<AdminUserOrder[]>(`/api/v1/admin/users/${userId}/orders`);
+}
+
+export function getUserOrderReceipt(userId: string, orderId: string): Promise<OrderReceipt> {
+  applyAdminClient();
+  return get<OrderReceipt>(`/api/v1/admin/users/${userId}/orders/${orderId}/receipt`);
 }
 
 export function grantUserPlan(userId: string, req: GrantUserPlanRequest): Promise<AdminUserOrder> {

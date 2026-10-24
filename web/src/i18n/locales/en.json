@@ -1497,7 +1497,8 @@
           "price": "Amount",
           "status": "Status",
           "term": "Term change",
-          "at": "Processed"
+          "at": "Processed",
+          "receipt": "Receipt"
         },
         "source": {
           "grant": "Admin grant",
@@ -1518,7 +1519,12 @@
           "price": "Enter a number, e.g. 12.50",
           "note": "Keep the reason under 200 characters."
         },
-        "until": "Until {{to}}"
+        "until": "Until {{to}}",
+        "viewReceipt": "View receipt",
+        "receiptTitle": "Receipt",
+        "receiptError": "Couldn't load the receipt.",
+        "close": "Close",
+        "openStripe": "Open Stripe receipt"
       },
       "device": {
         "desktop": "Desktop",
@@ -1528,7 +1534,12 @@
         "unknown": "Unknown device"
       },
       "accountSection": "Account",
-      "accountHint": "Name and account status. Grant plans and terms from the Plan tab."
+      "accountHint": "Name and account status. Grant plans and terms from the Plan tab.",
+      "resetConfirmTitle": "Reset this user's traffic?",
+      "resetConfirmBody": "{{email}}'s usage this month ({{used}}) will be reset to zero.",
+      "resetConfirmNote": "This can't be undone. The regular monthly reset date stays the same.",
+      "resetConfirm": "Reset",
+      "resetCancel": "Cancel"
     },
     "nodeEvents": {
       "title": "Node events",

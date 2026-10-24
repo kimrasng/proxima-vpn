@@ -5,8 +5,9 @@ import {
   SpaceBetween, StatusIndicator, Table, Textarea, Tiles,
 } from "@cloudscape-design/components";
 import { ApiError } from "../../api/client";
-import { grantUserPlan, listUserOrders } from "../../api/admin";
-import type { AdminUserOrder, Plan, UserDetail } from "../../api/types";
+import { getUserOrderReceipt, grantUserPlan, listUserOrders } from "../../api/admin";
+import type { AdminUserOrder, OrderReceipt, Plan, UserDetail } from "../../api/types";
+import OrderReceiptDetails from "../../components/OrderReceiptDetails";
 import { formatPriceCents } from "../../utils/planPricing";
 import { formatAbsoluteTime } from "../../utils/relativeTime";
 
@@ -45,6 +46,19 @@ export default function UserPlanGrantPanel({ user, plans, onGranted }: Props) {
   const [orders, setOrders] = useState<AdminUserOrder[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(true);
   const [ordersError, setOrdersError] = useState(false);
+  const [receipt, setReceipt] = useState<OrderReceipt | null>(null);
+  const [receiptLoading, setReceiptLoading] = useState<string | null>(null);
+
+  const openReceipt = async (orderId: string) => {
+    setReceiptLoading(orderId);
+    try {
+      setReceipt(await getUserOrderReceipt(user.id, orderId));
+    } catch {
+      setFlash({ type: "error", text: t("admin.userDetail.grant.receiptError") });
+    } finally {
+      setReceiptLoading(null);
+    }
+  };
 
   const loadOrders = useCallback(async () => {
     try {
@@ -236,11 +250,26 @@ export default function UserPlanGrantPanel({ user, plans, onGranted }: Props) {
             <Box>{formatAbsoluteTime(order.paid_at ?? order.created_at)}</Box>
             {order.paid_by && <Box variant="small" color="text-body-secondary">{order.paid_by}</Box>}
           </SpaceBetween> },
+          { id: "receipt", header: t("admin.userDetail.grant.col.receipt"), cell: (order) => order.status === "paid" ? (
+            <Button variant="inline-link" loading={receiptLoading === order.id} disabled={receiptLoading !== null}
+              ariaLabel={`${t("admin.userDetail.grant.viewReceipt")} ${order.plan_name}`}
+              onClick={() => void openReceipt(order.id)}>{t("admin.userDetail.grant.viewReceipt")}</Button>
+          ) : "—" },
         ]}
         empty={ordersError
           ? <Box textAlign="center" color="text-status-error">{t("admin.userDetail.grant.ordersError")}</Box>
           : <Box textAlign="center" color="text-body-secondary">{t("admin.userDetail.grant.ordersEmpty")}</Box>}
       />
+
+      <Modal visible={receipt !== null} onDismiss={() => setReceipt(null)} header={t("admin.userDetail.grant.receiptTitle")}
+        closeAriaLabel={t("admin.userDetail.grant.cancel")}
+        footer={<Box float="right"><SpaceBetween direction="horizontal" size="xs">
+          <Button onClick={() => setReceipt(null)}>{t("admin.userDetail.grant.close")}</Button>
+          {receipt?.receipt_url && <Button variant="primary" href={receipt.receipt_url} target="_blank" iconName="external" iconAlign="right">
+            {t("admin.userDetail.grant.openStripe")}</Button>}
+        </SpaceBetween></Box>}>
+        {receipt && <OrderReceiptDetails receipt={receipt} />}
+      </Modal>
 
       <Modal visible={confirm} onDismiss={() => !saving && setConfirm(false)} header={t("admin.userDetail.grant.confirmTitle")}
         footer={<Box float="right"><SpaceBetween direction="horizontal" size="xs">

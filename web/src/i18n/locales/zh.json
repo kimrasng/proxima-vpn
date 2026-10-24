@@ -1497,7 +1497,8 @@
           "price": "金额",
           "status": "状态",
           "term": "期限变化",
-          "at": "处理时间"
+          "at": "处理时间",
+          "receipt": "收据"
         },
         "source": {
           "grant": "管理员发放",
@@ -1518,7 +1519,12 @@
           "price": "请输入数字，例如 12.50",
           "note": "原因请少于 200 个字符。"
         },
-        "until": "至 {{to}}"
+        "until": "至 {{to}}",
+        "viewReceipt": "查看收据",
+        "receiptTitle": "收据",
+        "receiptError": "无法加载收据。",
+        "close": "关闭",
+        "openStripe": "打开 Stripe 收据"
       },
       "device": {
         "desktop": "桌面",
@@ -1528,7 +1534,12 @@
         "unknown": "未知设备"
       },
       "accountSection": "账户",
-      "accountHint": "管理名称和账户状态。套餐与期限请在“套餐管理”标签中发放。"
+      "accountHint": "管理名称和账户状态。套餐与期限请在“套餐管理”标签中发放。",
+      "resetConfirmTitle": "要重置该用户的流量吗？",
+      "resetConfirmBody": "将把 {{email}} 本月的用量（{{used}}）清零。",
+      "resetConfirmNote": "此操作无法撤销。每月固定的重置日期保持不变。",
+      "resetConfirm": "重置",
+      "resetCancel": "取消"
     },
     "nodeEvents": {
       "title": "节点事件",

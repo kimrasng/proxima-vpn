@@ -1497,7 +1497,8 @@
           "price": "금액",
           "status": "상태",
           "term": "기간 변화",
-          "at": "처리 일시"
+          "at": "처리 일시",
+          "receipt": "영수증"
         },
         "source": {
           "grant": "관리자 지급",
@@ -1518,7 +1519,12 @@
           "price": "금액을 숫자로 입력하세요. 예: 12.50",
           "note": "사유는 200자 이하로 입력하세요."
         },
-        "until": "{{to}}까지"
+        "until": "{{to}}까지",
+        "viewReceipt": "영수증 보기",
+        "receiptTitle": "영수증",
+        "receiptError": "영수증을 불러오지 못했습니다.",
+        "close": "닫기",
+        "openStripe": "Stripe 영수증 열기"
       },
       "device": {
         "desktop": "데스크톱",
@@ -1528,7 +1534,12 @@
         "unknown": "알 수 없는 기기"
       },
       "accountSection": "계정",
-      "accountHint": "이름과 계정 상태를 관리합니다. 플랜과 기간은 '플랜 관리' 탭에서 지급하세요."
+      "accountHint": "이름과 계정 상태를 관리합니다. 플랜과 기간은 '플랜 관리' 탭에서 지급하세요.",
+      "resetConfirmTitle": "트래픽을 초기화할까요?",
+      "resetConfirmBody": "{{email}}의 이번 달 사용량 {{used}}을 0으로 초기화합니다.",
+      "resetConfirmNote": "되돌릴 수 없어요. 매월 정기 리셋 날짜는 그대로 유지됩니다.",
+      "resetConfirm": "초기화",
+      "resetCancel": "취소"
     },
     "nodeEvents": {
       "title": "노드 이벤트",

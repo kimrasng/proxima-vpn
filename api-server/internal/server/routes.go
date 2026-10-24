@@ -121,6 +121,7 @@ func (s *Server) registerRoutes() {
 	adminPlanGrantHandler := handlers.NewAdminPlanGrantHandler(s.db)
 	adminUsers.Get("/:id/orders", adminPlanGrantHandler.ListOrders)
 	adminUsers.Post("/:id/plan-grants", adminPlanGrantHandler.Grant)
+	adminUsers.Get("/:id/orders/:orderId/receipt", handlers.NewUserCheckoutHandler(s.db, s.payments).AdminReceipt)
 
 	adminOrderHandler := handlers.NewAdminOrderHandler(s.db)
 	adminOrders := admin.Group("/orders")
