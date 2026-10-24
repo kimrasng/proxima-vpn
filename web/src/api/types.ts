@@ -878,6 +878,11 @@ export interface RedeemResetTicketResult {
   reset_bytes: number;
 }
 
+export interface UserResetTicket extends ResetTicket {
+  used_at: string | null;
+  reset_bytes: number | null;
+}
+
 export type ResetTicketTarget = "user" | "plan" | "all";
 
 export interface ResetTicketGrant {

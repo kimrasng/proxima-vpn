@@ -191,3 +191,32 @@ func TestResetTicket_RequiresCappedRunningPlan(t *testing.T) {
 		t.Errorf("rejected redemption consumed the ticket")
 	}
 }
+
+func TestResetTicket_RevokeOnlyUnusedOwnTicket(t *testing.T) {
+	_, ctx, svc, _, user := resetTicketFixture(t)
+	owner := user("active", 400)
+	other := user("active", 0)
+	ticketID := grantOne(t, ctx, svc, owner, time.Now().Add(24*time.Hour))
+
+	if err := svc.Revoke(ctx, other, ticketID, "", "admin@x.test"); !errors.Is(err, services.ErrResetTicketNotFound) {
+		t.Errorf("revoke through another user err = %v, want ErrResetTicketNotFound", err)
+	}
+	if err := svc.Revoke(ctx, owner, ticketID, "", "admin@x.test"); err != nil {
+		t.Fatalf("revoke: %v", err)
+	}
+	if all, _ := svc.ListForUser(ctx, owner); len(all) != 0 {
+		t.Errorf("revoked ticket still listed: %d", len(all))
+	}
+
+	usedID := grantOne(t, ctx, svc, owner, time.Now().Add(24*time.Hour))
+	if _, err := svc.Redeem(ctx, owner, usedID, "u@x.test"); err != nil {
+		t.Fatalf("redeem: %v", err)
+	}
+	if err := svc.Revoke(ctx, owner, usedID, "", "admin@x.test"); !errors.Is(err, services.ErrResetTicketUsed) {
+		t.Errorf("revoke used err = %v, want ErrResetTicketUsed", err)
+	}
+	all, _ := svc.ListForUser(ctx, owner)
+	if len(all) != 1 || all[0].UsedAt == nil || all[0].ResetBytes == nil || *all[0].ResetBytes != 400 {
+		t.Errorf("used ticket history = %+v, want one used ticket that reset 400 bytes", all)
+	}
+}

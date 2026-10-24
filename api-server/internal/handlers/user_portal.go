@@ -335,9 +335,10 @@ type userSummary struct {
 	Online        int        `json:"online"`
 	OnlineIPs     int        `json:"online_ips"`
 	MaxConcurrent int        `json:"max_concurrent"`
-	// NextTrafficResetAt is when TrafficResetScheduler next zeroes usage: the
-	// next monthly anniversary of plan_started_at, or nil when there is none
-	// before the term ends (or no capped plan at all).
+	// NextTrafficResetAt is the next monthly anniversary of plan_started_at,
+	// the day TrafficResetScheduler zeroes usage. It can fall after the term
+	// ends (a 30-day term ends a day before its first anniversary); the reset
+	// then happens only if the term is extended, which keeps the anchor.
 	NextTrafficResetAt *time.Time `json:"next_traffic_reset_at"`
 }
 
@@ -370,7 +371,7 @@ func (h *UserPortalHandler) GetSummary(c *fiber.Ctx) error {
 		          FROM generate_series(1, 1 + ((DATE_PART('year', NOW()) - DATE_PART('year', u.plan_started_at))::int * 12
 		                                     + (DATE_PART('month', NOW()) - DATE_PART('month', u.plan_started_at))::int)) m
 		        ) a
-		        WHERE a.reset_at > NOW() AND a.reset_at < u.plan_expires_at
+		        WHERE a.reset_at > NOW()
 		        ORDER BY a.reset_at LIMIT 1)
 		FROM users u
 		LEFT JOIN plans p ON u.plan_id = p.id

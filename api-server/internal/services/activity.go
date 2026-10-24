@@ -59,6 +59,7 @@ const (
 
 	EventResetTicketGranted = "plan.reset_ticket_granted"
 	EventResetTicketUsed    = "plan.reset_ticket_used"
+	EventResetTicketRevoked = "plan.reset_ticket_revoked"
 )
 
 // NodeEventTypes enumerates the events recorded against a node target and backs

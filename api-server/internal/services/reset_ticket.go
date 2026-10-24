@@ -28,6 +28,17 @@ var (
 	ErrResetInvalidGrant  = errors.New("invalid reset ticket grant")
 )
 
+// UserResetTicket is one ticket as an administrator sees it on the user's page:
+// spent and lapsed tickets stay listed so the history explains past resets.
+type UserResetTicket struct {
+	ID         string     `json:"id"`
+	Name       string     `json:"name"`
+	GrantedAt  time.Time  `json:"granted_at"`
+	ExpiresAt  time.Time  `json:"expires_at"`
+	UsedAt     *time.Time `json:"used_at"`
+	ResetBytes *int64     `json:"reset_bytes"`
+}
+
 // ResetTicketGrant is one administrator grant as the admin history shows it.
 type ResetTicketGrant struct {
 	ID             string    `json:"id"`
@@ -295,4 +306,54 @@ func (s *ResetTicketService) Redeem(ctx context.Context, userID, ticketID, actor
 		Detail: map[string]any{"ticket_id": ticketID, "name": name, "reset_bytes": trafficUsed},
 	})
 	return &RedeemResult{TicketName: name, ResetBytes: trafficUsed}, nil
+}
+
+// ListForUser returns every ticket userID was ever granted, newest first.
+func (s *ResetTicketService) ListForUser(ctx context.Context, userID string) ([]UserResetTicket, error) {
+	rows, err := s.db.Query(ctx,
+		`SELECT id::text, name, granted_at, expires_at, used_at, reset_bytes
+		 FROM reset_tickets WHERE user_id = $1 ORDER BY granted_at DESC`, userID)
+	if err != nil {
+		return nil, fmt.Errorf("list user tickets: %w", err)
+	}
+	defer rows.Close()
+	out := make([]UserResetTicket, 0)
+	for rows.Next() {
+		var t UserResetTicket
+		if err := rows.Scan(&t.ID, &t.Name, &t.GrantedAt, &t.ExpiresAt, &t.UsedAt, &t.ResetBytes); err != nil {
+			return nil, fmt.Errorf("scan user ticket: %w", err)
+		}
+		out = append(out, t)
+	}
+	return out, rows.Err()
+}
+
+// Revoke deletes one unused ticket of userID. A spent ticket is the record of
+// a reset that already happened, so it is kept; revoking it would rewrite
+// history without giving the data back.
+func (s *ResetTicketService) Revoke(ctx context.Context, userID, ticketID, actorID, actorLabel string) error {
+	var name string
+	err := s.db.QueryRow(ctx,
+		`DELETE FROM reset_tickets WHERE id = $1 AND user_id = $2 AND used_at IS NULL RETURNING name`,
+		ticketID, userID,
+	).Scan(&name)
+	if errors.Is(err, pgx.ErrNoRows) {
+		var used bool
+		if qerr := s.db.QueryRow(ctx,
+			`SELECT used_at IS NOT NULL FROM reset_tickets WHERE id = $1 AND user_id = $2`, ticketID, userID,
+		).Scan(&used); qerr == nil && used {
+			return ErrResetTicketUsed
+		}
+		return ErrResetTicketNotFound
+	}
+	if err != nil {
+		return fmt.Errorf("revoke ticket: %w", err)
+	}
+	s.act.Log(ctx, Record{
+		EventType: EventResetTicketRevoked, Severity: SeverityInfo,
+		ActorType: "admin", ActorID: actorID, ActorLabel: actorLabel,
+		TargetType: "user", TargetID: userID,
+		Detail: map[string]any{"ticket_id": ticketID, "name": name},
+	})
+	return nil
 }

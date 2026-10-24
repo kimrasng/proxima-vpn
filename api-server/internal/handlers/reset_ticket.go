@@ -144,3 +144,54 @@ func (h *ResetTicketHandler) ListGrants(c *fiber.Ctx) error {
 	}
 	return c.JSON(grants)
 }
+
+// ListForUser handles GET /api/v1/admin/users/:id/reset-tickets.
+// @Summary List a user's reset tickets
+// @Description Returns every ticket the user was granted, including used and expired ones
+// @Tags admin-reset-tickets
+// @Produce json
+// @Param id path string true "User ID"
+// @Success 200 {array} services.UserResetTicket
+// @Security BearerAuth
+// @Router /admin/users/{id}/reset-tickets [get]
+func (h *ResetTicketHandler) ListForUser(c *fiber.Ctx) error {
+	userID := c.Params("id")
+	if !isUUID(userID) {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "user not found"})
+	}
+	tickets, err := h.svc.ListForUser(context.Background(), userID)
+	if err != nil {
+		log.Printf("[reset-tickets] list for user %s failed: %v", userID, err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "internal server error"})
+	}
+	return c.JSON(tickets)
+}
+
+// Revoke handles DELETE /api/v1/admin/users/:id/reset-tickets/:ticketId.
+// @Summary Revoke a reset ticket
+// @Description Deletes one of the user's unused tickets; used tickets are kept as history
+// @Tags admin-reset-tickets
+// @Param id path string true "User ID"
+// @Param ticketId path string true "Ticket ID"
+// @Success 204
+// @Failure 404 {object} map[string]string
+// @Failure 409 {object} map[string]string
+// @Security BearerAuth
+// @Router /admin/users/{id}/reset-tickets/{ticketId} [delete]
+func (h *ResetTicketHandler) Revoke(c *fiber.Ctx) error {
+	userID, ticketID := c.Params("id"), c.Params("ticketId")
+	if !isUUID(userID) || !isUUID(ticketID) {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "reset ticket not found"})
+	}
+	err := h.svc.Revoke(context.Background(), userID, ticketID, adminIDOf(c), adminEmail(c))
+	switch {
+	case errors.Is(err, services.ErrResetTicketNotFound):
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "reset ticket not found"})
+	case errors.Is(err, services.ErrResetTicketUsed):
+		return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "a used ticket cannot be revoked", "code": "used"})
+	case err != nil:
+		log.Printf("[reset-tickets] revoke %s failed: %v", ticketID, err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "internal server error"})
+	}
+	return c.SendStatus(fiber.StatusNoContent)
+}

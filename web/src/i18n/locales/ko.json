@@ -1420,7 +1420,47 @@
       "resetTraffic": "트래픽 초기화",
       "suspend": "정지",
       "activate": "활성화",
-      "byNodeHint": "노드에서 측정한 실제 전송량입니다. 위의 할당량은 노드 트래픽 배수가 적용된 과금 기준이라 합계가 사용량과 일치하지 않을 수 있습니다."
+      "byNodeHint": "노드에서 측정한 실제 전송량입니다. 위의 할당량은 노드 트래픽 배수가 적용된 과금 기준이라 합계가 사용량과 일치하지 않을 수 있습니다.",
+      "tabs": {
+        "label": "사용자 정보 탭",
+        "overview": "개요",
+        "plan": "플랜 관리",
+        "traffic": "데이터 사용량",
+        "sessions": "접속·세션",
+        "devices": "기기 ({{count}})",
+        "logins": "로그인 기록",
+        "resetTickets": "리셋권"
+      },
+      "resetTickets": {
+        "title": "리셋권",
+        "description": "이 사용자에게 지급된 리셋권입니다. 사용하지 않은 리셋권은 회수할 수 있어요.",
+        "loading": "리셋권을 불러오는 중…",
+        "loadError": "리셋권을 불러오지 못했습니다.",
+        "retry": "다시 시도",
+        "empty": "지급된 리셋권이 없습니다.",
+        "col": {
+          "name": "이름",
+          "state": "상태",
+          "granted": "지급일시",
+          "expires": "만료일시",
+          "used": "사용",
+          "actions": "작업"
+        },
+        "state": {
+          "usable": "사용 가능",
+          "used": "사용함",
+          "expired": "만료"
+        },
+        "usedDetail": "{{at}} · {{bytes}} 초기화",
+        "revoke": "회수",
+        "confirmTitle": "리셋권을 회수할까요?",
+        "confirmBody": "'{{name}}' 리셋권을 이 사용자에게서 삭제합니다. 되돌릴 수 없습니다.",
+        "confirm": "회수",
+        "cancel": "취소",
+        "revoked": "'{{name}}' 리셋권을 회수했습니다.",
+        "revokeUsed": "이미 사용한 리셋권은 회수할 수 없습니다.",
+        "revokeError": "리셋권을 회수하지 못했습니다."
+      }
     },
     "nodeEvents": {
       "title": "노드 이벤트",
@@ -1830,9 +1870,10 @@
       "noAnnouncements": "등록된 공지사항이 없습니다.",
       "serverNeedsPlan": "플랜을 구매하면 이용 가능한 서버를 확인할 수 있습니다.",
       "monthlyRemaining": "이번 달 남은 데이터",
-      "trafficLeftOfLimit": "{{limit}} 중 {{left}} 남음",
-      "nextResetIn": "{{days}}일 {{hours}}시간 뒤 데이터 리셋 ({{date}})",
-      "nextResetInHours": "{{hours}}시간 뒤 데이터 리셋 ({{date}})"
+      "nextResetIn": "데이터 리셋: {{date}} ({{days}}일 {{hours}}시간 뒤)",
+      "nextResetInHours": "데이터 리셋: {{date}} ({{hours}}시간 뒤)",
+      "trafficUsedSummary": "월 {{limit}} 중 {{used}} 사용",
+      "nextResetAfterTerm": "다음 리셋: {{date}} (플랜을 연장하면 적용)"
     },
     "devices": {
       "accountUrl": "계정 구독 URL",

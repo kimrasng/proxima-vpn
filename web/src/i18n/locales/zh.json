@@ -1420,7 +1420,47 @@
       "resetTraffic": "重置流量",
       "suspend": "停用",
       "activate": "启用",
-      "byNodeHint": "节点测得的实际传输量。上方配额按计费字节统计，节点流量倍率会对其缩放，因此两者未必相等。"
+      "byNodeHint": "节点测得的实际传输量。上方配额按计费字节统计，节点流量倍率会对其缩放，因此两者未必相等。",
+      "tabs": {
+        "label": "用户详情标签",
+        "overview": "概览",
+        "plan": "套餐管理",
+        "traffic": "流量用量",
+        "sessions": "连接与会话",
+        "devices": "设备（{{count}}）",
+        "logins": "登录记录",
+        "resetTickets": "重置券"
+      },
+      "resetTickets": {
+        "title": "重置券",
+        "description": "发给该用户的重置券。未使用的可以收回。",
+        "loading": "正在加载重置券…",
+        "loadError": "无法加载重置券。",
+        "retry": "重试",
+        "empty": "尚未发放重置券。",
+        "col": {
+          "name": "名称",
+          "state": "状态",
+          "granted": "发放时间",
+          "expires": "到期时间",
+          "used": "使用",
+          "actions": "操作"
+        },
+        "state": {
+          "usable": "可用",
+          "used": "已使用",
+          "expired": "已过期"
+        },
+        "usedDetail": "{{at}} · 清零 {{bytes}}",
+        "revoke": "收回",
+        "confirmTitle": "要收回这张重置券吗？",
+        "confirmBody": "将从该用户处删除“{{name}}”。此操作无法撤销。",
+        "confirm": "收回",
+        "cancel": "取消",
+        "revoked": "已收回“{{name}}”。",
+        "revokeUsed": "已使用的重置券无法收回。",
+        "revokeError": "无法收回重置券。"
+      }
     },
     "nodeEvents": {
       "title": "节点事件",
@@ -1830,9 +1870,10 @@
       "noAnnouncements": "暂无公告。",
       "serverNeedsPlan": "购买套餐后即可查看可用服务器。",
       "monthlyRemaining": "本月剩余流量",
-      "trafficLeftOfLimit": "共 {{limit}}，剩余 {{left}}",
-      "nextResetIn": "{{days}} 天 {{hours}} 小时后重置流量（{{date}}）",
-      "nextResetInHours": "{{hours}} 小时后重置流量（{{date}}）"
+      "nextResetIn": "流量重置：{{date}}（{{days}} 天 {{hours}} 小时后）",
+      "nextResetInHours": "流量重置：{{date}}（{{hours}} 小时后）",
+      "trafficUsedSummary": "本月已用 {{used}}，共 {{limit}}",
+      "nextResetAfterTerm": "下次重置：{{date}}（续期套餐后生效）"
     },
     "devices": {
       "accountUrl": "账户订阅 URL",

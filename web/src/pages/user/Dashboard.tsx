@@ -48,6 +48,8 @@ export default function Dashboard() {
   const resetDays = Math.floor(untilReset / 86400000);
   const resetHours = Math.floor((untilReset % 86400000) / 3600000);
   const canReset = hasPlan && !expired && trafficLimit > 0;
+  const resetAfterTerm = !!(nextReset && expires && nextReset.getTime() >= expires.getTime());
+  const resetDate = nextReset?.toLocaleString(i18n.resolvedLanguage ?? i18n.language, { month: "long", day: "numeric", hour: "numeric", minute: "2-digit" }) ?? "";
   const dateFormat = (date: string | Date) => new Date(date).toLocaleDateString(i18n.resolvedLanguage ?? i18n.language);
   const onlineNodes = nodes.data?.filter((node) => node.status === "online").length ?? 0;
   const latestAnnouncements = (announcements.data ?? [])
@@ -137,17 +139,20 @@ export default function Dashboard() {
                     <SpaceBetween size="xs">
                       <Box variant="awsui-key-label">{t(trafficLimit > 0 ? "user.dashboard.monthlyRemaining" : "user.dashboard.monthlyTraffic")}</Box>
                       <Box variant="h2">{formatBytes(trafficLimit > 0 ? Math.max(0, trafficLimit - data.traffic_used) : data.traffic_used)}</Box>
-                      <Box color="text-body-secondary">{trafficLimit > 0
-                        ? t("user.dashboard.trafficAllowance", { limit: formatBytes(trafficLimit) })
-                        : t("user.dashboard.trafficUnlimited")}</Box>
-                      {trafficLimit > 0 && <ProgressBar value={Math.max(0, 100 - trafficPercentage)}
-                        label={t("user.dashboard.trafficLeftOfLimit", { left: formatBytes(Math.max(0, trafficLimit - data.traffic_used)), limit: formatBytes(trafficLimit) })}
-                        additionalInfo={t("user.dashboard.trafficUsedOfLimit", { used: formatBytes(data.traffic_used), limit: formatBytes(trafficLimit) })}
-                        status={trafficPercentage >= 100 ? "error" : "in-progress"} />}
-                      {trafficLimit > 0 && nextReset && <Box variant="small" color="text-body-secondary">
-                        {t(resetDays > 0 ? "user.dashboard.nextResetIn" : "user.dashboard.nextResetInHours",
-                          { days: resetDays, hours: resetHours, date: nextReset.toLocaleString(i18n.resolvedLanguage ?? i18n.language, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) })}
-                      </Box>}
+                      {trafficLimit > 0 ? <>
+                        <ProgressBar value={Math.max(0, 100 - trafficPercentage)}
+                          ariaLabel={t("user.dashboard.monthlyRemaining")}
+                          additionalInfo={t("user.dashboard.trafficUsedSummary", { used: formatBytes(data.traffic_used), limit: formatBytes(trafficLimit) })}
+                          status={trafficPercentage >= 100 ? "error" : "in-progress"} />
+                        {nextReset && <Box color="text-body-secondary">
+                          <span style={{ display: "inline-flex", alignItems: "flex-start", gap: 6 }}>
+                            <Icon name="calendar" variant="subtle" />
+                            <span>{resetAfterTerm
+                              ? t("user.dashboard.nextResetAfterTerm", { date: resetDate })
+                              : t(resetDays > 0 ? "user.dashboard.nextResetIn" : "user.dashboard.nextResetInHours", { date: resetDate, days: resetDays, hours: resetHours })}</span>
+                          </span>
+                        </Box>}
+                      </> : <Box color="text-body-secondary">{t("user.dashboard.trafficUnlimited")}</Box>}
                     </SpaceBetween>
                     <SpaceBetween size="xs">
                       <Box variant="awsui-key-label">{t("user.dashboard.expiresAt")}</Box>

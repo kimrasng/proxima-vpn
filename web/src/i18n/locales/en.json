@@ -1420,7 +1420,47 @@
       "resetTraffic": "Reset traffic",
       "suspend": "Suspend",
       "activate": "Activate",
-      "byNodeHint": "Wire traffic measured at the node. The quota above counts charged bytes, which a node traffic multiplier can scale, so these figures need not add up to Used."
+      "byNodeHint": "Wire traffic measured at the node. The quota above counts charged bytes, which a node traffic multiplier can scale, so these figures need not add up to Used.",
+      "tabs": {
+        "label": "User detail tabs",
+        "overview": "Overview",
+        "plan": "Plan",
+        "traffic": "Data usage",
+        "sessions": "Connections & sessions",
+        "devices": "Devices ({{count}})",
+        "logins": "Login history",
+        "resetTickets": "Reset tickets"
+      },
+      "resetTickets": {
+        "title": "Reset tickets",
+        "description": "Tickets granted to this user. Unused tickets can be revoked.",
+        "loading": "Loading reset tickets…",
+        "loadError": "Couldn't load reset tickets.",
+        "retry": "Retry",
+        "empty": "No tickets have been granted.",
+        "col": {
+          "name": "Name",
+          "state": "Status",
+          "granted": "Granted",
+          "expires": "Expires",
+          "used": "Used",
+          "actions": "Actions"
+        },
+        "state": {
+          "usable": "Usable",
+          "used": "Used",
+          "expired": "Expired"
+        },
+        "usedDetail": "{{at}} · reset {{bytes}}",
+        "revoke": "Revoke",
+        "confirmTitle": "Revoke this ticket?",
+        "confirmBody": "'{{name}}' will be removed from this user. This can't be undone.",
+        "confirm": "Revoke",
+        "cancel": "Cancel",
+        "revoked": "Revoked '{{name}}'.",
+        "revokeUsed": "A used ticket can't be revoked.",
+        "revokeError": "Couldn't revoke the ticket."
+      }
     },
     "nodeEvents": {
       "title": "Node events",
@@ -1830,9 +1870,10 @@
       "noAnnouncements": "No announcements have been posted.",
       "serverNeedsPlan": "Purchase a plan to see the servers available to you.",
       "monthlyRemaining": "Data left this month",
-      "trafficLeftOfLimit": "{{left}} of {{limit}} left",
-      "nextResetIn": "Data resets in {{days}}d {{hours}}h ({{date}})",
-      "nextResetInHours": "Data resets in {{hours}}h ({{date}})"
+      "nextResetIn": "Data resets {{date}} (in {{days}}d {{hours}}h)",
+      "nextResetInHours": "Data resets {{date}} (in {{hours}}h)",
+      "trafficUsedSummary": "{{used}} of {{limit}} used this month",
+      "nextResetAfterTerm": "Next reset {{date}} (if you extend your plan)"
     },
     "devices": {
       "accountUrl": "Account subscription URL",

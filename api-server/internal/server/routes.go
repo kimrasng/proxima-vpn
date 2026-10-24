@@ -115,6 +115,9 @@ func (s *Server) registerRoutes() {
 	adminUsers.Put("/:id", adminUserHandler.Update)
 	adminUsers.Delete("/:id", adminUserHandler.Delete)
 	adminUsers.Post("/:id/reset-traffic", adminUserHandler.ResetTraffic)
+	resetTicketHandler := handlers.NewResetTicketHandler(s.db)
+	adminUsers.Get("/:id/reset-tickets", resetTicketHandler.ListForUser)
+	adminUsers.Delete("/:id/reset-tickets/:ticketId", resetTicketHandler.Revoke)
 
 	adminOrderHandler := handlers.NewAdminOrderHandler(s.db)
 	adminOrders := admin.Group("/orders")
@@ -130,7 +133,6 @@ func (s *Server) registerRoutes() {
 	adminPromotions.Put("/:id", adminPromotionHandler.Update)
 	adminPromotions.Delete("/:id", adminPromotionHandler.Delete)
 
-	resetTicketHandler := handlers.NewResetTicketHandler(s.db)
 	admin.Get("/reset-tickets", resetTicketHandler.ListGrants)
 	admin.Post("/reset-tickets", resetTicketHandler.Grant)
 

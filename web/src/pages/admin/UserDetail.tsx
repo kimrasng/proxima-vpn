@@ -5,7 +5,6 @@ import {
   Alert,
   Box,
   Button,
-  ColumnLayout,
   Container,
   ContentLayout,
   DatePicker,
@@ -23,6 +22,7 @@ import {
   StatusIndicator,
   type StatusIndicatorProps,
   Table,
+  Tabs,
   Toggle,
 } from "@cloudscape-design/components";
 import {
@@ -49,6 +49,7 @@ import { usePublishBreadcrumbLeaf } from "../../hooks/useBreadcrumbLeaf";
 import { useManualRefresh } from "../../hooks/useManualRefresh";
 import { formatBytes } from "../../utils/format";
 import { formatAbsoluteTime, formatTime } from "../../utils/relativeTime";
+import UserResetTicketsPanel from "./UserResetTicketsPanel";
 
 const REFRESH_INTERVAL = 30000;
 const LOGIN_HISTORY_LIMIT = 50;
@@ -117,6 +118,7 @@ function UserDetailPage() {
   const [trafficError, setTrafficError] = useState<string | null>(null);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [flash, setFlash] = useState<{ type: "success" | "error"; content: string }[]>([]);
+  const [activeTab, setActiveTab] = useState("overview");
 
   usePublishBreadcrumbLeaf(user?.name || user?.email);
 
@@ -338,351 +340,388 @@ function UserDetailPage() {
           />
         )}
 
-        <ColumnLayout columns={2} minColumnWidth={400}>
-          <Container
-            fitHeight
-            header={<Header variant="h2">{t("admin.userDetail.identity")}</Header>}
-          >
-            <KeyValuePairs
-              columns={2}
-              items={[
-                { label: t("admin.users.col.email"), value: user.email },
-                {
-                  label: t("admin.users.col.status"),
-                  value: (
-                    <StatusIndicator type={statusIndicatorType(user.status, user.is_active)}>
-                      {!user.is_active && user.status === "active"
-                        ? t("admin.users.status.disabled")
-                        : t(`admin.users.status.${user.status}`, { defaultValue: user.status })}
-                    </StatusIndicator>
-                  ),
-                },
-                {
-                  label: t("admin.users.col.plan"),
-                  value: user.plan_name ?? t("admin.users.noPlan"),
-                },
-                { label: t("admin.userDetail.createdAt"), value: formatAbsoluteTime(user.created_at) },
-                {
-                  label: t("admin.userDetail.planExpiresAt"),
-                  value: user.plan_expires_at
-                    ? formatAbsoluteTime(user.plan_expires_at)
-                    : t("admin.userDetail.none"),
-                },
-                { label: t("admin.userDetail.subToken"), value: user.sub_token || t("admin.userDetail.none") },
-              ]}
-            />
-          </Container>
-
-          <Container
-            fitHeight
-            header={<Header variant="h2">{t("admin.userDetail.editSection")}</Header>}
-          >
-            <Form
-              actions={
-                <Button variant="primary" loading={saving} onClick={() => void handleSave()}>
-                  {t("admin.userDetail.save")}
-                </Button>
-              }
-            >
-              <SpaceBetween size="m">
-                <FormField label={t("admin.userDetail.nameLabel")}>
-                  <Input
-                    value={form.name}
-                    onChange={({ detail }) => setForm((f) => (f ? { ...f, name: detail.value } : f))}
-                  />
-                </FormField>
-                <FormField label={t("admin.userDetail.statusLabel")}>
-                  <Select
-                    selectedOption={statusOptions.find((o) => o.value === form.status) ?? null}
-                    options={statusOptions}
-                    onChange={({ detail }) =>
-                      setForm((f) =>
-                        f ? { ...f, status: detail.selectedOption.value ?? "active" } : f,
-                      )
-                    }
-                  />
-                </FormField>
-                <FormField label={t("admin.userDetail.planLabel")}>
-                  <Select
-                    selectedOption={planOptions.find((o) => o.value === form.plan_id) ?? null}
-                    options={planOptions}
-                    onChange={({ detail }) =>
-                      setForm((f) => (f ? { ...f, plan_id: detail.selectedOption.value ?? "" } : f))
-                    }
-                  />
-                </FormField>
-                <FormField label={t("admin.userDetail.expiresAtLabel")}>
-                  <DatePicker
-                    value={form.plan_expires_at}
-                    placeholder="YYYY/MM/DD"
-                    onChange={({ detail }) =>
-                      setForm((f) => (f ? { ...f, plan_expires_at: detail.value } : f))
-                    }
-                  />
-                </FormField>
-                <FormField label={t("admin.userDetail.activeLabel")}>
-                  <Toggle
-                    checked={form.is_active}
-                    onChange={({ detail }) =>
-                      setForm((f) => (f ? { ...f, is_active: detail.checked } : f))
+        <Tabs
+          activeTabId={activeTab}
+          onChange={({ detail }) => setActiveTab(detail.activeTabId)}
+          ariaLabel={t("admin.userDetail.tabs.label")}
+          tabs={[
+            {
+              id: "overview",
+              label: t("admin.userDetail.tabs.overview"),
+              content: (
+                  <Container
+                    header={<Header variant="h2">{t("admin.userDetail.identity")}</Header>}
+                  >
+                    <KeyValuePairs
+                      columns={2}
+                      items={[
+                        { label: t("admin.users.col.email"), value: user.email },
+                        {
+                          label: t("admin.users.col.status"),
+                          value: (
+                            <StatusIndicator type={statusIndicatorType(user.status, user.is_active)}>
+                              {!user.is_active && user.status === "active"
+                                ? t("admin.users.status.disabled")
+                                : t(`admin.users.status.${user.status}`, { defaultValue: user.status })}
+                            </StatusIndicator>
+                          ),
+                        },
+                        {
+                          label: t("admin.users.col.plan"),
+                          value: user.plan_name ?? t("admin.users.noPlan"),
+                        },
+                        { label: t("admin.userDetail.createdAt"), value: formatAbsoluteTime(user.created_at) },
+                        {
+                          label: t("admin.userDetail.planExpiresAt"),
+                          value: user.plan_expires_at
+                            ? formatAbsoluteTime(user.plan_expires_at)
+                            : t("admin.userDetail.none"),
+                        },
+                        { label: t("admin.userDetail.subToken"), value: user.sub_token || t("admin.userDetail.none") },
+                      ]}
+                    />
+                  </Container>
+              ),
+            },
+            {
+              id: "plan",
+              label: t("admin.userDetail.tabs.plan"),
+              content: (
+                  <Container
+                    header={<Header variant="h2">{t("admin.userDetail.editSection")}</Header>}
+                  >
+                    <Form
+                      actions={
+                        <Button variant="primary" loading={saving} onClick={() => void handleSave()}>
+                          {t("admin.userDetail.save")}
+                        </Button>
+                      }
+                    >
+                      <SpaceBetween size="m">
+                        <FormField label={t("admin.userDetail.nameLabel")}>
+                          <Input
+                            value={form.name}
+                            onChange={({ detail }) => setForm((f) => (f ? { ...f, name: detail.value } : f))}
+                          />
+                        </FormField>
+                        <FormField label={t("admin.userDetail.statusLabel")}>
+                          <Select
+                            selectedOption={statusOptions.find((o) => o.value === form.status) ?? null}
+                            options={statusOptions}
+                            onChange={({ detail }) =>
+                              setForm((f) =>
+                                f ? { ...f, status: detail.selectedOption.value ?? "active" } : f,
+                              )
+                            }
+                          />
+                        </FormField>
+                        <FormField label={t("admin.userDetail.planLabel")}>
+                          <Select
+                            selectedOption={planOptions.find((o) => o.value === form.plan_id) ?? null}
+                            options={planOptions}
+                            onChange={({ detail }) =>
+                              setForm((f) => (f ? { ...f, plan_id: detail.selectedOption.value ?? "" } : f))
+                            }
+                          />
+                        </FormField>
+                        <FormField label={t("admin.userDetail.expiresAtLabel")}>
+                          <DatePicker
+                            value={form.plan_expires_at}
+                            placeholder="YYYY/MM/DD"
+                            onChange={({ detail }) =>
+                              setForm((f) => (f ? { ...f, plan_expires_at: detail.value } : f))
+                            }
+                          />
+                        </FormField>
+                        <FormField label={t("admin.userDetail.activeLabel")}>
+                          <Toggle
+                            checked={form.is_active}
+                            onChange={({ detail }) =>
+                              setForm((f) => (f ? { ...f, is_active: detail.checked } : f))
+                            }
+                          >
+                            {form.is_active ? t("admin.users.activate") : t("admin.users.suspend")}
+                          </Toggle>
+                        </FormField>
+                      </SpaceBetween>
+                    </Form>
+                  </Container>
+              ),
+            },
+            {
+              id: "traffic",
+              label: t("admin.userDetail.tabs.traffic"),
+              content: (
+                <SpaceBetween size="l">
+                  <Container header={<Header variant="h2">{t("admin.userDetail.traffic")}</Header>}>
+                    <SpaceBetween size="m">
+                      {trafficError && <Alert type="error">{trafficError}</Alert>}
+                      <KeyValuePairs
+                        columns={4}
+                        items={[
+                          {
+                            label: t("admin.userDetail.trafficUsed"),
+                            value: formatBytes(traffic?.traffic_used ?? user.traffic_used),
+                          },
+                          {
+                            label: t("admin.userDetail.trafficLimit"),
+                            value: !traffic
+                              ? "—"
+                              : traffic.unlimited
+                                ? t("admin.userDetail.unlimited")
+                                : formatBytes(traffic.traffic_limit ?? 0),
+                          },
+                          {
+                            label: t("admin.userDetail.trafficRemaining"),
+                            value: !traffic
+                              ? "—"
+                              : traffic.unlimited
+                                ? t("admin.userDetail.unlimited")
+                                : formatBytes(traffic.traffic_remaining ?? 0),
+                          },
+                          {
+                            label: t("admin.userDetail.trafficResetAt"),
+                            value: user.traffic_reset_at
+                              ? formatAbsoluteTime(user.traffic_reset_at)
+                              : t("admin.userDetail.never"),
+                          },
+                        ]}
+                      />
+                      {traffic && !traffic.unlimited && (
+                        <ProgressBar
+                          value={traffic.percentage}
+                          label={t("admin.userDetail.trafficPercentage")}
+                          description={`${traffic.percentage.toFixed(1)}%`}
+                        />
+                      )}
+                    </SpaceBetween>
+                  </Container>
+                  <Container
+                    header={
+                      <Header
+                        variant="h2"
+                        actions={
+                          <SegmentedControl
+                            selectedId={window}
+                            options={trafficWindows.map((w) => ({
+                              id: w,
+                              text: t(`admin.userDetail.window.${w}`),
+                            }))}
+                            onChange={({ detail }) => {
+                              if (isTrafficWindow(detail.selectedId)) setWindow(detail.selectedId);
+                            }}
+                          />
+                        }
+                      >
+                        {t("admin.userDetail.byNode")}
+                      </Header>
                     }
                   >
-                    {form.is_active ? t("admin.users.activate") : t("admin.users.suspend")}
-                  </Toggle>
-                </FormField>
-              </SpaceBetween>
-            </Form>
-          </Container>
-        </ColumnLayout>
-
-        <Container header={<Header variant="h2">{t("admin.userDetail.traffic")}</Header>}>
-          <SpaceBetween size="m">
-            {trafficError && <Alert type="error">{trafficError}</Alert>}
-            <KeyValuePairs
-              columns={4}
-              items={[
-                {
-                  label: t("admin.userDetail.trafficUsed"),
-                  value: formatBytes(traffic?.traffic_used ?? user.traffic_used),
-                },
-                {
-                  label: t("admin.userDetail.trafficLimit"),
-                  value: !traffic
-                    ? "—"
-                    : traffic.unlimited
-                      ? t("admin.userDetail.unlimited")
-                      : formatBytes(traffic.traffic_limit ?? 0),
-                },
-                {
-                  label: t("admin.userDetail.trafficRemaining"),
-                  value: !traffic
-                    ? "—"
-                    : traffic.unlimited
-                      ? t("admin.userDetail.unlimited")
-                      : formatBytes(traffic.traffic_remaining ?? 0),
-                },
-                {
-                  label: t("admin.userDetail.trafficResetAt"),
-                  value: user.traffic_reset_at
-                    ? formatAbsoluteTime(user.traffic_reset_at)
-                    : t("admin.userDetail.never"),
-                },
-              ]}
-            />
-            {traffic && !traffic.unlimited && (
-              <ProgressBar
-                value={traffic.percentage}
-                label={t("admin.userDetail.trafficPercentage")}
-                description={`${traffic.percentage.toFixed(1)}%`}
-              />
-            )}
-          </SpaceBetween>
-        </Container>
-
-        <Container
-          header={
-            <Header
-              variant="h2"
-              actions={
-                <SegmentedControl
-                  selectedId={window}
-                  options={trafficWindows.map((w) => ({
-                    id: w,
-                    text: t(`admin.userDetail.window.${w}`),
-                  }))}
-                  onChange={({ detail }) => {
-                    if (isTrafficWindow(detail.selectedId)) setWindow(detail.selectedId);
-                  }}
-                />
-              }
-            >
-              {t("admin.userDetail.byNode")}
-            </Header>
-          }
-        >
-          <SpaceBetween size="s">
-            <Box variant="small" color="text-body-secondary">
-              {t("admin.userDetail.byNodeHint")}
-            </Box>
-            <Table
-              variant="embedded"
-              items={traffic?.by_node ?? []}
-              columnDefinitions={[
-                {
-                  id: "node",
-                  header: t("admin.userDetail.nodeCol.node"),
-                  cell: (item) => item.node_name,
-                },
-                {
-                  id: "upload",
-                  header: t("admin.userDetail.nodeCol.upload"),
-                  cell: (item) => formatBytes(item.upload),
-                },
-                {
-                  id: "download",
-                  header: t("admin.userDetail.nodeCol.download"),
-                  cell: (item) => formatBytes(item.download),
-                },
-                {
-                  id: "total",
-                  header: t("admin.userDetail.nodeCol.total"),
-                  cell: (item) => formatBytes(item.total),
-                },
-              ]}
-              empty={<Box textAlign="center">{t("admin.userDetail.byNodeEmpty")}</Box>}
-            />
-          </SpaceBetween>
-        </Container>
-
-        <Container header={<Header variant="h2">{t("admin.userDetail.tunnelSessions.title")}</Header>}>
-          <SpaceBetween size="s">
-            <Box variant="small" color="text-body-secondary">
-              {t("admin.userDetail.tunnelSessions.hint")}
-            </Box>
-            {tunnelSessionsError && (
-              <Alert type="warning">{t("admin.userDetail.tunnelSessions.fetchError")}</Alert>
-            )}
-            <KeyValuePairs items={[{
-              label: t("admin.userDetail.tunnelSessions.count"),
-              value: tunnelSessions?.complete && tunnelSessions.count !== null
-                ? tunnelSessions.count
-                : t("admin.userDetail.tunnelSessions.unknown"),
-            }, {
-              label: t("admin.userDetail.tunnelSessions.limit"),
-              value: tunnelSessions?.limit && tunnelSessions.limit > 0
-                ? tunnelSessions.limit
-                : t("admin.userDetail.tunnelSessions.unlimited"),
-            }]} />
-            {tunnelSessions?.complete && tunnelSessions.over_limit && (
-              <Alert type="warning">{t("admin.userDetail.tunnelSessions.overLimitUnenforced")}</Alert>
-            )}
-            {tunnelSessions && !tunnelSessions.complete && (
-              <Alert type="info">{t("admin.userDetail.tunnelSessions.incomplete")}</Alert>
-            )}
-          </SpaceBetween>
-        </Container>
-
-        <Container
-          header={<Header variant="h2">{t("admin.userDetail.clientAddresses.title")}</Header>}
-        >
-          <SpaceBetween size="s">
-            <Box variant="small" color="text-body-secondary">
-              {t("admin.userDetail.clientAddresses.hint")}
-            </Box>
-            {clientAddressesError && (
-              <Alert type="warning">{t("admin.userDetail.clientAddresses.fetchError")}</Alert>
-            )}
-            <KeyValuePairs
-              items={[
-                {
-                  label: t("admin.userDetail.clientAddresses.count"),
-                  value: clientAddresses?.complete && clientAddresses.count !== null
-                    ? clientAddresses.count
-                    : t("admin.userDetail.clientAddresses.unknown"),
-                },
-              ]}
-            />
-            {clientAddresses && !clientAddresses.complete && (
-              <Alert type="info">{t("admin.userDetail.clientAddresses.incomplete")}</Alert>
-            )}
-            <Table
-              variant="embedded"
-              items={clientAddresses?.addresses ?? []}
-              columnDefinitions={[
-                {
-                  id: "address",
-                  header: t("admin.userDetail.clientAddresses.address"),
-                  cell: (address) => address,
-                },
-              ]}
-              empty={
-                <Box textAlign="center">
-                  {t(clientAddresses?.complete
-                    ? "admin.userDetail.clientAddresses.empty"
-                    : "admin.userDetail.clientAddresses.unknown")}
-                </Box>
-              }
-            />
-          </SpaceBetween>
-        </Container>
-
-        <ColumnLayout columns={2} minColumnWidth={420}>
-          <Container
-            fitHeight
-            header={<Header variant="h2" counter={`(${user.devices.length})`}>{t("admin.userDetail.devices")}</Header>}
-          >
-            <SpaceBetween size="s">
-              <Box variant="small" color="text-body-secondary">{t("admin.userDetail.deviceCountHint", { count: user.devices.length })}</Box>
-              <Box variant="small" color="text-body-secondary">{t("admin.userDetail.onlineUnknown")}</Box>
-              <Table
-              variant="embedded"
-              items={user.devices}
-              columnDefinitions={[
-                {
-                  id: "name",
-                  header: t("admin.userDetail.deviceCol.name"),
-                  cell: (item) => item.name ?? "—",
-                },
-                {
-                  id: "uuid",
-                  header: t("admin.userDetail.deviceCol.uuid"),
-                  cell: (item) => item.xray_uuid,
-                },
-                {
-                  id: "created",
-                  header: t("admin.userDetail.deviceCol.createdAt"),
-                  cell: (item) => formatAbsoluteTime(item.created_at),
-                },
-              ]}
-              empty={<Box textAlign="center">{t("admin.userDetail.devicesEmpty")}</Box>}
-              />
-            </SpaceBetween>
-          </Container>
-
-          <Container
-            fitHeight
-            header={<Header variant="h2" counter={`(${logins.length})`}>{t("admin.userDetail.loginHistory")}</Header>}
-          >
-            <SpaceBetween size="s">
-              {loginError && <Alert type="error">{loginError}</Alert>}
-              <Table
-                variant="embedded"
-                items={logins}
-                columnDefinitions={[
-                  {
-                    id: "time",
-                    header: t("admin.userDetail.loginCol.time"),
-                    cell: (item) => formatAbsoluteTime(item.created_at),
-                  },
-                  {
-                    id: "ip",
-                    header: t("admin.userDetail.loginCol.ip"),
-                    cell: (item) => item.ip || "—",
-                  },
-                  {
-                    id: "outcome",
-                    header: t("admin.userDetail.loginCol.outcome"),
-                    cell: (item) => (
-                      <StatusIndicator type={item.success ? "success" : "error"}>
-                        {item.success
-                          ? t("admin.userDetail.loginSuccess")
-                          : t(`admin.userDetail.reason.${item.failure_reason}`, {
-                              defaultValue: t("admin.userDetail.loginFailure"),
-                            })}
-                      </StatusIndicator>
-                    ),
-                  },
-                  {
-                    id: "agent",
-                    header: t("admin.userDetail.loginCol.agent"),
-                    cell: (item) => item.user_agent || "—",
-                  },
-                ]}
-                empty={<Box textAlign="center">{t("admin.userDetail.loginHistoryEmpty")}</Box>}
-              />
-            </SpaceBetween>
-          </Container>
-        </ColumnLayout>
+                    <SpaceBetween size="s">
+                      <Box variant="small" color="text-body-secondary">
+                        {t("admin.userDetail.byNodeHint")}
+                      </Box>
+                      <Table
+                        variant="embedded"
+                        items={traffic?.by_node ?? []}
+                        columnDefinitions={[
+                          {
+                            id: "node",
+                            header: t("admin.userDetail.nodeCol.node"),
+                            cell: (item) => item.node_name,
+                          },
+                          {
+                            id: "upload",
+                            header: t("admin.userDetail.nodeCol.upload"),
+                            cell: (item) => formatBytes(item.upload),
+                          },
+                          {
+                            id: "download",
+                            header: t("admin.userDetail.nodeCol.download"),
+                            cell: (item) => formatBytes(item.download),
+                          },
+                          {
+                            id: "total",
+                            header: t("admin.userDetail.nodeCol.total"),
+                            cell: (item) => formatBytes(item.total),
+                          },
+                        ]}
+                        empty={<Box textAlign="center">{t("admin.userDetail.byNodeEmpty")}</Box>}
+                      />
+                    </SpaceBetween>
+                  </Container>
+                </SpaceBetween>
+              ),
+            },
+            {
+              id: "sessions",
+              label: t("admin.userDetail.tabs.sessions"),
+              content: (
+                <SpaceBetween size="l">
+                  <Container header={<Header variant="h2">{t("admin.userDetail.tunnelSessions.title")}</Header>}>
+                    <SpaceBetween size="s">
+                      <Box variant="small" color="text-body-secondary">
+                        {t("admin.userDetail.tunnelSessions.hint")}
+                      </Box>
+                      {tunnelSessionsError && (
+                        <Alert type="warning">{t("admin.userDetail.tunnelSessions.fetchError")}</Alert>
+                      )}
+                      <KeyValuePairs items={[{
+                        label: t("admin.userDetail.tunnelSessions.count"),
+                        value: tunnelSessions?.complete && tunnelSessions.count !== null
+                          ? tunnelSessions.count
+                          : t("admin.userDetail.tunnelSessions.unknown"),
+                      }, {
+                        label: t("admin.userDetail.tunnelSessions.limit"),
+                        value: tunnelSessions?.limit && tunnelSessions.limit > 0
+                          ? tunnelSessions.limit
+                          : t("admin.userDetail.tunnelSessions.unlimited"),
+                      }]} />
+                      {tunnelSessions?.complete && tunnelSessions.over_limit && (
+                        <Alert type="warning">{t("admin.userDetail.tunnelSessions.overLimitUnenforced")}</Alert>
+                      )}
+                      {tunnelSessions && !tunnelSessions.complete && (
+                        <Alert type="info">{t("admin.userDetail.tunnelSessions.incomplete")}</Alert>
+                      )}
+                    </SpaceBetween>
+                  </Container>
+                  <Container
+                    header={<Header variant="h2">{t("admin.userDetail.clientAddresses.title")}</Header>}
+                  >
+                    <SpaceBetween size="s">
+                      <Box variant="small" color="text-body-secondary">
+                        {t("admin.userDetail.clientAddresses.hint")}
+                      </Box>
+                      {clientAddressesError && (
+                        <Alert type="warning">{t("admin.userDetail.clientAddresses.fetchError")}</Alert>
+                      )}
+                      <KeyValuePairs
+                        items={[
+                          {
+                            label: t("admin.userDetail.clientAddresses.count"),
+                            value: clientAddresses?.complete && clientAddresses.count !== null
+                              ? clientAddresses.count
+                              : t("admin.userDetail.clientAddresses.unknown"),
+                          },
+                        ]}
+                      />
+                      {clientAddresses && !clientAddresses.complete && (
+                        <Alert type="info">{t("admin.userDetail.clientAddresses.incomplete")}</Alert>
+                      )}
+                      <Table
+                        variant="embedded"
+                        items={clientAddresses?.addresses ?? []}
+                        columnDefinitions={[
+                          {
+                            id: "address",
+                            header: t("admin.userDetail.clientAddresses.address"),
+                            cell: (address) => address,
+                          },
+                        ]}
+                        empty={
+                          <Box textAlign="center">
+                            {t(clientAddresses?.complete
+                              ? "admin.userDetail.clientAddresses.empty"
+                              : "admin.userDetail.clientAddresses.unknown")}
+                          </Box>
+                        }
+                      />
+                    </SpaceBetween>
+                  </Container>
+                </SpaceBetween>
+              ),
+            },
+            {
+              id: "devices",
+              label: t("admin.userDetail.tabs.devices", { count: user.devices.length }),
+              content: (
+                  <Container
+                    header={<Header variant="h2" counter={`(${user.devices.length})`}>{t("admin.userDetail.devices")}</Header>}
+                  >
+                    <SpaceBetween size="s">
+                      <Box variant="small" color="text-body-secondary">{t("admin.userDetail.deviceCountHint", { count: user.devices.length })}</Box>
+                      <Box variant="small" color="text-body-secondary">{t("admin.userDetail.onlineUnknown")}</Box>
+                      <Table
+                      variant="embedded"
+                      items={user.devices}
+                      columnDefinitions={[
+                        {
+                          id: "name",
+                          header: t("admin.userDetail.deviceCol.name"),
+                          cell: (item) => item.name ?? "—",
+                        },
+                        {
+                          id: "uuid",
+                          header: t("admin.userDetail.deviceCol.uuid"),
+                          cell: (item) => item.xray_uuid,
+                        },
+                        {
+                          id: "created",
+                          header: t("admin.userDetail.deviceCol.createdAt"),
+                          cell: (item) => formatAbsoluteTime(item.created_at),
+                        },
+                      ]}
+                      empty={<Box textAlign="center">{t("admin.userDetail.devicesEmpty")}</Box>}
+                      />
+                    </SpaceBetween>
+                  </Container>
+              ),
+            },
+            {
+              id: "logins",
+              label: t("admin.userDetail.tabs.logins"),
+              content: (
+                  <Container
+                    header={<Header variant="h2" counter={`(${logins.length})`}>{t("admin.userDetail.loginHistory")}</Header>}
+                  >
+                    <SpaceBetween size="s">
+                      {loginError && <Alert type="error">{loginError}</Alert>}
+                      <Table
+                        variant="embedded"
+                        items={logins}
+                        columnDefinitions={[
+                          {
+                            id: "time",
+                            header: t("admin.userDetail.loginCol.time"),
+                            cell: (item) => formatAbsoluteTime(item.created_at),
+                          },
+                          {
+                            id: "ip",
+                            header: t("admin.userDetail.loginCol.ip"),
+                            cell: (item) => item.ip || "—",
+                          },
+                          {
+                            id: "outcome",
+                            header: t("admin.userDetail.loginCol.outcome"),
+                            cell: (item) => (
+                              <StatusIndicator type={item.success ? "success" : "error"}>
+                                {item.success
+                                  ? t("admin.userDetail.loginSuccess")
+                                  : t(`admin.userDetail.reason.${item.failure_reason}`, {
+                                      defaultValue: t("admin.userDetail.loginFailure"),
+                                    })}
+                              </StatusIndicator>
+                            ),
+                          },
+                          {
+                            id: "agent",
+                            header: t("admin.userDetail.loginCol.agent"),
+                            cell: (item) => item.user_agent || "—",
+                          },
+                        ]}
+                        empty={<Box textAlign="center">{t("admin.userDetail.loginHistoryEmpty")}</Box>}
+                      />
+                    </SpaceBetween>
+                  </Container>
+              ),
+            },
+            {
+              id: "resetTickets",
+              label: t("admin.userDetail.tabs.resetTickets"),
+              content: <UserResetTicketsPanel userId={user.id} />,
+            },
+          ]}
+        />
       </SpaceBetween>
     </ContentLayout>
   );

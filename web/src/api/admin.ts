@@ -19,6 +19,7 @@ import type {
   UpdateNodeGroupRequest,
   Plan,
   ResetTicketGrant,
+  UserResetTicket,
   GrantResetTicketRequest,
   CreatePlanRequest,
   UpdatePlanRequest,
@@ -261,6 +262,16 @@ export function deletePlan(id: string): Promise<void> {
 export function listPromotions(): Promise<PromotionCode[]> {
   applyAdminClient();
   return get<PromotionCode[]>('/api/v1/admin/promotions');
+}
+
+export function listUserResetTickets(userId: string): Promise<UserResetTicket[]> {
+  applyAdminClient();
+  return get<UserResetTicket[]>(`/api/v1/admin/users/${userId}/reset-tickets`);
+}
+
+export function revokeUserResetTicket(userId: string, ticketId: string): Promise<void> {
+  applyAdminClient();
+  return del<void>(`/api/v1/admin/users/${userId}/reset-tickets/${ticketId}`);
 }
 
 export function listResetTicketGrants(): Promise<ResetTicketGrant[]> {
