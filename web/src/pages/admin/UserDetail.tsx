@@ -7,7 +7,6 @@ import {
   Button,
   Container,
   ContentLayout,
-  DatePicker,
   Flashbar,
   Form,
   FormField,
@@ -48,7 +47,9 @@ import type {
 import { usePublishBreadcrumbLeaf } from "../../hooks/useBreadcrumbLeaf";
 import { useManualRefresh } from "../../hooks/useManualRefresh";
 import { formatBytes } from "../../utils/format";
+import { describeClient } from "../../utils/userAgent";
 import { formatAbsoluteTime, formatTime } from "../../utils/relativeTime";
+import UserPlanGrantPanel from "./UserPlanGrantPanel";
 import UserResetTicketsPanel from "./UserResetTicketsPanel";
 
 const REFRESH_INTERVAL = 30000;
@@ -201,14 +202,6 @@ function UserDetailPage() {
     REFRESH_INTERVAL,
   );
 
-  const planOptions = useMemo(
-    () => [
-      { label: t("admin.users.noPlan"), value: "" },
-      ...plans.map((p) => ({ label: p.name, value: p.id })),
-    ],
-    [plans, t],
-  );
-
   const statusOptions = useMemo(
     () => editableStatuses.map((s) => ({ label: t(`admin.users.status.${s}`), value: s })),
     [t],
@@ -225,14 +218,6 @@ function UserDetailPage() {
       if (form.name !== user.name) patch.name = form.name;
       if (form.status !== user.status) patch.status = form.status;
       if (form.is_active !== user.is_active) patch.is_active = form.is_active;
-      if (form.plan_id !== (user.plan_id ?? "")) patch.plan_id = form.plan_id || undefined;
-
-      const currentExpiry = user.plan_expires_at ? (user.plan_expires_at.split("T")[0] ?? "") : "";
-      if (form.plan_expires_at !== currentExpiry) {
-        patch.plan_expires_at = form.plan_expires_at
-          ? new Date(form.plan_expires_at).toISOString()
-          : undefined;
-      }
 
       if (Object.keys(patch).length === 0) {
         setFlash([{ type: "success", content: t("admin.userDetail.saveSuccess") }]);
@@ -349,6 +334,7 @@ function UserDetailPage() {
               id: "overview",
               label: t("admin.userDetail.tabs.overview"),
               content: (
+                <SpaceBetween size="l">
                   <Container
                     header={<Header variant="h2">{t("admin.userDetail.identity")}</Header>}
                   >
@@ -381,72 +367,54 @@ function UserDetailPage() {
                       ]}
                     />
                   </Container>
+                    <Container
+                      header={<Header variant="h2" description={t("admin.userDetail.accountHint")}>{t("admin.userDetail.accountSection")}</Header>}
+                    >
+                      <Form
+                        actions={
+                          <Button variant="primary" loading={saving} onClick={() => void handleSave()}>
+                            {t("admin.userDetail.save")}
+                          </Button>
+                        }
+                      >
+                        <SpaceBetween size="m">
+                          <FormField label={t("admin.userDetail.nameLabel")}>
+                            <Input
+                              value={form.name}
+                              onChange={({ detail }) => setForm((f) => (f ? { ...f, name: detail.value } : f))}
+                            />
+                          </FormField>
+                          <FormField label={t("admin.userDetail.statusLabel")}>
+                            <Select
+                              selectedOption={statusOptions.find((o) => o.value === form.status) ?? null}
+                              options={statusOptions}
+                              onChange={({ detail }) =>
+                                setForm((f) =>
+                                  f ? { ...f, status: detail.selectedOption.value ?? "active" } : f,
+                                )
+                              }
+                            />
+                          </FormField>
+                          <FormField label={t("admin.userDetail.activeLabel")}>
+                            <Toggle
+                              checked={form.is_active}
+                              onChange={({ detail }) =>
+                                setForm((f) => (f ? { ...f, is_active: detail.checked } : f))
+                              }
+                            >
+                              {form.is_active ? t("admin.users.activate") : t("admin.users.suspend")}
+                            </Toggle>
+                          </FormField>
+                        </SpaceBetween>
+                      </Form>
+                    </Container>
+                </SpaceBetween>
               ),
             },
             {
               id: "plan",
               label: t("admin.userDetail.tabs.plan"),
-              content: (
-                  <Container
-                    header={<Header variant="h2">{t("admin.userDetail.editSection")}</Header>}
-                  >
-                    <Form
-                      actions={
-                        <Button variant="primary" loading={saving} onClick={() => void handleSave()}>
-                          {t("admin.userDetail.save")}
-                        </Button>
-                      }
-                    >
-                      <SpaceBetween size="m">
-                        <FormField label={t("admin.userDetail.nameLabel")}>
-                          <Input
-                            value={form.name}
-                            onChange={({ detail }) => setForm((f) => (f ? { ...f, name: detail.value } : f))}
-                          />
-                        </FormField>
-                        <FormField label={t("admin.userDetail.statusLabel")}>
-                          <Select
-                            selectedOption={statusOptions.find((o) => o.value === form.status) ?? null}
-                            options={statusOptions}
-                            onChange={({ detail }) =>
-                              setForm((f) =>
-                                f ? { ...f, status: detail.selectedOption.value ?? "active" } : f,
-                              )
-                            }
-                          />
-                        </FormField>
-                        <FormField label={t("admin.userDetail.planLabel")}>
-                          <Select
-                            selectedOption={planOptions.find((o) => o.value === form.plan_id) ?? null}
-                            options={planOptions}
-                            onChange={({ detail }) =>
-                              setForm((f) => (f ? { ...f, plan_id: detail.selectedOption.value ?? "" } : f))
-                            }
-                          />
-                        </FormField>
-                        <FormField label={t("admin.userDetail.expiresAtLabel")}>
-                          <DatePicker
-                            value={form.plan_expires_at}
-                            placeholder="YYYY/MM/DD"
-                            onChange={({ detail }) =>
-                              setForm((f) => (f ? { ...f, plan_expires_at: detail.value } : f))
-                            }
-                          />
-                        </FormField>
-                        <FormField label={t("admin.userDetail.activeLabel")}>
-                          <Toggle
-                            checked={form.is_active}
-                            onChange={({ detail }) =>
-                              setForm((f) => (f ? { ...f, is_active: detail.checked } : f))
-                            }
-                          >
-                            {form.is_active ? t("admin.users.activate") : t("admin.users.suspend")}
-                          </Toggle>
-                        </FormField>
-                      </SpaceBetween>
-                    </Form>
-                  </Container>
-              ),
+              content: <UserPlanGrantPanel user={user} plans={plans} onGranted={() => { void fetchAll(); markUpdated(); }} />,
             },
             {
               id: "traffic",
@@ -706,7 +674,22 @@ function UserDetailPage() {
                           {
                             id: "agent",
                             header: t("admin.userDetail.loginCol.agent"),
-                            cell: (item) => item.user_agent || "—",
+                            cell: (item) => {
+                              const client = describeClient(item.user_agent);
+                              if (!client.browser && !client.os) return "—";
+                              return (
+                                <span title={item.user_agent}>
+                                  <SpaceBetween size="xxxs">
+                                    <Box>{[client.browser, client.os].filter(Boolean).join(" · ")}</Box>
+                                    <Box variant="small" color="text-body-secondary">{client.device === "desktop" ? t("admin.userDetail.device.desktop")
+                                      : client.device === "mobile" ? t("admin.userDetail.device.mobile")
+                                      : client.device === "tablet" ? t("admin.userDetail.device.tablet")
+                                      : client.device === "app" ? t("admin.userDetail.device.app")
+                                      : t("admin.userDetail.device.unknown")}</Box>
+                                  </SpaceBetween>
+                                </span>
+                              );
+                            },
                           },
                         ]}
                         empty={<Box textAlign="center">{t("admin.userDetail.loginHistoryEmpty")}</Box>}

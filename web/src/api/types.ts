@@ -660,6 +660,28 @@ export interface OrderResponse {
   cancelled_at?: string;
 }
 
+export interface AdminUserOrder {
+  id: string;
+  plan_name: string;
+  duration_days: number;
+  price_cents: number;
+  status: OrderStatus;
+  provider: string;
+  note: string;
+  created_at: string;
+  paid_at: string | null;
+  paid_by: string;
+  granted_plan_expires_before: string | null;
+  granted_plan_expires_after: string | null;
+}
+
+export interface GrantUserPlanRequest {
+  plan_id: string;
+  duration_days: number;
+  price_cents: number;
+  note: string;
+}
+
 export interface OrderReceipt {
   order_id: string;
   plan_name: string;
@@ -671,6 +693,9 @@ export interface OrderReceipt {
   email: string;
   paid_at?: string;
   receipt_url?: string;
+  note?: string;
+  plan_expires_before?: string;
+  plan_expires_after?: string;
 }
 
 export type PromotionRejectReason =

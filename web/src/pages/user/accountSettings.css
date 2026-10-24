@@ -1,0 +1,23 @@
+.account-settings__form {
+  max-width: 560px;
+}
+
+.account-settings__explain {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.account-settings__tips,
+.account-settings__steps {
+  margin: 0;
+  padding-inline-start: 20px;
+  display: grid;
+  gap: 8px;
+}
+
+.account-settings__compare {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+}

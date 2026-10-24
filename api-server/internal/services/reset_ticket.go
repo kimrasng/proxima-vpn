@@ -357,3 +357,24 @@ func (s *ResetTicketService) Revoke(ctx context.Context, userID, ticketID, actor
 	})
 	return nil
 }
+
+// ListUsedForUser returns the tickets userID has spent, newest first.
+func (s *ResetTicketService) ListUsedForUser(ctx context.Context, userID string, limit int) ([]UserResetTicket, error) {
+	rows, err := s.db.Query(ctx,
+		`SELECT id::text, name, granted_at, expires_at, used_at, reset_bytes
+		 FROM reset_tickets WHERE user_id = $1 AND used_at IS NOT NULL
+		 ORDER BY used_at DESC LIMIT $2`, userID, limit)
+	if err != nil {
+		return nil, fmt.Errorf("list used tickets: %w", err)
+	}
+	defer rows.Close()
+	out := make([]UserResetTicket, 0)
+	for rows.Next() {
+		var t UserResetTicket
+		if err := rows.Scan(&t.ID, &t.Name, &t.GrantedAt, &t.ExpiresAt, &t.UsedAt, &t.ResetBytes); err != nil {
+			return nil, fmt.Errorf("scan used ticket: %w", err)
+		}
+		out = append(out, t)
+	}
+	return out, rows.Err()
+}

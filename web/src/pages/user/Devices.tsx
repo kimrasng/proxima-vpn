@@ -15,6 +15,7 @@ import {
   StatusIndicator,
   Container,
   Tabs,
+  Link,
 } from "@cloudscape-design/components";
 import { QRCodeSVG } from "qrcode.react";
 import type { PublicSubscriptionDomain, UserProfile } from "../../api/types";
@@ -275,6 +276,11 @@ export default function Devices() {
                 <Button onClick={() => setShowQrModal(true)}>{t("user.devices.showQr")}</Button>
               </Box>
               <Box variant="small" color="text-body-secondary">{t("user.devices.concurrentHint")}</Box>
+              <Box variant="small" color="text-body-secondary">
+                {t("user.subReset.leakPrompt")}{" "}
+                <Link variant="secondary" fontSize="body-s" href="/portal/subscription-reset"
+                  onFollow={(event) => { event.preventDefault(); navigate("/portal/subscription-reset"); }}>{t("user.subReset.leakLink")}</Link>
+              </Box>
             </SpaceBetween>
           </Container>
         )}

@@ -267,6 +267,10 @@ type orderReceiptResponse struct {
 	Email        string     `json:"email"`
 	PaidAt       *time.Time `json:"paid_at"`
 	ReceiptURL   string     `json:"receipt_url,omitempty"`
+	// Note is the administrator's reason for a granted order; empty otherwise.
+	Note          string     `json:"note,omitempty"`
+	ExpiresBefore *time.Time `json:"plan_expires_before,omitempty"`
+	ExpiresAfter  *time.Time `json:"plan_expires_after,omitempty"`
 }
 
 // Receipt handles GET /api/v1/user/orders/:id/receipt. Only the order's own
@@ -290,14 +294,15 @@ func (h *UserCheckoutHandler) Receipt(c *fiber.Ctx) error {
 	var sessionID string
 	err := h.db.QueryRow(ctx,
 		`SELECT o.id, p.name, o.duration_days, o.price_cents, o.discount_cents,
-		        o.provider, o.provider_session_id, u.email, o.paid_at
+		        o.provider, o.provider_session_id, u.email, o.paid_at,
+		        o.granted_plan_expires_before, o.granted_plan_expires_after
 		 FROM plan_orders o
 		 JOIN plans p ON p.id = o.plan_id
 		 JOIN users u ON u.id = o.user_id
 		 WHERE o.id = $1 AND o.user_id = $2 AND o.status = 'paid'`,
 		orderID, userID,
 	).Scan(&r.OrderID, &r.PlanName, &r.DurationDays, &r.PriceCents, &r.Discount,
-		&r.Provider, &sessionID, &r.Email, &r.PaidAt)
+		&r.Provider, &sessionID, &r.Email, &r.PaidAt, &r.ExpiresBefore, &r.ExpiresAfter)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "paid order not found"})
@@ -310,6 +315,9 @@ func (h *UserCheckoutHandler) Receipt(c *fiber.Ctx) error {
 		 ORDER BY received_at DESC LIMIT 1`, orderID,
 	).Scan(&r.Currency)
 
+	if r.Provider == services.ProviderGrant {
+		r.Note, sessionID = sessionID, ""
+	}
 	if sessionID != "" {
 		if provider, ok := h.registry.Get(r.Provider); ok {
 			if rp, ok := provider.(payments.ReceiptProvider); ok {

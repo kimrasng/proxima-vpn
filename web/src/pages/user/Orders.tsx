@@ -127,7 +127,12 @@ export default function Orders() {
               {
                 id: "plan",
                 header: t("user.plan.order.col.plan"),
-                cell: (item) => item.plan_name,
+                cell: (item) => item.provider === "grant" ? (
+                  <SpaceBetween size="xxxs">
+                    <Box>{item.plan_name}</Box>
+                    <Box variant="small" color="text-status-info">{t("user.orders.grantedBadge")}</Box>
+                  </SpaceBetween>
+                ) : item.plan_name,
               },
               {
                 id: "duration",
@@ -252,8 +257,29 @@ export default function Orders() {
               </SpaceBetween>
               <SpaceBetween size="xxs">
                 <Box variant="awsui-key-label">{t("user.plan.order.receipt.method")}</Box>
-                <Box>{receipt.provider === "stripe" ? "Stripe" : t("user.plan.order.receipt.methodPanel")}</Box>
+                <Box>{receipt.provider === "stripe" ? "Stripe"
+                  : receipt.provider === "grant" ? t("user.orders.receipt.methodGrant")
+                  : t("user.plan.order.receipt.methodPanel")}</Box>
               </SpaceBetween>
+              {receipt.note && (
+                <SpaceBetween size="xxs">
+                  <Box variant="awsui-key-label">{t("user.orders.receipt.note")}</Box>
+                  <Box>{receipt.note}</Box>
+                </SpaceBetween>
+              )}
+              {receipt.plan_expires_after && (
+                <SpaceBetween size="xxs">
+                  <Box variant="awsui-key-label">{t("user.orders.receipt.term")}</Box>
+                  <Box>{receipt.plan_expires_before
+                    ? t("user.orders.receipt.termChange", {
+                        from: new Date(receipt.plan_expires_before).toLocaleDateString(i18n.resolvedLanguage ?? i18n.language),
+                        to: new Date(receipt.plan_expires_after).toLocaleDateString(i18n.resolvedLanguage ?? i18n.language),
+                      })
+                    : t("user.orders.receipt.termUntil", {
+                        to: new Date(receipt.plan_expires_after).toLocaleDateString(i18n.resolvedLanguage ?? i18n.language),
+                      })}</Box>
+                </SpaceBetween>
+              )}
             </ColumnLayout>
           )}
         </Modal>

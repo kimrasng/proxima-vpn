@@ -195,3 +195,21 @@ func (h *ResetTicketHandler) Revoke(c *fiber.Ctx) error {
 	}
 	return c.SendStatus(fiber.StatusNoContent)
 }
+
+// ListMyHistory handles GET /api/v1/user/reset-tickets/history.
+// @Summary List my used reset tickets
+// @Description Tickets the user already spent, with when and how much usage each reset
+// @Tags user-portal
+// @Produce json
+// @Success 200 {array} services.UserResetTicket
+// @Security BearerAuth
+// @Router /user/reset-tickets/history [get]
+func (h *ResetTicketHandler) ListMyHistory(c *fiber.Ctx) error {
+	userID := c.Locals("user_id").(string)
+	used, err := h.svc.ListUsedForUser(context.Background(), userID, 20)
+	if err != nil {
+		log.Printf("[reset-tickets] history for %s failed: %v", userID, err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "internal server error"})
+	}
+	return c.JSON(used)
+}

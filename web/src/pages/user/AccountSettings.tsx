@@ -1,32 +1,44 @@
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
-  ContentLayout,
-  Header,
-  Container,
-  SpaceBetween,
+  Alert,
   Box,
   Button,
-  FormField,
-  Input,
-  Spinner,
+  ColumnLayout,
+  Container,
+  ContentLayout,
   Flashbar,
   type FlashbarProps,
-  CopyToClipboard,
-  Modal,
-  Alert,
+  Form,
+  FormField,
+  Header,
+  Icon,
+  Input,
+  KeyValuePairs,
+  SpaceBetween,
+  Spinner,
+  Tabs,
 } from "@cloudscape-design/components";
 import type { UserProfile } from "../../api/types";
 import * as userApi from "../../api/user";
 import { focusFirstInvalid, hasFieldErrors } from "../../utils/formValidation";
 import PasskeySettings from "../../components/PasskeySettings";
+import "./accountSettings.css";
+
+const TABS = ["profile", "security", "subscription"] as const;
+type TabId = (typeof TABS)[number];
 
 export default function AccountSettings() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const navigate = useNavigate();
+  const [params, setParams] = useSearchParams();
+  const requested = params.get("tab");
+  const activeTab: TabId = TABS.includes(requested as TabId) ? (requested as TabId) : "profile";
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [flash, setFlash] = useState<FlashbarProps.MessageDefinition[]>([]);
-  const handlePasskeyMessage = useCallback((message: FlashbarProps.MessageDefinition) => setFlash([message]), []);
+  const notify = useCallback((message: FlashbarProps.MessageDefinition) => setFlash([{ ...message, dismissible: true, onDismiss: () => setFlash([]) }]), []);
 
   const [name, setName] = useState("");
   const [savingProfile, setSavingProfile] = useState(false);
@@ -35,43 +47,32 @@ export default function AccountSettings() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [savingPassword, setSavingPassword] = useState(false);
-  // Field errors stay hidden until the first save attempt, then track edits.
   const [showPasswordErrors, setShowPasswordErrors] = useState(false);
   const passwordErrors = {
     currentPassword: currentPassword ? undefined : t("user.account.currentPasswordRequired"),
-    newPassword: newPassword ? undefined : t("user.account.newPasswordRequired"),
+    newPassword: !newPassword ? t("user.account.newPasswordRequired")
+      : newPassword.length < 8 ? t("user.account.passwordTooShort") : undefined,
     confirmPassword: newPassword && confirmPassword !== newPassword ? t("user.account.passwordMismatch") : undefined,
   };
   const visiblePasswordErrors: Partial<typeof passwordErrors> = showPasswordErrors ? passwordErrors : {};
 
-  const [subToken, setSubToken] = useState("");
-  const [showRegenModal, setShowRegenModal] = useState(false);
-  const [regenerating, setRegenerating] = useState(false);
-
   useEffect(() => {
-    const load = async () => {
-      try {
-        const data = await userApi.getProfile();
-        setProfile(data);
-        setName(data.name);
-      } catch {
-        setFlash([{ type: "error", content: t("user.account.loadError"), dismissible: true, onDismiss: () => setFlash([]) }]);
-      } finally {
-        setLoading(false);
-      }
-    };
-    void load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    let active = true;
+    userApi.getProfile()
+      .then((data) => { if (active) { setProfile(data); setName(data.name); } })
+      .catch(() => { if (active) notify({ type: "error", content: t("user.account.loadError") }); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [notify, t]);
 
   const handleSaveProfile = async () => {
     try {
       setSavingProfile(true);
       const updated = await userApi.updateProfile({ name });
       setProfile(updated);
-      setFlash([{ type: "success", content: t("user.account.profileSaved"), dismissible: true, onDismiss: () => setFlash([]) }]);
+      notify({ type: "success", content: t("user.account.profileSaved") });
     } catch {
-      setFlash([{ type: "error", content: t("user.account.profileError"), dismissible: true, onDismiss: () => setFlash([]) }]);
+      notify({ type: "error", content: t("user.account.profileError") });
     } finally {
       setSavingProfile(false);
     }
@@ -90,110 +91,128 @@ export default function AccountSettings() {
       setNewPassword("");
       setConfirmPassword("");
       setShowPasswordErrors(false);
-      setFlash([{ type: "success", content: t("user.account.passwordSaved"), dismissible: true, onDismiss: () => setFlash([]) }]);
+      notify({ type: "success", content: t("user.account.passwordSaved") });
     } catch {
-      setFlash([{ type: "error", content: t("user.account.passwordError"), dismissible: true, onDismiss: () => setFlash([]) }]);
+      notify({ type: "error", content: t("user.account.passwordError") });
     } finally {
       setSavingPassword(false);
     }
   };
 
-  const handleRegenerate = async () => {
-    try {
-      setRegenerating(true);
-      const result = await userApi.regenerateSubToken();
-      setSubToken(result.sub_token);
-      setShowRegenModal(false);
-      setFlash([{ type: "success", content: t("user.account.tokenRegenerated"), dismissible: true, onDismiss: () => setFlash([]) }]);
-    } catch {
-      setFlash([{ type: "error", content: t("user.account.tokenError"), dismissible: true, onDismiss: () => setFlash([]) }]);
-    } finally {
-      setRegenerating(false);
-    }
-  };
-
+  const header = <Header variant="h1" description={t("user.account.description")}>{t("user.account.title")}</Header>;
   if (loading) {
-    return (
-      <ContentLayout header={<Header variant="h1" description={t("user.account.description")}>{t("user.account.title")}</Header>}>
-        <Box textAlign="center" padding="xl">
-          <Spinner size="large" />
-        </Box>
-      </ContentLayout>
-    );
+    return <ContentLayout header={header}><Box textAlign="center" padding="xl"><Spinner size="large" /></Box></ContentLayout>;
   }
 
+  const joined = profile && "created_at" in profile && typeof (profile as { created_at?: string }).created_at === "string"
+    ? new Date((profile as { created_at: string }).created_at).toLocaleDateString(i18n.resolvedLanguage ?? i18n.language)
+    : null;
+
   return (
-    <ContentLayout header={<Header variant="h1" description={t("user.account.description")}>{t("user.account.title")}</Header>}>
+    <ContentLayout header={header}>
       <SpaceBetween size="l">
         <Flashbar items={flash} />
-
-        <Container header={<Header variant="h2">{t("user.account.profileSection")}</Header>}>
-          <SpaceBetween size="m">
-            <FormField label={t("user.account.email")}>
-              <Input value={profile?.email ?? ""} disabled />
-            </FormField>
-            <FormField label={t("user.account.name")}>
-              <Input value={name} onChange={({ detail }) => setName(detail.value)} />
-            </FormField>
-            <Button variant="primary" onClick={handleSaveProfile} loading={savingProfile}>
-              {t("common.save")}
-            </Button>
-          </SpaceBetween>
-        </Container>
-
-        <PasskeySettings onMessage={handlePasskeyMessage} />
-        <Container header={<Header variant="h2">{t("user.account.passwordSection")}</Header>}>
-          <SpaceBetween size="m">
-            <FormField label={t("user.account.currentPassword")} errorText={visiblePasswordErrors.currentPassword}>
-              <Input type="password" value={currentPassword} onChange={({ detail }) => setCurrentPassword(detail.value)} />
-            </FormField>
-            <FormField label={t("user.account.newPassword")} errorText={visiblePasswordErrors.newPassword}>
-              <Input type="password" value={newPassword} onChange={({ detail }) => setNewPassword(detail.value)} />
-            </FormField>
-            <FormField label={t("user.account.confirmPassword")} errorText={visiblePasswordErrors.confirmPassword}>
-              <Input type="password" value={confirmPassword} onChange={({ detail }) => setConfirmPassword(detail.value)} />
-            </FormField>
-            <Button variant="primary" onClick={handleSavePassword} loading={savingPassword}>
-              {t("common.save")}
-            </Button>
-          </SpaceBetween>
-        </Container>
-
-        {(profile?.sub_token || subToken) && <Container header={<Header variant="h2">{t("user.account.subscriptionSection")}</Header>}>
-          <SpaceBetween size="m">
-            <FormField label={t("user.account.subToken")}>
-              <CopyToClipboard
-                copyButtonAriaLabel="Copy token"
-                textToCopy={subToken || "••••••••"}
-                copySuccessText={t("common.copied")}
-                copyErrorText={t("common.error")}
-                variant="inline"
-              />
-            </FormField>
-            <Button onClick={() => setShowRegenModal(true)}>{t("user.account.regenerate")}</Button>
-          </SpaceBetween>
-        </Container>}
+        <Tabs
+          activeTabId={activeTab}
+          onChange={({ detail }) => setParams(detail.activeTabId === "profile" ? {} : { tab: detail.activeTabId }, { replace: true })}
+          ariaLabel={t("user.account.tabs.label")}
+          tabs={[
+            {
+              id: "profile",
+              label: t("user.account.tabs.profile"),
+              content: (
+                <Container header={<Header variant="h2" description={t("user.account.profileHint")}>{t("user.account.profileSection")}</Header>}>
+                  <div className="account-settings__form">
+                    <Form actions={<Button variant="primary" onClick={() => void handleSaveProfile()} loading={savingProfile}
+                      disabled={name.trim() === (profile?.name ?? "")}>{t("common.save")}</Button>}>
+                      <SpaceBetween size="l">
+                        <FormField label={t("user.account.email")} description={t("user.account.emailHint")}>
+                          <Input value={profile?.email ?? ""} readOnly />
+                        </FormField>
+                        <FormField label={t("user.account.name")} description={t("user.account.nameHint")}>
+                          <Input value={name} onChange={({ detail }) => setName(detail.value)} />
+                        </FormField>
+                        {joined && <KeyValuePairs items={[{ label: t("user.account.joined"), value: joined }]} />}
+                      </SpaceBetween>
+                    </Form>
+                  </div>
+                </Container>
+              ),
+            },
+            {
+              id: "security",
+              label: t("user.account.tabs.security"),
+              content: (
+                <SpaceBetween size="l">
+                  <PasskeySettings onMessage={notify} />
+                  <Container header={<Header variant="h2" description={t("user.account.passwordHint")}>{t("user.account.passwordSection")}</Header>}>
+                    <ColumnLayout columns={2} minColumnWidth={320}>
+                      <div className="account-settings__form">
+                        <Form actions={<Button variant="primary" onClick={() => void handleSavePassword()} loading={savingPassword}>
+                          {t("user.account.changePassword")}</Button>}>
+                          <SpaceBetween size="l">
+                            <FormField label={t("user.account.currentPassword")} errorText={visiblePasswordErrors.currentPassword}>
+                              <Input type="password" autoComplete="current-password" value={currentPassword}
+                                onChange={({ detail }) => setCurrentPassword(detail.value)} />
+                            </FormField>
+                            <FormField label={t("user.account.newPassword")} constraintText={t("user.account.passwordRule")}
+                              errorText={visiblePasswordErrors.newPassword}>
+                              <Input type="password" autoComplete="new-password" value={newPassword}
+                                onChange={({ detail }) => setNewPassword(detail.value)} />
+                            </FormField>
+                            <FormField label={t("user.account.confirmPassword")} errorText={visiblePasswordErrors.confirmPassword}>
+                              <Input type="password" autoComplete="new-password" value={confirmPassword}
+                                onChange={({ detail }) => setConfirmPassword(detail.value)} />
+                            </FormField>
+                          </SpaceBetween>
+                        </Form>
+                      </div>
+                      <Box color="text-body-secondary">
+                        <SpaceBetween size="s">
+                          <Box variant="h4">{t("user.account.passwordTipsTitle")}</Box>
+                          <ul className="account-settings__tips">
+                            <li>{t("user.account.passwordTip1")}</li>
+                            <li>{t("user.account.passwordTip2")}</li>
+                            <li>{t("user.account.passwordTip3")}</li>
+                          </ul>
+                        </SpaceBetween>
+                      </Box>
+                    </ColumnLayout>
+                  </Container>
+                </SpaceBetween>
+              ),
+            },
+            {
+              id: "subscription",
+              label: t("user.account.tabs.subscription"),
+              content: (
+                <Container header={<Header variant="h2" description={t("user.account.subscriptionHint")}>{t("user.account.subscriptionSection")}</Header>}>
+                  <SpaceBetween size="l">
+                    <div className="account-settings__explain">
+                      <Icon name="key" size="medium" variant="subtle" />
+                      <Box>{t("user.account.subscriptionExplain")}</Box>
+                    </div>
+                    <ColumnLayout columns={2} minColumnWidth={260}>
+                      <SpaceBetween size="xs">
+                        <Box variant="h4">{t("user.account.linkUseTitle")}</Box>
+                        <Box color="text-body-secondary">{t("user.account.linkUseBody")}</Box>
+                        <Box><Button variant="inline-link" onClick={() => navigate("/portal/devices")}>{t("user.account.linkUseAction")}</Button></Box>
+                      </SpaceBetween>
+                      <SpaceBetween size="xs">
+                        <Box variant="h4">{t("user.account.linkLeakTitle")}</Box>
+                        <Box color="text-body-secondary">{t("user.account.linkLeakBody")}</Box>
+                        <Box><Button onClick={() => navigate("/portal/subscription-reset")} disabled={!profile?.sub_token}>
+                          {t("user.account.linkLeakAction")}</Button></Box>
+                      </SpaceBetween>
+                    </ColumnLayout>
+                    {!profile?.sub_token && <Alert type="info">{t("user.account.noSubscriptionYet")}</Alert>}
+                  </SpaceBetween>
+                </Container>
+              ),
+            },
+          ]}
+        />
       </SpaceBetween>
-
-      <Modal
-        visible={showRegenModal}
-        onDismiss={() => setShowRegenModal(false)}
-        header={t("user.account.regenerateTitle")}
-        footer={
-          <Box float="right">
-            <SpaceBetween direction="horizontal" size="xs">
-              <Button variant="link" onClick={() => setShowRegenModal(false)}>
-                {t("common.cancel")}
-              </Button>
-              <Button variant="primary" onClick={handleRegenerate} loading={regenerating}>
-                {t("common.confirm")}
-              </Button>
-            </SpaceBetween>
-          </Box>
-        }
-      >
-        <Alert type="warning">{t("user.account.regenerateWarning")}</Alert>
-      </Modal>
     </ContentLayout>
   );
 }

@@ -25,6 +25,7 @@ type Props = {
 export default function ResetTickets({ canReset, onRedeemed }: Props) {
   const { t, i18n } = useTranslation();
   const tickets = useUserResource(userApi.listResetTickets);
+  const history = useUserResource(userApi.listResetTicketHistory);
   const [confirm, setConfirm] = useState<ResetTicket | null>(null);
   const [busy, setBusy] = useState(false);
   const [flash, setFlash] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -49,13 +50,15 @@ export default function ResetTickets({ canReset, onRedeemed }: Props) {
       setBusy(false);
       setConfirm(null);
       tickets.refresh();
+      history.refresh();
     }
   };
 
   const items = tickets.data ?? [];
   // Accounts without a capped plan only see the section once they hold a
   // ticket; an empty "no tickets" card would mean nothing to them.
-  if (!canReset && !tickets.loading && !tickets.error && items.length === 0 && !flash) return null;
+  const used = history.data ?? [];
+  if (!canReset && !tickets.loading && !tickets.error && items.length === 0 && used.length === 0 && !flash) return null;
   return (
     <Container header={<Header variant="h2" counter={items.length ? `(${items.length})` : undefined}
       description={t("user.resetTickets.description")}>{t("user.resetTickets.title")}</Header>}>
@@ -98,6 +101,24 @@ export default function ResetTickets({ canReset, onRedeemed }: Props) {
           </div>
         )}
         {items.length > 0 && !canReset && <Box variant="small" color="text-body-secondary">{t("user.resetTickets.needsPlan")}</Box>}
+        {used.length > 0 && (
+          <div className="reset-tickets__history" style={{ borderBlockStart: `1px solid ${colorBorderDividerDefault}` }}>
+            <Box variant="h4" padding={{ top: "s", bottom: "xs" }}>{t("user.resetTickets.historyTitle")}</Box>
+            <ul className="reset-tickets__history-list">
+              {used.slice(0, 5).map((ticket) => (
+                <li key={ticket.id}>
+                  <Box>{ticket.name}</Box>
+                  <Box variant="small" color="text-body-secondary">
+                    {t("user.resetTickets.historyItem", {
+                      at: ticket.used_at ? new Date(ticket.used_at).toLocaleString(i18n.resolvedLanguage ?? i18n.language, { year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "-",
+                      bytes: formatBytes(ticket.reset_bytes ?? 0),
+                    })}
+                  </Box>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </SpaceBetween>
       <Modal visible={confirm !== null} onDismiss={() => !busy && setConfirm(null)} header={t("user.resetTickets.confirmTitle")}
         closeAriaLabel={t("user.announcements.close")}

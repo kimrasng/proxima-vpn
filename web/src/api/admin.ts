@@ -20,6 +20,8 @@ import type {
   Plan,
   ResetTicketGrant,
   UserResetTicket,
+  AdminUserOrder,
+  GrantUserPlanRequest,
   GrantResetTicketRequest,
   CreatePlanRequest,
   UpdatePlanRequest,
@@ -262,6 +264,16 @@ export function deletePlan(id: string): Promise<void> {
 export function listPromotions(): Promise<PromotionCode[]> {
   applyAdminClient();
   return get<PromotionCode[]>('/api/v1/admin/promotions');
+}
+
+export function listUserOrders(userId: string): Promise<AdminUserOrder[]> {
+  applyAdminClient();
+  return get<AdminUserOrder[]>(`/api/v1/admin/users/${userId}/orders`);
+}
+
+export function grantUserPlan(userId: string, req: GrantUserPlanRequest): Promise<AdminUserOrder> {
+  applyAdminClient();
+  return post<AdminUserOrder>(`/api/v1/admin/users/${userId}/plan-grants`, req);
 }
 
 export function listUserResetTickets(userId: string): Promise<UserResetTicket[]> {

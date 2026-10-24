@@ -118,6 +118,9 @@ func (s *Server) registerRoutes() {
 	resetTicketHandler := handlers.NewResetTicketHandler(s.db)
 	adminUsers.Get("/:id/reset-tickets", resetTicketHandler.ListForUser)
 	adminUsers.Delete("/:id/reset-tickets/:ticketId", resetTicketHandler.Revoke)
+	adminPlanGrantHandler := handlers.NewAdminPlanGrantHandler(s.db)
+	adminUsers.Get("/:id/orders", adminPlanGrantHandler.ListOrders)
+	adminUsers.Post("/:id/plan-grants", adminPlanGrantHandler.Grant)
 
 	adminOrderHandler := handlers.NewAdminOrderHandler(s.db)
 	adminOrders := admin.Group("/orders")
@@ -321,6 +324,7 @@ func (s *Server) registerRoutes() {
 	userPortalHandler := handlers.NewUserPortalHandler(s.db, s.redis)
 	user.Get("/summary", userPortalHandler.GetSummary)
 	user.Get("/reset-tickets", resetTicketHandler.ListMine)
+	user.Get("/reset-tickets/history", resetTicketHandler.ListMyHistory)
 	user.Post("/reset-tickets/:id/redeem", resetTicketHandler.Redeem)
 	user.Get("/profile", userPortalHandler.GetProfile)
 	user.Get("/passkeys", userAuthHandler.ListPasskeys)

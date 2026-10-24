@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import {
   Alert, Box, Button, Container, CopyToClipboard, FormField, Header,
-  Input, Modal, Select, SpaceBetween, Spinner,
+  Input, Modal, Select, SpaceBetween, Spinner, Link,
 } from "@cloudscape-design/components";
 import { QRCodeSVG } from "qrcode.react";
 import type { UserSummary } from "../api/types";
@@ -71,6 +71,11 @@ export default function DeviceQuickConnect({
             {orderedDomains.length > 1 && <Box variant="small" color="text-body-secondary">
               {t("user.devices.subscriptionDomainWarning")}
             </Box>}
+            <Box variant="small" color="text-body-secondary">
+              {t("user.subReset.leakPrompt")}{" "}
+              <Link variant="secondary" fontSize="body-s" onFollow={(event) => { event.preventDefault(); navigate("/portal/subscription-reset"); }}
+                href="/portal/subscription-reset">{t("user.subReset.leakLink")}</Link>
+            </Box>
           </>
         )}
       </SpaceBetween>
