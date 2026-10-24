@@ -207,46 +207,13 @@
 }
 
 .landing__art {
-  position: relative;
   margin: 0;
   aspect-ratio: 4 / 3;
-  overflow: hidden;
   border-radius: 24px;
-  background: var(--landing-soft);
-}
-
-.landing__art-main {
-  position: absolute;
-  left: 4%;
-  bottom: 6%;
-  width: 68%;
-}
-
-.landing__art-side {
-  position: absolute;
-  top: 4%;
-  right: 2%;
-  width: 40%;
-}
-
-.landing__squiggle {
-  position: absolute;
-  fill: none;
-  stroke: var(--landing-ink);
-  stroke-width: 2;
-  stroke-linecap: round;
-}
-
-.landing__squiggle--a {
-  top: 46%;
-  left: 4%;
-  width: 18%;
-}
-
-.landing__squiggle--b {
-  right: 4%;
-  bottom: 6%;
-  width: 26%;
+  background-color: #dfe6f3;
+  background-position: center 35%;
+  background-size: cover;
+  box-shadow: 0 18px 50px rgba(19, 33, 63, 0.12);
 }
 
 .landing__footer {

@@ -1,8 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { resolveLanguage } from "../utils/language";
-import laying from "../assets/landing/laying.svg";
-import selfie from "../assets/landing/selfie.svg";
+import background from "../assets/auth-bg.jpg";
 import "./landing.css";
 
 const LANGUAGES = [
@@ -60,12 +59,7 @@ export default function Landing() {
           </div>
         </section>
 
-        <figure className="landing__art" aria-hidden="true">
-          <img src={laying} alt="" className="landing__art-main" />
-          <img src={selfie} alt="" className="landing__art-side" />
-          <svg className="landing__squiggle landing__squiggle--a" viewBox="0 0 120 20"><path d="M2 14c18-14 26 8 40-2s22-8 76-2" /></svg>
-          <svg className="landing__squiggle landing__squiggle--b" viewBox="0 0 160 24"><path d="M2 18c22-16 34 10 56-4s40 2 100-6" /></svg>
-        </figure>
+        <figure className="landing__art" aria-hidden="true" style={{ backgroundImage: `url(${background})` }} />
       </main>
 
       <footer className="landing__footer">© {new Date().getFullYear()} Proxima. {t("landing.rights")}</footer>

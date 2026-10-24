@@ -75,63 +75,50 @@
   padding: 24px;
 }
 
-.auth-layout--art {
-  background: #f7f9fc;
+.auth-layout--photo {
+  position: relative;
+  isolation: isolate;
+  background-color: #dfe6f3;
+  background-position: center 35%;
+  background-size: cover;
+}
+
+/* A light veil keeps the photo calm behind form text in both colour modes. */
+.auth-layout--photo::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(180deg, rgba(247, 249, 252, 0.15), rgba(247, 249, 252, 0.45));
+}
+
+/*
+ * On the photo the login column is centred in the viewport: the card is the only
+ * thing on the page, so it should sit where the eye lands.
+ */
+.auth-layout--photo .auth-layout__languages {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  z-index: 1;
+}
+
+.auth-layout--photo .auth-layout__main {
+  justify-content: center;
+  padding: 56px 0;
+}
+
+.auth-layout--photo .auth-layout__main > * {
+  padding: 28px 24px 20px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 18px 50px rgba(19, 33, 63, 0.18);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
 }
 
 .auth-layout__languages {
   align-self: flex-end;
-}
-
-.auth-layout__body {
-  flex: 1 1 auto;
-  display: flex;
-  justify-content: center;
-  gap: clamp(32px, 5vw, 72px);
-  width: 100%;
-  max-width: 1120px;
-  margin: 0 auto;
-}
-
-.auth-layout__art {
-  display: none;
-}
-
-@media (min-width: 1024px) {
-  .auth-layout--art .auth-layout__body {
-    align-items: center;
-  }
-
-  .auth-layout__art {
-    position: relative;
-    display: block;
-    flex: 1 1 0;
-    max-width: 560px;
-    aspect-ratio: 4 / 3;
-    overflow: hidden;
-    border-radius: 24px;
-    background: #edf3fd;
-  }
-
-  .auth-layout__art-main {
-    position: absolute;
-    left: 4%;
-    bottom: 6%;
-    width: 70%;
-  }
-
-  .auth-layout__art-side {
-    position: absolute;
-    top: 5%;
-    right: 3%;
-    width: 40%;
-  }
-
-  .auth-layout--art .auth-layout__main {
-    flex: 0 0 400px;
-    margin: 0;
-    padding-top: 0;
-  }
 }
 
 /* Icon, text and the dropdown caret must stay on one line. */
