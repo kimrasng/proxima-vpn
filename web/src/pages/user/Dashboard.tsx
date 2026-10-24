@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import {
   Alert, Box, Button, ColumnLayout, Container, ContentLayout,
-  ExpandableSection, Grid, Header, Icon, Modal, ProgressBar, SpaceBetween,
+  Grid, Header, Icon, Modal, ProgressBar, SpaceBetween,
   Spinner, StatusIndicator, Table,
 } from "@cloudscape-design/components";
 import {
@@ -134,8 +134,9 @@ export default function Dashboard() {
                       <Box color="text-body-secondary">{trafficLimit > 0
                         ? t("user.dashboard.trafficAllowance", { limit: formatBytes(trafficLimit) })
                         : t("user.dashboard.trafficUnlimited")}</Box>
-                      {trafficLimit > 0 && <ProgressBar value={trafficPercentage}
-                        label={t("user.dashboard.trafficUsedOfLimit", { used: formatBytes(data.traffic_used), limit: formatBytes(trafficLimit) })}
+                      {trafficLimit > 0 && <ProgressBar value={Math.max(0, 100 - trafficPercentage)}
+                        label={t("user.dashboard.trafficLeftOfLimit", { left: formatBytes(Math.max(0, trafficLimit - data.traffic_used)), limit: formatBytes(trafficLimit) })}
+                        additionalInfo={t("user.dashboard.trafficUsedOfLimit", { used: formatBytes(data.traffic_used), limit: formatBytes(trafficLimit) })}
                         status={trafficPercentage >= 100 ? "error" : "in-progress"} />}
                     </SpaceBetween>
                     <SpaceBetween size="xs">
@@ -147,8 +148,8 @@ export default function Dashboard() {
                   </ColumnLayout>
                   {trafficPercentage >= 80 && <Alert type="warning">{t(trafficPercentage >= 100
                     ? "user.dashboard.trafficExhausted" : "user.dashboard.trafficWarning")}</Alert>}
-                  <ExpandableSection headerText={t("user.dashboard.connections")}>
-                    <SpaceBetween size="xs">
+                  <SpaceBetween size="xs">
+                      <Box variant="awsui-key-label">{t("user.dashboard.connections")}</Box>
                       <Box>{data.max_concurrent > 0
                         ? t("user.dashboard.countOfCap", { current: data.online_ips, cap: data.max_concurrent })
                         : t("user.dashboard.countUnlimited", { current: data.online_ips })}</Box>
@@ -156,8 +157,7 @@ export default function Dashboard() {
                       {data.max_concurrent > 0 && data.online_ips > data.max_concurrent && <StatusIndicator type="warning">
                         {t("user.dashboard.connectionsOverCap")}
                       </StatusIndicator>}
-                    </SpaceBetween>
-                  </ExpandableSection>
+                  </SpaceBetween>
               </>
             </SpaceBetween>
           </Container>

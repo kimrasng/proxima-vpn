@@ -1771,7 +1771,8 @@
       "supportedApps": "查看支持的应用",
       "noAnnouncements": "暂无公告。",
       "serverNeedsPlan": "购买套餐后即可查看可用服务器。",
-      "monthlyRemaining": "本月剩余流量"
+      "monthlyRemaining": "本月剩余流量",
+      "trafficLeftOfLimit": "共 {{limit}}，剩余 {{left}}"
     },
     "devices": {
       "accountUrl": "账户订阅 URL",

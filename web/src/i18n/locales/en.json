@@ -1771,7 +1771,8 @@
       "supportedApps": "View supported apps",
       "noAnnouncements": "No announcements have been posted.",
       "serverNeedsPlan": "Purchase a plan to see the servers available to you.",
-      "monthlyRemaining": "Data left this month"
+      "monthlyRemaining": "Data left this month",
+      "trafficLeftOfLimit": "{{left}} of {{limit}} left"
     },
     "devices": {
       "accountUrl": "Account subscription URL",

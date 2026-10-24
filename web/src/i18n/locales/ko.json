@@ -1771,7 +1771,8 @@
       "supportedApps": "지원하는 앱 보기",
       "noAnnouncements": "등록된 공지사항이 없습니다.",
       "serverNeedsPlan": "플랜을 구매하면 이용 가능한 서버를 확인할 수 있습니다.",
-      "monthlyRemaining": "이번 달 남은 데이터"
+      "monthlyRemaining": "이번 달 남은 데이터",
+      "trafficLeftOfLimit": "{{limit}} 중 {{left}} 남음"
     },
     "devices": {
       "accountUrl": "계정 구독 URL",
