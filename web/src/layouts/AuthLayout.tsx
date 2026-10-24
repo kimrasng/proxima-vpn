@@ -2,8 +2,9 @@ import { Outlet, useLocation } from "react-router-dom";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { ButtonDropdown, Icon } from "@cloudscape-design/components";
-import { colorBackgroundLayoutMain } from "@cloudscape-design/design-tokens";
 import { resolveLanguage } from "../utils/language";
+import laying from "../assets/landing/laying.svg";
+import selfie from "../assets/landing/selfie.svg";
 import "./authLayout.css";
 
 const LANGUAGES = [
@@ -20,10 +21,11 @@ export default function AuthLayout() {
   }, [location.search]);
   const { t, i18n } = useTranslation();
   const current = resolveLanguage(i18n.resolvedLanguage ?? i18n.language);
+  const showArt = !location.pathname.startsWith("/admin");
   const currentLabel = LANGUAGES.find((language) => language.id === current)?.text ?? LANGUAGES[0].text;
 
   return (
-    <div className="auth-layout" style={{ background: colorBackgroundLayoutMain }}>
+    <div className={`auth-layout${showArt ? " auth-layout--art" : ""}`}>
       <div className="auth-layout__languages">
         <ButtonDropdown
           variant="normal"
@@ -45,9 +47,17 @@ export default function AuthLayout() {
         </ButtonDropdown>
       </div>
 
-      <main className="auth-layout__main">
-        <Outlet />
-      </main>
+      <div className="auth-layout__body">
+        {showArt && (
+          <aside className="auth-layout__art" aria-hidden="true">
+            <img src={laying} alt="" className="auth-layout__art-main" />
+            <img src={selfie} alt="" className="auth-layout__art-side" />
+          </aside>
+        )}
+        <main className="auth-layout__main">
+          <Outlet />
+        </main>
+      </div>
     </div>
   );
 }

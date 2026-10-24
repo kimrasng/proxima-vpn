@@ -2437,5 +2437,16 @@
       "cancelled": "Passkey sign-in was cancelled.",
       "loginError": "Passkey sign-in failed."
     }
+  },
+  "landing": {
+    "badge": "Start right after sign-up",
+    "title": "Feel at home,\nwherever you connect",
+    "lead": "Use Korean services from abroad without the hassle. Add one link to your app and you're set.",
+    "point1": "Fast, stable servers",
+    "point2": "One account for all your devices",
+    "point3": "Remaining data and expiry at a glance",
+    "start": "Get started",
+    "login": "Log in",
+    "rights": "All rights reserved."
   }
 }
