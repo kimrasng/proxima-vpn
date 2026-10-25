@@ -32,27 +32,22 @@
   margin: 0 auto;
 }
 
+/* Plain wordmark, no mark: Proxima in ink, VPN in the brand blue. */
 .landing__brand {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   color: var(--landing-ink);
-  font-size: 19px;
+  font-size: 20px;
   font-weight: 800;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
   text-decoration: none;
 }
 
-.landing__logo {
-  display: grid;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: linear-gradient(140deg, #4c8dff, #1f56c4);
-  color: #fff;
-  font-size: 15px;
-  font-weight: 800;
+.landing__brand-accent {
+  color: var(--landing-accent);
+  font-weight: 700;
+  letter-spacing: 0.06em;
 }
 
 .landing__lang {

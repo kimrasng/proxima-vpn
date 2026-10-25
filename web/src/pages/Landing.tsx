@@ -18,8 +18,7 @@ export default function Landing() {
     <div className="landing">
       <header className="landing__header">
         <Link to="/" className="landing__brand" aria-label={t("auth.portal.name")}>
-          <span className="landing__logo" aria-hidden="true">P</span>
-          <span>Proxima</span>
+          Proxima <span className="landing__brand-accent">VPN</span>
         </Link>
         <label className="landing__lang">
           <span className="landing__sr">{t("auth.portal.language")}</span>
