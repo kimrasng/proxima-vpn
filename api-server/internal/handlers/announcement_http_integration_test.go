@@ -57,7 +57,7 @@ func TestAnnouncementLocalizedLifecycle(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer res.Body.Close()
+		defer func() { _ = res.Body.Close() }()
 		if res.StatusCode != wantStatus {
 			var message interface{}
 			if err := json.NewDecoder(res.Body).Decode(&message); err != nil {

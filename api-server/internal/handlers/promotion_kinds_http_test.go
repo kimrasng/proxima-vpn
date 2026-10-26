@@ -44,7 +44,7 @@ func promotionKindsRequest(t *testing.T, app *fiber.App, method, path, body stri
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 	data, err := io.ReadAll(res.Body)
 	if err != nil {
 		t.Fatal(err)
@@ -63,7 +63,7 @@ func TestPromotionKindsCreateDefaults(t *testing.T) {
 	// Given: migrated trial routes and a unique campaign code.
 	app, pool := promotionKindsApp(t)
 	code := uuid.NewString()
-	t.Cleanup(func() { pool.Exec(context.Background(), `DELETE FROM free_trial_promotions WHERE code=$1`, code) })
+	t.Cleanup(func() { _, _ = pool.Exec(context.Background(), `DELETE FROM free_trial_promotions WHERE code=$1`, code) })
 	// When: optional defaults are omitted.
 	var result freeTrialResponse
 	promotionKindsRequest(t, app, "POST", "/free-trials",
@@ -104,16 +104,16 @@ func TestPromotionKindsPublicLookup(t *testing.T) {
 			switch kind {
 			case "trial":
 				_, err = pool.Exec(ctx, `INSERT INTO free_trial_promotions(code,duration_days,trial_days) VALUES($1,30,7)`, code)
-				t.Cleanup(func() { pool.Exec(ctx, `DELETE FROM free_trial_promotions WHERE code=$1`, code) })
+				t.Cleanup(func() { _, _ = pool.Exec(ctx, `DELETE FROM free_trial_promotions WHERE code=$1`, code) })
 			case "affiliate":
 				_, err = pool.Exec(ctx, `INSERT INTO affiliate_partners(name,code,commission_rate,discount_type,discount_value) VALUES('Partner',$1,10,'fixed',150)`, code)
-				t.Cleanup(func() { pool.Exec(ctx, `DELETE FROM affiliate_partners WHERE code=$1`, code) })
+				t.Cleanup(func() { _, _ = pool.Exec(ctx, `DELETE FROM affiliate_partners WHERE code=$1`, code) })
 			case "coupon", "inactive", "expired", "exhausted":
 				_, err = pool.Exec(ctx, `INSERT INTO promotion_codes(code,discount_type,discount_value,valid_from,valid_until,is_active,max_redemptions,redeemed_count)
 					VALUES($1,'percent',20,NOW()-INTERVAL '2 days',
 					CASE WHEN $2='expired' THEN NOW()-INTERVAL '1 day' ELSE NOW()+INTERVAL '1 day' END,
 					$2<>'inactive',1,CASE WHEN $2='exhausted' THEN 1 ELSE 0 END)`, code, kind)
-				t.Cleanup(func() { pool.Exec(ctx, `DELETE FROM promotion_codes WHERE code=$1`, code) })
+				t.Cleanup(func() { _, _ = pool.Exec(ctx, `DELETE FROM promotion_codes WHERE code=$1`, code) })
 			}
 			if err != nil {
 				t.Fatal(err)
@@ -146,8 +146,8 @@ func TestPromotionKindsCommissionSummaryAndPaid(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() {
-		pool.Exec(ctx, `DELETE FROM affiliate_commissions WHERE partner_id=$1`, partnerID)
-		pool.Exec(ctx, `DELETE FROM affiliate_partners WHERE id=$1`, partnerID)
+		_, _ = pool.Exec(ctx, `DELETE FROM affiliate_commissions WHERE partner_id=$1`, partnerID)
+		_, _ = pool.Exec(ctx, `DELETE FROM affiliate_partners WHERE id=$1`, partnerID)
 	})
 	if _, err := pool.Exec(ctx, `INSERT INTO affiliate_commissions(id,partner_id,order_amount,commission_amount)
 		VALUES($1,$2,1000,100)`, commissionID, partnerID); err != nil {
