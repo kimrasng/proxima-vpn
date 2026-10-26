@@ -24,7 +24,7 @@ import { focusFirstInvalid, hasFieldErrors } from "../../utils/formValidation";
 import PromotionFormFields from "./PromotionFormFields";
 import {
   emptyPromotionForm,
-  formatKst,
+
   toPromotionForm,
   toPromotionRequest,
   validatePromotionForm,
@@ -189,7 +189,7 @@ export default function CouponPromotions() {
               id: "validity",
               header: t("admin.promotions.col.validity"),
               minWidth: 220,
-              cell: (item) => `${formatKst(item.valid_from)} — ${formatKst(item.valid_until)} KST`,
+              cell: (item) => `${new Date(item.valid_from).toLocaleString()} — ${new Date(item.valid_until).toLocaleString()} KST`,
             },
             {
               id: "redemptions",

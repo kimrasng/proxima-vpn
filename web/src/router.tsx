@@ -61,7 +61,6 @@ const UserGuides = lazy(() => import("./pages/user/Guides"));
 const UserGuideDetail = lazy(() => import("./pages/user/GuideDetail"));
 
 export const router = createBrowserRouter([
-  { path: "/p/:code", element: <PromoLanding /> },
   {
     path: "/",
     element: <CaptureReferralRoute />,
@@ -70,6 +69,7 @@ export const router = createBrowserRouter([
     element: <AuthLayout />,
     children: [
       { path: "/login", element: <Login /> },
+      { path: "/p/:code", element: <PromoLanding /> },
       { path: "/register", element: <Register /> },
       { path: "/forgot-password", element: <ForgotPassword /> },
       { path: "/reset-password", element: <ResetPassword /> },

@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
-  Alert,
   Box,
   Button,
   Container,
@@ -83,7 +82,6 @@ export default function Login() {
       </Box>
 
       <SpaceBetween size="l">
-        )}
         {flash.length > 0 && <Flashbar items={flash} i18nStrings={{ ariaLabel: t("admin.notifications.title") }} />}
         <div className="auth-layout__card">
         <Container header={<Header variant="h1">{t("auth.login.title")}</Header>}>
