@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"regexp"
 	"testing"
 	"time"
 
@@ -321,6 +322,9 @@ func TestGrantPlan_IssuesSubTokenOnFirstGrantOnly(t *testing.T) {
 	first := read()
 	if first == nil || *first == "" {
 		t.Fatal("first grant did not issue a subscription token")
+	}
+	if !regexp.MustCompile(`^[A-Z0-9]{48}$`).MatchString(*first) {
+		t.Fatalf("subscription token %q is not 48 uppercase letters or digits", *first)
 	}
 	if _, err := svc.GrantPlan(ctx, userID, planID); err != nil {
 		t.Fatalf("renewal: %v", err)

@@ -113,7 +113,7 @@ func (h *AdminUserHandler) Create(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "internal server error"})
 	}
 
-	subToken := crypto.NewUUID()
+	subToken := crypto.NewSubToken()
 
 	isActive := true
 	if req.IsActive != nil {
@@ -407,7 +407,9 @@ func (h *AdminUserHandler) Update(c *fiber.Ctx) error {
 		setClauses = append(setClauses, fmt.Sprintf("plan_id = $%d", argIdx))
 		args = append(args, *req.PlanID)
 		argIdx++
-		setClauses = append(setClauses, "sub_token = COALESCE(sub_token, gen_random_uuid()::text)")
+		setClauses = append(setClauses, fmt.Sprintf("sub_token = COALESCE(sub_token, $%d)", argIdx))
+		args = append(args, crypto.NewSubToken())
+		argIdx++
 	}
 	if req.PlanStartedAt != nil {
 		setClauses = append(setClauses, fmt.Sprintf("plan_started_at = $%d", argIdx))

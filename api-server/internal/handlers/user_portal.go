@@ -260,7 +260,7 @@ func (h *UserPortalHandler) GetTrafficStats(c *fiber.Ctx) error {
 // @Router /user/sub-token/regenerate [post]
 func (h *UserPortalHandler) RegenerateSubToken(c *fiber.Ctx) error {
 	userID := c.Locals("user_id").(string)
-	newToken := crypto.NewUUID()
+	newToken := crypto.NewSubToken()
 
 	tag, err := h.db.Exec(context.Background(),
 		`UPDATE users SET sub_token = $1, updated_at = NOW() WHERE id = $2 AND sub_token IS NOT NULL`,

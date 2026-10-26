@@ -8,6 +8,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/proximavpn/proxima-vpn/pkg/crypto"
 )
 
 // PlanService centralizes plan-assignment logic shared by the checkout order
@@ -129,7 +130,7 @@ func (s *PlanService) grantPlan(ctx context.Context, userID, planID string, dura
 	err = tx.QueryRow(ctx,
 		`UPDATE users u
 		 SET plan_id          = p.id,
-		     sub_token        = COALESCE(u.sub_token, gen_random_uuid()::text),
+		     sub_token        = COALESCE(u.sub_token, $5),
 		     plan_started_at  = CASE WHEN $3::bool THEN u.plan_started_at ELSE NOW() END,
 		     plan_expires_at  = GREATEST(COALESCE(u.plan_expires_at, NOW()), NOW())
 		                        + make_interval(days => COALESCE($4::int, p.duration_days)),
@@ -141,7 +142,7 @@ func (s *PlanService) grantPlan(ctx context.Context, userID, planID string, dura
 		 FROM plans p
 		 WHERE u.id = $1 AND p.id = $2
 		 RETURNING u.plan_started_at, u.plan_expires_at, u.traffic_used, u.traffic_reset_at, u.status`,
-		userID, planID, isRenewal, durationDays,
+		userID, planID, isRenewal, durationDays, crypto.NewSubToken(),
 	).Scan(&r.PlanStartedAt, &r.PlanExpiresAt, &r.TrafficUsed, &r.TrafficResetAt, &r.Status)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
