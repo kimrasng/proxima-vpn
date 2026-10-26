@@ -208,7 +208,7 @@ func (h *AdminAnnouncementHandler) Create(c *fiber.Ctx) error {
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "failed to create announcement"})
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 	err = tx.QueryRow(ctx,
 		`INSERT INTO announcements (title, content, format, rendered_html, image_url, expires_at)
 		 VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
@@ -261,7 +261,7 @@ func (h *AdminAnnouncementHandler) Update(c *fiber.Ctx) error {
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "failed to update announcement"})
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 	var current announcementItem
 	err = scanAnnouncement(tx.QueryRow(ctx, `SELECT `+announcementColumns+` FROM announcements a WHERE a.id=$1 FOR UPDATE`, id), &current)
 	if errors.Is(err, pgx.ErrNoRows) {

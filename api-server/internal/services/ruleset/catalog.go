@@ -140,7 +140,7 @@ func (c *Catalog) tree(ctx context.Context, sha string) ([]treeEntry, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 	if res.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("github tree %s: %s", sha, res.Status)
 	}
@@ -212,7 +212,7 @@ func (f *Fetcher) Fetch(ctx context.Context, rawURL, format string) (Contents, e
 	if err != nil {
 		return Contents{}, err
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 	if res.StatusCode != http.StatusOK {
 		return Contents{}, fmt.Errorf("download failed: %s", res.Status)
 	}

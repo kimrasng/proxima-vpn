@@ -699,7 +699,7 @@ assert d.get("proxy-groups"), "clash: no proxy-groups"
 names = {p.get("name") for p in proxies}
 for g in d["proxy-groups"]:
     for ref in (g.get("proxies") or []):
-        assert ref in names or ref in {n.get("name") for n in d["proxy-groups"]} or ref == "DIRECT", \
+        assert ref in names or ref in {n.get("name") for n in d["proxy-groups"]} or ref in {"DIRECT", "REJECT", "PASS"}, \
             f"clash: proxy-group {g.get('name')!r} references unknown proxy {ref!r}"
 print("clash ok:", sorted(types))
 PY

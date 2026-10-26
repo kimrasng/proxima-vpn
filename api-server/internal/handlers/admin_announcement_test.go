@@ -22,7 +22,7 @@ func TestAnnouncementPreviewSanitizesHTML(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 
 	// Then structure survives, but executable content does not.
 	var result struct {
