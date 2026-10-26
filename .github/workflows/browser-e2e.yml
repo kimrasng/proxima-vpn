@@ -118,7 +118,35 @@ jobs:
           E2E_ADMIN_PASSWORD: E2ETestAdminPass123!
           ENABLE_TEST_EMAIL_CODE_LOOKUP: "true"
           VITE_API_PROXY_TARGET: http://localhost:2053
-        run: cd web && npm run test:e2e
+          CLOUDFLARE_API_TOKEN: e2e-stub-token-not-a-real-credential
+          CLOUDFLARE_ZONE_ID: 0123456789abcdef0123456789abcdef
+          ENTRY_DNS_BASE_DOMAIN: entry.e2e.test
+          CLOUDFLARE_API_BASE_URL: http://127.0.0.1:18090/client/v4
+        run: |
+          cd web
+          PLAYWRIGHT_HTML_OUTPUT_DIR=playwright-report/main npx playwright test --project=user-portal --project=admin --retries=0 --output=test-results/main
+          # The real node provisioning journey gets its own API rate-limit
+          # window rather than sleeping or relaxing production limits.
+          api_pid=$(pgrep -x api-server)
+          kill "$api_pid"
+          for i in $(seq 1 30); do
+            kill -0 "$api_pid" 2>/dev/null || break
+            sleep 1
+          done
+          if kill -0 "$api_pid" 2>/dev/null; then
+            echo "old api-server did not exit"
+            exit 1
+          fi
+          nohup /tmp/api-server >> /tmp/api-server.log 2>&1 &
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:2053/health > /dev/null; then
+              PLAYWRIGHT_HTML_OUTPUT_DIR=playwright-report/node-chains npx playwright test --project=node-chains --retries=0 --output=test-results/node-chains
+              exit $?
+            fi
+            sleep 1
+          done
+          echo "isolated node-chain api-server did not become healthy"
+          exit 1
 
       - name: Dump api-server log on failure
         if: failure()

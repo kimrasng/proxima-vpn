@@ -36,7 +36,13 @@ export default defineConfig({
     // Specs that drive the panel as a logged-in admin.
     {
       name: "admin",
-      testMatch: /(?:admin|node-chains|admin-subscription-domains)\.spec\.ts/,
+      testMatch: /(?:admin|admin-subscription-domains)\.spec\.ts/,
+      dependencies: ["setup"],
+      use: { ...devices["Desktop Chrome"], storageState: "e2e/.auth/admin.json" },
+    },
+    {
+      name: "node-chains",
+      testMatch: /node-chains\.spec\.ts/,
       dependencies: ["setup"],
       use: { ...devices["Desktop Chrome"], storageState: "e2e/.auth/admin.json" },
     },

@@ -2,7 +2,10 @@ import { test, expect } from "@playwright/test";
 import { entry, exit, chain, mockTopology } from "./managed-chain-fixtures";
 
 test.use({ storageState: { cookies: [], origins: [] } });
-test.beforeEach(async ({ page }) => { await mockTopology(page); });
+test.beforeEach(async ({ page }) => {
+  await mockTopology(page);
+  await page.route("**/api/v1/admin/node-tags", (route) => route.fulfill({ json: [] }));
+});
 
 test("disabled assigned routes do not turn a server into unassigned", async ({ page }) => {
   await page.route("**/api/v1/admin/node-chains", (route) => route.fulfill({ json: [{ ...chain, enabled: false, group_ids: ["access"] }] }));

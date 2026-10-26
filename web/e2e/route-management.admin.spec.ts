@@ -3,7 +3,10 @@ import { entry, exit, chain, mockTopology } from "./managed-chain-fixtures";
 import type { CreateNodeChainBatchRequest } from "../src/api/types";
 
 test.use({ storageState: { cookies: [], origins: [] } });
-test.beforeEach(async ({ page }) => { await mockTopology(page); });
+test.beforeEach(async ({ page }) => {
+  await mockTopology(page);
+  await page.route("**/api/v1/admin/node-tags", (route) => route.fulfill({ json: [] }));
+});
 
 test("server inventory includes dual-role servers and preserves role in URL", async ({ page }) => {
   await page.route("**/api/v1/admin/nodes", (route) => route.fulfill({ json: [entry, exit, { ...exit, id: "both", name: "Combined", role: "both" }] }));

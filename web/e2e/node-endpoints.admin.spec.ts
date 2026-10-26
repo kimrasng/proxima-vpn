@@ -45,6 +45,7 @@ test.describe("PHS-030 node endpoints", () => {
     await page.route("**/src/api/**", (route) => route.continue());
     await page.route(endpoint, (route) => route.fulfill({ json: [node] }));
     await page.route("**/api/v1/admin/node-chains", (route) => route.fulfill({ json: [] }));
+    await page.route("**/api/v1/admin/node-tags", (route) => route.fulfill({ json: [] }));
   });
 
   for (const [status, label] of Object.entries({ pending: "Pending", ready: "Ready", conflict: "Conflict", error: "Error", deleting: "Deleting", deleted: "Deleted" })) {
@@ -200,7 +201,7 @@ test.describe("PHS-030 node endpoints", () => {
     expect(payloads).toEqual([{
       name: node.name, country: node.country, region: node.region, traffic_multiplier: 1,
       max_concurrent_conns: 0, role: "both", publish_direct: true,
-      firewall_preset: "standard", labels: {}, os_family: "debian",
+      firewall_preset: "standard", labels: {}, tags: [], os_family: "debian",
     }]);
   });
 });

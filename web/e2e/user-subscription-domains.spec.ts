@@ -1,4 +1,7 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { QRCodeSVG } from "qrcode.react";
 import {
   expectOnlyAccountUrl, expectSelectedDomain, fixtureSubscriptionPath, mockSession, mockSubscription, publicDomains,
 } from "./subscription-domain-fixtures";
@@ -6,35 +9,53 @@ import en from "../src/i18n/locales/en.json" with { type: "json" };
 import ko from "../src/i18n/locales/ko.json" with { type: "json" };
 import zh from "../src/i18n/locales/zh.json" with { type: "json" };
 
+function addressOptions(page: Page, messages = en) {
+  return page.getByRole("radiogroup", { name: messages.user.connect.addressGroup, exact: true }).getByRole("radio");
+}
+
+async function expectAccountQr(page: Page, url: string) {
+  const dialog = page.getByRole("dialog");
+  const qr = dialog.getByRole("img", { name: en.user.devices.qrTitle, exact: true });
+  await expect(qr).toBeVisible();
+  const expectedSvg = renderToStaticMarkup(createElement(QRCodeSVG, { value: url, size: 220 }));
+  const expectedPaths = [...expectedSvg.matchAll(/<path\b[^>]*\bd="([^"]+)"/g)].map((match) => match[1]);
+  expect(expectedPaths.length).toBeGreaterThan(0);
+  expect(await qr.locator("path").evaluateAll((paths) => paths.map((path) => path.getAttribute("d")))).toEqual(expectedPaths);
+  await expect(dialog.getByRole("tab")).toHaveCount(0);
+}
+
 test.describe("PHS-027 user subscription domains", () => {
   test.beforeEach(async ({ page }) => {
     await mockSession(page, "user");
     await mockSubscription(page);
+    // Vite serves application modules under /src/api/, not the backend /api/.
+    await page.route("**/src/api/**", (route) => route.continue());
   });
 
   test("baseline: default wins over order and manual choice keeps the account path", async ({ page }) => {
     // Given an intentionally unsorted public pool.
     await page.goto("/portal/devices");
     await expectSelectedDomain(page, "blocked.example.test");
-    await expect(page.getByRole("tab")).toHaveText([
-      "blocked.example.test", "timeout.example.test", "working.example.test",
-    ]);
+    await expect(addressOptions(page)).toHaveText(["Address 1", "Address 2", "Address 3"]);
+    await addressOptions(page).nth(1).click();
+    await expectSelectedDomain(page, "timeout.example.test");
     // When the user manually chooses a different host.
-    await page.getByRole("tab", { name: "working.example.test", exact: true }).click();
+    await addressOptions(page).nth(2).click();
     // Then only the host changes; the encoded account path survives.
     await expectSelectedDomain(page, "working.example.test");
   });
 
   test("public domains use https and drop any panel port", async ({ page }) => {
     await page.goto("/portal/devices");
-    await expect(page.getByRole("tabpanel").locator("code")).toHaveText(`https://blocked.example.test${fixtureSubscriptionPath}`);
+    await expectOnlyAccountUrl(page, `https://blocked.example.test${fixtureSubscriptionPath}`);
   });
 
   test("the account token is percent-encoded exactly once and carries no format query", async ({ page }) => {
     await mockSubscription(page, "a b/ü?#");
     await page.goto("/portal/devices");
-    await expect(page.getByRole("tabpanel").locator("code")).toHaveText("https://blocked.example.test/sub/a%20b%2F%C3%BC%3F%23");
+    await expectOnlyAccountUrl(page, "https://blocked.example.test/sub/a%20b%2F%C3%BC%3F%23");
     await expect(page.getByText("format=")).toHaveCount(0);
+    await expect(page.locator("[href*='format=']")).toHaveCount(0);
   });
 
   test("an account without a plan shows the no-plan state and no subscription URL", async ({ page }) => {
@@ -45,6 +66,8 @@ test.describe("PHS-027 user subscription domains", () => {
     await expect(page.getByText(en.user.devices.noPlanTitle, { exact: true })).toBeVisible();
     await expect(page.getByText(en.user.devices.noPlanHint, { exact: true })).toBeVisible();
     await expect(page.locator("code")).toHaveCount(0);
+    await expect(page.locator("input[readonly]")).toHaveCount(0);
+    await expect(addressOptions(page)).toHaveCount(0);
     await expect(page.getByRole("tab")).toHaveCount(0);
   });
 
@@ -56,8 +79,8 @@ test.describe("PHS-027 user subscription domains", () => {
       }));
       await page.goto("/portal/devices");
       await expectOnlyAccountUrl(page, new URL(fixtureSubscriptionPath, page.url()).toString());
-      await expect(page.getByRole("tab")).toHaveCount(0);
-      await expect(page.getByRole("button", { name: "Test reachability", exact: true })).toHaveCount(0);
+      await expect(addressOptions(page)).toHaveCount(0);
+      await expect(page.getByRole("button", { name: en.user.connect.testAddresses, exact: true })).toHaveCount(0);
     });
   }
 
@@ -93,30 +116,27 @@ test.describe("PHS-027 user subscription domains", () => {
     // When the mixed response loads, then only valid DNS hosts remain selectable.
     await page.goto("/portal/devices");
     expect(await page.evaluate(() => typeof URL.canParse)).toBe("undefined");
-    await expect(page.getByRole("tab")).toHaveText(hosts);
-    for (const host of hosts) {
-      await page.getByRole("tab", { name: host, exact: true }).click();
-      await expect(page.getByRole("tabpanel").locator("code")).toHaveText(`https://${host}${fixtureSubscriptionPath}`);
+    await expect(addressOptions(page)).toHaveText(["Address 1", "Address 2", "Address 3"]);
+    for (const [index, host] of hosts.entries()) {
+      await addressOptions(page).nth(index).click();
+      await expectSelectedDomain(page, host);
     }
     rows = malformedRows.map(({ row }) => row);
     await page.reload();
     await expectOnlyAccountUrl(page, new URL(fixtureSubscriptionPath, page.url()).toString());
-    await expect(page.getByRole("tab")).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Test reachability", exact: true })).toHaveCount(0);
+    await expect(addressOptions(page)).toHaveCount(0);
+    await expect(page.getByRole("button", { name: en.user.connect.testAddresses, exact: true })).toHaveCount(0);
   });
 
   test("QR dialog shows one account URL without format tabs and follows the selected domain", async ({ page }) => {
     await page.goto("/portal/devices");
-    await page.getByRole("button", { name: en.user.devices.showQr, exact: true }).click();
-    let dialog = page.getByRole("dialog");
-    await expect(dialog.locator("code")).toHaveText(`https://blocked.example.test${fixtureSubscriptionPath}`);
-    await expect(dialog.getByRole("tab")).toHaveCount(0);
+    await page.getByRole("button", { name: en.user.connect.qr, exact: true }).click();
+    await expectAccountQr(page, `https://blocked.example.test${fixtureSubscriptionPath}`);
     await page.keyboard.press("Escape");
     await expect(page.getByRole("dialog")).toHaveCount(0);
-    await page.getByRole("tab", { name: "working.example.test", exact: true }).click();
-    await page.getByRole("button", { name: en.user.devices.showQr, exact: true }).click();
-    dialog = page.getByRole("dialog");
-    await expect(dialog.locator("code")).toHaveText(`https://working.example.test${fixtureSubscriptionPath}`);
+    await addressOptions(page).nth(2).click();
+    await page.getByRole("button", { name: en.user.connect.qr, exact: true }).click();
+    await expectAccountQr(page, `https://working.example.test${fixtureSubscriptionPath}`);
   });
 
   test("portal exposes only the account URL and QR, without per-app format URLs", async ({ page }) => {
@@ -124,9 +144,11 @@ test.describe("PHS-027 user subscription domains", () => {
     await expectOnlyAccountUrl(page, `https://blocked.example.test${fixtureSubscriptionPath}`);
     await expect(page.getByRole("button", { name: en.user.devices.overrideTitle })).toHaveCount(0);
     await expect(page.locator("a[href*='/sub/']")).toHaveCount(0);
-    await page.getByRole("tab", { name: "working.example.test", exact: true }).click();
+    await expect(page.locator("[href*='format=']")).toHaveCount(0);
+    await expect(page.getByText("format=")).toHaveCount(0);
+    await addressOptions(page).nth(2).click();
     await expectOnlyAccountUrl(page, `https://working.example.test${fixtureSubscriptionPath}`);
-    await expect(page.getByRole("button", { name: en.user.devices.showQr, exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: en.user.connect.qr, exact: true })).toBeVisible();
   });
 
   for (const { name, row } of malformedRows) {
@@ -134,8 +156,8 @@ test.describe("PHS-027 user subscription domains", () => {
       await page.route("**/api/v1/user/subscription-domains", (route) => route.fulfill({ json: [row] }));
       await page.goto("/portal/devices");
       await expectOnlyAccountUrl(page, new URL(fixtureSubscriptionPath, page.url()).toString());
-      await expect(page.getByRole("tab")).toHaveCount(0);
-      await expect(page.getByRole("button", { name: "Test reachability", exact: true })).toHaveCount(0);
+      await expect(addressOptions(page)).toHaveCount(0);
+      await expect(page.getByRole("button", { name: en.user.connect.testAddresses, exact: true })).toHaveCount(0);
     });
   }
 
@@ -143,18 +165,19 @@ test.describe("PHS-027 user subscription domains", () => {
     let rows: unknown[] = [...malformedRows.map(({ row }) => row), ...publicDomains];
     await page.route("**/api/v1/user/subscription-domains", (route) => route.fulfill({ json: rows }));
     await page.goto("/portal/devices");
-    await expect(page.getByRole("tab")).toHaveText([
-      "blocked.example.test", "timeout.example.test", "working.example.test",
-    ]);
-    await page.getByRole("tab", { name: "working.example.test", exact: true }).click();
+    await expect(addressOptions(page)).toHaveText(["Address 1", "Address 2", "Address 3"]);
+    await expectSelectedDomain(page, "blocked.example.test");
+    await addressOptions(page).nth(1).click();
+    await expectSelectedDomain(page, "timeout.example.test");
+    await addressOptions(page).nth(2).click();
     await expectSelectedDomain(page, "working.example.test");
     rows = malformedRows.map(({ row }) => row);
     await page.reload();
-    await expect(page.getByRole("tab")).toHaveCount(0);
+    await expect(addressOptions(page)).toHaveCount(0);
     await expectOnlyAccountUrl(page, new URL(fixtureSubscriptionPath, page.url()).toString());
   });
 
-  test("browser race orders working first, bounds timeout, retries and allows manual fallback", async ({ page }) => {
+  test("browser race selects working address, bounds timeout, retries and allows manual fallback", async ({ page }) => {
     await page.clock.install();
     const requests: string[] = [];
     let retry = false;
@@ -170,12 +193,12 @@ test.describe("PHS-027 user subscription domains", () => {
       }
     });
     await page.goto("/portal/devices");
-    await page.getByRole("button", { name: "Test reachability", exact: true }).click();
+    await page.getByRole("button", { name: en.user.connect.testAddresses, exact: true }).click();
     await expect.poll(() => requests.length).toBe(3);
-    await expect(page.getByText(en.user.devices.testingDomains, { exact: true })).toBeVisible();
+    await expect(page.getByText(en.user.connect.testing, { exact: true })).toBeVisible();
     await page.clock.fastForward(8001);
-    await expect(page.getByRole("tab")).toHaveText([
-      "working.example.test ✓", "blocked.example.test ✕", "timeout.example.test ✕",
+    await expect(addressOptions(page)).toHaveText([
+      "Address 1 ✕", "Address 2 ✕", "Address 3 ✓",
     ], { timeout: 3000 });
     await expectSelectedDomain(page, "working.example.test");
     // Probes hit the account URL itself, with the token still encoded.
@@ -184,13 +207,13 @@ test.describe("PHS-027 user subscription domains", () => {
       `https://timeout.example.test${fixtureSubscriptionPath}`,
       `https://working.example.test${fixtureSubscriptionPath}`,
     ]);
-    await page.getByRole("tab", { name: "timeout.example.test ✕", exact: true }).click();
+    await addressOptions(page).nth(1).click();
     await expectSelectedDomain(page, "timeout.example.test");
-    await expect(page.getByText(en.user.devices.domainUnreachable, { exact: true })).toBeVisible();
+    await expect(addressOptions(page).nth(1).getByLabel(en.user.connect.unreachable, { exact: true })).toBeVisible();
     retry = true;
-    await page.getByRole("button", { name: "Test reachability", exact: true }).click();
-    await expect(page.getByRole("tab")).toHaveText([
-      "blocked.example.test ✓", "timeout.example.test ✓", "working.example.test ✓",
+    await page.getByRole("button", { name: en.user.connect.testAddresses, exact: true }).click();
+    await expect(addressOptions(page)).toHaveText([
+      "Address 1 ✓", "Address 2 ✓", "Address 3 ✓",
     ]);
     await expectSelectedDomain(page, "blocked.example.test");
     await expect.poll(() => requests.length).toBe(6);
@@ -199,16 +222,14 @@ test.describe("PHS-027 user subscription domains", () => {
   test("all failed domains stay selectable and reload clears stale reachability", async ({ page }) => {
     await page.route("https://*.example.test/**", (route) => route.abort("connectionrefused"));
     await page.goto("/portal/devices");
-    await page.getByRole("button", { name: "Test reachability", exact: true }).click();
-    await expect(page.getByRole("tab")).toHaveText([
-      "blocked.example.test ✕", "timeout.example.test ✕", "working.example.test ✕",
+    await page.getByRole("button", { name: en.user.connect.testAddresses, exact: true }).click();
+    await expect(addressOptions(page)).toHaveText([
+      "Address 1 ✕", "Address 2 ✕", "Address 3 ✕",
     ]);
-    await page.getByRole("tab", { name: "working.example.test ✕", exact: true }).click();
+    await addressOptions(page).nth(2).click();
     await expectSelectedDomain(page, "working.example.test");
     await page.reload();
-    await expect(page.getByRole("tab")).toHaveText([
-      "blocked.example.test", "timeout.example.test", "working.example.test",
-    ]);
+    await expect(addressOptions(page)).toHaveText(["Address 1", "Address 2", "Address 3"]);
     await expectSelectedDomain(page, "blocked.example.test");
   });
 
@@ -216,13 +237,11 @@ test.describe("PHS-027 user subscription domains", () => {
     await page.route("https://*.example.test/**", () => {});
     for (let attempt = 0; attempt < 3; attempt++) {
       await page.goto("/portal/devices");
-      await page.getByRole("button", { name: "Test reachability", exact: true }).click();
+      await page.getByRole("button", { name: en.user.connect.testAddresses, exact: true }).click();
       await page.goto("/portal/account");
     }
     await page.goto("/portal/devices");
-    await expect(page.getByRole("tab")).toHaveText([
-      "blocked.example.test", "timeout.example.test", "working.example.test",
-    ]);
+    await expect(addressOptions(page)).toHaveText(["Address 1", "Address 2", "Address 3"]);
     await expectSelectedDomain(page, "blocked.example.test");
   });
 
@@ -231,17 +250,19 @@ test.describe("PHS-027 user subscription domains", () => {
       test(`${language} guidance and selection at ${width}px`, async ({ page }) => {
         await mockSession(page, "user", language);
         await mockSubscription(page);
+        await page.route("**/src/api/**", (route) => route.continue());
         await page.setViewportSize({ width, height: 900 });
         const adminRequests: string[] = [];
         page.on("request", (request) => {
           if (request.url().includes("/api/v1/admin/")) adminRequests.push(request.url());
         });
         await page.goto("/portal/devices");
-        await expect(page.getByText(messages.user.devices.subscriptionDomainWarning, { exact: true })).toBeVisible();
-        await expect(page.getByText(messages.user.devices.subscriptionDomainDescription, { exact: true })).toBeVisible();
-        await page.getByRole("tab", { name: "working.example.test", exact: true }).click();
+        await expect(page.getByText(messages.user.connect.step1Body, { exact: true })).toBeVisible();
+        await expect(page.getByText(messages.user.connect.addressHintFull, { exact: true })).toBeVisible();
+        await expect(page.getByText(messages.user.connect.whatBody, { exact: true })).toBeVisible();
+        await addressOptions(page, messages).nth(2).click();
         await expectSelectedDomain(page, "working.example.test");
-        await expect(page.getByRole("button", { name: messages.user.devices.testDomains, exact: true })).toBeVisible();
+        await expect(page.getByRole("button", { name: messages.user.connect.testAddresses, exact: true })).toBeVisible();
         await expect(page.getByText(messages.admin.subscriptionDomains.healthTitle, { exact: true })).toHaveCount(0);
         expect(adminRequests).toEqual([]);
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);

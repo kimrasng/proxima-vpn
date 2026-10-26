@@ -206,10 +206,13 @@ test.describe("PHS-027 public filtering integration", () => {
         localStorage.setItem("proxima_user_token", token);
         localStorage.setItem("i18nextLng", "en");
       }, user.token);
-      await page.route("**/api/v1/user/profile", (route) => route.fulfill({ json: { plan_name: "Fixture", sub_token: "fixture-token" } }));
+      await page.route("**/api/v1/user/profile", (route) => route.fulfill({ json: { plan_name: "Fixture", status: "active", sub_token: "fixture-token" } }));
       await page.goto("/portal/devices");
-      await expect(page.getByRole("tab")).toHaveText([`public-${suffix}.example.test`]);
-      await expect(page.getByRole("tabpanel").locator("code")).toHaveText(`https://public-${suffix}.example.test/sub/fixture-token`);
+      // A single usable address has no redundant selector.
+      await expect(page.locator(".connect-domains").getByRole("radio")).toHaveCount(0);
+      await expect(page.getByRole("textbox", { name: "Current subscription link", exact: true })).toHaveValue(`https://public-${suffix}.example.test/sub/fixture-token`);
+      await expect(page.getByText(`private-${suffix}.example.test`, { exact: true })).toHaveCount(0);
+      await expect(page.getByText(`disabled-${suffix}.example.test`, { exact: true })).toHaveCount(0);
     } finally {
       for (const id of ids) {
         const deleted = await request.delete(`/api/v1/admin/subscription-domains/${id}`, { headers });

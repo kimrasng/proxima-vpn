@@ -24,18 +24,24 @@ export const fixtureSubscriptionPath = "/sub/fixture%2Ftoken%2Bvalue";
 
 export async function mockSubscription(page: Page, subToken = fixtureToken) {
   await page.route("**/api/v1/user/profile", (route) => route.fulfill({
-    json: { name: "Browser fixture", email: "fixture@example.test", plan_name: "Fixture", sub_token: subToken },
+    json: { name: "Browser fixture", email: "fixture@example.test", plan_name: "Fixture",
+      status: "active", sub_token: subToken },
   }));
   await page.route("**/api/v1/user/subscription-domains", (route) => route.fulfill({ json: publicDomains }));
 }
 
 export async function expectSelectedDomain(page: Page, domain: string) {
-  await expect(page.getByRole("tab", { name: domain, exact: false })).toHaveAttribute("aria-selected", "true");
-  await expect(page.getByRole("tabpanel").locator("code")).toHaveText(`https://${domain}${fixtureSubscriptionPath}`);
+  await expect(page.locator(".connect-domains").getByRole("radio", { checked: true })).toHaveCount(1);
+  await expect(page.locator(".connect-selected-domain__value")).toHaveText(domain);
+  await expectOnlyAccountUrl(page, `https://${domain}${fixtureSubscriptionPath}`);
 }
 
 // While the QR dialog is closed, the account URL is the only visible <code>
 // on the subscription page.
 export async function expectOnlyAccountUrl(page: Page, url: string) {
-  await expect(page.locator("code").filter({ visible: true })).toHaveText([url]);
+  const accountUrl = page.locator("input[readonly]");
+  await expect(accountUrl).toHaveCount(1);
+  await expect(accountUrl).toBeVisible();
+  await expect(accountUrl).toHaveValue(url);
+  await expect(page.locator("code").filter({ visible: true })).toHaveCount(0);
 }

@@ -140,9 +140,17 @@ test.describe("admin navigation", () => {
     ];
 
     for (const p of pages) {
+      const target = page.locator(`nav a[href="${p.urlPart}"]`);
+      if (!(await target.isVisible())) {
+        const group = p.urlPart === "/admin/activity" || p.urlPart === "/admin/connections" ? "Monitoring"
+          : p.urlPart === "/admin/nodes" || p.urlPart === "/admin/node-groups" ? "Infrastructure"
+          : p.urlPart === "/admin/plans" || p.urlPart === "/admin/users" ? "Customers & sales"
+          : p.urlPart === "/admin/announcements" ? "Customer support" : "System";
+        await page.locator("nav").getByRole("button", { name: group, exact: true }).click();
+      }
       // Scoped to the side nav: the breadcrumb of the page you are already on
       // carries the same accessible name, which makes a bare getByRole ambiguous.
-      await page.locator(`nav a[href="${p.urlPart}"]`).click();
+      await target.click();
       await expect(page).toHaveURL(new RegExp(p.urlPart.replace(/\//g, "\\/")));
       await expect(page.getByRole("heading", { name: p.heading }).first()).toBeVisible();
       // Nothing on a freshly-loaded page should be reporting a load failure.
@@ -165,7 +173,7 @@ test.describe("admin settings", () => {
     // Numeric settings render as <input type="number"> (spinbutton), not textbox.
     await page.getByRole("spinbutton", { name: "Update Interval" }).fill(interval);
 
-    await page.getByRole("button", { name: "Save Settings" }).click();
+    await page.getByRole("button", { name: "Save Settings" }).first().click();
 
     await expect(page.getByText(/Settings saved successfully/i)).toBeVisible();
     await expect(page.getByText(/Failed to save settings/i)).toHaveCount(0);
@@ -183,7 +191,7 @@ test.describe("admin settings", () => {
 
     const before = await toggle.isChecked();
     await toggle.click();
-    await page.getByRole("button", { name: "Save Settings" }).click();
+    await page.getByRole("button", { name: "Save Settings" }).first().click();
     await expect(page.getByText(/Settings saved successfully/i)).toBeVisible();
 
     await page.reload();
@@ -193,7 +201,7 @@ test.describe("admin settings", () => {
     // Restore, so this test leaves the panel as it found it (and so a later
     // run of the user-registration spec isn't blocked by it).
     await page.getByRole("checkbox", { name: "Allow Self-Registration" }).click();
-    await page.getByRole("button", { name: "Save Settings" }).click();
+    await page.getByRole("button", { name: "Save Settings" }).first().click();
     await expect(page.getByText(/Settings saved successfully/i)).toBeVisible();
   });
 });

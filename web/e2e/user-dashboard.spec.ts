@@ -16,6 +16,7 @@ const GB = 1024 ** 3;
 const overview: UserSummary = {
   plan_name: "Everyday Plus", status: "active", traffic_used: 25 * GB,
   traffic_limit: 100 * GB, plan_expires_at: EXPIRES,
+  next_traffic_reset_at: null,
   devices: 2, max_devices: 4, online: 1, online_ips: 2, max_concurrent: 5,
 };
 const profile: UserProfile = {
@@ -96,8 +97,9 @@ async function mockDashboard(page: Page, language = "en") {
         "subscription-domains": publicDomains, nodes: state.nodes,
         announcements: state.announcements, plans: state.plans, orders: state.orders,
         "payment-providers": [{ name: "stripe", mode: "redirect" }],
+        subscription: null,
       };
-      await route.fulfill({ json: responses[path] ?? {} });
+      await route.fulfill({ json: Object.hasOwn(responses, path) ? responses[path] : {} });
     } else if (request.method() === "POST" && path === "orders") {
       const body: CreateOrderRequest = request.postDataJSON();
       state.orderPosts.push(body);
@@ -115,18 +117,12 @@ async function mockDashboard(page: Page, language = "en") {
   return state;
 }
 
-async function choose(page: Page, label: string, option: string) {
-  // Cloudscape Select exposes its labelled trigger as a button, not a combobox.
-  await page.getByRole("button", { name: new RegExp(label) }).click();
-  await page.getByRole("option", { name: option, exact: true }).click();
-}
-
 async function openOverview(page: Page, title = en.user.dashboard.title) {
   await page.goto("/portal/dashboard");
   await expect(page.getByRole("heading", { name: title, exact: true })).toBeVisible();
 }
 
-function accountUrlInput(page: Page, label = en.user.devices.accountUrl) {
+function accountUrlInput(page: Page, label = en.user.connect.currentLink) {
   return page.getByRole("textbox", { name: label, exact: true });
 }
 
@@ -147,8 +143,8 @@ test.describe("mocked user dashboard and purchase journey", () => {
     await openOverview(page);
     await expect(page.getByRole("heading", { name: "Everyday Plus", exact: true })).toBeVisible();
     await expect(page.getByText(en.user.dashboard.monthlyRemaining, { exact: true })).toBeVisible();
-    await expect(page.getByText("75.0 GB", { exact: true })).toBeVisible();
-    await expect(page.getByText("25.0 GB of 100.0 GB used this month", { exact: true })).toBeVisible();
+    await expect(page.getByText("75 GB", { exact: true })).toBeVisible();
+    await expect(page.getByText("25 GB of 100 GB used this month", { exact: true })).toBeVisible();
     await expect(page.getByText("10 days left", { exact: true })).toBeVisible();
     // The registered-devices tile (devices / max_devices) is gone.
     await expect(page.getByText("2 of 4", { exact: true })).toHaveCount(0);
@@ -167,12 +163,15 @@ test.describe("mocked user dashboard and purchase journey", () => {
     await openOverview(page);
     const url = accountUrlInput(page);
     await expect(url).toHaveValue(accountUrl("blocked.example.test"));
-    await choose(page, en.user.dashboard.subscriptionDomain, "working.example.test");
+    const addresses = page.getByRole("radiogroup", { name: en.user.connect.addressGroup, exact: true });
+    await expect(addresses.getByRole("radio", { name: "Address 1", exact: true })).toBeChecked();
+    await addresses.getByRole("radio", { name: "Address 3", exact: true }).click();
+    await expect(addresses.getByRole("radio", { name: "Address 3", exact: true })).toBeChecked();
     const selected = accountUrl("working.example.test");
     await expect(url).toHaveValue(selected);
-    await page.getByRole("button", { name: en.user.dashboard.copyUrl, exact: true }).click();
+    await page.getByRole("button", { name: en.user.connect.copyCurrent, exact: true }).click();
     await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(selected);
-    await page.getByRole("button", { name: en.user.devices.showQr, exact: true }).click();
+    await page.getByRole("button", { name: en.user.connect.qr, exact: true }).click();
     const dialog = page.getByRole("dialog");
     await expect(dialog.getByText(en.user.devices.qrTitle, { exact: true }).first()).toBeVisible();
     const qr = dialog.locator('svg[width="220"][height="220"]');
@@ -190,7 +189,7 @@ test.describe("mocked user dashboard and purchase journey", () => {
   test("the supported-apps link opens the account subscription page", async ({ page }) => {
     await mockDashboard(page);
     await openOverview(page);
-    await page.getByRole("button", { name: en.user.dashboard.supportedApps, exact: true }).click();
+    await page.getByRole("button", { name: en.user.connect.moreGuide, exact: true }).first().click();
     await expect(page).toHaveURL(/\/portal\/devices$/);
     await expect(page.getByRole("heading", { name: en.user.devices.title, exact: true })).toBeVisible();
   });
@@ -381,8 +380,11 @@ test.describe("mocked user dashboard and purchase journey", () => {
       await expect(page.getByRole("heading", { name: "Everyday Plus", exact: true })).toBeVisible();
       await expect(page.getByText(ko.user.dashboard.monthlyRemaining, { exact: true })).toBeVisible();
       await expect(page.getByRole("heading", { name: ko.user.dashboard.quickConnect, exact: true })).toBeVisible();
-      await expect(accountUrlInput(page, ko.user.devices.accountUrl)).toHaveValue(accountUrl("blocked.example.test"));
-      await expect(page.getByRole("button", { name: ko.user.dashboard.supportedApps, exact: true })).toBeVisible();
+      await expect(accountUrlInput(page, ko.user.connect.currentLink)).toHaveValue(accountUrl("blocked.example.test"));
+      await expect(page.getByRole("button", { name: ko.user.connect.moreGuide, exact: true })).toHaveCount(2);
+      for (const guide of await page.getByRole("button", { name: ko.user.connect.moreGuide, exact: true }).all()) {
+        await expect(guide).toBeVisible();
+      }
       await expect(page.getByRole("heading", { name: ko.user.dashboard.serverStatus, exact: true })).toBeVisible();
       await expect(page.getByRole("button", { name: bulletin.title, exact: true })).toBeVisible();
       expect(await page.evaluate(() => document.body.classList.contains("awsui-dark-mode"))).toBe(theme === "dark");
