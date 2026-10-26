@@ -1,20 +1,29 @@
 /* Plan purchase page layout. Colors and radii come from Cloudscape tokens inline;
    this file only owns grid structure. */
+/* A plan card should read like a card, not a page: cap its width instead of
+   stretching to fill, so the layout stays compact with one or many plans. */
 .plan-info__grid {
   display: grid;
-  gap: 20px;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 400px));
 }
 
 .plan-info__card {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 14px;
   height: 100%;
 }
 
+.plan-info__price {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+}
+
 .plan-info__divided {
-  padding-block-start: 16px;
+  padding-block-start: 10px;
 }
 
 .plan-info__feature {
@@ -30,7 +39,7 @@
 }
 
 .plan-info__stat {
-  padding: 12px 8px;
+  padding: 8px 6px;
   text-align: center;
   min-width: 0;
   overflow-wrap: anywhere;
@@ -54,7 +63,7 @@
   cursor: pointer;
   font: inherit;
   min-width: 0;
-  padding: 8px 4px;
+  padding: 6px 4px;
   text-align: center;
 }
 
@@ -102,4 +111,107 @@
 
 .plan-info__receipt-promo {
   padding-block-end: 12px;
+}
+
+/* Korean/Chinese sentences break at phrase boundaries (see orderAudit.css). */
+.plan-info {
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+.plan-info__stat > :first-child {
+  white-space: nowrap;
+}
+
+.plan-current {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px 28px;
+}
+
+.plan-current__name,
+.plan-current__metric {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.plan-current__metric {
+  border-inline-start: 1px solid var(--color-border-divider-default, #e9ebed);
+  padding-inline-start: 24px;
+}
+
+.plan-how {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.plan-how__step {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--color-border-divider-default, #e9ebed);
+  background: var(--color-background-container-content, #fff);
+}
+
+.plan-how__num {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  font-weight: 800;
+  font-size: 13px;
+  color: #fff;
+  background: var(--color-background-button-primary-default, #006ce0);
+}
+
+.plan-faq {
+  display: grid;
+  gap: 4px;
+}
+
+.plan-faq__item {
+  border-block-end: 1px solid var(--color-border-divider-default, #e9ebed);
+  padding-block: 10px;
+}
+
+.plan-faq__item:last-child {
+  border-block-end: none;
+}
+
+.plan-faq__item summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.plan-faq__item p {
+  margin-block: 8px 0;
+}
+
+@media (max-width: 688px) {
+  .plan-current,
+  .plan-how {
+    grid-template-columns: 1fr;
+  }
+
+  .plan-current__metric {
+    border-inline-start: none;
+    padding-inline-start: 0;
+    border-block-start: 1px solid var(--color-border-divider-default, #e9ebed);
+    padding-block-start: 14px;
+  }
+
+  .plan-info__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .plan-info__grid > * {
+    max-width: 100%;
+  }
 }

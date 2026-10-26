@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import {
@@ -12,7 +12,6 @@ import {
   Flashbar,
   type FlashbarProps,
   StatusIndicator,
-  ColumnLayout,
   Badge,
   Icon,
   Input,
@@ -20,12 +19,14 @@ import {
   Modal,
   Alert,
   Tiles,
+  ProgressBar,
 } from "@cloudscape-design/components";
 import {
   borderRadiusInput, borderRadiusItem, colorBackgroundCellShaded, colorBackgroundInputDefault,
   colorBackgroundItemSelected, colorBorderDividerDefault, colorBorderInputDefault, colorBorderItemSelected,
 } from "@cloudscape-design/design-tokens";
 import "./planInfo.css";
+import ResetTickets from "../../components/ResetTickets";
 import type {
   UserProfile,
   UserPlanItem,
@@ -41,7 +42,8 @@ function formatBytes(bytes: number): string {
   if (bytes === 0) return "∞";
   const units = ["B", "KB", "MB", "GB", "TB"];
   const i = Math.floor(Math.log(bytes) / Math.log(1024));
-  return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${units[i]}`;
+  const value = bytes / Math.pow(1024, i);
+  return `${Number.isInteger(value) ? value : value.toFixed(1)} ${units[i]}`;
 }
 
 // The PATCH endpoint reports a refused code as a 400 with this envelope rather
@@ -108,8 +110,20 @@ export default function PlanInfo() {
   // instead of collapsing into a page banner, so the user sees what was ordered.
   const [placedOrder, setPlacedOrder] = useState<OrderResponse | null>(null);
   const [stripeTabBlocked, setStripeTabBlocked] = useState<string | null>(null);
+  // After Stripe opens in its own tab the payment is out-of-band, so the user
+  // watches a persistent "payment in progress" popup here instead of a
+  // transient toast; it can reopen the tab and closes into a fresh reload.
+  const [paying, setPaying] = useState<{ url: string; planName: string; priceCents: number } | null>(null);
+  // Coming back from Stripe deserves its own popup (a receipt-style result),
+  // not a transient toast the user can miss before it fades.
+  type CheckoutReturn =
+    | { kind: "confirming" }
+    | { kind: "paid" | "extension"; planName: string; days: number; until: string }
+    | { kind: "pending" | "cancelled" | "failed" };
+  const [checkoutReturn, setCheckoutReturn] = useState<CheckoutReturn | null>(null);
+  const returnGeneration = useRef(0);
 
-  const loadData = async () => {
+  const loadData = async (): Promise<OrderResponse[] | null> => {
     try {
       setLoading(true);
       const [profileData, planList, orderList, providerList] = await Promise.all([
@@ -121,11 +135,13 @@ export default function PlanInfo() {
       setProfile(profileData);
       setPlans(planList);
       setOrders(orderList);
+      return orderList;
       // Manual bank transfer is hidden from customers for now; only hosted
       // checkout (Stripe) is offered. Admins still settle orders manually.
       setProviders(providerList.filter((provider) => provider.mode === "redirect"));
     } catch {
       setFlash([{ type: "error", content: t("user.plan.loadError"), dismissible: true, onDismiss: () => setFlash([]) }]);
+      return null;
     } finally {
       setLoading(false);
     }
@@ -146,40 +162,38 @@ export default function PlanInfo() {
     const orderId = params.get("order_id");
     const sessionId = params.get("session_id");
     window.history.replaceState({}, "", window.location.pathname);
-    const show = (type: FlashbarProps.Type, content: string) =>
-      setFlash([{ type, content, dismissible: true, onDismiss: () => setFlash([]) }]);
-
     if (checkoutResult === "cancelled") {
-      show("info", t("user.plan.order.checkout.cancelled"));
+      setCheckoutReturn({ kind: "cancelled" });
       return;
     }
     if (!orderId || !sessionId) {
-      show("info", t("user.plan.order.checkout.successPending"));
+      setCheckoutReturn({ kind: "pending" });
       return;
     }
-    show("in-progress", t("user.plan.checkoutModal.confirming"));
+    const generation = ++returnGeneration.current;
+    setCheckoutReturn({ kind: "confirming" });
     void (async () => {
       try {
         const result = await userApi.confirmCheckout(orderId, sessionId);
-        // An extension keeps plan_started_at; a new term starts at the grant.
-        // Comparing it to the order's own time stays right even when the
-        // webhook settled the order before this page loaded.
-        let wasActive = false;
+        if (returnGeneration.current !== generation) return;
         if (result.status === "paid") {
+          // An extension keeps plan_started_at; a new term starts at the grant.
+          // Comparing it to the order's own time stays right even when the
+          // webhook settled the order before this page loaded.
           const [after, orderList] = await Promise.all([userApi.getProfile(), userApi.listMyOrders()]);
           const order = orderList.find((item) => item.id === orderId);
-          wasActive = !!after.plan_started_at && !!order && new Date(after.plan_started_at) < new Date(order.created_at);
+          const wasActive = !!after.plan_started_at && !!order && new Date(after.plan_started_at) < new Date(order.created_at);
+          setCheckoutReturn({
+            kind: wasActive ? "extension" : "paid",
+            planName: order?.plan_name ?? "",
+            days: order?.duration_days ?? 0,
+            until: after.plan_expires_at ?? "",
+          });
+        } else {
+          setCheckoutReturn({ kind: "pending" });
         }
-        show(
-          result.status === "paid" ? "success" : "info",
-          result.status === "paid"
-            ? wasActive
-              ? t("user.plan.extend.done")
-              : t("user.plan.checkoutModal.paid")
-            : t("user.plan.order.checkout.successPending"),
-        );
       } catch {
-        show("warning", t("user.plan.checkoutModal.confirmFailed"));
+        if (returnGeneration.current === generation) setCheckoutReturn({ kind: "failed" });
       } finally {
         await loadData();
       }
@@ -192,7 +206,12 @@ export default function PlanInfo() {
   useEffect(() => {
     const onFocus = () => {
       if (document.visibilityState === "visible" && orders.some((order) => order.status === "pending")) {
-        void loadData();
+        void (async () => {
+          const list = await loadData();
+          // Payment finished in the Stripe tab: the waiting popup has served its
+          // purpose, so it closes itself instead of asking to be dismissed.
+          if (list && !list.some((order) => order.status === "pending")) setPaying(null);
+        })();
       }
     };
     document.addEventListener("visibilitychange", onFocus);
@@ -294,9 +313,8 @@ export default function PlanInfo() {
       if (!session.redirect_url) throw new Error("checkout returned no redirect URL");
       if (stripeTab && !stripeTab.closed) {
         stripeTab.location.href = session.redirect_url;
+        setPaying({ url: session.redirect_url, planName: checkout?.planName ?? "", priceCents: checkout?.priceCents ?? 0 });
         closeCheckout();
-        setFlash([{ type: "info", content: t("user.plan.checkoutModal.stripeOpened"), dismissible: true, onDismiss: () => setFlash([]) }]);
-        await loadData();
       } else {
         setStripeTabBlocked(session.redirect_url);
       }
@@ -413,38 +431,67 @@ export default function PlanInfo() {
     return new Date(Math.max(base.getTime(), Date.now()) + days * 86400000);
   };
 
+  const daysLeft = profile?.plan_expires_at
+    ? Math.max(0, Math.ceil((new Date(profile.plan_expires_at).getTime() - Date.now()) / 86400000))
+    : 0;
+
   return (
     <ContentLayout header={<Header variant="h1" description={t("user.plan.subtitle")}>{t("user.plan.title")}</Header>}>
+      <div className="plan-info">
       <SpaceBetween size="l">
         <Flashbar items={flash} />
 
         {hasPlan && profile && (
-          <Container header={<Header variant="h2">{t("user.plan.currentPlan")}</Header>}>
-            <ColumnLayout columns={4} variant="text-grid">
-              <SpaceBetween size="xs">
+          <Container
+            header={
+              <Header variant="h2" description={t("user.plan.current.description")}>
+                {t("user.plan.currentPlan")}
+              </Header>
+            }
+          >
+            <div className="plan-current">
+              <div className="plan-current__name">
                 <Box variant="awsui-key-label">{t("user.plan.planName")}</Box>
-                <Box>{profile.plan_name}</Box>
-              </SpaceBetween>
-              <SpaceBetween size="xs">
-                <Box variant="awsui-key-label">{t("user.plan.trafficLimit")}</Box>
-                <Box>{profile.traffic_limit ? formatBytes(profile.traffic_limit) : "∞"}</Box>
-              </SpaceBetween>
-              <SpaceBetween size="xs">
-                <Box variant="awsui-key-label">{t("user.plan.expiresAt")}</Box>
-                <Box>
-                  {profile.plan_expires_at
-                    ? new Date(profile.plan_expires_at).toLocaleDateString(i18n.resolvedLanguage ?? i18n.language)
-                    : "-"}
-                </Box>
-              </SpaceBetween>
-              <SpaceBetween size="xs">
-                <Box variant="awsui-key-label">{t("user.plan.status")}</Box>
+                <Box variant="h2" padding="n">{profile.plan_name}</Box>
                 <StatusIndicator type={profile.status === "active" ? "success" : "warning"}>
                   {t(STATUS_LABEL_KEYS[profile.status] ?? "user.dashboard.statusUnknown")}
                 </StatusIndicator>
-              </SpaceBetween>
-            </ColumnLayout>
+              </div>
+              <div className="plan-current__metric">
+                <Box variant="awsui-key-label">{t(profile.traffic_limit ? "user.plan.current.dataLeft" : "user.plan.current.dataUsed")}</Box>
+                <Box variant="h2" padding="n">
+                  {profile.traffic_limit
+                    ? formatBytes(Math.max(0, profile.traffic_limit - profile.traffic_used))
+                    : formatBytes(profile.traffic_used) }
+                </Box>
+                {profile.traffic_limit ? (
+                  <ProgressBar
+                    value={Math.max(0, 100 - Math.min(100, (profile.traffic_used / profile.traffic_limit) * 100))}
+                    ariaLabel={t("user.plan.current.dataLeft")}
+                    additionalInfo={t("user.plan.current.dataOf", { limit: formatBytes(profile.traffic_limit) })}
+                  />
+                ) : (
+                  <Box variant="small" color="text-body-secondary">{t("user.plan.current.unlimited")}</Box>
+                )}
+              </div>
+              <div className="plan-current__metric">
+                <Box variant="awsui-key-label">{t("user.plan.expiresAt")}</Box>
+                <Box variant="h2" padding="n">
+                  {profile.plan_expires_at ? t("user.plan.current.daysLeft", { days: daysLeft }) : "-"}
+                </Box>
+                <Box variant="small" color="text-body-secondary">
+                  {profile.plan_expires_at ? t("user.plan.current.until", { date: formatDate(new Date(profile.plan_expires_at)) }) : ""}
+                </Box>
+              </div>
+            </div>
+            <Box variant="small" color="text-body-secondary" margin={{ top: "m" }}>
+              {t("user.plan.current.note")}
+            </Box>
           </Container>
+        )}
+
+        {hasPlan && profile && (
+          <ResetTickets canReset={!!profile.traffic_limit} onRedeemed={() => void loadData()} />
         )}
 
         {!hasPlan && !pendingOrder && (
@@ -485,7 +532,24 @@ export default function PlanInfo() {
         )}
 
         <SpaceBetween size="m">
-          <Header variant="h2" counter={plans.length > 0 ? `(${plans.length})` : undefined}>{t("user.plan.availablePlans")}</Header>
+          <Header
+            variant="h2"
+            counter={plans.length > 0 ? `(${plans.length})` : undefined}
+            description={t("user.plan.how.description")}
+          >
+            {t("user.plan.availablePlans")}
+          </Header>
+          <div className="plan-how">
+            {[1, 2, 3].map((n) => (
+              <div key={n} className="plan-how__step">
+                <span className="plan-how__num" aria-hidden>{n}</span>
+                <div>
+                  <Box fontWeight="bold">{t(`user.plan.how.step${n}Title`)}</Box>
+                  <Box variant="small" color="text-body-secondary">{t(`user.plan.how.step${n}Body`)}</Box>
+                </div>
+              </div>
+            ))}
+          </div>
           {plans.length === 0 ? (
             <Container>
               <Box textAlign="center" color="text-body-secondary" padding="l">{t("user.plan.noPlansAvailable")}</Box>
@@ -502,18 +566,27 @@ export default function PlanInfo() {
                   { label: t("user.plan.maxDevices"), value: String(item.max_devices) },
                 ];
                 return (
-                  <Container key={item.id} fitHeight header={<Header variant="h2">{item.name}</Header>}>
+                  <Container
+                    key={item.id}
+                    fitHeight
+                    header={
+                      <Header
+                        variant="h2"
+                        actions={isExtension(item.id) ? <Badge color="blue">{t("user.plan.current.badge")}</Badge> : undefined}
+                      >
+                        {item.name}
+                      </Header>
+                    }
+                  >
                     <div className="plan-info__card">
                       {selectedPrice ? (
-                        <Box textAlign="center">
-                          <Box tagOverride="span" fontSize="display-l" fontWeight="bold">{formatPriceCents(selectedPrice.price_cents)}</Box>
+                        <div className="plan-info__price">
+                          <Box tagOverride="span" fontSize="heading-xl" fontWeight="bold">{formatPriceCents(selectedPrice.price_cents)}</Box>
                           <Box tagOverride="span" color="text-body-secondary">
                             {" "}{t("user.plan.perDays", { days: selectedPrice.duration_days })}
                           </Box>
-                          {savings && (
-                            <Box margin={{ top: "xxs" }}><Badge color="green">{t("user.plan.order.savings", { percent: savings.percent })}</Badge></Box>
-                          )}
-                        </Box>
+                          {savings && <Badge color="green">{t("user.plan.order.savings", { percent: savings.percent })}</Badge>}
+                        </div>
                       ) : null}
 
                       {item.purchasable && selectedPrice && item.prices.length > 1 && (
@@ -629,6 +702,91 @@ export default function PlanInfo() {
             </div>
           )}
         </SpaceBetween>
+
+        <Container header={<Header variant="h2">{t("user.plan.faq.title")}</Header>}>
+          <div className="plan-faq">
+            {[1, 2, 3, 4, 5].map((n) => (
+              <details key={n} className="plan-faq__item">
+                <summary>{t(`user.plan.faq.q${n}`)}</summary>
+                <Box variant="p" color="text-body-secondary">{t(`user.plan.faq.a${n}`)}</Box>
+              </details>
+            ))}
+          </div>
+        </Container>
+
+        <Modal
+          visible={checkoutReturn !== null}
+          onDismiss={checkoutReturn?.kind === "confirming" ? undefined : () => { ++returnGeneration.current; setCheckoutReturn(null); void loadData(); }}
+          closeAriaLabel={t("user.announcements.close")}
+          header={checkoutReturn?.kind === "paid" ? t("user.plan.return.paidTitle")
+            : checkoutReturn?.kind === "extension" ? t("user.plan.return.extensionTitle")
+            : checkoutReturn?.kind === "cancelled" ? t("user.plan.return.cancelledTitle")
+            : checkoutReturn?.kind === "failed" ? t("user.plan.return.failedTitle")
+            : t("user.plan.return.pendingTitle")}
+          footer={checkoutReturn && checkoutReturn.kind !== "confirming" ? (
+            <Box float="right">
+              <Button variant="primary" onClick={() => { ++returnGeneration.current; setCheckoutReturn(null); void loadData(); }}>{t("user.plan.return.ok")}</Button>
+            </Box>
+          ) : undefined}
+        >
+          {checkoutReturn?.kind === "confirming" || checkoutReturn?.kind === undefined ? (
+            <Box textAlign="center" padding="l">
+              <SpaceBetween size="s" alignItems="center">
+                <Spinner size="large" />
+                <Box>{t("user.plan.return.confirming")}</Box>
+              </SpaceBetween>
+            </Box>
+          ) : checkoutReturn?.kind === "paid" || checkoutReturn?.kind === "extension" ? (
+            <SpaceBetween size="m">
+              <StatusIndicator type="success">
+                {checkoutReturn.kind === "extension"
+                  ? t("user.plan.return.extensionBody", { days: checkoutReturn.days, until: checkoutReturn.until ? new Date(checkoutReturn.until).toLocaleDateString(i18n.resolvedLanguage ?? i18n.language) : "-" })
+                  : t("user.plan.return.paidBody", { plan: checkoutReturn.planName, until: checkoutReturn.until ? new Date(checkoutReturn.until).toLocaleDateString(i18n.resolvedLanguage ?? i18n.language) : "-" })}
+              </StatusIndicator>
+              <Box variant="small" color="text-body-secondary">{t("user.plan.return.autoHint")}</Box>
+            </SpaceBetween>
+          ) : (
+            <SpaceBetween size="m">
+              <StatusIndicator type={checkoutReturn.kind === "pending" ? "in-progress" : "info"}>
+                {checkoutReturn.kind === "pending" ? t("user.plan.return.pendingBody")
+                  : checkoutReturn.kind === "cancelled" ? t("user.plan.return.cancelledBody")
+                  : t("user.plan.return.failedBody")}
+              </StatusIndicator>
+              {checkoutReturn.kind === "cancelled" && pendingOrder && (
+                <Button variant="primary" onClick={() => { ++returnGeneration.current; setCheckoutReturn(null); openOrderCheckout(pendingOrder); }}>
+                  {t("user.plan.order.checkout.payNow")}
+                </Button>
+              )}
+            </SpaceBetween>
+          )}
+        </Modal>
+
+        <Modal
+          visible={paying !== null}
+          onDismiss={() => { setPaying(null); void loadData(); }}
+          closeAriaLabel={t("user.announcements.close")}
+          header={t("user.plan.paying.title")}
+          footer={
+            <Box float="right">
+              <SpaceBetween direction="horizontal" size="xs">
+                <Button onClick={() => { setPaying(null); void loadData(); }}>{t("user.plan.paying.dismiss")}</Button>
+                {paying && (
+                  <Button variant="primary" iconName="external" iconAlign="right" onClick={() => window.open(paying.url, "_blank")}>
+                    {t("user.plan.paying.reopen")}
+                  </Button>
+                )}
+              </SpaceBetween>
+            </Box>
+          }
+        >
+          {paying && (
+            <SpaceBetween size="m">
+              <StatusIndicator type="in-progress">{t("user.plan.paying.standby")}</StatusIndicator>
+              <Box>{t("user.plan.paying.body", { plan: paying.planName, amount: formatPriceCents(paying.priceCents) })}</Box>
+              <Box variant="small" color="text-body-secondary">{t("user.plan.paying.reopenHint")}</Box>
+            </SpaceBetween>
+          )}
+        </Modal>
 
         <Modal
           size="medium"
@@ -825,6 +983,7 @@ export default function PlanInfo() {
           })}
         </Modal>
       </SpaceBetween>
+      </div>
     </ContentLayout>
   );
 }

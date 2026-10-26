@@ -266,6 +266,7 @@ type orderReceiptResponse struct {
 	Provider     string     `json:"provider"`
 	Email        string     `json:"email"`
 	PaidAt       *time.Time `json:"paid_at"`
+	CreatedAt    time.Time  `json:"created_at"`
 	ReceiptURL   string     `json:"receipt_url,omitempty"`
 	// Note is the administrator's reason for a granted order; empty otherwise.
 	Note          string     `json:"note,omitempty"`
@@ -317,14 +318,14 @@ func (h *UserCheckoutHandler) writeReceipt(c *fiber.Ctx, orderID, userID string)
 	err := h.db.QueryRow(ctx,
 		`SELECT o.id, p.name, o.duration_days, o.price_cents, o.discount_cents,
 		        o.provider, o.provider_session_id, u.email, o.paid_at,
-		        o.granted_plan_expires_before, o.granted_plan_expires_after
+		        o.granted_plan_expires_before, o.granted_plan_expires_after, o.created_at
 		 FROM plan_orders o
 		 JOIN plans p ON p.id = o.plan_id
 		 JOIN users u ON u.id = o.user_id
 		 WHERE o.id = $1 AND o.user_id = $2 AND o.status = 'paid'`,
 		orderID, userID,
 	).Scan(&r.OrderID, &r.PlanName, &r.DurationDays, &r.PriceCents, &r.Discount,
-		&r.Provider, &sessionID, &r.Email, &r.PaidAt, &r.ExpiresBefore, &r.ExpiresAfter)
+		&r.Provider, &sessionID, &r.Email, &r.PaidAt, &r.ExpiresBefore, &r.ExpiresAfter, &r.CreatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "paid order not found"})

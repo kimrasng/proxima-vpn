@@ -2145,6 +2145,62 @@
         "detail": "This is your current plan, so the new term is added on top. Your expiry moves from {{from}} to {{to}}; data usage and the reset date stay as they are.",
         "confirmAmount": "Pay {{amount}} and extend",
         "done": "Payment complete. Your plan has been extended."
+      },
+      "paying": {
+        "title": "Payment in progress",
+        "standby": "The Stripe checkout page opened in a new tab.",
+        "body": "Pay {{amount}} for {{plan}} in the new tab. Your plan is applied automatically when the payment completes.",
+        "reopenHint": "If you closed the window or it never opened, you can open it again.",
+        "reopen": "Reopen checkout",
+        "dismiss": "Close"
+      },
+      "return": {
+        "confirming": "Checking your payment…",
+        "paidTitle": "Payment complete",
+        "extensionTitle": "Your plan was extended",
+        "pendingTitle": "Checking your payment",
+        "cancelledTitle": "Payment cancelled",
+        "failedTitle": "Couldn't verify the payment",
+        "paidBody": "{{plan}} is active. You can use it until {{until}}.",
+        "extensionBody": "{{days}} days were added after your current term. You can use the plan until {{until}}.",
+        "pendingBody": "The payment does not look complete yet. Your plan applies automatically once it is, so please check back soon.",
+        "cancelledBody": "The order stays pending. You can continue paying whenever you're ready.",
+        "failedBody": "A network problem kept us from verifying the payment. Please check back shortly.",
+        "autoHint": "Your usage and the monthly reset date stay as they are.",
+        "ok": "OK"
+      },
+      "current": {
+        "description": "Data and time left on the plan you're using now.",
+        "dataLeft": "Data left this month",
+        "dataUsed": "Used this month",
+        "dataOf": "of {{limit}} per month",
+        "unlimited": "This plan has no data limit.",
+        "daysLeft": "{{days}} days left",
+        "until": "Until {{date}}",
+        "note": "There is no automatic billing. Pay for the same plan again before it ends and the new term is added after the time you have left.",
+        "badge": "Current"
+      },
+      "how": {
+        "description": "You pay once for the term you choose.",
+        "step1Title": "Pick a term",
+        "step1Body": "Longer terms cost less per day. Each term button shows its discount.",
+        "step2Title": "Pay by card",
+        "step2Body": "The pay button opens Stripe checkout in a new tab. Proxima never stores your card details.",
+        "step3Title": "Ready right away",
+        "step3Body": "The plan applies as soon as payment completes. VPN apps you already added keep working without changes."
+      },
+      "faq": {
+        "title": "Frequently asked questions",
+        "q1": "Will I be charged automatically?",
+        "a1": "No. You pay once for the term you choose. Nothing is charged again when it ends; the plan simply expires.",
+        "q2": "What happens when I extend my current plan?",
+        "a2": "The new term is added after the time you have left. This month's usage and your monthly reset date stay the same.",
+        "q3": "What happens to my remaining time if I switch plans?",
+        "a3": "You move to the new plan as soon as you pay, and your remaining time carries over to it. Data usage starts again from zero.",
+        "q4": "When is my data refilled?",
+        "a4": "Usage resets to zero on the same day each month, counted from the day your plan started. If you run out earlier, a reset ticket resets it immediately.",
+        "q5": "What is a reset ticket?",
+        "a5": "A coupon that sets this month's data usage back to zero right away. You can get one from promotions or support and use it in the Reset tickets section above."
       }
     },
     "account": {
@@ -2259,7 +2315,11 @@
         "note": "Reason",
         "term": "Plan term",
         "termChange": "{{from}} → {{to}}",
-        "termUntil": "Until {{to}}"
+        "termUntil": "Until {{to}}",
+        "statusPaid": "Paid",
+        "orderDate": "Order date",
+        "subtotal": "Subtotal",
+        "discount": "Discount"
       }
     },
     "resetTickets": {

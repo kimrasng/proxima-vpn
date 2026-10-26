@@ -1,0 +1,22 @@
+.order-receipt__panel {
+  padding: 4px 16px;
+}
+
+.order-receipt__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  padding-block: 8px;
+  min-width: 0;
+}
+
+.order-receipt__row > :first-child {
+  flex: none;
+  white-space: nowrap;
+  word-break: keep-all;
+}
+
+.order-receipt__row > :last-child {
+  overflow-wrap: anywhere;
+}

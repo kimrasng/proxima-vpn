@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import {
+  Spinner,
   Alert,
   Box,
   Button,
@@ -81,8 +82,9 @@ export default function Orders() {
   };
 
   const handleViewReceipt = async (orderId: string) => {
+    setReceiptLoading(orderId);
+    setReceipt(null);
     try {
-      setReceiptLoading(orderId);
       setReceipt(await userApi.getOrderReceipt(orderId));
     } catch {
       setFlash([{ type: "error", content: t("user.plan.order.receipt.error"), dismissible: true, onDismiss: () => setFlash([]) }]);
@@ -184,7 +186,6 @@ export default function Orders() {
                   ) : item.status === "paid" ? (
                     <Button
                       variant="inline-link"
-                      loading={receiptLoading === item.id}
                       disabled={receiptLoading !== null}
                       onClick={() => void handleViewReceipt(item.id)}
                     >
@@ -200,14 +201,14 @@ export default function Orders() {
         )}
 
         <Modal
-          visible={receipt !== null}
-          onDismiss={() => setReceipt(null)}
+          visible={receipt !== null || receiptLoading !== null}
+          onDismiss={() => { setReceipt(null); setReceiptLoading(null); }}
           closeAriaLabel={t("user.announcements.close")}
           header={t("user.plan.order.receipt.title")}
           footer={
             <Box float="right">
               <SpaceBetween direction="horizontal" size="xs">
-                <Button onClick={() => setReceipt(null)}>{t("user.plan.order.dismiss")}</Button>
+                <Button onClick={() => { setReceipt(null); setReceiptLoading(null); }}>{t("user.plan.order.dismiss")}</Button>
                 {receipt?.receipt_url && (
                   <Button
                     variant="primary"
@@ -216,14 +217,16 @@ export default function Orders() {
                     iconName="external"
                     iconAlign="right"
                   >
-                    {t("user.plan.order.receipt.openStripe")}
+                    {t(receipt.receipt_url.includes("invoice.stripe.com") ? "user.plan.order.receipt.openInvoice" : "user.plan.order.receipt.openStripe")}
                   </Button>
                 )}
               </SpaceBetween>
             </Box>
           }
         >
-          {receipt && <OrderReceiptDetails receipt={receipt} />}
+          {receipt ? <OrderReceiptDetails receipt={receipt} /> : (
+            <Box textAlign="center" padding="l"><Spinner size="large" /></Box>
+          )}
         </Modal>
 
         <Modal

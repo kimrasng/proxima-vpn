@@ -691,6 +691,7 @@ export interface OrderReceipt {
   currency: string;
   provider: string;
   email: string;
+  created_at?: string;
   paid_at?: string;
   receipt_url?: string;
   note?: string;
