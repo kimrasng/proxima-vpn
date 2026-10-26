@@ -150,6 +150,19 @@ func (s *Server) registerRoutes() {
 	adminPromotions.Put("/:id", adminPromotionHandler.Update)
 	adminPromotions.Delete("/:id", adminPromotionHandler.Delete)
 
+	freeTrials := handlers.NewAdminFreeTrialHandler(s.db)
+	admin.Get("/free-trials", freeTrials.List)
+	admin.Post("/free-trials", freeTrials.Create)
+	admin.Put("/free-trials/:id", freeTrials.Update)
+	admin.Delete("/free-trials/:id", freeTrials.Delete)
+	affiliates := handlers.NewAdminAffiliateHandler(s.db)
+	admin.Get("/affiliates", affiliates.List)
+	admin.Post("/affiliates", affiliates.Create)
+	admin.Put("/affiliates/:id", affiliates.Update)
+	admin.Delete("/affiliates/:id", affiliates.Delete)
+	admin.Get("/affiliates/:id/commissions", affiliates.Commissions)
+	admin.Put("/affiliates/:id/commissions/:commissionId/paid", affiliates.MarkPaid)
+
 	admin.Get("/reset-tickets", resetTicketHandler.ListGrants)
 
 	oauthHandler := handlers.NewOAuthHandler(s.db, s.config.Server.PanelURL)
@@ -179,29 +192,6 @@ func (s *Server) registerRoutes() {
 	admin.Post("/settings/test/telegram", settingsTestLimiter, adminSettingsHandler.TestTelegram)
 
 	adminAnnouncementHandler := handlers.NewAdminAnnouncementHandler(s.db)
-	freeTrials := handlers.NewAdminFreeTrialHandler(s.db)
-	admin.Get("/free-trials", freeTrials.List)
-	admin.Post("/free-trials", freeTrials.Create)
-	admin.Put("/free-trials/:id", freeTrials.Update)
-	admin.Delete("/free-trials/:id", freeTrials.Delete)
-	affiliates := handlers.NewAdminAffiliateHandler(s.db)
-	admin.Get("/affiliates", affiliates.List)
-	admin.Post("/affiliates", affiliates.Create)
-	admin.Put("/affiliates/:id", affiliates.Update)
-	admin.Delete("/affiliates/:id", affiliates.Delete)
-	admin.Get("/affiliates/:id/commissions", affiliates.Commissions)
-	admin.Put("/affiliates/:id/commissions/:commissionId/paid", affiliates.MarkPaid)
-
-	adminAnnouncements := admin.Group("/announcements")
-	adminAnnouncements.Get("/", adminAnnouncementHandler.List)
-	adminAnnouncements.Post("/", adminAnnouncementHandler.Create)
-	adminAnnouncements.Post("/preview", adminAnnouncementHandler.Preview)
-	adminAnnouncements.Put("/:id", adminAnnouncementHandler.Update)
-	adminAnnouncements.Delete("/:id", adminAnnouncementHandler.Delete)
-
-	guideHandler := handlers.NewGuideHandler(s.db)
-	adminGuides := admin.Group("/guides")
-	adminGuides.Get("/", guideHandler.ListGuides)
 	supportHandler := handlers.NewSupportHandler(s.db, s.mailer, s.config.Server.PanelURL)
 	adminSupport := admin.Group("/support")
 	adminSupport.Get("/summary", supportHandler.AdminSummary)
@@ -219,6 +209,16 @@ func (s *Server) registerRoutes() {
 	adminSupport.Put("/faqs/:id", supportHandler.AdminUpdateFAQ)
 	adminSupport.Delete("/faqs/:id", supportHandler.AdminDeleteFAQ)
 
+	adminAnnouncements := admin.Group("/announcements")
+	adminAnnouncements.Get("/", adminAnnouncementHandler.List)
+	adminAnnouncements.Post("/", adminAnnouncementHandler.Create)
+	adminAnnouncements.Post("/preview", adminAnnouncementHandler.Preview)
+	adminAnnouncements.Put("/:id", adminAnnouncementHandler.Update)
+	adminAnnouncements.Delete("/:id", adminAnnouncementHandler.Delete)
+
+	guideHandler := handlers.NewGuideHandler(s.db)
+	adminGuides := admin.Group("/guides")
+	adminGuides.Get("/", guideHandler.ListGuides)
 	adminGuides.Post("/", guideHandler.CreateGuide)
 	adminGuides.Post("/preview", guideHandler.Preview)
 	adminGuides.Get("/categories", guideHandler.ListCategories)
@@ -425,6 +425,21 @@ func (s *Server) registerRoutes() {
 	user.Get("/traffic", userPortalHandler.GetTrafficStats)
 	user.Post("/sub-token/regenerate", userPortalHandler.RegenerateSubToken)
 	user.Get("/announcements", userPortalHandler.ListLocalizedAnnouncements)
+
+	userSupportLimiter := limiter.New(limiter.Config{
+		Max: 30, Expiration: time.Minute,
+		KeyGenerator: func(c *fiber.Ctx) string { return c.Locals("user_id").(string) },
+		LimitReached: func(c *fiber.Ctx) error {
+			return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{"error": "too many support requests, try again shortly"})
+		},
+	})
+	userSupport := user.Group("/support")
+	userSupport.Get("/faq", supportHandler.ListFAQ)
+	userSupport.Get("/tickets", supportHandler.ListTickets)
+	userSupport.Post("/tickets", userSupportLimiter, supportHandler.CreateTicket)
+	userSupport.Get("/tickets/:id", supportHandler.GetTicket)
+	userSupport.Post("/tickets/:id/messages", userSupportLimiter, supportHandler.PostMessage)
+	userSupport.Post("/tickets/:id/close", supportHandler.CloseTicket)
 	userGuideHandler := handlers.NewGuideHandler(s.db)
 	user.Get("/guides", userGuideHandler.ListPublished)
 	user.Get("/guides/:id", userGuideHandler.GetPublished)
@@ -474,21 +489,6 @@ func (s *Server) registerRoutes() {
 	sub := s.app.Group("/sub")
 	sub.Get("/:sub_token/:device_id", subLimiter, subscriptionHandler.GetSubscription)
 	sub.Get("/:sub_token", subLimiter, subscriptionHandler.GetAccountSubscription)
-
-	userSupportLimiter := limiter.New(limiter.Config{
-		Max: 30, Expiration: time.Minute,
-		KeyGenerator: func(c *fiber.Ctx) string { return c.Locals("user_id").(string) },
-		LimitReached: func(c *fiber.Ctx) error {
-			return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{"error": "too many support requests, try again shortly"})
-		},
-	})
-	userSupport := user.Group("/support")
-	userSupport.Get("/faq", supportHandler.ListFAQ)
-	userSupport.Get("/tickets", supportHandler.ListTickets)
-	userSupport.Post("/tickets", userSupportLimiter, supportHandler.CreateTicket)
-	userSupport.Get("/tickets/:id", supportHandler.GetTicket)
-	userSupport.Post("/tickets/:id/messages", userSupportLimiter, supportHandler.PostMessage)
-	userSupport.Post("/tickets/:id/close", supportHandler.CloseTicket)
 
 	// Outside /api/v1 and outside any JWT-protected group: a hosted payment
 	// provider authenticates its callback with a signature, not a bearer
