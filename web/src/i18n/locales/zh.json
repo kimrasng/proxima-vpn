@@ -2882,6 +2882,39 @@
       "endpointGroup": {
         "oauth": "OAuth 端点",
         "client": "资源 API（Bearer 令牌）"
+      },
+      "users": {
+        "title": "已授权 {{app}} 的用户",
+        "description": "允许此应用使用其账户的用户。断开连接后，应用的令牌会立即失效，用户需要重新授权才能继续使用。",
+        "refresh": "刷新",
+        "search": "按邮箱或姓名查找",
+        "matches": "匹配 {{count}} 人",
+        "noMatch": "没有匹配的用户。",
+        "empty": "还没有用户授权此应用。",
+        "col": {
+          "user": "用户",
+          "scopes": "已授予的权限",
+          "granted": "授权时间",
+          "lastUsed": "最后使用",
+          "session": "应用登录",
+          "actions": "操作"
+        },
+        "neverUsed": "从未使用",
+        "sessionLive": "已登录",
+        "sessionNone": "已过期",
+        "revoke": "断开连接",
+        "revokeAll": "断开所有用户",
+        "revokeTitle": "要断开此用户的连接吗？",
+        "revokeBody": "将断开 {{email}} 与 {{app}} 的连接。应用的令牌会立即失效，用户需要重新授权才能继续使用。",
+        "revokeAllTitle": "要断开所有用户的连接吗？",
+        "revokeAllBody": "将断开已授权 {{app}} 的全部 {{count}} 位用户。所有令牌会立即失效，用户将从应用中退出登录。",
+        "revokeAllKeep": "应用注册信息、Client ID 和密钥会保留。用户在应用中重新登录并授权后即可继续使用。",
+        "typeName": "请输入应用名称“{{app}}”以确认",
+        "revokeAllConfirm": "断开 {{count}} 位用户",
+        "revokedOne": "已断开 {{email}} 的连接。",
+        "revokedAll": "已断开 {{app}} 的 {{count}} 位用户。",
+        "revokeError": "无法断开连接。",
+        "loadError": "无法加载用户列表。"
       }
     },
     "oauthDocs": {

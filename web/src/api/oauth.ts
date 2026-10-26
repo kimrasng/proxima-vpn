@@ -85,6 +85,31 @@ export function rotateOAuthAppSecret(id: string): Promise<{ client_secret: strin
   return post<{ client_secret: string }>(`/api/v1/admin/oauth-apps/${encodeURIComponent(id)}/secret`);
 }
 
+export interface OAuthAppUser {
+  user_id: string;
+  email: string;
+  name: string;
+  scopes: OAuthScope[];
+  granted_at: string;
+  last_used_at: string | null;
+  active_tokens: number;
+}
+
+export function listOAuthAppUsers(id: string): Promise<OAuthAppUser[]> {
+  setClientTokenType('admin');
+  return get<OAuthAppUser[]>(`/api/v1/admin/oauth-apps/${encodeURIComponent(id)}/users`);
+}
+
+export function revokeOAuthAppUser(id: string, userId: string): Promise<{ revoked: number }> {
+  setClientTokenType('admin');
+  return del<{ revoked: number }>(`/api/v1/admin/oauth-apps/${encodeURIComponent(id)}/users/${encodeURIComponent(userId)}`);
+}
+
+export function revokeAllOAuthAppUsers(id: string): Promise<{ revoked: number }> {
+  setClientTokenType('admin');
+  return del<{ revoked: number }>(`/api/v1/admin/oauth-apps/${encodeURIComponent(id)}/users`);
+}
+
 export function deleteOAuthApp(id: string): Promise<void> {
   setClientTokenType('admin');
   return del<void>(`/api/v1/admin/oauth-apps/${encodeURIComponent(id)}`);

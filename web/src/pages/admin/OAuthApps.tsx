@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import {
@@ -36,6 +36,7 @@ import {
   type OAuthScope,
 } from "../../api/oauth";
 import { OAUTH_ENDPOINT_GROUPS, breakAtSlashes } from "./oauthEndpoints";
+import OAuthAppUsersPanel from "./OAuthAppUsersPanel";
 import "./oauthApps.css";
 
 const EMPTY: OAuthAppInput = {
@@ -85,12 +86,14 @@ export default function OAuthApps() {
   const [revealed, setRevealed] = useState<{ app: OAuthApp; secret: string } | null>(null);
   const [selected, setSelected] = useState<OAuthApp[]>([]);
 
-  const notify = (type: FlashbarProps.Type, content: string) =>
-    setFlash([{ type, content, dismissible: true, dismissLabel: t("common.close"), onDismiss: () => setFlash([]) }]);
+  const notify = useCallback((type: FlashbarProps.Type, content: string) =>
+    setFlash([{ type, content, dismissible: true, dismissLabel: t("common.close"), onDismiss: () => setFlash([]) }]), [t]);
 
   const load = async () => {
     try {
-      setApps(await listOAuthApps());
+      const list = await listOAuthApps();
+      setApps(list);
+      setSelected((cur) => (cur.length && list.some((a) => a.id === cur[0]?.id) ? cur : list.slice(0, 1)));
     } catch (err) {
       notify("error", errorText(err, t("admin.oauthApps.loadError")));
     } finally {
@@ -328,7 +331,15 @@ export default function OAuthApps() {
                 </div>
               ),
             },
-            { id: "users", header: t("admin.oauthApps.col.users"), cell: (a) => t("admin.oauthApps.usersCount", { count: a.active_users }) },
+            {
+              id: "users",
+              header: t("admin.oauthApps.col.users"),
+              cell: (a) => (
+                <Button variant="inline-link" onClick={() => setSelected([a])}>
+                  {t("admin.oauthApps.usersCount", { count: a.active_users })}
+                </Button>
+              ),
+            },
             {
               id: "status",
               header: t("admin.oauthApps.col.status"),
@@ -341,6 +352,10 @@ export default function OAuthApps() {
             { id: "created", header: t("admin.oauthApps.col.created"), cell: (a) => fmtDate(a.created_at) },
           ]}
         />
+
+        {current && (
+          <OAuthAppUsersPanel key={current.id} app={current} onChanged={() => void load()} onNotify={notify} />
+        )}
       </SpaceBetween>
 
       <Modal

@@ -160,6 +160,9 @@ func (s *Server) registerRoutes() {
 	oauthApps.Put("/:id", oauthHandler.UpdateClient)
 	oauthApps.Post("/:id/secret", oauthHandler.RotateSecret)
 	oauthApps.Delete("/:id", oauthHandler.DeleteClient)
+	oauthApps.Get("/:id/users", oauthHandler.ListAppUsers)
+	oauthApps.Delete("/:id/users", oauthHandler.RevokeAllAppUsers)
+	oauthApps.Delete("/:id/users/:user_id", oauthHandler.RevokeAppUser)
 	admin.Post("/reset-tickets", resetTicketHandler.Grant)
 
 	adminSettingsHandler := handlers.NewAdminSettingsHandler(s.db)

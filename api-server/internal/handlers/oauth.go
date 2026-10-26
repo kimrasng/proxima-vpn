@@ -484,3 +484,69 @@ func (h *OAuthHandler) ClientSubscription(c *fiber.Ctx) error {
 	}
 	return c.JSON(fiber.Map{"available": true, "url": primary, "domains": domains})
 }
+
+// ListAppUsers handles GET /api/v1/admin/oauth-apps/:id/users.
+// @Summary List users who authorized an OAuth app
+// @Tags admin-oauth
+// @Param id path string true "App ID"
+// @Produce json
+// @Success 200 {array} services.OAuthAppUser
+// @Failure 404 {object} map[string]string
+// @Security BearerAuth
+// @Router /admin/oauth-apps/{id}/users [get]
+func (h *OAuthHandler) ListAppUsers(c *fiber.Ctx) error {
+	if !isUUID(c.Params("id")) {
+		return adminClientError(c, services.ErrOAuthClientNotFound)
+	}
+	list, err := h.svc.ListAppUsers(c.Context(), c.Params("id"))
+	if err != nil {
+		return adminClientError(c, err)
+	}
+	return c.JSON(list)
+}
+
+// RevokeAppUser handles DELETE /api/v1/admin/oauth-apps/:id/users/:user_id.
+// @Summary Disconnect one user from an OAuth app
+// @Tags admin-oauth
+// @Param id path string true "App ID"
+// @Param user_id path string true "User ID"
+// @Success 200 {object} map[string]int
+// @Failure 404 {object} map[string]string
+// @Security BearerAuth
+// @Router /admin/oauth-apps/{id}/users/{user_id} [delete]
+func (h *OAuthHandler) RevokeAppUser(c *fiber.Ctx) error {
+	if !isUUID(c.Params("id")) {
+		return adminClientError(c, services.ErrOAuthClientNotFound)
+	}
+	if !isUUID(c.Params("user_id")) {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "this user has not authorized the app"})
+	}
+	n, err := h.svc.RevokeAppUsers(c.Context(), c.Params("id"), c.Params("user_id"))
+	if err != nil {
+		return adminClientError(c, err)
+	}
+	if n == 0 {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "this user has not authorized the app"})
+	}
+	return c.JSON(fiber.Map{"revoked": n})
+}
+
+// RevokeAllAppUsers handles DELETE /api/v1/admin/oauth-apps/:id/users. Every
+// user is disconnected and must approve the app again; the app itself stays.
+// @Summary Disconnect every user from an OAuth app
+// @Tags admin-oauth
+// @Param id path string true "App ID"
+// @Success 200 {object} map[string]int
+// @Failure 404 {object} map[string]string
+// @Security BearerAuth
+// @Router /admin/oauth-apps/{id}/users [delete]
+func (h *OAuthHandler) RevokeAllAppUsers(c *fiber.Ctx) error {
+	if !isUUID(c.Params("id")) {
+		return adminClientError(c, services.ErrOAuthClientNotFound)
+	}
+	n, err := h.svc.RevokeAppUsers(c.Context(), c.Params("id"), "")
+	if err != nil {
+		return adminClientError(c, err)
+	}
+	return c.JSON(fiber.Map{"revoked": n})
+}

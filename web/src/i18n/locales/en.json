@@ -2882,6 +2882,39 @@
       "endpointGroup": {
         "oauth": "OAuth endpoints",
         "client": "Resource API (Bearer token)"
+      },
+      "users": {
+        "title": "Users who authorized {{app}}",
+        "description": "People who let this app use their account. Disconnecting ends the app's tokens immediately; the user must approve again to keep using it.",
+        "refresh": "Refresh",
+        "search": "Find by email or name",
+        "matches": "{{count}} matches",
+        "noMatch": "No matching users.",
+        "empty": "No one has authorized this app yet.",
+        "col": {
+          "user": "User",
+          "scopes": "Granted permissions",
+          "granted": "Authorized",
+          "lastUsed": "Last used",
+          "session": "App sign-in",
+          "actions": "Actions"
+        },
+        "neverUsed": "Never used",
+        "sessionLive": "Signed in",
+        "sessionNone": "Expired",
+        "revoke": "Disconnect",
+        "revokeAll": "Disconnect all users",
+        "revokeTitle": "Disconnect this user?",
+        "revokeBody": "Disconnect {{app}} from {{email}}. The app's tokens stop working right away, and the user has to approve the app again to keep using it.",
+        "revokeAllTitle": "Disconnect every user?",
+        "revokeAllBody": "Disconnect all {{count}} users who authorized {{app}}. Every token stops working right away and they are signed out of the app.",
+        "revokeAllKeep": "The app registration, Client ID and secret stay. Users can keep using the app after they sign in and approve it again.",
+        "typeName": "Type the app name \"{{app}}\" to confirm",
+        "revokeAllConfirm": "Disconnect {{count}} users",
+        "revokedOne": "Disconnected {{email}}.",
+        "revokedAll": "Disconnected {{count}} users from {{app}}.",
+        "revokeError": "Couldn't disconnect.",
+        "loadError": "Couldn't load the user list."
       }
     },
     "oauthDocs": {
