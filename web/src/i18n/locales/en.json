@@ -2692,7 +2692,6 @@
       "priority": "Priority",
       "replyPlaceholder": "Write your reply to the user",
       "sendReply": "Send reply",
-      "emailNotice": "Sending a reply emails {{email}}.",
       "replyError": "Could not send the reply.",
       "updateError": "Could not update the ticket.",
       "delete": "Delete",
@@ -2700,7 +2699,9 @@
       "deleteBody": "This ticket and its whole conversation will be deleted permanently.",
       "deleteError": "Could not delete the ticket.",
       "cancel": "Cancel",
-      "closedNotice": "This ticket is closed. Set its status to Awaiting reply to answer it."
+      "closedNotice": "This ticket is closed. Set its status to Awaiting reply to answer it.",
+      "notifyUser": "Email the user about this reply",
+      "notifyUserHint": "When checked, {{email}} gets an email saying a new reply was added. When unchecked, the reply is only saved on the ticket."
     },
     "manage": {
       "title": "Support help",

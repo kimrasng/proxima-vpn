@@ -239,7 +239,7 @@ func TestSupportConversationAndReplyEmail(t *testing.T) {
 		t.Fatalf("ticket %s missing from the admin inbox: %s", a, raw)
 	}
 
-	f.expect(201, "POST", "/admin/support/tickets/"+a+"/messages", "", admin, map[string]string{"body": "확인해 보겠습니다."})
+	f.expect(201, "POST", "/admin/support/tickets/"+a+"/messages", "", admin, map[string]any{"body": "확인해 보겠습니다.", "notify_user": true})
 	first := m.next(t)
 	if first.To != email || !strings.Contains(first.Body, supportTestPanelURL+"/portal/tickets/"+a) {
 		t.Fatalf("reply email = to %q body %q", first.To, first.Body)
@@ -268,10 +268,36 @@ func TestSupportConversationAndReplyEmail(t *testing.T) {
 	f.expect(409, "POST", "/admin/support/tickets/"+a+"/messages", "", admin, map[string]string{"body": "late reply"})
 
 	b := f.open(userID, category, "second question", "hello")
-	f.expect(201, "POST", "/admin/support/tickets/"+b+"/messages", "", admin, map[string]string{"body": "second answer"})
+	f.expect(201, "POST", "/admin/support/tickets/"+b+"/messages", "", admin, map[string]any{"body": "second answer", "notify_user": true})
 	second := m.next(t)
 	if !strings.Contains(second.Body, "/portal/tickets/"+b) || strings.Contains(second.Body, a) {
 		t.Fatalf("second email does not point at the second ticket only: %q", second.Body)
+	}
+	m.assertNone(t)
+}
+
+func TestSupportReplyEmailsOnlyWhenAskedTo(t *testing.T) {
+	m := newSupportMailer(nil)
+	f := newSupportFixture(t, m)
+	userID, email := f.newUser("en")
+	id := f.open(userID, f.categoryID("billing"), "subject", "body")
+	const admin = "ops@example.test"
+	reply := func(payload map[string]any) {
+		t.Helper()
+		f.expect(201, "POST", "/admin/support/tickets/"+id+"/messages", "", admin, payload)
+	}
+
+	reply(map[string]any{"body": "no flag at all"})
+	reply(map[string]any{"body": "explicitly off", "notify_user": false})
+	if got := len(f.thread(userID, id).Messages); got != 3 {
+		t.Fatalf("messages = %d, want 3 (every reply is stored whether or not it is emailed)", got)
+	}
+	m.assertNone(t)
+
+	reply(map[string]any{"body": "please tell the user", "notify_user": true})
+	got := m.next(t)
+	if got.To != email || !strings.Contains(got.Body, "/portal/tickets/"+id) {
+		t.Fatalf("email = to %q body %q", got.To, got.Body)
 	}
 	m.assertNone(t)
 }
@@ -344,7 +370,7 @@ func TestSupportReplySucceedsWhenEmailCannotBeSent(t *testing.T) {
 		f := newSupportFixture(t, m)
 		userID, _ := f.newUser("zh")
 		id := f.open(userID, f.categoryID("billing"), "subject", "body")
-		f.expect(201, "POST", "/admin/support/tickets/"+id+"/messages", "", "ops@example.test", map[string]string{"body": "answer"})
+		f.expect(201, "POST", "/admin/support/tickets/"+id+"/messages", "", "ops@example.test", map[string]any{"body": "answer", "notify_user": true})
 		m.next(t)
 		if got := len(f.thread(userID, id).Messages); got != 2 {
 			t.Fatalf("messages = %d, want 2", got)
@@ -354,7 +380,7 @@ func TestSupportReplySucceedsWhenEmailCannotBeSent(t *testing.T) {
 		f := newSupportFixture(t, nil)
 		userID, _ := f.newUser("en")
 		id := f.open(userID, f.categoryID("billing"), "subject", "body")
-		f.expect(201, "POST", "/admin/support/tickets/"+id+"/messages", "", "ops@example.test", map[string]string{"body": "answer"})
+		f.expect(201, "POST", "/admin/support/tickets/"+id+"/messages", "", "ops@example.test", map[string]any{"body": "answer", "notify_user": true})
 		if got := len(f.thread(userID, id).Messages); got != 2 {
 			t.Fatalf("messages = %d, want 2", got)
 		}

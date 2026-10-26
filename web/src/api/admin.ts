@@ -627,9 +627,9 @@ export function getSupportTicket(id: string): Promise<SupportThread<AdminSupport
   return get<SupportThread<AdminSupportTicket>>(`/api/v1/admin/support/tickets/${id}`);
 }
 
-export function replySupportTicket(id: string, body: string): Promise<SupportMessage> {
+export function replySupportTicket(id: string, body: string, notifyUser: boolean): Promise<SupportMessage> {
   applyAdminClient();
-  return post<SupportMessage>(`/api/v1/admin/support/tickets/${id}/messages`, { body });
+  return post<SupportMessage>(`/api/v1/admin/support/tickets/${id}/messages`, { body, notify_user: notifyUser });
 }
 
 export function updateSupportTicket(id: string, req: { status?: SupportStatus; priority?: SupportPriority }): Promise<void> {

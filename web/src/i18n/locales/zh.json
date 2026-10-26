@@ -2692,7 +2692,6 @@
       "priority": "优先级",
       "replyPlaceholder": "请输入给用户的回复",
       "sendReply": "发送回复",
-      "emailNotice": "发送回复后将向 {{email}} 发送通知邮件。",
       "replyError": "无法发送回复。",
       "updateError": "无法更新工单。",
       "delete": "删除",
@@ -2700,7 +2699,9 @@
       "deleteBody": "该工单及全部对话将被永久删除。",
       "deleteError": "无法删除工单。",
       "cancel": "取消",
-      "closedNotice": "该工单已关闭。如需回复，请先将状态改为“等待回复”。"
+      "closedNotice": "该工单已关闭。如需回复，请先将状态改为“等待回复”。",
+      "notifyUser": "回复后通过邮件通知用户",
+      "notifyUserHint": "勾选后将向 {{email}} 发送新回复提醒邮件；不勾选则只在工单中保存回复，不发送邮件。"
     },
     "manage": {
       "title": "工单帮助管理",

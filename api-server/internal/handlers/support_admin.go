@@ -24,6 +24,11 @@ type adminSupportTicketOut struct {
 	UserName  string `json:"user_name"`
 }
 
+type adminReplyRequest struct {
+	Body       string `json:"body"`
+	NotifyUser bool   `json:"notify_user"`
+}
+
 func adminLabel(c *fiber.Ctx) string {
 	email, _ := c.Locals("email").(string)
 	return email
@@ -165,7 +170,7 @@ func (h *SupportHandler) AdminGetTicket(c *fiber.Ctx) error {
 }
 
 // AdminReply handles POST /api/v1/admin/support/tickets/:id/messages.
-// @Summary Reply to a support ticket and notify the user by email
+// @Summary Reply to a support ticket; emails the user only when notify_user is true
 // @Tags admin-support
 // @Accept json
 // @Produce json
@@ -176,7 +181,7 @@ func (h *SupportHandler) AdminReply(c *fiber.Ctx) error {
 	if !isUUID(id) {
 		return supportFail(c, fiber.StatusNotFound, "ticket not found")
 	}
-	var req supportBodyRequest
+	var req adminReplyRequest
 	if err := c.BodyParser(&req); err != nil {
 		return supportFail(c, fiber.StatusBadRequest, "invalid request body")
 	}
@@ -214,7 +219,9 @@ func (h *SupportHandler) AdminReply(c *fiber.Ctx) error {
 	if err := tx.Commit(ctx); err != nil {
 		return supportServerError(c, "commit admin reply", err)
 	}
-	h.notifyReply(id)
+	if req.NotifyUser {
+		h.notifyReply(id)
+	}
 	return c.Status(fiber.StatusCreated).JSON(m)
 }
 

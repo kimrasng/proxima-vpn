@@ -2692,7 +2692,6 @@
       "priority": "우선순위",
       "replyPlaceholder": "사용자에게 보낼 답변을 입력하세요",
       "sendReply": "답변 보내기",
-      "emailNotice": "답변을 보내면 {{email}} 로 알림 이메일이 발송됩니다.",
       "replyError": "답변을 보내지 못했습니다.",
       "updateError": "티켓을 수정하지 못했습니다.",
       "delete": "삭제",
@@ -2700,7 +2699,9 @@
       "deleteBody": "이 티켓과 모든 대화 내용이 영구적으로 삭제됩니다.",
       "deleteError": "티켓을 삭제하지 못했습니다.",
       "cancel": "취소",
-      "closedNotice": "종료된 티켓입니다. 답변하려면 상태를 '답변 대기'로 바꾸세요."
+      "closedNotice": "종료된 티켓입니다. 답변하려면 상태를 '답변 대기'로 바꾸세요.",
+      "notifyUser": "답변 후 사용자에게 이메일로 알림 보내기",
+      "notifyUserHint": "체크하면 {{email}} 로 새 답변이 등록되었다는 안내 메일이 발송됩니다. 체크하지 않으면 메일 없이 티켓에만 답변이 남습니다."
     },
     "manage": {
       "title": "문의 도움말 관리",

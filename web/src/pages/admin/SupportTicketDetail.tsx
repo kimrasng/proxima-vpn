@@ -5,6 +5,7 @@ import {
   Alert,
   Box,
   Button,
+  Checkbox,
   ColumnLayout,
   Container,
   ContentLayout,
@@ -36,6 +37,7 @@ export default function SupportTicketDetail() {
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
   const [body, setBody] = useState("");
+  const [notifyUser, setNotifyUser] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -74,7 +76,7 @@ export default function SupportTicketDetail() {
 
   const reply = async () => {
     if (!body.trim()) return;
-    await run(async () => { await adminApi.replySupportTicket(ticketId, body.trim()); setBody(""); }, t("support.admin.replyError"));
+    await run(async () => { await adminApi.replySupportTicket(ticketId, body.trim(), notifyUser); setBody(""); }, t("support.admin.replyError"));
   };
 
   const remove = async () => {
@@ -160,7 +162,7 @@ export default function SupportTicketDetail() {
         {closed ? (
           <Alert type="info">{t("support.admin.closedNotice")}</Alert>
         ) : (
-          <Container header={<Header variant="h3" description={t("support.admin.emailNotice", { email: ticket.user_email })}>{t("support.thread.reply")}</Header>}>
+          <Container header={<Header variant="h3">{t("support.thread.reply")}</Header>}>
             <SpaceBetween size="s">
               <FormField stretch constraintText={t("support.create.bodyLimit", { count: body.length, max: BODY_MAX })}>
                 <Textarea
@@ -171,6 +173,13 @@ export default function SupportTicketDetail() {
                   ariaLabel={t("support.thread.reply")}
                 />
               </FormField>
+              <Checkbox
+                checked={notifyUser}
+                onChange={({ detail }) => setNotifyUser(detail.checked)}
+                description={t("support.admin.notifyUserHint", { email: ticket.user_email })}
+              >
+                {t("support.admin.notifyUser")}
+              </Checkbox>
               <Box float="right">
                 <Button variant="primary" loading={busy} disabled={!body.trim()} onClick={() => void reply()}>{t("support.admin.sendReply")}</Button>
               </Box>
