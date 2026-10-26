@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Button, Checkbox, FormField, Input, SpaceBetween, Toggle } from "@cloudscape-design/components";
+import { Button, Checkbox, FormField, Input, Toggle } from "@cloudscape-design/components";
 import { OAUTH_SCOPES, scopeKey } from "../../api/oauth";
 import { CodeBlock, type CopyLabels } from "./OAuthCodeBlock";
 import "./oauthDocsExtras.css";
@@ -71,7 +71,7 @@ export function OAuthUrlBuilder({ origin, copy }: { origin: string; copy: CopyLa
       <FormField label="state" description={t("admin.oauthDocs.builder.stateHint")}>
         <Input value={state} onChange={({ detail }) => setState(detail.value)} />
       </FormField>
-      <SpaceBetween size="s">
+      <div className="oauth-builder__stack">
         <Toggle checked={usePkce} onChange={({ detail }) => setUsePkce(detail.checked)}>{t("admin.oauthDocs.builder.pkce")}</Toggle>
         {usePkce && (
           <FormField label="code_challenge" description={t("admin.oauthDocs.builder.challengeHint")}>
@@ -87,7 +87,7 @@ export function OAuthUrlBuilder({ origin, copy }: { origin: string; copy: CopyLa
             <CodeBlock code={verifier} {...copy} />
           </FormField>
         )}
-      </SpaceBetween>
+      </div>
       <CodeBlock code={shown} copyText={oneLine} {...copy} />
       <div className="oauth-builder__actions">
         <Button iconName="external" iconAlign="right" href={oneLine} target="_blank" disabled={!clientId || !redirectUri}>

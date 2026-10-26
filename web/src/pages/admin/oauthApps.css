@@ -178,7 +178,7 @@
   line-height: 1.55;
   color: #16191f;
   word-break: keep-all;
-  overflow-wrap: normal;
+  overflow-wrap: anywhere;
   white-space: normal;
 }
 

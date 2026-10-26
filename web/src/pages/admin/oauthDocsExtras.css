@@ -94,3 +94,8 @@
 .oauth-builder .oauth-docs__code {
   max-width: 100%;
 }
+
+.oauth-builder__stack {
+  display: grid;
+  gap: 12px;
+}
