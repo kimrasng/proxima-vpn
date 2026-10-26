@@ -267,8 +267,11 @@ func isUniqueViolation(err error) bool {
 // discount_value's own bounds, and window ordering, all restated here so a
 // bad request gets a specific 400 rather than a generic 500.
 func validatePromotionRequest(req *promotionRequest) error {
-	if req.Code == "" {
-		return errors.New("code is required")
+	// Codes are user-visible on receipts and on Stripe's coupon label (which
+	// is capped at 40 characters and truncated when displayed there), so
+	// reject unusably long codes here rather than storing them silently.
+	if len([]rune(req.Code)) > 64 {
+		return errors.New("code must be 64 characters or fewer")
 	}
 	switch req.DiscountType {
 	case "percent":

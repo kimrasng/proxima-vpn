@@ -72,6 +72,23 @@ func (p *StripeProvider) Name() string {
 // Metadata carries the order id both on the session and on the resulting
 // PaymentIntent, so the webhook (keyed on session/PaymentIntent) and any
 // later refund/dispute event can both resolve back to the order.
+// couponDisplayName labels the Stripe coupon for a promotion. Stripe caps
+// the coupon name at 40 characters, while promotion codes are unbounded, so
+// a long code is truncated (by runes, not bytes) rather than failing the
+// checkout. The full code never leaves the panel: Stripe only shows this
+// label, and the amount comes from the server-side discount snapshot.
+func couponDisplayName(code string) string {
+	const maxCouponNameRunes = 40
+	if code == "" {
+		return "Promotion"
+	}
+	runes := []rune(code)
+	if len(runes) <= maxCouponNameRunes {
+		return code
+	}
+	return string(runes[:maxCouponNameRunes])
+}
+
 func (p *StripeProvider) StartCheckout(ctx context.Context, req CheckoutRequest) (*CheckoutHandoff, error) {
 	successURL := p.panelURL + "/portal/plan?checkout=success&order_id=" + req.OrderID + "&session_id={CHECKOUT_SESSION_ID}"
 	cancelURL := p.panelURL + "/portal/plan?checkout=cancelled"
@@ -106,10 +123,7 @@ func (p *StripeProvider) StartCheckout(ctx context.Context, req CheckoutRequest)
 	// coupon so Stripe's checkout page shows the original price with a
 	// discount line rather than just the reduced total.
 	if req.DiscountCents > 0 {
-		couponName := "Promotion"
-		if req.PromotionCode != "" {
-			couponName = req.PromotionCode
-		}
+		couponName := couponDisplayName(req.PromotionCode)
 		coupon, err := p.client.V1Coupons.Create(ctx, &stripe.CouponCreateParams{
 			AmountOff:      stripe.Int64(req.DiscountCents),
 			Currency:       stripe.String(p.currency),
