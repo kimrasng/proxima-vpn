@@ -1,3 +1,5 @@
+import { loginUrl } from '../utils/postLogin';
+
 const BASE_URL = import.meta.env.VITE_API_URL || '';
 
 const ADMIN_TOKEN_KEY = 'proxima_admin_token';
@@ -96,7 +98,9 @@ async function request<T>(
     const isLoginEndpoint = path.includes('/auth/login') || path.includes('/auth/passkey/login');
     if (!isLoginEndpoint) {
       removeToken(tokenType);
-      window.location.href = tokenType === 'admin' ? '/admin/login' : '/login';
+      window.location.href = tokenType === 'admin'
+        ? '/admin/login'
+        : loginUrl(window.location.pathname + window.location.search);
       throw new ApiError(401, 'Unauthorized');
     }
   }

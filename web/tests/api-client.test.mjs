@@ -6,6 +6,7 @@ import { createServer } from 'vite';
 let server;
 let client;
 let userApi;
+let postLogin;
 let storage;
 let location;
 
@@ -21,6 +22,7 @@ before(async () => {
   });
   client = await server.ssrLoadModule('/src/api/client.ts');
   userApi = await server.ssrLoadModule('/src/api/user.ts');
+  postLogin = await server.ssrLoadModule('/src/utils/postLogin.ts');
 });
 
 after(async () => {
@@ -41,11 +43,16 @@ beforeEach((t) => {
     ['proxima_admin_token', 'admin-token'],
     ['proxima_user_token', 'user-token'],
   ]);
-  location = { href: '/current-page' };
+  location = { href: '/current-page', pathname: '/current-page', search: '' };
   stubGlobal(t, 'localStorage', {
     getItem: (key) => storage.get(key) ?? null,
     setItem: (key, value) => storage.set(key, value),
     removeItem: (key) => storage.delete(key),
+  });
+  stubGlobal(t, 'sessionStorage', {
+    getItem: (key) => storage.get(`session:${key}`) ?? null,
+    setItem: (key, value) => storage.set(`session:${key}`, value),
+    removeItem: (key) => storage.delete(`session:${key}`),
   });
   stubGlobal(t, 'window', { location });
   client.setClientTokenType('user');
@@ -108,7 +115,7 @@ for (const expiredType of ['user', 'admin']) {
     await rejection;
     assert.equal(storage.has(`proxima_${expiredType}_token`), false);
     assert.equal(storage.get(`proxima_${otherType}_token`), `${otherType}-token`);
-    assert.equal(location.href, expiredType === 'admin' ? '/admin/login' : '/login');
+    assert.equal(location.href, expiredType === 'admin' ? '/admin/login' : '/login?continue=%2Fcurrent-page');
 
     requests[1].resolve(new Response(null, { status: 204 }));
     assert.equal(await otherRequest, undefined);
@@ -131,3 +138,23 @@ for (const loginPath of ['/api/v1/auth/login', '/api/v1/auth/passkey/login/finis
     assert.equal(location.href, '/current-page');
   });
 }
+
+test('promo login target preserves an encoded campaign code', () => {
+  const search = '?promo=' + encodeURIComponent('VIP & SAVE/20');
+  assert.equal(postLogin.consumePostLogin('/portal/dashboard', search), '/portal/plan?promo=VIP%20%26%20SAVE%2F20');
+});
+
+test('an explicit OAuth continuation takes precedence over a promo', () => {
+  const search = '?continue=%2Foauth%2Fauthorize%3Fclient_id%3Dabc&promo=VIP';
+  assert.equal(postLogin.consumePostLogin('/portal/dashboard', search), '/oauth/authorize?client_id=abc');
+});
+
+test('the session fallback retains the promo across registration navigation', () => {
+  postLogin.rememberPostLogin(postLogin.continueTarget('?promo=VIP'));
+  assert.equal(postLogin.consumePostLogin('/portal/dashboard', ''), '/portal/plan?promo=VIP');
+  assert.equal(storage.has('session:proxima_post_login'), false);
+});
+
+test('an unsafe continuation cannot redirect off-site and falls back to the promo', () => {
+  assert.equal(postLogin.continueTarget('?continue=%2F%2Fevil.example&promo=VIP'), '/portal/plan?promo=VIP');
+});
