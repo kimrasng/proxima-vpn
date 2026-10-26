@@ -1,9 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Alert, Box, Button, FormField, Header, Input, Modal, Select, SpaceBetween, StatusIndicator, Table, Toggle } from "@cloudscape-design/components";
+import { Alert, Box, Button, ColumnLayout, FormField, Header, Input, Modal, Select, SpaceBetween, StatusIndicator, Table, Toggle } from "@cloudscape-design/components";
 import { listPlans } from "../../api/admin";
 import { deleteFreeTrial, listFreeTrials, saveFreeTrial, type FreeTrialPromotion } from "../../api/promotionKinds";
 import type { Plan } from "../../api/types";
+import { ChipPicker, FormSection, SummaryCard } from "./promotionFormParts";
+import { generatePromoCode } from "./promotionFormModel";
+import PromoShareLink from "./PromoShareLink";
+
+const TRIAL_DAY_PRESETS = [3, 7, 14, 30];
+const DURATION_PRESETS = [30, 90, 180, 365];
 
 const emptyForm = {
   code: "", plan_id: "", duration_days: "30", trial_days: "7", max_redemptions: "",
@@ -65,6 +71,14 @@ export default function FreeTrialPromotions() {
     catch { setError(true); } finally { setSaving(false); }
   };
   const fieldError = (invalid: boolean) => showErrors && invalid ? t("admin.freeTrial.validation") : undefined;
+  const planName = plans.find((p) => p.id === form.plan_id)?.name;
+  const trialDays = Number(form.trial_days);
+  const summaryChips = [
+    planName ?? t("admin.freeTrial.summary.noPlan"),
+    form.requires_card ? t("admin.freeTrial.summary.card") : t("admin.freeTrial.summary.noCard"),
+    form.max_redemptions ? t("admin.freeTrial.summary.total", { count: Number(form.max_redemptions) }) : t("admin.freeTrial.summary.totalUnlimited"),
+    t("admin.freeTrial.summary.perUser", { count: Number(form.max_redemptions_per_user) || 0 }),
+  ];
   return <SpaceBetween size="l">
     {error && <Alert type="error" action={<Button onClick={() => void load()}>{t("admin.freeTrial.retry")}</Button>}>{t("admin.freeTrial.error")}</Alert>}
     <Table items={items} trackBy="id" loading={loading} loadingText={t("admin.freeTrial.loading")}
@@ -89,27 +103,76 @@ export default function FreeTrialPromotions() {
           <Button variant="inline-link" onClick={() => setDeleting(p)}>{t("admin.freeTrial.delete")}</Button>
         </SpaceBetween> },
       ]} />
-    <Modal visible={editor !== null} onDismiss={() => { if (!saving) setEditor(null); }}
+    <Modal visible={editor !== null} size="large" onDismiss={() => { if (!saving) setEditor(null); }}
       header={editor?.id ? t("admin.freeTrial.edit") : t("admin.freeTrial.create")}
       footer={<Box float="right"><SpaceBetween direction="horizontal" size="xs">
         <Button disabled={saving} onClick={() => setEditor(null)}>{t("admin.freeTrial.cancel")}</Button>
         <Button variant="primary" loading={saving} onClick={() => void save()}>{t("admin.freeTrial.save")}</Button>
       </SpaceBetween></Box>}>
-      <SpaceBetween size="m">
+      <div className="promo-form">
         {error && <Alert type="error">{t("admin.freeTrial.error")}</Alert>}
-        <FormField label={t("admin.freeTrial.code")} errorText={fieldError(invalid.code)}><Input value={form.code} onChange={({ detail }) => setForm({ ...form, code: detail.value })} /></FormField>
-        <FormField label={t("admin.freeTrial.plan")} errorText={fieldError(invalid.plan_id)}>
-          <Select selectedOption={plans.find((p) => p.id === form.plan_id) ? { value: form.plan_id, label: plans.find((p) => p.id === form.plan_id)?.name } : null}
-            placeholder={t("admin.freeTrial.selectPlan")} options={plans.map((p) => ({ value: p.id, label: p.name }))}
-            onChange={({ detail }) => setForm({ ...form, plan_id: detail.selectedOption.value ?? "" })} />
-        </FormField>
-        <FormField label={t("admin.freeTrial.durationDays")} errorText={fieldError(invalid.duration_days)}><Input type="number" value={form.duration_days} onChange={({ detail }) => setForm({ ...form, duration_days: detail.value })} /></FormField>
-        <FormField label={t("admin.freeTrial.trialDays")} errorText={fieldError(invalid.trial_days)}><Input type="number" value={form.trial_days} onChange={({ detail }) => setForm({ ...form, trial_days: detail.value })} /></FormField>
-        <FormField label={t("admin.freeTrial.maxRedemptions")} description={t("admin.freeTrial.unlimitedHint")} errorText={fieldError(invalid.max_redemptions)}><Input type="number" value={form.max_redemptions} onChange={({ detail }) => setForm({ ...form, max_redemptions: detail.value })} /></FormField>
-        <FormField label={t("admin.freeTrial.perUser")} errorText={fieldError(invalid.max_redemptions_per_user)}><Input type="number" value={form.max_redemptions_per_user} onChange={({ detail }) => setForm({ ...form, max_redemptions_per_user: detail.value })} /></FormField>
-        <Toggle checked={form.requires_card} onChange={({ detail }) => setForm({ ...form, requires_card: detail.checked })}>{t("admin.freeTrial.requiresCard")}</Toggle>
-        <Toggle checked={form.is_active} onChange={({ detail }) => setForm({ ...form, is_active: detail.checked })}>{t("admin.freeTrial.active")}</Toggle>
-      </SpaceBetween>
+        <SummaryCard code={form.code} emptyCode={t("admin.promotions.summary.noCode")}
+          headline={positive(form.trial_days) ? t("admin.freeTrial.summary.headline", { count: trialDays }) : t("admin.freeTrial.summary.noDays")}
+          active={form.is_active} activeText={form.is_active ? t("admin.promotions.form.activeOn") : t("admin.promotions.form.activeOff")}
+          chips={summaryChips} />
+        {form.code.trim() && <PromoShareLink code={form.code.trim()} />}
+
+        <FormSection step={1} title={t("admin.freeTrial.section.offer")} description={t("admin.freeTrial.section.offerDesc")}>
+          <SpaceBetween size="l">
+            <FormField stretch label={t("admin.freeTrial.code")} description={t("admin.freeTrial.codeHint")} errorText={fieldError(invalid.code)}>
+              <div className="promo-form__affix">
+                <Input value={form.code} placeholder="TRIAL7" onChange={({ detail }) => setForm({ ...form, code: detail.value })} />
+                <Button iconName="refresh" onClick={() => setForm({ ...form, code: generatePromoCode() })}>{t("admin.promotions.form.generate")}</Button>
+              </div>
+            </FormField>
+            <FormField stretch label={t("admin.freeTrial.plan")} description={t("admin.freeTrial.planHint")} errorText={fieldError(invalid.plan_id)}>
+              <Select selectedOption={planName ? { value: form.plan_id, label: planName } : null}
+                placeholder={t("admin.freeTrial.selectPlan")} options={plans.map((p) => ({ value: p.id, label: p.name }))}
+                onChange={({ detail }) => setForm({ ...form, plan_id: detail.selectedOption.value ?? "" })} />
+            </FormField>
+            <FormField stretch label={t("admin.freeTrial.trialDays")} description={t("admin.freeTrial.trialDaysHint")} errorText={fieldError(invalid.trial_days)}>
+              <div className="promo-form__chips-pick">
+                <ChipPicker label={t("admin.freeTrial.trialDays")} options={TRIAL_DAY_PRESETS} value={TRIAL_DAY_PRESETS.includes(trialDays) ? trialDays : null}
+                  onChange={(days) => setForm({ ...form, trial_days: String(days) })} format={(days) => t("admin.promotions.form.daysChip", { count: days })} />
+                <span className="promo-form__custom-days">
+                  <Input value={form.trial_days} type="number" inputMode="numeric" ariaLabel={t("admin.freeTrial.trialDays")}
+                    onChange={({ detail }) => setForm({ ...form, trial_days: detail.value })} />
+                  <span className="promo-form__unit">{t("admin.freeTrial.daysUnit")}</span>
+                </span>
+              </div>
+            </FormField>
+            <FormField stretch label={t("admin.freeTrial.durationDays")} description={t("admin.freeTrial.durationDaysHint")} errorText={fieldError(invalid.duration_days)}>
+              <div className="promo-form__chips-pick">
+                <ChipPicker label={t("admin.freeTrial.durationDays")} options={DURATION_PRESETS} value={DURATION_PRESETS.includes(Number(form.duration_days)) ? Number(form.duration_days) : null}
+                  onChange={(days) => setForm({ ...form, duration_days: String(days) })} format={(days) => t("admin.promotions.form.daysChip", { count: days })} />
+                <span className="promo-form__custom-days">
+                  <Input value={form.duration_days} type="number" inputMode="numeric" ariaLabel={t("admin.freeTrial.durationDays")}
+                    onChange={({ detail }) => setForm({ ...form, duration_days: detail.value })} />
+                  <span className="promo-form__unit">{t("admin.freeTrial.daysUnit")}</span>
+                </span>
+              </div>
+            </FormField>
+          </SpaceBetween>
+        </FormSection>
+
+        <FormSection step={2} title={t("admin.promotions.section.limits")} description={t("admin.freeTrial.section.limitsDesc")}>
+          <ColumnLayout columns={2} minColumnWidth={220}>
+            <FormField label={t("admin.freeTrial.maxRedemptions")} constraintText={t("admin.freeTrial.unlimitedHint")} errorText={fieldError(invalid.max_redemptions)}>
+              <Input value={form.max_redemptions} type="number" inputMode="numeric" placeholder={t("admin.freeTrial.unlimited")} onChange={({ detail }) => setForm({ ...form, max_redemptions: detail.value })} />
+            </FormField>
+            <FormField label={t("admin.freeTrial.perUser")} constraintText={t("admin.freeTrial.perUserHint")} errorText={fieldError(invalid.max_redemptions_per_user)}>
+              <Input value={form.max_redemptions_per_user} type="number" inputMode="numeric" onChange={({ detail }) => setForm({ ...form, max_redemptions_per_user: detail.value })} />
+            </FormField>
+          </ColumnLayout>
+        </FormSection>
+
+        <FormSection step={3} title={t("admin.freeTrial.section.rules")} description={t("admin.freeTrial.section.rulesDesc")}>
+          <SpaceBetween size="m">
+            <Toggle checked={form.requires_card} description={t("admin.freeTrial.requiresCardHint")} onChange={({ detail }) => setForm({ ...form, requires_card: detail.checked })}>{t("admin.freeTrial.requiresCard")}</Toggle>
+            <Toggle checked={form.is_active} description={t("admin.freeTrial.activeHint")} onChange={({ detail }) => setForm({ ...form, is_active: detail.checked })}>{t("admin.promotions.form.activeLabel")}</Toggle>
+          </SpaceBetween>
+        </FormSection>
+      </div>
     </Modal>
     <Modal visible={deleting !== null} onDismiss={() => { if (!saving) setDeleting(null); }} header={t("admin.freeTrial.delete")}
       footer={<SpaceBetween direction="horizontal" size="xs"><Button disabled={saving} onClick={() => setDeleting(null)}>{t("admin.freeTrial.cancel")}</Button><Button variant="primary" loading={saving} onClick={() => void remove()}>{t("admin.freeTrial.delete")}</Button></SpaceBetween>}>

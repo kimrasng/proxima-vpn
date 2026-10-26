@@ -72,7 +72,32 @@
       "error": "Could not complete the request. Check the fields and whether the code is already in use.",
       "retry": "Retry",
       "validation": "Enter a valid value. Day counts and redemption limits must be positive whole numbers.",
-      "deleteConfirm": "Delete free trial code {{code}}?"
+      "deleteConfirm": "Delete free trial code {{code}}?",
+      "codeHint": "Customers open the /p/code link or type it at checkout.",
+      "planHint": "The plan they can use during the trial.",
+      "trialDaysHint": "How long they can use it without paying.",
+      "durationDaysHint": "The plan length suggested when they pay after the trial.",
+      "daysUnit": "days",
+      "perUserHint": "How many times one person can use this code. Usually 1.",
+      "requiresCardHint": "When on, a card must be saved before the trial starts. Nothing is charged.",
+      "activeHint": "When off, visitors from the link are told the code is unavailable.",
+      "section": {
+        "offer": "Trial offer",
+        "offerDesc": "Choose which plan to give for free and for how long.",
+        "limitsDesc": "Cap how many people can join and how often one person can use it.",
+        "rules": "Conditions",
+        "rulesDesc": "Card requirement and whether the code is live."
+      },
+      "summary": {
+        "headline": "{{count}}-day free trial",
+        "noDays": "Enter the trial length",
+        "noPlan": "No plan selected",
+        "card": "Card required",
+        "noCard": "No card needed",
+        "total": "First {{count}} people",
+        "totalUnlimited": "No cap",
+        "perUser": "{{count}} per person"
+      }
     },
     "affiliate": {
       "title": "Affiliate partners",
@@ -112,7 +137,27 @@
       "pending": "Pending",
       "paid": "Paid",
       "markPaid": "Mark as paid",
-      "payConfirm": "Mark {{amount}} in commission as paid? This records a payment; it does not transfer funds."
+      "payConfirm": "Mark {{amount}} in commission as paid? This records a payment; it does not transfer funds.",
+      "namePlaceholder": "e.g. YouTuber Jane",
+      "codeHint": "The code the partner shares. It also works as a /p/code link.",
+      "activeHint": "When off, new customers no longer get the offer. Existing commissions stay.",
+      "commissionExample": "Example: if a customer pays $10.00, the partner earns {{amount}} ({{rate}}%).",
+      "section": {
+        "partner": "Partner",
+        "partnerDesc": "Who this code belongs to.",
+        "customer": "Customer benefit",
+        "customerDesc": "The discount customers get with this code.",
+        "commission": "Partner commission",
+        "commissionDesc": "The share of each paid order the partner earns.",
+        "status": "Status",
+        "statusDesc": "Whether the code can be used now."
+      },
+      "summary": {
+        "fixed": "{{value}} off",
+        "noName": "No partner name",
+        "noRate": "No commission rate",
+        "rate": "{{rate}}% commission"
+      }
     },
     "uuidEvictions": {
       "title": "UUID eviction acknowledgments",
@@ -1986,6 +2031,11 @@
         "months": "{{count}} months",
         "oneYear": "1 year",
         "span": "Usable for {{count}} days in total (KST)"
+      },
+      "share": {
+        "label": "Share link",
+        "copy": "Copy link",
+        "copied": "Copied"
       }
     },
     "subscriptionDomains": {

@@ -15,6 +15,8 @@ Use Cloudscape's default type scale: page `Header variant="h1"`, section `Header
 
 ## 4. Spacing & Layout
 
+Layout: Promotions - switch resource kinds above a single table -> stack; scroll owner: application content; no nested vertical scrolling. Each kind keeps its own loading, empty, error, and modal state. The primary action creates a resource; commission details follow the selected partner.
+
 Layout: Promo landing - one benefit and one login action -> cover with content-limiter; scroll owner: document; wrap long codes and stack badges on narrow screens. This public campaign hero uses a gradient from Cloudscape semantic tokens as explicitly requested, rather than changing admin surfaces.
 
 The `AppLayoutToolbar` owns navigation and content scrolling. Pages use `ContentLayout`, `SpaceBetween`, `Container`, and `Table` with Cloudscape's named sizes (`xs`, `s`, `m`, `l`). Modal forms stack labeled controls and remain usable in the narrow layout without fixed-width CSS.

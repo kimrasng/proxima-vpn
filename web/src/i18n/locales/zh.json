@@ -72,7 +72,32 @@
       "error": "请求失败。请检查输入和代码是否重复。",
       "retry": "重试",
       "validation": "请输入有效值。天数和兑换上限必须为正整数。",
-      "deleteConfirm": "删除免费试用代码 {{code}}？"
+      "deleteConfirm": "删除免费试用代码 {{code}}？",
+      "codeHint": "客户通过 /p/代码 链接进入，或在结账时手动输入。",
+      "planHint": "试用期间可使用的套餐。",
+      "trialDaysHint": "无需付款即可使用的天数。",
+      "durationDaysHint": "试用结束后续费时推荐的套餐时长。",
+      "daysUnit": "天",
+      "perUserHint": "每人可使用此代码的次数，通常为 1。",
+      "requiresCardHint": "开启后，开始试用前需绑定银行卡，不会实际扣款。",
+      "activeHint": "关闭后，通过链接进入的访客会看到代码不可用。",
+      "section": {
+        "offer": "试用内容",
+        "offerDesc": "设置免费提供的套餐及天数。",
+        "limitsDesc": "设置名额上限和每人使用次数。",
+        "rules": "使用条件",
+        "rulesDesc": "是否需要绑卡以及代码是否可用。"
+      },
+      "summary": {
+        "headline": "{{count}} 天免费试用",
+        "noDays": "请输入试用天数",
+        "noPlan": "未选择套餐",
+        "card": "需要绑卡",
+        "noCard": "无需绑卡",
+        "total": "前 {{count}} 人",
+        "totalUnlimited": "不限名额",
+        "perUser": "每人 {{count}} 次"
+      }
     },
     "affiliate": {
       "title": "联盟合作伙伴",
@@ -112,7 +137,27 @@
       "pending": "待支付",
       "paid": "已支付",
       "markPaid": "标记为已支付",
-      "payConfirm": "将 {{amount}} 佣金标记为已支付？此操作只记录付款，不会转账。"
+      "payConfirm": "将 {{amount}} 佣金标记为已支付？此操作只记录付款，不会转账。",
+      "namePlaceholder": "例如：YouTuber 小明",
+      "codeHint": "合作伙伴分享的代码，也可作为 /p/代码 链接使用。",
+      "activeHint": "关闭后新客户将无法享受优惠，已产生的佣金不受影响。",
+      "commissionExample": "例如：客户支付 $10.00 时，合作伙伴佣金为 {{amount}}（{{rate}}%）。",
+      "section": {
+        "partner": "合作伙伴信息",
+        "partnerDesc": "设置代码归属的合作伙伴。",
+        "customer": "客户优惠",
+        "customerDesc": "使用此代码的客户可获得的折扣。",
+        "commission": "合作伙伴佣金",
+        "commissionDesc": "每笔已付款订单中分给合作伙伴的比例。",
+        "status": "状态",
+        "statusDesc": "设置代码当前是否可用。"
+      },
+      "summary": {
+        "fixed": "立减 {{value}}",
+        "noName": "未填写合作伙伴名称",
+        "noRate": "未填写佣金比例",
+        "rate": "佣金 {{rate}}%"
+      }
     },
     "uuidEvictions": {
       "title": "UUID 封禁确认",
@@ -1986,6 +2031,11 @@
         "months": "{{count}} 个月",
         "oneYear": "1 年",
         "span": "共可使用 {{count}} 天（KST）"
+      },
+      "share": {
+        "label": "分享链接",
+        "copy": "复制链接",
+        "copied": "已复制"
       }
     },
     "subscriptionDomains": {

@@ -42,14 +42,73 @@ export const emptyPromotionForm: PromotionForm = {
   isActive: true,
 };
 
+// Promotion windows are entered and shown in KST regardless of the admin's
+// browser time zone. KST has no daylight saving, so a fixed +9h offset is exact:
+// a Date shifted by it reads KST wall-clock values through the UTC getters.
+const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
+
+function pad2(n: number): string {
+  return String(n).padStart(2, "0");
+}
+
+function toKstWallClock(date: Date): Date {
+  return new Date(date.getTime() + KST_OFFSET_MS);
+}
+
+// Expects a Date already shifted by toKstWallClock.
+function toDateString(kst: Date): string {
+  return `${kst.getUTCFullYear()}-${pad2(kst.getUTCMonth() + 1)}-${pad2(kst.getUTCDate())}`;
+}
+
 function splitIsoDate(iso: string): { date: string; time: string } {
   const parsed = new Date(iso);
   if (Number.isNaN(parsed.getTime())) return { date: "", time: "00:00" };
-  const pad = (n: number) => String(n).padStart(2, "0");
+  const kst = toKstWallClock(parsed);
+  return { date: toDateString(kst), time: `${pad2(kst.getUTCHours())}:${pad2(kst.getUTCMinutes())}` };
+}
+
+// "2026.10.26 14:30" in KST, for read-only displays such as the promotions table.
+export function formatKst(iso: string): string {
+  const { date, time } = splitIsoDate(iso);
+  return date ? `${date.replace(/-/g, ".")} ${time}` : "";
+}
+
+export type WindowUnit = "days" | "months";
+
+// A window of N days or months that starts now and includes today, so "30 days"
+// ends on day 30 at 23:59 and "1 month" from Oct 26 ends on Nov 25 23:59. Month
+// arithmetic clamps to the last day (Jan 31 + 1 month -> Feb 28).
+export function windowFromToday(
+  amount: number,
+  unit: WindowUnit,
+  now: Date = new Date(),
+): Pick<PromotionForm, "validFromDate" | "validFromTime" | "validUntilDate" | "validUntilTime"> {
+  const kstNow = toKstWallClock(now);
+  const end = new Date(Date.UTC(kstNow.getUTCFullYear(), kstNow.getUTCMonth(), kstNow.getUTCDate()));
+  if (unit === "months") {
+    const day = end.getUTCDate();
+    end.setUTCDate(1);
+    end.setUTCMonth(end.getUTCMonth() + amount);
+    const lastDay = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth() + 1, 0)).getUTCDate();
+    end.setUTCDate(Math.min(day, lastDay));
+  } else {
+    end.setUTCDate(end.getUTCDate() + amount);
+  }
+  end.setUTCDate(end.getUTCDate() - 1);
   return {
-    date: `${parsed.getFullYear()}-${pad(parsed.getMonth() + 1)}-${pad(parsed.getDate())}`,
-    time: `${pad(parsed.getHours())}:${pad(parsed.getMinutes())}`,
+    validFromDate: toDateString(kstNow),
+    validFromTime: `${pad2(kstNow.getUTCHours())}:${pad2(kstNow.getUTCMinutes())}`,
+    validUntilDate: toDateString(end),
+    validUntilTime: "23:59",
   };
+}
+
+// Whole calendar days covered by the window, counting both the start and end day.
+export function windowSpanDays(fromDate: string, untilDate: string): number | null {
+  const from = new Date(`${fromDate}T00:00:00Z`);
+  const until = new Date(`${untilDate}T00:00:00Z`);
+  if (Number.isNaN(from.getTime()) || Number.isNaN(until.getTime())) return null;
+  return Math.round((until.getTime() - from.getTime()) / 86_400_000) + 1;
 }
 
 export function toPromotionForm(promotion: PromotionCode): PromotionForm {
@@ -87,8 +146,10 @@ export function splitList(value: string): string[] {
     .filter((entry) => entry.length > 0);
 }
 
-export function localDateTimeToIso(date: string, time: string): string | null {
-  const parsed = new Date(`${date}T${time.length === 5 ? `${time}:00` : time}`);
+// Form values are KST wall-clock time; the API stores an absolute instant.
+export function kstDateTimeToIso(date: string, time: string): string | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}(:\d{2})?$/.test(time)) return null;
+  const parsed = new Date(`${date}T${time.length === 5 ? `${time}:00` : time}+09:00`);
   return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
 }
 
@@ -121,8 +182,8 @@ export function validatePromotionForm(form: PromotionForm, t: TFunction): Promot
     errors.minOrderDollars = t("admin.promotions.form.minOrderInvalid");
   }
 
-  const validFrom = localDateTimeToIso(form.validFromDate, form.validFromTime);
-  const validUntil = localDateTimeToIso(form.validUntilDate, form.validUntilTime);
+  const validFrom = kstDateTimeToIso(form.validFromDate, form.validFromTime);
+  const validUntil = kstDateTimeToIso(form.validUntilDate, form.validUntilTime);
   if (!validFrom) errors.validFrom = t("admin.promotions.form.validFromRequired");
   if (!validUntil) {
     errors.validUntil = t("admin.promotions.form.validUntilRequired");
@@ -155,8 +216,8 @@ export function toPromotionRequest(form: PromotionForm, includeActive: boolean):
     code: form.code.trim(),
     discount_type: form.discountType,
     discount_value: form.discountType === "percent" ? rawValue : Math.round(rawValue * 100),
-    valid_from: localDateTimeToIso(form.validFromDate, form.validFromTime) ?? "",
-    valid_until: localDateTimeToIso(form.validUntilDate, form.validUntilTime) ?? "",
+    valid_from: kstDateTimeToIso(form.validFromDate, form.validFromTime) ?? "",
+    valid_until: kstDateTimeToIso(form.validUntilDate, form.validUntilTime) ?? "",
     min_order_cents: Math.round(Number(form.minOrderDollars || "0") * 100),
     max_redemptions: form.unlimitedRedemptions ? null : Number(form.maxRedemptions),
     max_redemptions_per_user: Number(form.maxRedemptionsPerUser),
@@ -166,4 +227,10 @@ export function toPromotionRequest(form: PromotionForm, includeActive: boolean):
     allowed_user_ids: splitList(form.allowedUserIds),
     ...(includeActive ? { is_active: form.isActive } : {}),
   };
+}
+
+export function generatePromoCode(length = 8): string {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const bytes = crypto.getRandomValues(new Uint8Array(length));
+  return Array.from(bytes, (b) => alphabet[b % alphabet.length]).join("");
 }

@@ -72,7 +72,32 @@
       "error": "요청을 처리하지 못했습니다. 입력값과 코드 중복 여부를 확인하세요.",
       "retry": "다시 시도",
       "validation": "올바른 값을 입력하세요. 기간과 사용 한도는 양의 정수여야 합니다.",
-      "deleteConfirm": "무료 체험 코드 {{code}}을(를) 삭제할까요?"
+      "deleteConfirm": "무료 체험 코드 {{code}}을(를) 삭제할까요?",
+      "codeHint": "고객이 /p/코드 링크로 들어오거나 결제 화면에 직접 입력해요.",
+      "planHint": "체험 기간 동안 이 플랜으로 쓸 수 있어요.",
+      "trialDaysHint": "결제 없이 쓸 수 있는 기간이에요.",
+      "durationDaysHint": "체험이 끝난 뒤 이어서 결제할 때 안내할 플랜 기간이에요.",
+      "daysUnit": "일",
+      "perUserHint": "한 사람이 이 코드를 몇 번 쓸 수 있는지예요. 보통 1이에요.",
+      "requiresCardHint": "켜면 체험 시작 전에 카드를 등록해야 해요. 실제 청구는 하지 않아요.",
+      "activeHint": "끄면 링크로 들어와도 사용할 수 없다고 안내해요.",
+      "section": {
+        "offer": "체험 내용",
+        "offerDesc": "어떤 플랜을 며칠 동안 무료로 줄지 정해요.",
+        "limitsDesc": "선착순 인원과 한 사람당 사용 횟수를 정해요.",
+        "rules": "사용 조건",
+        "rulesDesc": "카드 등록 여부와 코드 사용 가능 상태를 정해요."
+      },
+      "summary": {
+        "headline": "{{count}}일 무료 체험",
+        "noDays": "체험 기간을 입력하세요",
+        "noPlan": "플랜 미선택",
+        "card": "카드 등록 필요",
+        "noCard": "카드 없이 시작",
+        "total": "선착순 {{count}}명",
+        "totalUnlimited": "인원 제한 없음",
+        "perUser": "1인 {{count}}회"
+      }
     },
     "affiliate": {
       "title": "제휴 파트너",
@@ -112,7 +137,27 @@
       "pending": "미지급",
       "paid": "지급 완료",
       "markPaid": "지급 완료로 표시",
-      "payConfirm": "{{amount}} 수수료를 지급 완료로 표시할까요? 지급 내역만 기록하며 실제 송금은 하지 않습니다."
+      "payConfirm": "{{amount}} 수수료를 지급 완료로 표시할까요? 지급 내역만 기록하며 실제 송금은 하지 않습니다.",
+      "namePlaceholder": "예: 유튜버 홍길동",
+      "codeHint": "파트너가 공유할 코드예요. /p/코드 링크로도 쓸 수 있어요.",
+      "activeHint": "끄면 새로 들어오는 고객에게 혜택이 적용되지 않아요. 이미 쌓인 수수료는 그대로예요.",
+      "commissionExample": "예: 고객이 $10.00를 결제하면 파트너 수수료는 {{amount}}예요 ({{rate}}%).",
+      "section": {
+        "partner": "파트너 정보",
+        "partnerDesc": "누구에게 줄 코드인지 정해요.",
+        "customer": "고객 혜택",
+        "customerDesc": "이 코드로 들어온 고객이 받는 할인이에요.",
+        "commission": "파트너 수수료",
+        "commissionDesc": "결제가 완료된 금액에서 파트너에게 줄 비율이에요.",
+        "status": "상태",
+        "statusDesc": "코드를 지금 쓸 수 있게 할지 정해요."
+      },
+      "summary": {
+        "fixed": "{{value}} 할인",
+        "noName": "파트너 이름 미입력",
+        "noRate": "수수료율 미입력",
+        "rate": "수수료 {{rate}}%"
+      }
     },
     "uuidEvictions": {
       "title": "UUID 차단 확인",
@@ -1986,6 +2031,11 @@
         "months": "{{count}}개월",
         "oneYear": "1년",
         "span": "총 {{count}}일 동안 사용할 수 있어요 (KST)"
+      },
+      "share": {
+        "label": "공유 링크",
+        "copy": "링크 복사",
+        "copied": "복사했어요"
       }
     },
     "subscriptionDomains": {

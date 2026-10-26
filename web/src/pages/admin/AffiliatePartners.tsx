@@ -1,8 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Alert, Box, Button, ColumnLayout, FormField, Header, Input, Modal, Select, SpaceBetween, StatusIndicator, Table, Toggle } from "@cloudscape-design/components";
+import { Alert, Box, Button, ColumnLayout, FormField, Header, Input, Modal, SegmentedControl, SpaceBetween, StatusIndicator, Table, Toggle } from "@cloudscape-design/components";
 import { deleteAffiliate, getAffiliateCommissions, listAffiliates, markAffiliateCommissionPaid, saveAffiliate, type AffiliateCommission, type AffiliateCommissionSummary, type AffiliatePartner } from "../../api/promotionKinds";
 import { formatPriceCents } from "../../utils/planPricing";
+import { ChipPicker, FormSection, SummaryCard } from "./promotionFormParts";
+import { generatePromoCode } from "./promotionFormModel";
+import PromoShareLink from "./PromoShareLink";
+
+const COMMISSION_PRESETS = [5, 10, 15, 20, 30];
 
 const emptyForm = { name: "", code: "", commission_rate: "10", discount_type: "percent" as "percent" | "fixed", discount_value: "10", is_active: true };
 
@@ -38,11 +43,12 @@ export default function AffiliatePartners() {
     finally { if (generation === detailGeneration.current) setDetailLoading(false); }
   };
   const rate = Number(form.commission_rate);
-  const value = Number(form.discount_value);
+  const value = form.discount_type === "fixed" ? Math.round(Number(form.discount_value) * 100) : Number(form.discount_value);
   const invalid = {
     name: !form.name.trim(), code: !form.code.trim(),
     rate: !form.commission_rate.trim() || !Number.isFinite(rate) || rate < 0 || rate > 100 || !/^\d+(\.\d{1,2})?$/.test(form.commission_rate),
-    value: !Number.isSafeInteger(value) || value <= 0 || (form.discount_type === "percent" && value > 100),
+    value: !Number.isSafeInteger(value) || value <= 0 || (form.discount_type === "percent" && value > 100)
+      || (form.discount_type === "fixed" && !/^\d+(\.\d{1,2})?$/.test(form.discount_value)),
   };
   const save = async () => {
     setShowErrors(true);
@@ -67,6 +73,12 @@ export default function AffiliatePartners() {
     catch { setDetailError(true); } finally { setSaving(false); }
   };
   const fieldError = (invalid: boolean) => showErrors && invalid ? t("admin.affiliate.validation") : undefined;
+  const discountText = invalid.value ? t("admin.promotions.summary.noDiscount")
+    : form.discount_type === "percent" ? t("admin.promotions.summary.percent", { value }) : t("admin.affiliate.summary.fixed", { value: formatPriceCents(value) });
+  const summaryChips = [
+    form.name.trim() || t("admin.affiliate.summary.noName"),
+    invalid.rate ? t("admin.affiliate.summary.noRate") : t("admin.affiliate.summary.rate", { rate }),
+  ];
   return <SpaceBetween size="l">
     {error && <Alert type="error" action={<Button onClick={() => void load()}>{t("admin.affiliate.retry")}</Button>}>{t("admin.affiliate.error")}</Alert>}
     <Table items={items} trackBy="id" loading={loading} loadingText={t("admin.affiliate.loading")}
@@ -81,26 +93,75 @@ export default function AffiliatePartners() {
         { id: "active", header: t("admin.affiliate.active"), cell: (p) => <StatusIndicator type={p.is_active ? "success" : "stopped"}>{p.is_active ? t("admin.affiliate.yes") : t("admin.affiliate.no")}</StatusIndicator> },
         { id: "actions", header: t("admin.affiliate.actions"), cell: (p) => <SpaceBetween direction="horizontal" size="xs">
           <Button variant="inline-link" onClick={() => {
-            setForm({ ...p, commission_rate: String(p.commission_rate), discount_value: String(p.discount_value) });
+            setForm({ ...p, commission_rate: String(p.commission_rate), discount_value: p.discount_type === "fixed" ? (p.discount_value / 100).toFixed(2) : String(p.discount_value) });
             setShowErrors(false); setError(false); setEditor({ id: p.id });
           }}>{t("admin.affiliate.edit")}</Button>
           <Button variant="inline-link" onClick={() => setDeleting(p)}>{t("admin.affiliate.delete")}</Button>
         </SpaceBetween> },
       ]} />
-    <Modal visible={editor !== null} onDismiss={() => { if (!saving) setEditor(null); }}
+    <Modal visible={editor !== null} size="large" onDismiss={() => { if (!saving) setEditor(null); }}
       header={editor?.id ? t("admin.affiliate.edit") : t("admin.affiliate.create")}
       footer={<Box float="right"><SpaceBetween direction="horizontal" size="xs"><Button disabled={saving} onClick={() => setEditor(null)}>{t("admin.affiliate.cancel")}</Button><Button variant="primary" loading={saving} onClick={() => void save()}>{t("admin.affiliate.save")}</Button></SpaceBetween></Box>}>
-      <SpaceBetween size="m">
+      <div className="promo-form">
         {error && <Alert type="error">{t("admin.affiliate.error")}</Alert>}
-        <FormField label={t("admin.affiliate.name")} errorText={fieldError(invalid.name)}><Input value={form.name} onChange={({ detail }) => setForm({ ...form, name: detail.value })} /></FormField>
-        <FormField label={t("admin.affiliate.code")} errorText={fieldError(invalid.code)}><Input value={form.code} onChange={({ detail }) => setForm({ ...form, code: detail.value })} /></FormField>
-        <FormField label={t("admin.affiliate.commissionRate")} errorText={fieldError(invalid.rate)}><Input type="number" value={form.commission_rate} onChange={({ detail }) => setForm({ ...form, commission_rate: detail.value })} /></FormField>
-        <FormField label={t("admin.affiliate.discountType")}><Select selectedOption={{ value: form.discount_type, label: form.discount_type === "percent" ? t("admin.affiliate.percent") : t("admin.affiliate.fixed") }}
-          options={[{ value: "percent", label: t("admin.affiliate.percent") }, { value: "fixed", label: t("admin.affiliate.fixed") }]}
-          onChange={({ detail }) => setForm({ ...form, discount_type: detail.selectedOption.value === "fixed" ? "fixed" : "percent" })} /></FormField>
-        <FormField label={t("admin.affiliate.discountValue")} description={form.discount_type === "fixed" ? t("admin.affiliate.fixedHint") : undefined} errorText={fieldError(invalid.value)}><Input type="number" value={form.discount_value} onChange={({ detail }) => setForm({ ...form, discount_value: detail.value })} /></FormField>
-        <Toggle checked={form.is_active} onChange={({ detail }) => setForm({ ...form, is_active: detail.checked })}>{t("admin.affiliate.active")}</Toggle>
-      </SpaceBetween>
+        <SummaryCard code={form.code} emptyCode={t("admin.promotions.summary.noCode")} headline={discountText}
+          active={form.is_active} activeText={form.is_active ? t("admin.promotions.form.activeOn") : t("admin.promotions.form.activeOff")} chips={summaryChips} />
+        {form.code.trim() && <PromoShareLink code={form.code.trim()} />}
+
+        <FormSection step={1} title={t("admin.affiliate.section.partner")} description={t("admin.affiliate.section.partnerDesc")}>
+          <ColumnLayout columns={2} minColumnWidth={240}>
+            <FormField stretch label={t("admin.affiliate.name")} errorText={fieldError(invalid.name)}>
+              <Input value={form.name} placeholder={t("admin.affiliate.namePlaceholder")} onChange={({ detail }) => setForm({ ...form, name: detail.value })} />
+            </FormField>
+            <FormField stretch label={t("admin.affiliate.code")} description={t("admin.affiliate.codeHint")} errorText={fieldError(invalid.code)}>
+              <div className="promo-form__affix">
+                <Input value={form.code} placeholder="PARTNER10" onChange={({ detail }) => setForm({ ...form, code: detail.value })} />
+                <Button iconName="refresh" ariaLabel={t("admin.promotions.form.generate")} onClick={() => setForm({ ...form, code: generatePromoCode() })} />
+              </div>
+            </FormField>
+          </ColumnLayout>
+        </FormSection>
+
+        <FormSection step={2} title={t("admin.affiliate.section.customer")} description={t("admin.affiliate.section.customerDesc")}>
+          <ColumnLayout columns={2} minColumnWidth={240}>
+            <FormField label={t("admin.affiliate.discountType")}>
+              <SegmentedControl selectedId={form.discount_type}
+                options={[{ id: "percent", text: t("admin.promotions.form.discountTypePercentLong") }, { id: "fixed", text: t("admin.promotions.form.discountTypeFixedLong") }]}
+                onChange={({ detail }) => setForm({ ...form, discount_type: detail.selectedId === "fixed" ? "fixed" : "percent", discount_value: "" })} />
+            </FormField>
+            <FormField label={t("admin.affiliate.discountValue")}
+              constraintText={form.discount_type === "fixed" ? t("admin.promotions.form.discountValueFixedHint") : t("admin.promotions.form.discountValuePercentHint")}
+              errorText={fieldError(invalid.value)}>
+              <div className="promo-form__affix">
+                {form.discount_type === "fixed" && <span className="promo-form__unit">$</span>}
+                <Input value={form.discount_value} type="number" inputMode={form.discount_type === "fixed" ? "decimal" : "numeric"}
+                  step={form.discount_type === "fixed" ? 0.01 : 1} placeholder={form.discount_type === "fixed" ? "1.50" : "10"}
+                  onChange={({ detail }) => setForm({ ...form, discount_value: detail.value })} />
+                {form.discount_type === "percent" && <span className="promo-form__unit">%</span>}
+              </div>
+            </FormField>
+          </ColumnLayout>
+        </FormSection>
+
+        <FormSection step={3} title={t("admin.affiliate.section.commission")} description={t("admin.affiliate.section.commissionDesc")}>
+          <FormField stretch label={t("admin.affiliate.commissionRate")} errorText={fieldError(invalid.rate)}>
+            <div className="promo-form__chips-pick">
+              <ChipPicker label={t("admin.affiliate.commissionRate")} options={COMMISSION_PRESETS} value={COMMISSION_PRESETS.includes(rate) ? rate : null}
+                onChange={(next) => setForm({ ...form, commission_rate: String(next) })} format={(next) => `${next}%`} />
+              <span className="promo-form__custom-days">
+                <Input value={form.commission_rate} type="number" inputMode="decimal" ariaLabel={t("admin.affiliate.commissionRate")}
+                  onChange={({ detail }) => setForm({ ...form, commission_rate: detail.value })} />
+                <span className="promo-form__unit">%</span>
+              </span>
+            </div>
+          </FormField>
+          {!invalid.rate && <p className="promo-window__span">{t("admin.affiliate.commissionExample", { rate, amount: formatPriceCents(Math.round(10 * rate)) })}</p>}
+        </FormSection>
+
+        <FormSection step={4} title={t("admin.affiliate.section.status")} description={t("admin.affiliate.section.statusDesc")}>
+          <Toggle checked={form.is_active} description={t("admin.affiliate.activeHint")} onChange={({ detail }) => setForm({ ...form, is_active: detail.checked })}>{t("admin.promotions.form.activeLabel")}</Toggle>
+        </FormSection>
+      </div>
     </Modal>
     <Modal visible={deleting !== null} onDismiss={() => { if (!saving) setDeleting(null); }} header={t("admin.affiliate.delete")}
       footer={<SpaceBetween direction="horizontal" size="xs"><Button disabled={saving} onClick={() => setDeleting(null)}>{t("admin.affiliate.cancel")}</Button><Button variant="primary" loading={saving} onClick={() => void remove()}>{t("admin.affiliate.delete")}</Button></SpaceBetween>}>
