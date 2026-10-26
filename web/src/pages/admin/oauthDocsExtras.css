@@ -1,0 +1,96 @@
+.oauth-resp {
+  display: grid;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid #e3e6ea;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.oauth-resp__head {
+  display: grid;
+  gap: 6px;
+}
+
+.oauth-resp__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.oauth-resp__case {
+  display: grid;
+  gap: 6px;
+}
+
+.oauth-resp__label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  font-size: 13.5px;
+  color: #414d5c;
+}
+
+.oauth-resp__badge {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.oauth-resp__badge--ok {
+  background: #f2fcf3;
+  color: #037f0c;
+  border: 1px solid #b6e6bb;
+}
+
+.oauth-resp__badge--err {
+  background: #fff7f7;
+  color: #b3141c;
+  border: 1px solid #f1b5b8;
+}
+
+.oauth-builder {
+  display: grid;
+  gap: 14px;
+  padding: 14px 16px;
+  border: 1px solid #e3e6ea;
+  border-radius: 12px;
+  background: #fbfcfd;
+}
+
+.oauth-builder__scopes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr));
+  gap: 8px 14px;
+}
+
+.oauth-builder__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.oauth-builder__fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  gap: 14px;
+}
+
+/* narrow screens: grid and flex children default to min-width:auto, so a long
+   code line or a Cloudscape input would stretch the whole page. */
+.oauth-resp,
+.oauth-resp *,
+.oauth-builder,
+.oauth-builder * {
+  min-width: 0;
+}
+
+.oauth-resp .oauth-docs__code,
+.oauth-builder .oauth-docs__code {
+  max-width: 100%;
+}

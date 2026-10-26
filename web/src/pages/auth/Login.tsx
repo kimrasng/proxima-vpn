@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
+  Alert,
   Box,
   Button,
   Container,
@@ -25,6 +26,7 @@ export default function Login() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
+  const resumingOAuth = continueTarget(location.search)?.startsWith("/oauth/authorize") ?? false;
   useEffect(() => {
     const target = continueTarget(location.search);
     if (target) rememberPostLogin(target);
@@ -82,6 +84,9 @@ export default function Login() {
       </Box>
 
       <SpaceBetween size="l">
+        {resumingOAuth && (
+          <Alert type="info" header={t("auth.login.oauthContinueTitle")}>{t("auth.login.oauthContinueBody")}</Alert>
+        )}
         {flash.length > 0 && <Flashbar items={flash} i18nStrings={{ ariaLabel: t("admin.notifications.title") }} />}
         <div className="auth-layout__card">
         <Container header={<Header variant="h1">{t("auth.login.title")}</Header>}>

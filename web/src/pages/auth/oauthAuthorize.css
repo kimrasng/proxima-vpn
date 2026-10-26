@@ -1,0 +1,227 @@
+/* Consent is information-dense (app header, account, scope list), so it pulls
+   the shared auth column wider than its 400px default at desktop widths. */
+.auth-layout__main:has(.oauth-consent) {
+  max-width: 520px;
+}
+
+.oauth-consent {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  margin: 0 auto;
+  box-sizing: border-box;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+.oauth-consent__card {
+  padding: 28px 24px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 600px) {
+  .oauth-consent__card {
+    padding: 20px 16px;
+  }
+}
+
+.oauth-consent__head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.oauth-consent__badge {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  margin: 0 auto;
+  border-radius: 16px;
+  background: #e8f1ff;
+  color: #0b5fd6;
+}
+
+.oauth-consent__badge--error {
+  background: #fff1e5;
+  color: #b4530a;
+}
+
+.oauth-consent__scopes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid #e3e6ea;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.oauth-consent__scopes li {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  color: #0f7a3d;
+}
+
+.oauth-consent__scopes li + li {
+  border-top: 1px solid #eef0f2;
+}
+
+.oauth-consent__scopes li.oauth-consent__scope--write {
+  color: #b4530a;
+  background: #fffaf3;
+}
+
+.oauth-consent__scope-title {
+  color: #16191f;
+  font-weight: 700;
+}
+
+.oauth-consent__scope-desc {
+  margin-top: 2px;
+  color: #5f6b7a;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.oauth-consent__note {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #f4f6f8;
+  color: #414d5c;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.oauth-consent__redirect {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: baseline;
+  color: #5f6b7a;
+  font-size: 13px;
+}
+
+.oauth-consent__redirect code {
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: #f4f6f8;
+  color: #16191f;
+  font-size: 13px;
+}
+
+.oauth-consent__actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+
+.oauth-consent__stack { display: grid; gap: 18px; }
+.oauth-consent__title {
+  margin: 0;
+  text-align: center;
+  font-size: 22px;
+  line-height: 1.4;
+  font-weight: 800;
+  color: var(--color-text-heading-default, #0f141a);
+}
+.oauth-consent__lead {
+  margin: -6px 0 0;
+  text-align: center;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--color-text-body-secondary, #414d5c);
+}
+.oauth-consent__hint {
+  margin: 0;
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--color-text-body-secondary, #5f6b7a);
+}
+.oauth-consent__section-title { margin-bottom: 8px; font-weight: 700; color: var(--color-text-heading-default, #16191f); }
+
+.oauth-consent__apps { display: flex; align-items: center; justify-content: center; gap: 14px; }
+.oauth-consent__app {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  background: #eef2f7;
+  color: #16191f;
+  font-size: 24px;
+  font-weight: 800;
+}
+.oauth-consent__app--proxima { background: linear-gradient(135deg, #2563eb, #7c3aed); color: #fff; }
+.oauth-consent__link { display: inline-flex; color: #8d99a8; }
+
+.oauth-consent__account {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid #e3e6ea;
+}
+.oauth-consent__avatar {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #e8f1ff;
+  color: #0b5fd6;
+  font-weight: 800;
+}
+.oauth-consent__account-text { flex: 1; min-width: 0; display: grid; overflow-wrap: anywhere; }
+.oauth-consent__account-label { font-size: 12px; color: #5f6b7a; }
+
+.oauth-consent__error-detail {
+  display: grid;
+  gap: 4px;
+  justify-items: center;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: #f4f6f8;
+  text-align: center;
+}
+.oauth-consent__error-label { font-size: 12px; color: #5f6b7a; }
+.oauth-consent__error-detail code { font-size: 14px; font-weight: 700; color: #b4530a; }
+.oauth-consent__error-desc { font-size: 13px; color: #414d5c; overflow-wrap: anywhere; }
+
+.oauth-consent__actions--single { grid-template-columns: minmax(0, 1fr); }
+
+.oauth-consent__handoff { padding: 12px 0; }
+.oauth-consent__badge--lg { width: 80px; height: 80px; border-radius: 50%; }
+.oauth-consent__badge--ok { background: #e6f6ec; color: #0f7a3d; }
+.oauth-consent__handoff .oauth-consent__title { font-size: 26px; }
+.oauth-consent__handoff .oauth-consent__lead { font-size: 16px; }
+
+@media (max-width: 600px) {
+  .oauth-consent__title { font-size: 20px; }
+  .oauth-consent__handoff .oauth-consent__title { font-size: 22px; }
+}
+
+/* Titles and hints balance their lines so no syllable is left alone ("합니다." on its own line). */
+.oauth-consent__title,
+.oauth-consent__lead,
+.oauth-consent__hint { text-wrap: balance; }
+
+/* The email is one token: truncate it rather than breaking it mid-word. */
+.oauth-consent__account-text { overflow-wrap: normal; }
+.oauth-consent__email { display: block; font-size: 15px; white-space: nowrap; }
+.oauth-consent__account > :last-child { flex: none; }
+
+.oauth-consent__link { gap: 0; font-size: 12px; }
+.oauth-consent__redirect code { overflow-wrap: anywhere; }
+.oauth-consent__actions { align-items: stretch; }

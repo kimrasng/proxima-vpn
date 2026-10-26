@@ -1085,6 +1085,7 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) (migrateErr error) {
 	migrations = append(migrations, guideSchema...)
 	migrations = append(migrations, supportSchema...)
 	migrations = append(migrations, clashRoutingSchema...)
+	migrations = append(migrations, oauthSchema...)
 	migrations = append(migrations, adminAccountSchema...)
 	migrations = append(migrations, promotionKindSchema...)
 

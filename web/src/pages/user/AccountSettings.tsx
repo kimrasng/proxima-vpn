@@ -24,9 +24,10 @@ import type { UserProfile } from "../../api/types";
 import * as userApi from "../../api/user";
 import { focusFirstInvalid, hasFieldErrors } from "../../utils/formValidation";
 import PasskeySettings from "../../components/PasskeySettings";
+import ConnectedApps from "../../components/ConnectedApps";
 import "./accountSettings.css";
 
-const TABS = ["profile", "security", "subscription"] as const;
+const TABS = ["profile", "security", "subscription", "apps"] as const;
 type TabId = (typeof TABS)[number];
 
 export default function AccountSettings() {
@@ -209,6 +210,11 @@ export default function AccountSettings() {
                   </SpaceBetween>
                 </Container>
               ),
+            },
+            {
+              id: "apps",
+              label: t("user.account.tabs.apps"),
+              content: <ConnectedApps onMessage={notify} />,
             },
           ]}
         />

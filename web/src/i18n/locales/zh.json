@@ -308,7 +308,9 @@
       "guides": "指南与文档",
       "support": "客服工单",
       "supportHelp": "工单帮助管理",
-      "admins": "管理员账户"
+      "admins": "管理员账户",
+      "oauthApps": "OAuth 应用",
+      "oauthDocs": "OAuth 接入文档"
     },
     "dashboard": {
       "title": "仪表盘",
@@ -1254,7 +1256,9 @@
       "routing": "编辑 Clash Meta 订阅中的代理组、规则集和规则顺序。保存后在下次订阅更新时生效。",
       "support": "查看并回复用户提交的工单。回复后会向用户邮箱发送通知。",
       "supportHelp": "管理用户提交工单前看到的分类与常见问题，可分别填写韩语、英语和中文。",
-      "admins": "邀请管理员、管理角色与状态，并修改自己的姓名和密码。只有所有者可以管理其他管理员。"
+      "admins": "邀请管理员、管理角色与状态，并修改自己的姓名和密码。只有所有者可以管理其他管理员。",
+      "oauthApps": "注册使用 Proxima 账户登录的自有或第三方应用，并为每个应用设置权限和允许的回调地址。",
+      "oauthDocs": "说明创建 OAuth 应用并接入登录、令牌与资源 API 的完整流程。"
     },
     "notifications": {
       "title": "通知"
@@ -2864,6 +2868,304 @@
         "passwordChanged": "密码已修改，其他所有会话均已退出。"
       },
       "notOwner": "只有所有者可以管理管理员团队。如需权限请联系所有者。"
+    },
+    "oauthApps": {
+      "title": "OAuth 应用",
+      "description": "注册使用 Proxima 账户登录的应用（包括自有应用），管理其权限、回调地址和客户端密钥。",
+      "create": "创建应用",
+      "createTitle": "新建 OAuth 应用",
+      "editTitle": "编辑 {{name}}",
+      "listTitle": "已注册的应用",
+      "howTitle": "接入方式",
+      "how": {
+        "step1Title": "注册应用",
+        "step1Body": "在此创建应用并设置回调地址和权限，系统会发放 Client ID 和密钥。",
+        "step2Title": "登录请求",
+        "step2Body": "应用将用户引导至 /oauth/authorize，用户登录 Proxima 并批准权限。",
+        "step3Title": "交换授权码",
+        "step3Body": "在令牌端点用回调收到的 code 换取 1 小时有效的访问令牌和刷新令牌。",
+        "step4Title": "调用 API",
+        "step4Body": "带上 Authorization: Bearer 头调用 /api/v1/client/*，只能使用已批准的权限。"
+      },
+      "endpointsTitle": "端点",
+      "endpoint": {
+        "authorize": "授权（在浏览器中打开）",
+        "token": "签发 / 刷新令牌",
+        "revoke": "吊销令牌",
+        "api": "资源 API",
+        "profile": "基本资料",
+        "subscription": "订阅链接",
+        "nodes": "节点状态",
+        "summary": "套餐与用量",
+        "tickets": "重置券列表",
+        "ticketHistory": "重置券使用记录",
+        "redeem": "使用重置券"
+      },
+      "emptyTitle": "暂无应用",
+      "emptyBody": "注册自有应用或集成后，即可使用 Proxima 账户登录。",
+      "col": {
+        "name": "应用",
+        "clientId": "Client ID",
+        "type": "类型",
+        "redirects": "允许的回调地址",
+        "scopes": "允许的权限",
+        "users": "已连接用户",
+        "status": "状态",
+        "created": "创建日期"
+      },
+      "type": {
+        "confidential": "服务器应用（使用密钥）",
+        "public": "移动 / 桌面应用（PKCE）"
+      },
+      "typeDesc": {
+        "confidential": "适用于能安全保存密钥的后端服务器。交换令牌时需要 Client secret。",
+        "public": "适用于无法隐藏密钥的移动和桌面应用，只通过 PKCE（S256）认证。"
+      },
+      "usersCount": "{{count}} 人",
+      "active": "使用中",
+      "inactive": "已停用",
+      "rotate": "重新生成密钥",
+      "copied": "已复制",
+      "copyFailed": "无法复制",
+      "field": {
+        "name": "应用名称",
+        "nameHint": "会原样显示在用户的授权页面上。",
+        "description": "说明",
+        "descriptionHint": "显示在授权页面应用名称下方的一行说明。（可选）",
+        "type": "应用类型",
+        "typeHint": "根据应用能否安全隐藏密钥来选择。",
+        "redirects": "允许的回调地址",
+        "redirectsHint": "登录后接收 code 的地址，请求中的地址必须与此处某一项完全一致。可使用 https、自定义协议（proxima://…）或回环 http（127.0.0.1，端口不限）。最多 10 个。",
+        "redirectN": "回调地址 {{n}}",
+        "scopes": "允许的权限",
+        "scopesHint": "应用可请求的最大范围。用户只会看到并批准应用实际请求的权限。",
+        "active": "启用",
+        "activeHint": "停用后，此应用的所有令牌立即失效，并禁止新的登录。"
+      },
+      "addRedirect": "添加回调地址",
+      "removeRedirect": "删除回调地址",
+      "redirect": {
+        "required": "请输入回调地址。",
+        "invalid": "不是有效的绝对地址。",
+        "http": "http 仅可用于 127.0.0.1、::1 或 localhost，其他情况请使用 https。",
+        "fragment": "不能包含 # 之后的片段。",
+        "duplicate": "该地址已存在。"
+      },
+      "nameRequired": "请输入应用名称。",
+      "scopesRequired": "请至少选择一项权限。",
+      "toPublicWarn": "改为公开应用后，现有密钥会立即删除，应用只能通过 PKCE 获取令牌。",
+      "toConfidentialWarn": "改为服务器应用会发放新密钥，保存后只显示一次。",
+      "created": "已创建 {{name}}。",
+      "updated": "已保存 {{name}}。",
+      "deleted": "已删除 {{name}}。",
+      "saveError": "无法保存。",
+      "loadError": "无法加载应用列表。",
+      "secretTitle": "客户端密钥",
+      "secretOnce": "此密钥只显示这一次。关闭前请保存到安全的地方（如服务器环境变量）。丢失后需要重新生成。",
+      "secretUse": "请求令牌时通过 HTTP Basic（client_id:client_secret）或在请求体中以 client_id、client_secret 发送。不要放进应用代码或代码仓库。",
+      "secretDone": "已保存",
+      "rotateTitle": "要重新生成密钥吗？",
+      "rotateBody": "{{name}} 的现有密钥将立即失效。请把应用服务器配置改为新密钥后才能继续获取令牌。已签发的令牌保持有效。",
+      "deleteTitle": "要删除此应用吗？",
+      "deleteBody": "删除 {{name}} 会吊销 {{count}} 位已连接用户的全部令牌，且无法恢复。",
+      "docs": "接入文档",
+      "endpointGroup": {
+        "oauth": "OAuth 端点",
+        "client": "资源 API（Bearer 令牌）"
+      }
+    },
+    "oauthDocs": {
+      "title": "OAuth 接入文档",
+      "description": "从头到尾说明自有应用或外部服务如何用 Proxima 账户登录并使用用户数据。",
+      "back": "返回 OAuth 应用",
+      "toc": "目录",
+      "copy": "复制",
+      "col": {
+        "scope": "权限",
+        "desc": "说明",
+        "param": "参数",
+        "required": "必填",
+        "code": "错误码",
+        "meaning": "含义与处理"
+      },
+      "required": {
+        "yes": "必填",
+        "no": "可选"
+      },
+      "overview": {
+        "title": "整体流程",
+        "body": "Proxima 使用 OAuth 2.0 授权码模式（含 PKCE）。应用不会拿到用户密码，只能在用户于 Proxima 页面亲自批准的范围内读取或修改账户数据。",
+        "step1Title": "注册应用",
+        "step1Body": "管理员创建 OAuth 应用并设置回调地址和允许的权限，获得 Client ID（服务器应用还会获得 Client secret）。",
+        "step2Title": "请求登录与授权",
+        "step2Body": "应用将用户引导至 /oauth/authorize，用户登录 Proxima 并在授权页面点击允许。",
+        "step3Title": "回调收到 code",
+        "step3Body": "Proxima 将 code 和 state 附加到已注册的回调地址并跳转回来。code 10 分钟内仅可使用一次。",
+        "step4Title": "交换令牌",
+        "step4Body": "应用将 code 发送到令牌端点，换取访问令牌和刷新令牌。",
+        "step5Title": "调用 API 与刷新",
+        "step5Body": "带上 Authorization: Bearer 头调用 /api/v1/client/*，过期后用刷新令牌获取新令牌。",
+        "fact": {
+          "codeLabel": "授权码",
+          "codeValue": "10 分钟 · 一次性",
+          "accessLabel": "访问令牌",
+          "accessValue": "1 小时",
+          "refreshLabel": "刷新令牌",
+          "refreshValue": "30 天 · 每次使用都会更换"
+        }
+      },
+      "register": {
+        "title": "注册应用",
+        "body": "在 OAuth 应用页面点击“创建应用”，设置名称、类型、回调地址和允许的权限。名称会原样显示在用户授权页面上。",
+        "confidential": "适用于后端服务器等能安全保存密钥的场景。获取令牌时用 Client ID 和 Client secret 认证。密钥只在创建时显示一次，请立即保存到服务器环境变量。",
+        "public": "适用于用户可以查看代码、无法隐藏密钥的移动和桌面应用。只通过 PKCE（S256）认证，且必须使用 PKCE。",
+        "redirectTitle": "回调地址规则",
+        "redirect1": "请求中的 redirect_uri 必须与已注册的值逐字完全一致。",
+        "redirect2": "https 地址不限；http 仅可用于本机地址（127.0.0.1、::1、localhost）。",
+        "redirect3": "本机 http 地址端口不同也可匹配，以便桌面应用每次运行时使用空闲端口。",
+        "redirect4": "可以使用 proxima://oauth/callback 这样的应用专用协议。带 # 片段、包含账号密码的地址以及 javascript: 等危险协议会被拒绝。",
+        "scopesTitle": "权限（scope）列表"
+      },
+      "authorize": {
+        "title": "登录与授权请求",
+        "body": "在用户的浏览器（或应用内调用的系统浏览器）中打开以下地址。实际发送时需连成一行。",
+        "pkceTitle": "生成 PKCE",
+        "pkceBody": "每次请求生成随机的 code_verifier 并保存在应用内，将其 SHA-256 值转为 base64url 作为 code_challenge 发送。获取令牌时需一并发送原始 verifier。",
+        "callbackTitle": "回调响应",
+        "callbackBody": "用户允许时返回 code 和 state，拒绝时返回 error=access_denied。务必核对返回的 state 与发送的是否一致。应用或回调地址本身无效的请求不会跳回应用，而会停在 Proxima 错误页面。"
+      },
+      "param": {
+        "response_type": "固定为 code",
+        "client_id": "OAuth 应用页面中的 Client ID",
+        "redirect_uri": "已注册的回调地址之一（需 URL 编码）",
+        "scope": "以空格分隔的权限。留空则请求该应用允许的全部权限。",
+        "state": "防止 CSRF 的随机值，会原样返回到回调。",
+        "code_challenge": "PKCE 值。移动和桌面应用必填",
+        "code_challenge_method": "固定为 S256"
+      },
+      "token": {
+        "title": "交换令牌",
+        "body": "将回调收到的 code 以 POST 发送到令牌端点。请求体可以是 application/x-www-form-urlencoded 或 JSON。",
+        "publicTitle": "移动 / 桌面应用（无密钥）",
+        "confidentialTitle": "服务器应用（HTTP Basic 认证）",
+        "responseTitle": "成功响应",
+        "note": "redirect_uri 必须与授权请求时相同。同一个 code 使用两次会失败，并且用该 code 已签发的令牌也会全部失效。响应带有 Cache-Control: no-store。"
+      },
+      "refresh": {
+        "title": "刷新与吊销令牌",
+        "body": "访问令牌过期（1 小时）后，用刷新令牌换取新的令牌对。传入 scope 可以缩小范围，但不能扩大。",
+        "note": "每次刷新时刷新令牌也会更换，应用必须保存新值。再次使用已被替换的旧刷新令牌会被视为盗用，该次登录产生的所有令牌都会失效。",
+        "revokeTitle": "退出登录（吊销令牌）",
+        "revokeBody": "用户在应用中退出登录时，请将刷新令牌或访问令牌发送到吊销端点使其立即失效。发送未知令牌也会返回 200。"
+      },
+      "api": {
+        "title": "资源 API",
+        "body": "每个请求都要带上 Authorization: Bearer {access_token} 头。令牌缺少相应权限时返回 403 insufficient_scope。",
+        "exampleTitle": "调用示例",
+        "ep": {
+          "profile": "姓名、邮箱、账户状态、语言",
+          "subscription": "订阅链接及各公开订阅域名下的地址",
+          "nodes": "用户套餐可用节点的名称、国家和状态",
+          "summary": "当前套餐、流量用量与上限、到期日",
+          "tickets": "可用的重置券列表",
+          "ticketHistory": "重置券使用记录",
+          "redeem": "使用一张重置券重置本月流量用量。已使用或已过期的重置券返回 409"
+        }
+      },
+      "errors": {
+        "title": "错误响应",
+        "body": "错误按 OAuth 标准格式（{ error, error_description }）返回。令牌无效时返回 401 并附带 WWW-Authenticate 头。"
+      },
+      "error": {
+        "invalid_request": "缺少必填值或格式错误，请检查请求参数。",
+        "invalid_client": "Client ID 或密钥错误，或应用已停用。（401）",
+        "invalid_grant": "code 或刷新令牌已过期或被重复使用，或 redirect_uri、PKCE verifier 不匹配。请重新开始登录。",
+        "invalid_scope": "请求了应用未允许的权限，或刷新时试图扩大范围。",
+        "unsupported_grant_type": "grant_type 仅支持 authorization_code 和 refresh_token。",
+        "access_denied": "用户在授权页面点击了拒绝。",
+        "invalid_token": "访问令牌已过期或被吊销，或用户断开了连接、修改了密码、应用被停用。请刷新或重新登录。（401）",
+        "insufficient_scope": "令牌缺少此 API 所需的权限。（403）",
+        "slow_down": "令牌请求过多，请稍后再试。（429）"
+      },
+      "security": {
+        "title": "安全检查清单",
+        "item1": "Client secret 只放在服务器上，不要放进应用代码、代码仓库或日志。一旦泄露，请立即点击“重新生成密钥”。",
+        "item2": "移动和桌面应用请使用“移动 / 桌面应用（PKCE）”类型创建，并且每次请求都使用新的 code_verifier。",
+        "item3": "每次请求生成新的 state，并在回调中务必核对。",
+        "item4": "只请求需要的权限。像使用重置券（reset_tickets:redeem）这样会修改数据的权限，仅在确有需要时使用。",
+        "item5": "将令牌保存在设备的安全存储（Keychain、Keystore 等）中，退出登录时调用吊销端点。",
+        "item6": "用户修改密码、在“已连接的应用”中断开连接，或管理员停用应用时，现有令牌会立即失效。收到 401 时请让用户重新登录。"
+      },
+      "responses": {
+        "title": "响应示例（成功与失败）",
+        "body": "每个端点实际返回的响应。成功为绿色，失败为红色，失败涵盖服务器可能返回的所有情况。数值仅为示例。",
+        "success": "成功",
+        "failure": "失败",
+        "redirect": "重定向",
+        "authorizeNote": "此端点不返回 JSON，而是让浏览器回到应用的 redirect_uri。如果 client_id 或 redirect_uri 本身有误，就没有安全的地方可以跳转，因此由授权页面显示错误。",
+        "ep": {
+          "authorize": "授权结果（应用被跳转回的地址）",
+          "token": "签发令牌（authorization_code）",
+          "refresh": "刷新令牌（refresh_token）",
+          "revoke": "撤销令牌",
+          "common": "所有资源 API 共有的错误"
+        },
+        "when": {
+          "a_ok": "用户已同意。code 有效期 10 分钟，只能使用一次。",
+          "a_denied": "用户在授权页面拒绝了请求。",
+          "a_scope": "应用请求了未被允许的 scope。",
+          "a_pkce": "公开应用没有使用 PKCE（S256），或 code_challenge 格式不正确。",
+          "a_type": "response_type 不是 code。",
+          "t_ok": "code 已换成令牌。访问令牌有效 1 小时，刷新令牌有效 30 天。",
+          "t_grant": "code 错误、已过期或已使用。redirect_uri 与授权请求不一致或用户修改过密码时也一样。同一个 code 用两次，会使它签发的令牌全部失效。",
+          "t_pkce": "code_verifier 与授权请求中的 code_challenge 不匹配。",
+          "t_req": "code 为空。",
+          "t_nogrant": "没有发送 grant_type。",
+          "t_type": "不支持的 grant_type。只支持 authorization_code 和 refresh_token。",
+          "t_client": "Client ID 或密钥错误，或应用已停用。使用 Basic 认证时还会返回 WWW-Authenticate。",
+          "t_slow": "同一地址一分钟内请求超过 60 次。",
+          "r_ok": "新的令牌对。刷新令牌也会更换，请保存新值。",
+          "r_grant": "刷新令牌错误、已过期或已撤销。重复使用已更换的旧值会得到同样的错误，并撤销该次登录的所有令牌。请重新登录。",
+          "r_scope": "传入的 scope 比最初授予的范围更宽。",
+          "r_req": "refresh_token 为空。",
+          "v_ok": "已撤销。发送未知或空的令牌同样返回 200。",
+          "v_client": "Client ID 或密钥错误。",
+          "p_ok": "带有 profile scope 的令牌。",
+          "s_ok": "每个公开的订阅域名对应一个地址，url 为默认域名的地址。",
+          "s_none": "该账号还没有订阅链接。",
+          "n_ok": "用户套餐可使用的节点。status 为 online、offline 等。",
+          "n_empty": "用户没有套餐，或套餐没有节点组。",
+          "m_ok": "traffic_used 和 traffic_limit 单位为字节。没有流量上限的套餐 traffic_limit 为 null。",
+          "k_ok": "尚未使用且未过期的重置券。",
+          "k_empty": "没有可用的重置券。",
+          "h_ok": "最多最近 20 条，按使用时间从新到旧。",
+          "h_empty": "还没有使用过重置券。",
+          "d_ok": "已使用重置券并重置本月用量。reset_bytes 为被清零的用量（字节）。",
+          "d_404": "该 ticket id 不存在，或不属于此用户。",
+          "d_used": "该重置券已被使用。",
+          "d_expired": "该重置券已过期。",
+          "d_noplan": "没有正在运行且有流量上限的套餐，没有可重置的用量。",
+          "server": "服务器内部错误，请稍后重试。",
+          "c_missing": "缺少 Authorization 头，或不是 Bearer 格式。",
+          "c_invalid": "访问令牌错误、已过期或已撤销。用户断开应用、修改密码或应用被停用时也一样。请用刷新令牌刷新。",
+          "c_scope": "令牌缺少此 API 所需的 scope。响应中的 scope 即为所需权限。"
+        }
+      },
+      "builder": {
+        "title": "生成授权 URL",
+        "body": "填写各项后，下方 URL 会即时生成。复制的 URL 可作为单行粘贴。",
+        "required": "必填。",
+        "redirectHint": "必须与应用登记的 redirect URI 逐字一致。",
+        "scopeHint": "在应用允许的范围内选择。全不选则请求应用允许的全部权限。",
+        "scopeEmpty": "未选择任何权限，因此不发送 scope，即请求应用允许的全部权限。",
+        "stateHint": "每次请求使用新的随机值，并在返回后核对 state 是否一致。",
+        "pkce": "使用 PKCE（公开应用必须）",
+        "challengeHint": "code_verifier 的 SHA-256 经 base64url 编码，共 43 个字符。",
+        "generate": "重新生成 verifier、challenge 和 state",
+        "insecure": "当前页面不是安全来源，无法自动生成。请通过 https 或 localhost 打开，或手动填写。",
+        "verifierHint": "换取令牌时需要发送此值。离开本页面后会消失，请现在保存。",
+        "open": "在新标签页中打开"
+      }
     }
   },
   "user": {
@@ -3551,7 +3853,9 @@
       "submit": "登录",
       "registerLink": "没有账户？注册",
       "forgotPassword": "忘记密码？",
-      "error": "登录失败，请检查您的凭据。"
+      "error": "登录失败，请检查您的凭据。",
+      "oauthContinueTitle": "请登录以继续连接应用",
+      "oauthContinueBody": "登录后会直接回到刚才的授权页面。"
     },
     "adminLogin": {
       "title": "管理员登录",
@@ -3654,6 +3958,63 @@
       "loginButton": "使用通行密钥登录",
       "cancelled": "已取消通行密钥登录。",
       "loginError": "通行密钥登录失败。"
+    },
+    "oauth": {
+      "title": "{{app}} 想要使用你的 Proxima 账户",
+      "scopesTitle": "允许后，此应用可以",
+      "never": "你的密码和支付信息不会提供给应用。应用只能在以下权限范围内使用你的账户。",
+      "redirectLabel": "批准后返回",
+      "approve": "允许",
+      "deny": "拒绝",
+      "revokeHint": "可随时在 账户设置 › 已连接的应用 中断开连接。",
+      "approved": "已批准",
+      "returning": "正在返回应用",
+      "returningHint": "如果应用没有自动打开，请点击下方按钮。",
+      "openApp": "返回应用",
+      "errorTitle": "无法处理此连接请求",
+      "error": {
+        "invalid_client": "该应用未注册或已停用。",
+        "invalid_request": "应用发送的连接请求无效，请联系应用提供方。",
+        "other": "请稍后再试。",
+        "invalid_scope": "应用请求了未被允许的权限。",
+        "unsupported_response_type": "不支持此类连接请求。",
+        "server_error": "服务器无法处理该请求，请稍后再试。"
+      },
+      "errorHint": "请在应用中重新开始登录；如果问题持续，请联系应用提供方。",
+      "toDashboard": "前往仪表板",
+      "scope": {
+        "profile": {
+          "title": "查看基本资料",
+          "desc": "姓名、邮箱、账户状态和语言"
+        },
+        "subscription_read": {
+          "title": "查看订阅链接",
+          "desc": "添加到 VPN 应用的订阅地址，应用可借此直接连接节点。"
+        },
+        "nodes_read": {
+          "title": "查看节点状态",
+          "desc": "你可使用的服务器列表及是否在线"
+        },
+        "plan_read": {
+          "title": "查看套餐和用量",
+          "desc": "当前套餐、剩余流量和到期日"
+        },
+        "reset_tickets_read": {
+          "title": "查看重置券",
+          "desc": "持有的重置券及使用记录"
+        },
+        "reset_tickets_redeem": {
+          "title": "使用重置券",
+          "desc": "应用可以使用重置券重置本月流量用量。"
+        }
+      },
+      "approvedTitle": "已允许连接",
+      "closeHint": "回到应用后即可关闭此窗口。",
+      "signedInAs": "将使用此账户连接",
+      "switchAccount": "使用其他账户",
+      "errorDetail": "错误代码",
+      "errorHintReturn": "返回应用后，应用可以收到此错误并重新尝试。",
+      "backToApp": "返回应用"
     }
   },
   "landing": {

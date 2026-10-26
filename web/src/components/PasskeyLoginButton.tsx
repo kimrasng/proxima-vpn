@@ -6,6 +6,7 @@ import { browserSupportsWebAuthn, startAuthentication, WebAuthnError } from "@si
 import { ApiError } from "../api/client";
 import { beginPasskeyLogin, finishPasskeyLogin } from "../api/passkey";
 import { setToken } from "../api/auth";
+import { consumePostLogin } from "../utils/postLogin";
 import type { FlashbarProps } from "@cloudscape-design/components";
 
 type Props = { onMessage: (message: FlashbarProps.MessageDefinition) => void; onLoadingChange: (loading: boolean) => void; disabled?: boolean };
@@ -24,7 +25,7 @@ export default function PasskeyLoginButton({ onMessage, onLoadingChange, disable
       const credential = await startAuthentication({ optionsJSON: begin.options });
       const result = await finishPasskeyLogin(begin.session_id, credential);
       setToken("user", result.token);
-      navigate("/portal/dashboard", { replace: true });
+      navigate(consumePostLogin("/portal/dashboard"), { replace: true });
     } catch (error) {
       const cancelled = error instanceof WebAuthnError && ["ERROR_CEREMONY_ABORTED", "ERROR_NOT_ALLOWED"].includes(error.code as string);
       if (cancelled || (error instanceof Error && error.name === "NotAllowedError")) {

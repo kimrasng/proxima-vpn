@@ -48,7 +48,7 @@ func (h *UserPortalHandler) GetProfile(c *fiber.Ctx) error {
 		planExpiresAt *time.Time
 		planStartedAt *time.Time
 		language      string
-    subToken string
+		subToken      string
 	)
 
 	err := h.db.QueryRow(context.Background(), `
@@ -67,7 +67,7 @@ func (h *UserPortalHandler) GetProfile(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{
-		"sub_token": subToken,
+		"sub_token":       subToken,
 		"email":           email,
 		"name":            name,
 		"language":        language,
@@ -184,7 +184,7 @@ func (h *UserPortalHandler) UpdateProfile(c *fiber.Ctx) error {
 			})
 		}
 		_, err = h.db.Exec(ctx,
-			`UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2`,
+			`UPDATE users SET password_hash = $1, password_changed_at = NOW(), updated_at = NOW() WHERE id = $2`,
 			hash, userID,
 		)
 		if err != nil {

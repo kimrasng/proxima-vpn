@@ -35,6 +35,8 @@ const NodeDetail = lazy(() => import("./pages/admin/NodeDetail"));
 const UUIDEvictions = lazy(() => import("./pages/admin/UUIDEvictions"));
 const Connections = lazy(() => import("./pages/admin/Connections"));
 const SubscriptionDomains = lazy(() => import("./pages/admin/SubscriptionDomains"));
+const OAuthApps = lazy(() => import("./pages/admin/OAuthApps"));
+const OAuthDocs = lazy(() => import("./pages/admin/OAuthDocs"));
 const AdminAccounts = lazy(() => import("./pages/admin/AdminAccounts"));
 
 const Login = lazy(() => import("./pages/auth/Login"));
@@ -42,6 +44,7 @@ const AdminLogin = lazy(() => import("./pages/auth/AdminLogin"));
 const Register = lazy(() => import("./pages/auth/Register"));
 const ForgotPassword = lazy(() => import("./pages/auth/ForgotPassword"));
 const ResetPassword = lazy(() => import("./pages/auth/ResetPassword"));
+const OAuthAuthorize = lazy(() => import("./pages/auth/OAuthAuthorize"));
 
 const Devices = lazy(() => import("./pages/user/Devices"));
 const UserDashboard = lazy(() => import("./pages/user/Dashboard"));
@@ -74,6 +77,7 @@ export const router = createBrowserRouter([
       { path: "/forgot-password", element: <ForgotPassword /> },
       { path: "/reset-password", element: <ResetPassword /> },
       { path: "/admin/login", element: <AdminLogin /> },
+      { path: "/oauth/authorize", element: <OAuthAuthorize /> },
     ],
   },
   {
@@ -98,6 +102,8 @@ export const router = createBrowserRouter([
       { path: "/admin/uuid-evictions", element: <UUIDEvictions /> },
       { path: "/admin/connections", element: <Connections /> },
       { path: "/admin/subscription-domains", element: <SubscriptionDomains /> },
+      { path: "/admin/oauth-apps", element: <OAuthApps /> },
+      { path: "/admin/oauth-apps/docs", element: <OAuthDocs /> },
       { path: "/admin/orders", element: <Orders /> },
       { path: "/admin/orders/:orderId", element: <OrderDetail /> },
       { path: "/admin/promotions", element: <Promotions /> },
