@@ -107,6 +107,16 @@ func (p *StripeProvider) StartCheckout(ctx context.Context, req CheckoutRequest)
 				"order_id": req.OrderID,
 			},
 		},
+		// A paid invoice (invoice.stripe.com, with PDF) instead of only the
+		// charge receipt. Stripe bills this separately per paid session.
+		InvoiceCreation: &stripe.CheckoutSessionCreateInvoiceCreationParams{
+			Enabled: stripe.Bool(true),
+			InvoiceData: &stripe.CheckoutSessionCreateInvoiceCreationInvoiceDataParams{
+				Metadata: map[string]string{
+					"order_id": req.OrderID,
+				},
+			},
+		},
 		LineItems: []*stripe.CheckoutSessionCreateLineItemParams{
 			{
 				Quantity: stripe.Int64(1),
@@ -235,18 +245,28 @@ func confirmationFromSession(session *stripe.CheckoutSession, externalID string,
 	}, nil
 }
 
-// ReceiptURL returns the Stripe-hosted receipt of the charge behind a paid
-// Checkout Session. Zero-total sessions never create a PaymentIntent, so they
-// have no receipt and return "".
+// ReceiptURL returns the Stripe-hosted document for a paid Checkout Session:
+// the paid invoice page when the session created one, otherwise the charge
+// receipt (sessions created before invoice creation was enabled). Zero-total
+// sessions have neither and return "".
 func (p *StripeProvider) ReceiptURL(ctx context.Context, sessionID string) (string, error) {
 	params := &stripe.CheckoutSessionRetrieveParams{}
+	params.AddExpand("invoice")
 	params.AddExpand("payment_intent.latest_charge")
 	session, err := p.client.V1CheckoutSessions.Retrieve(ctx, sessionID, params)
 	if err != nil {
 		return "", fmt.Errorf("retrieve checkout session: %w", err)
 	}
-	if session.PaymentIntent == nil || session.PaymentIntent.LatestCharge == nil {
-		return "", nil
+	return sessionDocumentURL(session), nil
+}
+
+// sessionDocumentURL prefers the hosted invoice over the charge receipt.
+func sessionDocumentURL(session *stripe.CheckoutSession) string {
+	if session.Invoice != nil && session.Invoice.HostedInvoiceURL != "" {
+		return session.Invoice.HostedInvoiceURL
 	}
-	return session.PaymentIntent.LatestCharge.ReceiptURL, nil
+	if session.PaymentIntent != nil && session.PaymentIntent.LatestCharge != nil {
+		return session.PaymentIntent.LatestCharge.ReceiptURL
+	}
+	return ""
 }

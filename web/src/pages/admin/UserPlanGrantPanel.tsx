@@ -266,7 +266,7 @@ export default function UserPlanGrantPanel({ user, plans, onGranted }: Props) {
         footer={<Box float="right"><SpaceBetween direction="horizontal" size="xs">
           <Button onClick={() => setReceipt(null)}>{t("admin.userDetail.grant.close")}</Button>
           {receipt?.receipt_url && <Button variant="primary" href={receipt.receipt_url} target="_blank" iconName="external" iconAlign="right">
-            {t("admin.userDetail.grant.openStripe")}</Button>}
+            {t(receipt.receipt_url.includes("invoice.stripe.com") ? "admin.userDetail.grant.openInvoice" : "admin.userDetail.grant.openStripe")}</Button>}
         </SpaceBetween></Box>}>
         {receipt && <OrderReceiptDetails receipt={receipt} />}
       </Modal>
