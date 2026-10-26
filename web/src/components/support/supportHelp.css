@@ -7,6 +7,7 @@
 
 .support-help__answer {
   white-space: pre-wrap;
+  word-break: keep-all;
   overflow-wrap: anywhere;
   line-height: 1.55;
 }
@@ -65,5 +66,187 @@
 @media (max-width: 600px) {
   .support-steps__label {
     display: none;
+  }
+}
+
+.support-help__categories {
+  display: grid;
+  border-block-start: 1px solid var(--color-border-divider-default, #e9ebed);
+}
+
+.support-help__category {
+  border-block-end: 1px solid var(--color-border-divider-default, #e9ebed);
+}
+
+.support-help__category-header,
+.support-faq__question {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.support-help__category-header::-webkit-details-marker,
+.support-faq__question::-webkit-details-marker {
+  display: none;
+}
+
+.support-help__category-header {
+  padding: 12px 4px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-text-heading-default, #0f141a);
+}
+
+.support-help__category-name {
+  flex: 1;
+  min-width: 0;
+}
+
+.support-help__count {
+  flex: none;
+  min-width: 22px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--color-background-container-header, #f3f3f7);
+  border: 1px solid var(--color-border-divider-default, #e9ebed);
+  color: var(--color-text-body-secondary, #5f6b7a);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.support-help__category-body {
+  padding: 0 0 14px 22px;
+}
+
+.support-faq {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.support-faq__item {
+  border: 1px solid var(--color-border-divider-default, #e9ebed);
+  border-radius: 10px;
+  background: var(--color-background-container-content, #fff);
+  transition: border-color 120ms ease;
+}
+
+.support-faq__item:hover,
+.support-faq__item[open] {
+  border-color: var(--color-text-link-default, #006ce0);
+}
+
+.support-faq__question {
+  padding: 10px 12px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-body-default, #0f141a);
+}
+
+.support-faq__text {
+  flex: 1;
+  min-width: 0;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+.support-faq__mark {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--color-text-link-default, #006ce0) 12%, transparent);
+  color: var(--color-text-link-default, #006ce0);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.support-faq__mark--answer {
+  background: color-mix(in srgb, var(--color-text-status-success, #00802f) 12%, transparent);
+  color: var(--color-text-status-success, #00802f);
+}
+
+.support-faq__answer {
+  display: flex;
+  gap: 10px;
+  padding: 10px 12px 12px;
+  border-block-start: 1px dashed var(--color-border-divider-default, #e9ebed);
+  color: var(--color-text-body-secondary, #414d5c);
+  font-size: 14px;
+}
+
+.support-faq__chevron {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-inline-end: 2px solid currentColor;
+  border-block-end: 2px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform 120ms ease;
+  opacity: 0.7;
+}
+
+.support-faq__question .support-faq__chevron {
+  order: 3;
+}
+
+details[open] > summary > .support-faq__chevron {
+  transform: rotate(45deg);
+}
+
+.support-solved {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 8px 0 4px;
+  text-align: center;
+}
+
+.support-solved__icon {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--color-text-status-success, #00802f) 14%, transparent);
+  color: var(--color-text-status-success, #00802f);
+  font-size: 32px;
+  font-weight: 700;
+  animation: support-solved-pop 320ms cubic-bezier(0.2, 0.9, 0.3, 1.4);
+}
+
+.support-solved__title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--color-text-heading-default, #0f141a);
+}
+
+.support-solved__body {
+  margin: 0;
+  word-break: keep-all;
+  max-width: 34ch;
+  color: var(--color-text-body-secondary, #414d5c);
+  line-height: 1.55;
+}
+
+@keyframes support-solved-pop {
+  from { transform: scale(0.6); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .support-solved__icon,
+  .support-faq__chevron,
+  .support-faq__item {
+    animation: none;
+    transition: none;
   }
 }

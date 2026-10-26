@@ -39,6 +39,7 @@ export default function CreateTicketModal({ visible, help, onDismiss, onCreated 
   const [showErrors, setShowErrors] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [solved, setSolved] = useState(false);
 
   const categories = help?.categories ?? [];
   const faqs = useMemo(() => help?.faqs ?? [], [help?.faqs]);
@@ -66,6 +67,12 @@ export default function CreateTicketModal({ visible, help, onDismiss, onCreated 
     onDismiss();
   };
 
+  const markSolved = () => {
+    reset();
+    onDismiss();
+    setSolved(true);
+  };
+
   const submit = async () => {
     setShowErrors(true);
     if (hasFieldErrors(errors)) { focusFirstInvalid(); return; }
@@ -86,6 +93,23 @@ export default function CreateTicketModal({ visible, help, onDismiss, onCreated 
   const steps = [t("support.create.step1"), t("support.create.step2"), t("support.create.step3")];
 
   return (
+    <>
+    <Modal
+      visible={solved}
+      onDismiss={() => setSolved(false)}
+      size="small"
+      header={t("support.create.solvedTitle")}
+      footer={
+        <Box float="right">
+          <Button variant="primary" onClick={() => setSolved(false)}>{t("support.create.solvedOk")}</Button>
+        </Box>
+      }
+    >
+      <div className="support-solved" role="status">
+        <div className="support-solved__icon" aria-hidden="true">✓</div>
+        <p className="support-solved__body">{t("support.create.solvedBody")}</p>
+      </div>
+    </Modal>
     <Modal
       visible={visible}
       onDismiss={dismiss}
@@ -139,7 +163,7 @@ export default function CreateTicketModal({ visible, help, onDismiss, onCreated 
             {categoryFaqs.length === 0
               ? <Box color="text-body-secondary">{t("support.create.noAnswers")}</Box>
               : <FaqList faqs={categoryFaqs} language={language} />}
-            <Button onClick={dismiss}>{t("support.create.solved")}</Button>
+            <Button iconName="check" onClick={markSolved}>{t("support.create.solved")}</Button>
           </SpaceBetween>
         )}
 
@@ -171,5 +195,6 @@ export default function CreateTicketModal({ visible, help, onDismiss, onCreated 
         )}
       </SpaceBetween>
     </Modal>
+    </>
   );
 }

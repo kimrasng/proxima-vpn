@@ -17,6 +17,7 @@ import * as userApi from "../../api/user";
 import { ApiError } from "../../api/client";
 import { useUserResource } from "../../hooks/useUserResource";
 import { pickLocalized } from "../../utils/localizedText";
+import { formatAbsoluteTime } from "../../utils/relativeTime";
 import SupportThread from "../../components/support/SupportThread";
 import SupportStatus from "../../components/support/SupportStatus";
 
@@ -83,18 +84,22 @@ export default function TicketDetail() {
   return (
     <ContentLayout
       header={
-        <Header
-          variant="h1"
-          description={pickLocalized(ticket.category_names, language)}
-          actions={
-            <SpaceBetween direction="horizontal" size="xs">
-              <Button onClick={back}>{t("support.thread.backToList")}</Button>
-              {!closed && <Button loading={closing} onClick={() => void close()}>{t("support.thread.close")}</Button>}
-            </SpaceBetween>
-          }
-        >
-          <span className="support-ticket-title">{ticket.subject} <SupportStatus status={ticket.status} /></span>
-        </Header>
+        <SpaceBetween size="xxs">
+          <Button variant="link" iconName="angle-left" onClick={back}>{t("support.thread.backToList")}</Button>
+          <Header
+            variant="h1"
+            description={
+              <span className="support-ticket-meta">
+                <span>{pickLocalized(ticket.category_names, language)}</span>
+                <span aria-hidden="true">·</span>
+                <span>{t("support.thread.createdAt", { time: formatAbsoluteTime(ticket.created_at) })}</span>
+              </span>
+            }
+            actions={!closed && <Button iconName="close" loading={closing} onClick={() => void close()}>{t("support.thread.close")}</Button>}
+          >
+            <span className="support-ticket-title">{ticket.subject} <SupportStatus status={ticket.status} pill /></span>
+          </Header>
+        </SpaceBetween>
       }
     >
       <SpaceBetween size="l">

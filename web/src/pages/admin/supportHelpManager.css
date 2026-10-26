@@ -1,0 +1,64 @@
+.faq-editor {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+.faq-editor__main { display: grid; gap: 16px; min-width: 0; }
+.faq-editor__langs {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 12px;
+  background: var(--color-background-container-header, #f3f3f7);
+  border: 1px solid var(--color-border-divider-default, #e9ebed);
+}
+.faq-editor__lang {
+  flex: 1;
+  display: grid;
+  gap: 2px;
+  justify-items: center;
+  padding: 8px 6px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--color-text-body-secondary, #5f6b7a);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.faq-editor__lang--current {
+  background: var(--color-background-container-content, #fff);
+  color: var(--color-text-heading-default, #0f141a);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+.faq-editor__lang:focus-visible { outline: 2px solid var(--color-text-link-default, #006ce0); outline-offset: 1px; }
+.faq-editor__dot { font-size: 11px; font-weight: 500; }
+.faq-editor__dot::before { content: "\25CF  "; }
+.faq-editor__dot--done { color: var(--color-text-status-success, #00802f); }
+.faq-editor__dot--partial { color: var(--color-text-status-warning, #855900); }
+.faq-editor__dot--empty { color: var(--color-text-status-inactive, #8d99a8); }
+
+.faq-editor__preview {
+  position: sticky;
+  top: 0;
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px dashed var(--color-border-divider-default, #c6c6cd);
+  background: var(--color-background-container-header, #f8f8fa);
+  min-width: 0;
+}
+.faq-editor__preview-card {
+  padding: 4px 12px 12px;
+  border-radius: 10px;
+  background: var(--color-background-container-content, #fff);
+  border: 1px solid var(--color-border-divider-default, #e9ebed);
+}
+.faq-editor__preview-cat { cursor: default; }
+
+@media (max-width: 900px) {
+  .faq-editor { grid-template-columns: minmax(0, 1fr); }
+  .faq-editor__preview { position: static; }
+}

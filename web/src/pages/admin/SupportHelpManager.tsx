@@ -24,6 +24,9 @@ import { ApiError } from "../../api/client";
 import type { LocalizedText, SupportCategory, SupportFAQ } from "../../api/types";
 import { focusFirstInvalid, hasFieldErrors } from "../../utils/formValidation";
 import { pickLocalized } from "../../utils/localizedText";
+import { FaqList } from "../../components/support/SupportHelp";
+import "../../components/support/supportHelp.css";
+import "./supportHelpManager.css";
 
 const LANGS = ["ko", "en", "zh"] as const;
 type Lang = (typeof LANGS)[number];
@@ -47,6 +50,7 @@ export default function SupportHelpManager() {
   const [deleting, setDeleting] = useState<Deleting>(null);
   const [saving, setSaving] = useState(false);
   const [showErrors, setShowErrors] = useState(false);
+  const [faqLang, setFaqLang] = useState<Lang>("ko");
 
   const load = useCallback(async () => {
     try {
@@ -81,7 +85,7 @@ export default function SupportHelpManager() {
     answers: hasAny(faqForm.answers) ? undefined : t("support.manage.answerRequired"),
   };
 
-  const closeForms = () => { setCategoryForm(null); setFaqForm(null); setShowErrors(false); };
+  const closeForms = () => { setCategoryForm(null); setFaqForm(null); setShowErrors(false); setFaqLang("ko"); };
 
   const saveCategory = async () => {
     if (!categoryForm || !categoryErrors) return;
@@ -279,12 +283,85 @@ export default function SupportHelpManager() {
                 onChange={({ detail }) => setFaqForm({ ...faqForm, categoryId: detail.selectedOption.value ?? "" })}
               />
             </FormField>
-            {localizedFields(t("support.manage.question"), faqForm.questions, (questions) => setFaqForm({ ...faqForm, questions }), faqErrors.questions, false)}
-            {localizedFields(t("support.manage.answer"), faqForm.answers, (answers) => setFaqForm({ ...faqForm, answers }), faqErrors.answers, true)}
-            <ColumnLayout columns={2}>
-              <FormField label={t("support.manage.sortOrder")}><Input type="number" value={faqForm.sort} onChange={({ detail }) => setFaqForm({ ...faqForm, sort: detail.value })} /></FormField>
-              <FormField label={t("support.list.status")}><Toggle checked={faqForm.active} onChange={({ detail }) => setFaqForm({ ...faqForm, active: detail.checked })}>{t("support.manage.active")}</Toggle></FormField>
-            </ColumnLayout>
+            <div className="faq-editor">
+              <div className="faq-editor__main">
+                <Box variant="small" color="text-body-secondary">{t("support.manage.langGuide")}</Box>
+                <div className="faq-editor__langs" role="tablist" aria-label={t("support.manage.contentLang")}>
+                  {LANGS.map((lang) => {
+                    const done = faqForm.questions[lang].trim() !== "" && faqForm.answers[lang].trim() !== "";
+                    const partial = !done && (faqForm.questions[lang].trim() !== "" || faqForm.answers[lang].trim() !== "");
+                    return (
+                      <button
+                        key={lang}
+                        type="button"
+                        role="tab"
+                        aria-selected={faqLang === lang}
+                        className={`faq-editor__lang${faqLang === lang ? " faq-editor__lang--current" : ""}`}
+                        onClick={() => setFaqLang(lang)}
+                      >
+                        <span>{langLabel[lang]}</span>
+                        <span className={`faq-editor__dot faq-editor__dot--${done ? "done" : partial ? "partial" : "empty"}`}>
+                          {done ? t("support.manage.langDone") : partial ? t("support.manage.langPartial") : t("support.manage.langEmpty")}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <FormField stretch label={t("support.manage.questionIn", { lang: langLabel[faqLang] })} errorText={showErrors ? faqErrors.questions : undefined}>
+                  <Input
+                    value={faqForm.questions[faqLang]}
+                    placeholder={t("support.manage.questionPlaceholder")}
+                    ariaLabel={`${t("support.manage.question")} (${faqLang})`}
+                    onChange={({ detail }) => setFaqForm({ ...faqForm, questions: { ...faqForm.questions, [faqLang]: detail.value } })}
+                  />
+                </FormField>
+                <FormField
+                  stretch
+                  label={t("support.manage.answerIn", { lang: langLabel[faqLang] })}
+                  constraintText={t("support.manage.answerHint")}
+                  errorText={showErrors ? faqErrors.answers : undefined}
+                >
+                  <Textarea
+                    rows={7}
+                    value={faqForm.answers[faqLang]}
+                    placeholder={t("support.manage.answerPlaceholder")}
+                    ariaLabel={`${t("support.manage.answer")} (${faqLang})`}
+                    onChange={({ detail }) => setFaqForm({ ...faqForm, answers: { ...faqForm.answers, [faqLang]: detail.value } })}
+                  />
+                </FormField>
+                <ColumnLayout columns={2}>
+                  <FormField label={t("support.manage.sortOrder")} constraintText={t("support.manage.sortHint")}>
+                    <Input type="number" value={faqForm.sort} onChange={({ detail }) => setFaqForm({ ...faqForm, sort: detail.value })} />
+                  </FormField>
+                  <FormField label={t("support.list.status")}>
+                    <Toggle
+                      checked={faqForm.active}
+                      description={faqForm.active ? t("support.manage.activeHint") : t("support.manage.inactiveHint")}
+                      onChange={({ detail }) => setFaqForm({ ...faqForm, active: detail.checked })}
+                    >
+                      {faqForm.active ? t("support.manage.active") : t("support.manage.inactive")}
+                    </Toggle>
+                  </FormField>
+                </ColumnLayout>
+              </div>
+              <aside className="faq-editor__preview" aria-label={t("support.manage.preview")}>
+                <Box variant="h4" padding="n">{t("support.manage.preview")}</Box>
+                <Box variant="small" color="text-body-secondary">{t("support.manage.previewHint", { lang: langLabel[faqLang], category: categoryName(faqForm.categoryId) })}</Box>
+                {faqForm.questions[faqLang].trim() || faqForm.answers[faqLang].trim() ? (
+                  <div className="faq-editor__preview-card">
+                    <div className="support-help__category-header faq-editor__preview-cat">{faqForm.categoryId ? categoryName(faqForm.categoryId) : t("support.manage.noCategory")}</div>
+                    <FaqList
+                      key={faqLang}
+                      language={faqLang}
+                      faqs={[{ id: "preview", category_id: faqForm.categoryId, questions: { [faqLang]: faqForm.questions[faqLang] || "…" }, answers: { [faqLang]: faqForm.answers[faqLang] || "…" }, sort_order: 0, is_active: true }]}
+                    />
+                  </div>
+                ) : (
+                  <Box color="text-body-secondary" fontSize="body-s">{t("support.manage.previewEmpty")}</Box>
+                )}
+                {!faqForm.active && <Box color="text-status-warning" fontSize="body-s">{t("support.manage.previewHidden")}</Box>}
+              </aside>
+            </div>
           </SpaceBetween>
         )}
       </Modal>

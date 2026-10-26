@@ -52,3 +52,46 @@
   gap: 8px;
   align-items: center;
 }
+
+.support-ticket-meta {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.support-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 20px;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.support-pill::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.support-pill--open {
+  color: var(--color-text-status-info, #006ce0);
+  background: color-mix(in srgb, var(--color-text-status-info, #006ce0) 12%, transparent);
+}
+
+.support-pill--answered {
+  color: var(--color-text-status-success, #00802f);
+  background: color-mix(in srgb, var(--color-text-status-success, #00802f) 12%, transparent);
+}
+
+.support-pill--closed {
+  color: var(--color-text-status-inactive, #5f6b7a);
+  background: color-mix(in srgb, var(--color-text-status-inactive, #5f6b7a) 14%, transparent);
+}

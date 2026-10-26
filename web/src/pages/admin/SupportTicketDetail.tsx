@@ -143,7 +143,7 @@ export default function SupportTicketDetail() {
             </SpaceBetween>
           }
         >
-          <span className="support-ticket-title">{ticket.subject} <SupportStatus status={ticket.status} /></span>
+          <span className="support-ticket-title">{ticket.subject} <SupportStatus status={ticket.status} pill /></span>
         </Header>
       }
     >
