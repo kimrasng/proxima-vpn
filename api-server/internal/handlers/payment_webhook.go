@@ -16,13 +16,14 @@ import (
 // resulting Confirmation to PaymentService.Settle - adding a provider never
 // means editing this file, only registering it (see payments.Build).
 type PaymentWebhookHandler struct {
+	db       *pgxpool.Pool
 	registry payments.Registry
 	payments *services.PaymentService
 }
 
 // NewPaymentWebhookHandler creates a new PaymentWebhookHandler.
 func NewPaymentWebhookHandler(db *pgxpool.Pool, registry payments.Registry) *PaymentWebhookHandler {
-	return &PaymentWebhookHandler{registry: registry, payments: services.NewPaymentService(db)}
+	return &PaymentWebhookHandler{db: db, registry: registry, payments: services.NewPaymentService(db)}
 }
 
 // Receive handles POST /webhooks/payments/:provider. Status discipline
@@ -45,6 +46,27 @@ func (h *PaymentWebhookHandler) Receive(c *fiber.Ctx) error {
 	// Copy before use: c.Body() aliases a fasthttp-owned buffer that is not
 	// valid once the handler returns, and this payload is persisted.
 	body := append([]byte(nil), c.Body()...)
+
+	if trialVerifier, ok := provider.(payments.TrialEventVerifier); ok {
+		event, err := trialVerifier.VerifyTrialEvent(body, func(key string) string { return c.Get(key) })
+		if err != nil {
+			return c.SendStatus(fiber.StatusBadRequest)
+		}
+		if event != nil {
+			gateway, ok := provider.(payments.TrialGateway)
+			if !ok {
+				return c.SendStatus(fiber.StatusInternalServerError)
+			}
+			handled, err := services.NewStripeTrialService(h.db, gateway).Process(c.UserContext(), *event)
+			if err != nil {
+				log.Printf("[payments] trial webhook %s failed: %v", event.ID, err)
+				return c.SendStatus(fiber.StatusInternalServerError)
+			}
+			if handled {
+				return c.SendStatus(fiber.StatusOK)
+			}
+		}
+	}
 
 	conf, err := verifier.VerifyWebhook(body, func(key string) string { return c.Get(key) })
 	if err != nil {

@@ -141,6 +141,21 @@ func (h *UserOrderHandler) Create(c *fiber.Ctx) error {
 
 	reqCtx := captureCheckoutContext(c, req.DeviceFingerprint)
 
+	// Serialize with the trial reservation on the same user, so a second tab
+	// cannot buy a competing plan while card registration is in flight.
+	var lockedUser string
+	if err := tx.QueryRow(ctx, `SELECT id FROM users WHERE id=$1 FOR UPDATE`, userID).Scan(&lockedUser); err != nil {
+		return c.SendStatus(fiber.StatusInternalServerError)
+	}
+	var trialCheckout bool
+	if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM stripe_trial_subscriptions
+		WHERE user_id=$1 AND status='checkout')`, userID).Scan(&trialCheckout); err != nil {
+		return c.SendStatus(fiber.StatusInternalServerError)
+	}
+	if trialCheckout {
+		return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "complete or cancel your trial checkout first"})
+	}
+
 	var resp orderResponse
 	err = tx.QueryRow(ctx,
 		`INSERT INTO plan_orders
@@ -201,11 +216,10 @@ func (h *UserOrderHandler) Create(c *fiber.Ctx) error {
 	}
 
 	_, stripeCheckoutAvailable := h.providers.Get(payments.ProviderStripe)
-	// Base free orders and fully discounted orders both go through Stripe
-	// when it is configured, so the checkout page shows the discount and
-	// Stripe records the session. Only when Stripe is absent does the local
-	// settlement path apply.
-	if resp.PriceCents == 0 && !stripeCheckoutAvailable {
+	// A fully discounted purchase still requires a Stripe checkout record,
+	// even when Stripe is temporarily unavailable. Only a genuinely free
+	// base plan can use the local grant path.
+	if resp.PriceCents == 0 && resp.DiscountCents == 0 && !stripeCheckoutAvailable {
 		if err := h.settleZeroCostOrder(ctx, resp.ID, userID); err != nil {
 			if errors.Is(err, errOrderNotPending) {
 				return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "order state or price changed; reload the order"})

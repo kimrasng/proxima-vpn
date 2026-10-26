@@ -1,4 +1,20 @@
 {
+  "trialSubscription": {
+    "title": "免费试用 · 自动续费",
+    "pending": "正在确认银行卡",
+    "error": "无法处理试用信息，请重试。",
+    "billing": "定期费用：每 {{days}} 天 {{price}}",
+    "ends": "当前使用期限：{{date}}",
+    "canceled": "已取消自动续费，现有使用期限保持不变。",
+    "automatic": "试用结束后将自动扣款。如不需要，请在试用结束前取消。",
+    "cancel": "取消自动续费",
+    "offer": "{{code}} · 免费试用 {{days}} 天",
+    "notice": "请在 Stripe 确认银行卡与试用后的费用。Proxima 不保存银行卡信息。",
+    "start": "开始免费试用",
+    "keep": "保留订阅",
+    "confirm": "取消自动续费",
+    "cancelHint": "仅停止后续扣款，当前试用或已付款的使用期限保持不变。"
+  },
   "app": {
     "title": "Proxima VPN",
     "welcome": "欢迎使用 Proxima VPN"

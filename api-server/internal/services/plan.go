@@ -101,6 +101,19 @@ func (s *PlanService) grantPlan(ctx context.Context, userID, planID string, dura
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
+	r, err := grantPlanTx(ctx, tx, userID, planID, durationDays)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("commit grant: %w", err)
+	}
+	return r, nil
+}
+
+// grantPlanTx lets recurring billing commit the entitlement and its receipt
+// together, while preserving the existing renewal/change/fresh semantics.
+func grantPlanTx(ctx context.Context, tx pgx.Tx, userID, planID string, durationDays *int) (*GrantResult, error) {
 	// FOR UPDATE locks the row before classifying it, so a concurrent grant on
 	// the same user cannot be classified against a row this transaction is
 	// about to change out from under it. The same locked read is what yields
@@ -109,7 +122,7 @@ func (s *PlanService) grantPlan(ctx context.Context, userID, planID string, dura
 	var isRenewal bool
 	var carriedSeconds int64
 	var expiresBefore *time.Time
-	err = tx.QueryRow(ctx,
+	err := tx.QueryRow(ctx,
 		`SELECT (plan_id IS NOT NULL AND plan_id = $2
 		         AND plan_expires_at IS NOT NULL AND plan_expires_at > NOW()) AS is_renewal,
 		        EXTRACT(EPOCH FROM
@@ -161,9 +174,6 @@ func (s *PlanService) grantPlan(ctx context.Context, userID, planID string, dura
 		r.Kind = GrantFresh
 	}
 
-	if err := tx.Commit(ctx); err != nil {
-		return nil, fmt.Errorf("commit grant: %w", err)
-	}
 	return r, nil
 }
 

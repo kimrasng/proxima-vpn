@@ -27,6 +27,7 @@ import {
 } from "@cloudscape-design/design-tokens";
 import "./planInfo.css";
 import ResetTickets from "../../components/ResetTickets";
+import TrialSubscriptionPanel from "../../components/TrialSubscriptionPanel";
 import type {
   UserProfile,
   UserPlanItem,
@@ -97,6 +98,17 @@ export default function PlanInfo() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const incomingPromo = searchParams.get("promo")?.trim() ?? "";
+  const [recurringBilling, setRecurringBilling] = useState(false);
+  const [incomingKind, setIncomingKind] = useState<{ code: string; type: string } | null>(null);
+  useEffect(() => {
+    if (!incomingPromo) return;
+    let active = true;
+    void getPromoLanding(incomingPromo).then(
+      (promo) => { if (active) setIncomingKind({ code: incomingPromo, type: promo.type }); },
+      () => { if (active) setIncomingKind({ code: incomingPromo, type: "invalid" }); },
+    );
+    return () => { active = false; };
+  }, [incomingPromo]);
   const openedIncomingPromo = useRef<string | null>(null);
   const appliedIncomingPromo = useRef<string | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -154,6 +166,16 @@ export default function PlanInfo() {
       setLoading(false);
     }
   };
+
+  const refreshTrialAccess = useCallback(() => {
+    void Promise.all([userApi.getProfile(), userApi.listMyOrders()]).then(
+      ([updatedProfile, updatedOrders]) => {
+        setProfile(updatedProfile);
+        setOrders(updatedOrders);
+      },
+      () => { setFlash([{ type: "error", content: t("user.plan.loadError") }]); },
+    );
+  }, [t]);
 
   useEffect(() => {
     void loadData();
@@ -322,6 +344,7 @@ export default function PlanInfo() {
 
   useEffect(() => {
     if (loading || !incomingPromo || openedIncomingPromo.current === incomingPromo) return;
+    if (incomingKind?.code !== incomingPromo || incomingKind.type === "trial" || incomingKind.type === "invalid") return;
     if (checkout) {
       openedIncomingPromo.current = incomingPromo;
       return;
@@ -346,13 +369,14 @@ export default function PlanInfo() {
     }
     // openCheckout closes over the same state these dependencies cover.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, incomingPromo, checkout, orders, plans, providers]);
+  }, [loading, incomingPromo, incomingKind, checkout, orders, plans, providers]);
 
   useEffect(() => {
+    if (incomingKind?.code !== incomingPromo || incomingKind.type === "trial" || incomingKind.type === "invalid") return;
     if (!checkout || !incomingPromo || promotionCode !== incomingPromo || applying || submitting || appliedIncomingPromo.current === incomingPromo) return;
     appliedIncomingPromo.current = incomingPromo;
     void handleApplyCode();
-  }, [checkout, incomingPromo, promotionCode, applying, submitting, handleApplyCode]);
+  }, [checkout, incomingPromo, incomingKind, promotionCode, applying, submitting, handleApplyCode]);
 
   // Hands an existing pending order to the chosen provider. A redirect provider
   // (Stripe) leaves the SPA; a manual one only records the choice, so the order
@@ -498,6 +522,7 @@ export default function PlanInfo() {
       <div className="plan-info">
       <SpaceBetween size="l">
         <Flashbar items={flash} />
+        <TrialSubscriptionPanel code={incomingPromo} onConfirmed={refreshTrialAccess} onBillingChange={setRecurringBilling} />
 
         {hasPlan && profile && (
           <Container
@@ -542,9 +567,9 @@ export default function PlanInfo() {
                 </Box>
               </div>
             </div>
-            <Box variant="small" color="text-body-secondary" margin={{ top: "m" }}>
+            {!recurringBilling && <Box variant="small" color="text-body-secondary" margin={{ top: "m" }}>
               {t("user.plan.current.note")}
-            </Box>
+            </Box>}
           </Container>
         )}
 
@@ -771,7 +796,7 @@ export default function PlanInfo() {
         <Container header={<Header variant="h2">{t("user.plan.faq.title")}</Header>}>
           <div className="plan-faq">
             {[
-              { q: t("user.plan.faq.q1"), a: t("user.plan.faq.a1") },
+              { q: t("user.plan.faq.q1"), a: recurringBilling ? t("trialSubscription.automatic") : t("user.plan.faq.a1") },
               { q: t("user.plan.faq.q2"), a: t("user.plan.faq.a2") },
               { q: t("user.plan.faq.q3"), a: t("user.plan.faq.a3") },
               { q: t("user.plan.faq.q4"), a: t("user.plan.faq.a4") },

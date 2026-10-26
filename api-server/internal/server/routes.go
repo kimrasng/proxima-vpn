@@ -395,7 +395,11 @@ func (s *Server) registerRoutes() {
 	user.Get("/orders", userOrderHandler.List)
 	user.Post("/orders/:id/cancel", userOrderHandler.Cancel)
 	user.Patch("/orders/:id/promotion", userOrderHandler.ApplyPromotion)
-	user.Post("/free-trials/redeem", handlers.NewUserFreeTrialHandler(s.db).Redeem)
+	trialSubscription := handlers.NewUserTrialSubscriptionHandler(s.db, s.payments)
+	user.Post("/free-trials/redeem", trialSubscription.Start)
+	user.Get("/free-trials/subscription", trialSubscription.Current)
+	user.Post("/free-trials/subscription/cancel", trialSubscription.Cancel)
+	user.Post("/free-trials/subscription/confirm", trialSubscription.Confirm)
 
 	userCheckoutHandler := handlers.NewUserCheckoutHandler(s.db, s.payments)
 	user.Post("/orders/:id/checkout", userCheckoutHandler.Start)

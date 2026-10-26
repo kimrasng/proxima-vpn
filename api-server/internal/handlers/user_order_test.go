@@ -66,7 +66,7 @@ func seedFreeOrderData(t *testing.T, pool *pgxpool.Pool, ctx context.Context, su
 	return userID, planID, groupID
 }
 
-func TestCreate_FreePromotionSettlesWithoutExternalProvider(t *testing.T) {
+func TestCreate_FreePromotionRequiresCheckoutWithoutExternalProvider(t *testing.T) {
 	pool := testOrderDB(t)
 	ctx := context.Background()
 	suffix := fmt.Sprintf("%d", os.Getpid())
@@ -115,25 +115,25 @@ func TestCreate_FreePromotionSettlesWithoutExternalProvider(t *testing.T) {
 	if err := json.NewDecoder(response.Body).Decode(&order); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if order.PriceCents != 0 || order.Status != "paid" {
-		t.Fatalf("order price/status = %d/%q, want 0/paid", order.PriceCents, order.Status)
+	if order.PriceCents != 0 || order.Status != "pending" {
+		t.Fatalf("order price/status = %d/%q, want 0/pending", order.PriceCents, order.Status)
 	}
 
-	var status, redemptionStatus, provider string
+	var status, redemptionStatus string
+	var events int
 	var planExpiresAt *time.Time
 	if err := pool.QueryRow(ctx,
-		`SELECT o.status, r.status, e.provider, u.plan_expires_at
+		`SELECT o.status, r.status, (SELECT COUNT(*) FROM payment_events e WHERE e.order_id=o.id), u.plan_expires_at
 		 FROM plan_orders o
 		 JOIN promotion_redemptions r ON r.order_id = o.id
-		 JOIN payment_events e ON e.order_id = o.id
 		 JOIN users u ON u.id = o.user_id
 		 WHERE o.id = $1`,
 		order.ID,
-	).Scan(&status, &redemptionStatus, &provider, &planExpiresAt); err != nil {
+	).Scan(&status, &redemptionStatus, &events, &planExpiresAt); err != nil {
 		t.Fatalf("read settled order: %v", err)
 	}
-	if status != "paid" || redemptionStatus != "confirmed" || provider != "promotion" || planExpiresAt == nil {
-		t.Errorf("settled state = status=%q redemption=%q provider=%q expiry=%v, want paid/confirmed/promotion/non-nil", status, redemptionStatus, provider, planExpiresAt)
+	if status != "pending" || redemptionStatus != "reserved" || events != 0 || planExpiresAt != nil {
+		t.Errorf("checkout state = status=%q redemption=%q events=%d expiry=%v, want pending/reserved/0/nil", status, redemptionStatus, events, planExpiresAt)
 	}
 }
 

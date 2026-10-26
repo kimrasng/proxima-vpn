@@ -1,4 +1,20 @@
 {
+  "trialSubscription": {
+    "title": "Free trial · Automatic billing",
+    "pending": "Confirming card registration",
+    "error": "We could not process your trial information. Please try again.",
+    "billing": "Recurring price: {{price}} per {{days}} days",
+    "ends": "Current access ends: {{date}}",
+    "canceled": "Automatic billing is canceled. Your granted access remains available.",
+    "automatic": "Your saved card will be charged after the trial. Cancel before it ends to avoid future charges.",
+    "cancel": "Cancel automatic billing",
+    "offer": "{{code}} · {{days}}-day free trial",
+    "notice": "Review card registration and the post-trial price on Stripe. Proxima does not store your card details.",
+    "start": "Start free trial",
+    "keep": "Keep subscription",
+    "confirm": "Cancel automatic billing",
+    "cancelHint": "Only future billing stops. Your current trial or paid access remains available."
+  },
   "app": {
     "title": "Proxima VPN",
     "welcome": "Welcome to Proxima VPN"

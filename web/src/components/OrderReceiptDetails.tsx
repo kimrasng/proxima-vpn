@@ -33,7 +33,8 @@ export default function OrderReceiptDetails({ receipt }: { receipt: OrderReceipt
         <Row label={t("user.plan.order.receipt.orderId")}><Box variant="code">{receipt.order_id}</Box></Row>
         <Row label={t("user.orders.receipt.orderDate")}>{date(receipt.created_at)}</Row>
         <Row label={t("user.plan.order.receipt.paidAt")}>{dateTime(receipt.paid_at)}</Row>
-        <Row label={t("user.plan.order.receipt.method")}>{receipt.provider === "stripe" ? "Stripe"
+        <Row label={t("user.plan.order.receipt.method")}>{receipt.provider === "stripe" || receipt.provider === "stripe_subscription" ? "Stripe"
+          : receipt.provider === "free_trial" ? t("trialSubscription.title")
           : receipt.provider === "grant" ? t("user.orders.receipt.methodGrant")
           : t("user.plan.order.receipt.methodPanel")}</Row>
         <Row label={t("user.plan.order.receipt.email")}>{receipt.email}</Row>
