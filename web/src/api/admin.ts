@@ -499,11 +499,6 @@ export function previewAnnouncement(format: string, content: string): Promise<{ 
   return post<{ html: string }>('/api/v1/admin/announcements/preview', { format, content });
 }
 
-export function previewAnnouncement(format: string, content: string): Promise<{ html: string }> {
-  applyAdminClient();
-  return post<{ html: string }>('/api/v1/admin/announcements/preview', { format, content });
-}
-
 export function deleteAnnouncement(id: string): Promise<void> {
   applyAdminClient();
   return del<void>(`/api/v1/admin/announcements/${id}`);
