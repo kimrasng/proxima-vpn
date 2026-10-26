@@ -1,0 +1,54 @@
+.support-thread {
+  display: grid;
+  gap: 12px;
+}
+
+.support-thread__item {
+  display: grid;
+  gap: 4px;
+  max-width: min(100%, 640px);
+}
+
+.support-thread__item--mine {
+  justify-self: end;
+}
+
+.support-thread__meta {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  font-size: 12px;
+  color: var(--color-text-body-secondary, #5f6b7a);
+}
+
+.support-thread__item--mine .support-thread__meta {
+  justify-content: flex-end;
+}
+
+.support-thread__bubble {
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--color-border-divider-default, #e9ebed);
+  background: var(--color-background-container-content, #fff);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+}
+
+.support-thread__item--mine .support-thread__bubble {
+  background: var(--color-background-button-primary-default, #006ce0);
+  border-color: transparent;
+  color: var(--color-text-button-inverted-default, #fff);
+}
+
+.support-thread__composer {
+  display: grid;
+  gap: 8px;
+}
+
+.support-ticket-title {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}

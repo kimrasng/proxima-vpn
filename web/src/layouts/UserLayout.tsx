@@ -41,6 +41,7 @@ export default function UserLayout() {
     },
     { type: "divider" },
     { type: "link", text: t("user.nav.announcements"), href: "/portal/announcements" },
+    { type: "link", text: t("user.nav.tickets"), href: "/portal/tickets" },
     { type: "link", text: t("user.nav.account"), href: "/portal/account" },
   ];
 

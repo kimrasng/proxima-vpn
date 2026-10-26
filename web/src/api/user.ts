@@ -18,6 +18,11 @@ import type {
   ResetTicket,
   UserResetTicket,
   RedeemResetTicketResult,
+  SupportHelp,
+  SupportTicket,
+  SupportThread,
+  SupportMessage,
+  CreateSupportTicketRequest,
 } from './types';
 
 function applyUserClient() {
@@ -156,4 +161,35 @@ export async function listPublicSubscriptionDomains(): Promise<PublicSubscriptio
     ) return [];
     return [{ id: row.id, domain: row.domain, display_order: row.display_order, is_default: row.is_default }];
   });
+}
+
+export function getSupportHelp(query = ''): Promise<SupportHelp> {
+  applyUserClient();
+  const suffix = query.trim() ? `?q=${encodeURIComponent(query.trim())}` : '';
+  return get<SupportHelp>(`/api/v1/user/support/faq${suffix}`);
+}
+
+export function listSupportTickets(): Promise<SupportTicket[]> {
+  applyUserClient();
+  return get<SupportTicket[]>('/api/v1/user/support/tickets');
+}
+
+export function createSupportTicket(req: CreateSupportTicketRequest): Promise<{ id: string }> {
+  applyUserClient();
+  return post<{ id: string }>('/api/v1/user/support/tickets', req);
+}
+
+export function getSupportTicket(id: string): Promise<SupportThread> {
+  applyUserClient();
+  return get<SupportThread>(`/api/v1/user/support/tickets/${id}`);
+}
+
+export function postSupportMessage(id: string, body: string): Promise<SupportMessage> {
+  applyUserClient();
+  return post<SupportMessage>(`/api/v1/user/support/tickets/${id}/messages`, { body });
+}
+
+export function closeSupportTicket(id: string): Promise<void> {
+  applyUserClient();
+  return post<void>(`/api/v1/user/support/tickets/${id}/close`, {});
 }

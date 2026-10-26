@@ -49,6 +49,11 @@ const UserOrders = lazy(() => import("./pages/user/Orders"));
 const AccountSettings = lazy(() => import("./pages/user/AccountSettings"));
 const SubscriptionReset = lazy(() => import("./pages/user/SubscriptionReset"));
 const UserAnnouncements = lazy(() => import("./pages/user/Announcements"));
+const UserTickets = lazy(() => import("./pages/user/Tickets"));
+const UserTicketDetail = lazy(() => import("./pages/user/TicketDetail"));
+const AdminSupportTickets = lazy(() => import("./pages/admin/SupportTickets"));
+const AdminSupportTicketDetail = lazy(() => import("./pages/admin/SupportTicketDetail"));
+const AdminSupportHelp = lazy(() => import("./pages/admin/SupportHelpManager"));
 const UserGuides = lazy(() => import("./pages/user/Guides"));
 const UserGuideDetail = lazy(() => import("./pages/user/GuideDetail"));
 
@@ -93,6 +98,9 @@ export const router = createBrowserRouter([
       { path: "/admin/promotions", element: <Promotions /> },
       { path: "/admin/reset-tickets", element: <AdminResetTickets /> },
       { path: "/admin/announcements", element: <AdminAnnouncements /> },
+      { path: "/admin/support", element: <AdminSupportTickets /> },
+      { path: "/admin/support/help", element: <AdminSupportHelp /> },
+      { path: "/admin/support/:ticketId", element: <AdminSupportTicketDetail /> },
       { path: "/admin/guides", element: <AdminGuides /> },
       { path: "/admin/settings", element: <Settings /> },
       { path: "/admin/2fa", element: <TwoFactor /> },
@@ -114,6 +122,8 @@ export const router = createBrowserRouter([
       { path: "/portal/account", element: <AccountSettings /> },
       { path: "/portal/subscription-reset", element: <SubscriptionReset /> },
       { path: "/portal/announcements", element: <UserAnnouncements /> },
+      { path: "/portal/tickets", element: <UserTickets /> },
+      { path: "/portal/tickets/:ticketId", element: <UserTicketDetail /> },
       { path: "/portal/guides", element: <UserGuides /> },
       { path: "/portal/guides/:guideId", element: <UserGuideDetail /> },
     ],

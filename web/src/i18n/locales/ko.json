@@ -235,7 +235,9 @@
       "promotions": "프로모션 코드",
       "subscriptionDomains": "구독 도메인",
       "resetTickets": "리셋권",
-      "guides": "가이드·문서"
+      "guides": "가이드·문서",
+      "support": "문의 티켓",
+      "supportHelp": "문의 도움말 관리"
     },
     "dashboard": {
       "title": "대시보드",
@@ -1095,7 +1097,9 @@
       "orders": "사용자가 신청한 플랜 주문을 확인하고 입금을 처리합니다. 결제 완료로 표시하면 해당 플랜이 즉시 사용자에게 적용됩니다.",
       "promotions": "프로모션 코드를 만들고 관리합니다. 전체·사용자별 사용 횟수를 제한하거나, 특정 요금제와 기간에만 적용하거나, 최소 주문 금액을 요구하거나, 첫 구매에만 쓰도록 제한할 수 있습니다.",
       "subscriptionDomains": "사용자에게 공개할 구독 도메인을 관리하고 서비스 측 DNS, TLS 및 인증서 상태를 검토합니다.",
-      "resetTickets": "데이터 리셋권을 지급하고 지급 이력을 확인합니다. 특정 사용자, 특정 플랜을 이용 중인 사용자, 또는 모든 사용자에게 지급할 수 있습니다. 사용자는 대시보드에서 리셋권을 써서 이번 달 데이터 사용량을 0으로 초기화합니다."
+      "resetTickets": "데이터 리셋권을 지급하고 지급 이력을 확인합니다. 특정 사용자, 특정 플랜을 이용 중인 사용자, 또는 모든 사용자에게 지급할 수 있습니다. 사용자는 대시보드에서 리셋권을 써서 이번 달 데이터 사용량을 0으로 초기화합니다.",
+      "support": "사용자가 남긴 문의 티켓을 확인하고 답변합니다. 답변을 남기면 사용자 이메일로 알림이 발송됩니다.",
+      "supportHelp": "티켓 작성 전 사용자에게 보여줄 카테고리와 자주 묻는 질문을 관리합니다. 한국어·영어·중국어를 각각 입력할 수 있습니다."
     },
     "notifications": {
       "title": "알림"
@@ -1942,7 +1946,8 @@
       "groupService": "플랜 · 구독",
       "groupUsage": "이용 현황",
       "orders": "주문 내역",
-      "guides": "사용 설명서"
+      "guides": "사용 설명서",
+      "tickets": "내 티켓"
     },
     "dashboard": {
       "title": "대시보드",
@@ -2589,5 +2594,152 @@
     "start": "시작하기",
     "login": "로그인",
     "rights": "모든 권리 보유."
+  },
+  "support": {
+    "status": {
+      "open": "답변 대기",
+      "answered": "답변 완료",
+      "closed": "종료"
+    },
+    "priority": {
+      "low": "낮음",
+      "normal": "보통",
+      "high": "높음"
+    },
+    "list": {
+      "title": "내 티켓",
+      "description": "문제가 있으면 문의를 남겨 주세요. 최대한 빨리 답변하겠습니다.",
+      "create": "티켓 만들기",
+      "tableTitle": "티켓 목록",
+      "loading": "티켓을 불러오는 중",
+      "loadError": "티켓을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.",
+      "empty": "아직 문의가 없습니다",
+      "emptyHint": "문제가 있으면 문의를 작성하세요.",
+      "subject": "제목",
+      "category": "분류",
+      "status": "상태",
+      "created": "생성 시간",
+      "lastReply": "마지막 답변",
+      "newReply": "새 답변"
+    },
+    "help": {
+      "title": "문의 전 도움말",
+      "searchPlaceholder": "질문 또는 답변 검색",
+      "emptyCategory": "이 분류에는 아직 등록된 답변이 없습니다.",
+      "noResults": "검색 결과가 없습니다.",
+      "stillStuck": "아직 문제가 있나요? 아래의 문제 해결 절차나 문의 제출을 계속하세요."
+    },
+    "create": {
+      "title": "티켓 만들기",
+      "stepsLabel": "문의 단계",
+      "step1": "문제 선택",
+      "step2": "문제 확인",
+      "step3": "사람에게 문의",
+      "whatProblem": "어떤 문제가 있나요?",
+      "whatProblemHint": "가장 가까운 상황을 선택하면 단계별로 확인해 드립니다.",
+      "choose": "문제 유형을 선택하세요",
+      "selected": "선택됨",
+      "noCategories": "선택할 수 있는 분류가 없습니다",
+      "next": "다음 단계",
+      "back": "이전",
+      "checkTitle": "먼저 이렇게 확인해 보세요",
+      "checkHint": "아래 안내로 해결되는 경우가 많습니다.",
+      "noAnswers": "이 분류에는 등록된 안내가 없습니다. 다음 단계에서 문의를 남겨 주세요.",
+      "solved": "해결됐어요",
+      "stillNeedHelp": "해결되지 않았어요",
+      "contactTitle": "문의 내용을 남겨 주세요",
+      "subject": "제목",
+      "subjectPlaceholder": "문제를 한 줄로 요약해 주세요",
+      "subjectRequired": "제목을 입력해 주세요.",
+      "body": "문의 내용",
+      "bodyPlaceholder": "언제, 어떤 화면에서, 어떤 문제가 있었는지 자세히 적어 주세요. 주문 번호가 있다면 함께 알려 주세요.",
+      "bodyRequired": "문의 내용을 입력해 주세요.",
+      "bodyLimit": "{{count}} / {{max}}자",
+      "submit": "티켓 제출",
+      "error": "티켓을 만들지 못했습니다. 잠시 후 다시 시도해 주세요."
+    },
+    "thread": {
+      "label": "대화 내역",
+      "you": "나",
+      "team": "운영팀",
+      "customer": "사용자",
+      "backToList": "목록으로",
+      "notFound": "티켓을 찾을 수 없습니다",
+      "loadError": "티켓을 불러오지 못했습니다.",
+      "close": "티켓 종료",
+      "closeError": "티켓을 종료하지 못했습니다.",
+      "closedNotice": "종료된 티켓입니다. 추가 문의는 새 티켓으로 남겨 주세요.",
+      "reply": "답글 작성",
+      "replyPlaceholder": "추가로 알려 주실 내용을 입력하세요",
+      "send": "보내기",
+      "sendError": "메시지를 보내지 못했습니다."
+    },
+    "admin": {
+      "title": "문의 티켓",
+      "description": "사용자 문의를 확인하고 답변합니다. 답변하면 사용자 이메일로 알림이 발송됩니다.",
+      "refresh": "새로고침",
+      "loadError": "티켓을 불러오지 못했습니다.",
+      "unread": "읽지 않음",
+      "filter": "상태 필터",
+      "all": "전체",
+      "tableTitle": "티켓",
+      "searchPlaceholder": "제목, 이메일, 이름 검색 후 Enter",
+      "empty": "조건에 맞는 티켓이 없습니다.",
+      "new": "새 문의",
+      "user": "사용자",
+      "updated": "최근 업데이트",
+      "details": "티켓 정보",
+      "priority": "우선순위",
+      "replyPlaceholder": "사용자에게 보낼 답변을 입력하세요",
+      "sendReply": "답변 보내기",
+      "emailNotice": "답변을 보내면 {{email}} 로 알림 이메일이 발송됩니다.",
+      "replyError": "답변을 보내지 못했습니다.",
+      "updateError": "티켓을 수정하지 못했습니다.",
+      "delete": "삭제",
+      "deleteTitle": "티켓 삭제",
+      "deleteBody": "이 티켓과 모든 대화 내용이 영구적으로 삭제됩니다.",
+      "deleteError": "티켓을 삭제하지 못했습니다.",
+      "cancel": "취소",
+      "closedNotice": "종료된 티켓입니다. 답변하려면 상태를 '답변 대기'로 바꾸세요."
+    },
+    "manage": {
+      "title": "문의 도움말 관리",
+      "description": "티켓 작성 전에 사용자에게 보여줄 카테고리와 자주 묻는 질문을 관리합니다.",
+      "loadError": "도움말을 불러오지 못했습니다.",
+      "faqsTab": "질문과 답변",
+      "categoriesTab": "카테고리",
+      "addFaq": "질문 추가",
+      "editFaq": "질문 수정",
+      "addCategory": "카테고리 추가",
+      "editCategory": "카테고리 수정",
+      "emptyFaqs": "등록된 질문이 없습니다.",
+      "emptyCategories": "등록된 카테고리가 없습니다.",
+      "question": "질문",
+      "answer": "답변",
+      "name": "이름",
+      "slug": "식별자",
+      "slugHint": "영문 소문자, 숫자, '-' 로 1~40자",
+      "slugInvalid": "영문 소문자, 숫자, '-' 로 1~40자여야 합니다.",
+      "nameRequired": "한 가지 언어 이상으로 이름을 입력해 주세요.",
+      "questionRequired": "한 가지 언어 이상으로 질문을 입력해 주세요.",
+      "answerRequired": "한 가지 언어 이상으로 답변을 입력해 주세요.",
+      "sortOrder": "정렬 순서",
+      "active": "사용",
+      "inactive": "숨김",
+      "answerCount": "질문 수",
+      "actions": "작업",
+      "edit": "수정",
+      "save": "저장",
+      "saveError": "저장하지 못했습니다.",
+      "deleteError": "삭제하지 못했습니다.",
+      "deleteTitle": "삭제 확인",
+      "deleteCategoryBody": "'{{name}}' 카테고리와 그 안의 모든 질문이 삭제됩니다. 기존 티켓은 유지됩니다.",
+      "deleteFaqBody": "'{{name}}' 질문을 삭제합니다.",
+      "lang": {
+        "ko": "한국어",
+        "en": "English",
+        "zh": "中文"
+      }
+    }
   }
 }

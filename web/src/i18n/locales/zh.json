@@ -235,7 +235,9 @@
       "promotions": "促销码",
       "subscriptionDomains": "订阅域名",
       "resetTickets": "重置券",
-      "guides": "指南与文档"
+      "guides": "指南与文档",
+      "support": "客服工单",
+      "supportHelp": "工单帮助管理"
     },
     "dashboard": {
       "title": "仪表盘",
@@ -1095,7 +1097,9 @@
       "orders": "查看套餐订单并确认付款。标记为已付款后，套餐会立即生效。",
       "promotions": "创建和管理促销码。可以限制总兑换次数和每位用户的兑换次数、仅适用于指定套餐或时长、要求最低订单金额，或仅限首次购买使用。",
       "subscriptionDomains": "管理向用户公开的订阅域名，并查看服务端的 DNS、TLS 和证书健康状态。",
-      "resetTickets": "发放流量重置券并查看发放记录。可以发给指定用户、正在使用某套餐的用户或所有用户。用户在仪表板使用重置券，将本月流量用量清零。"
+      "resetTickets": "发放流量重置券并查看发放记录。可以发给指定用户、正在使用某套餐的用户或所有用户。用户在仪表板使用重置券，将本月流量用量清零。",
+      "support": "查看并回复用户提交的工单。回复后会向用户邮箱发送通知。",
+      "supportHelp": "管理用户提交工单前看到的分类与常见问题，可分别填写韩语、英语和中文。"
     },
     "notifications": {
       "title": "通知"
@@ -1942,7 +1946,8 @@
       "groupService": "套餐 · 订阅",
       "groupUsage": "使用情况",
       "orders": "订单记录",
-      "guides": "使用说明"
+      "guides": "使用说明",
+      "tickets": "我的工单"
     },
     "dashboard": {
       "title": "概览",
@@ -2589,5 +2594,152 @@
     "start": "立即开始",
     "login": "登录",
     "rights": "保留所有权利。"
+  },
+  "support": {
+    "status": {
+      "open": "等待回复",
+      "answered": "已回复",
+      "closed": "已关闭"
+    },
+    "priority": {
+      "low": "低",
+      "normal": "普通",
+      "high": "高"
+    },
+    "list": {
+      "title": "我的工单",
+      "description": "遇到问题请给我们留言，我们会尽快回复。",
+      "create": "创建工单",
+      "tableTitle": "工单列表",
+      "loading": "正在加载工单",
+      "loadError": "无法加载工单，请稍后重试。",
+      "empty": "还没有工单",
+      "emptyHint": "遇到问题时请给我们留言。",
+      "subject": "标题",
+      "category": "分类",
+      "status": "状态",
+      "created": "创建时间",
+      "lastReply": "最后回复",
+      "newReply": "新回复"
+    },
+    "help": {
+      "title": "提交前的帮助",
+      "searchPlaceholder": "搜索问题或答案",
+      "emptyCategory": "该分类下暂无答案。",
+      "noResults": "没有搜索结果。",
+      "stillStuck": "问题仍未解决？请继续下面的排查步骤或提交工单。"
+    },
+    "create": {
+      "title": "创建工单",
+      "stepsLabel": "工单步骤",
+      "step1": "选择问题",
+      "step2": "检查问题",
+      "step3": "联系人工",
+      "whatProblem": "你遇到了什么问题？",
+      "whatProblemHint": "选择最接近的情况，我们会一步步帮你检查。",
+      "choose": "请选择问题类型",
+      "selected": "已选择",
+      "noCategories": "暂无可选分类",
+      "next": "下一步",
+      "back": "上一步",
+      "checkTitle": "请先试试这些方法",
+      "checkHint": "多数情况下按以下提示即可解决。",
+      "noAnswers": "该分类暂无提示，请在下一步留言。",
+      "solved": "已解决",
+      "stillNeedHelp": "仍未解决",
+      "contactTitle": "请告诉我们发生了什么",
+      "subject": "标题",
+      "subjectPlaceholder": "用一句话概括问题",
+      "subjectRequired": "请输入标题。",
+      "body": "详细说明",
+      "bodyPlaceholder": "请说明发生的时间、页面和问题，如有订单号请一并提供。",
+      "bodyRequired": "请输入详细说明。",
+      "bodyLimit": "{{count}} / {{max}} 字",
+      "submit": "提交工单",
+      "error": "无法创建工单，请稍后重试。"
+    },
+    "thread": {
+      "label": "对话记录",
+      "you": "我",
+      "team": "客服团队",
+      "customer": "用户",
+      "backToList": "返回列表",
+      "notFound": "未找到工单",
+      "loadError": "无法加载该工单。",
+      "close": "关闭工单",
+      "closeError": "无法关闭工单。",
+      "closedNotice": "该工单已关闭。如有其他问题请新建工单。",
+      "reply": "回复",
+      "replyPlaceholder": "请补充你想告诉我们的内容",
+      "send": "发送",
+      "sendError": "无法发送消息。"
+    },
+    "admin": {
+      "title": "客服工单",
+      "description": "查看并回复用户工单。回复后会通过邮件通知用户。",
+      "refresh": "刷新",
+      "loadError": "无法加载工单。",
+      "unread": "未读",
+      "filter": "状态筛选",
+      "all": "全部",
+      "tableTitle": "工单",
+      "searchPlaceholder": "搜索标题、邮箱或姓名，按 Enter",
+      "empty": "没有符合条件的工单。",
+      "new": "新",
+      "user": "用户",
+      "updated": "最近更新",
+      "details": "工单信息",
+      "priority": "优先级",
+      "replyPlaceholder": "请输入给用户的回复",
+      "sendReply": "发送回复",
+      "emailNotice": "发送回复后将向 {{email}} 发送通知邮件。",
+      "replyError": "无法发送回复。",
+      "updateError": "无法更新工单。",
+      "delete": "删除",
+      "deleteTitle": "删除工单",
+      "deleteBody": "该工单及全部对话将被永久删除。",
+      "deleteError": "无法删除工单。",
+      "cancel": "取消",
+      "closedNotice": "该工单已关闭。如需回复，请先将状态改为“等待回复”。"
+    },
+    "manage": {
+      "title": "工单帮助管理",
+      "description": "管理用户提交工单前看到的分类与常见问题。",
+      "loadError": "无法加载帮助内容。",
+      "faqsTab": "问题与答案",
+      "categoriesTab": "分类",
+      "addFaq": "添加问题",
+      "editFaq": "编辑问题",
+      "addCategory": "添加分类",
+      "editCategory": "编辑分类",
+      "emptyFaqs": "暂无问题。",
+      "emptyCategories": "暂无分类。",
+      "question": "问题",
+      "answer": "答案",
+      "name": "名称",
+      "slug": "标识",
+      "slugHint": "1-40 位小写字母、数字或“-”",
+      "slugInvalid": "请使用 1-40 位小写字母、数字或“-”。",
+      "nameRequired": "请至少用一种语言填写名称。",
+      "questionRequired": "请至少用一种语言填写问题。",
+      "answerRequired": "请至少用一种语言填写答案。",
+      "sortOrder": "排序",
+      "active": "显示",
+      "inactive": "隐藏",
+      "answerCount": "问题数",
+      "actions": "操作",
+      "edit": "编辑",
+      "save": "保存",
+      "saveError": "保存失败。",
+      "deleteError": "删除失败。",
+      "deleteTitle": "确认删除",
+      "deleteCategoryBody": "分类“{{name}}”及其下所有问题将被删除，已有工单不受影响。",
+      "deleteFaqBody": "将删除问题“{{name}}”。",
+      "lang": {
+        "ko": "한국어 (韩语)",
+        "en": "English (英语)",
+        "zh": "中文"
+      }
+    }
   }
 }

@@ -235,7 +235,9 @@
       "promotions": "Promotions",
       "subscriptionDomains": "Subscription Domains",
       "resetTickets": "Reset tickets",
-      "guides": "Guides & docs"
+      "guides": "Guides & docs",
+      "support": "Support tickets",
+      "supportHelp": "Support help"
     },
     "dashboard": {
       "title": "Dashboard",
@@ -1095,7 +1097,9 @@
       "orders": "Review plan orders and confirm payment. Marking an order paid applies the plan to the user immediately.",
       "promotions": "Create and manage promotion codes. A code can cap total and per-user redemptions, apply only to selected plans or durations, require a minimum order, or be limited to first purchases.",
       "subscriptionDomains": "Manage public subscription domains and review service-side DNS, TLS, and certificate health.",
-      "resetTickets": "Grant data reset tickets and review past grants. Tickets can go to one user, everyone currently on a plan, or every account. Users spend a ticket on their dashboard to reset this month's data usage to zero."
+      "resetTickets": "Grant data reset tickets and review past grants. Tickets can go to one user, everyone currently on a plan, or every account. Users spend a ticket on their dashboard to reset this month's data usage to zero.",
+      "support": "Read and answer tickets from users. Replying sends the user an email notification.",
+      "supportHelp": "Manage the categories and frequently asked questions shown before a user opens a ticket. Each can be written in Korean, English and Chinese."
     },
     "notifications": {
       "title": "Notifications"
@@ -1942,7 +1946,8 @@
       "groupService": "Plan & subscription",
       "groupUsage": "Usage",
       "orders": "Orders",
-      "guides": "User guides"
+      "guides": "User guides",
+      "tickets": "My tickets"
     },
     "dashboard": {
       "title": "Overview",
@@ -2589,5 +2594,152 @@
     "start": "Get started",
     "login": "Log in",
     "rights": "All rights reserved."
+  },
+  "support": {
+    "status": {
+      "open": "Awaiting reply",
+      "answered": "Answered",
+      "closed": "Closed"
+    },
+    "priority": {
+      "low": "Low",
+      "normal": "Normal",
+      "high": "High"
+    },
+    "list": {
+      "title": "My tickets",
+      "description": "If something is wrong, send us a ticket. We will reply as soon as we can.",
+      "create": "Create ticket",
+      "tableTitle": "Tickets",
+      "loading": "Loading tickets",
+      "loadError": "Could not load your tickets. Please try again shortly.",
+      "empty": "No tickets yet",
+      "emptyHint": "If you have a problem, write to us.",
+      "subject": "Subject",
+      "category": "Category",
+      "status": "Status",
+      "created": "Created",
+      "lastReply": "Last reply",
+      "newReply": "New reply"
+    },
+    "help": {
+      "title": "Help before you write",
+      "searchPlaceholder": "Search questions or answers",
+      "emptyCategory": "There are no answers in this category yet.",
+      "noResults": "No results.",
+      "stillStuck": "Still stuck? Continue with the steps below or submit a ticket."
+    },
+    "create": {
+      "title": "Create ticket",
+      "stepsLabel": "Ticket steps",
+      "step1": "Choose problem",
+      "step2": "Check it",
+      "step3": "Contact us",
+      "whatProblem": "What problem did you run into?",
+      "whatProblemHint": "Pick the closest situation and we will check it with you step by step.",
+      "choose": "Choose a problem type",
+      "selected": "Selected",
+      "noCategories": "No categories available",
+      "next": "Next",
+      "back": "Back",
+      "checkTitle": "Try this first",
+      "checkHint": "These answers solve most cases.",
+      "noAnswers": "There is no guidance for this category. Leave us a message in the next step.",
+      "solved": "That solved it",
+      "stillNeedHelp": "Still need help",
+      "contactTitle": "Tell us what happened",
+      "subject": "Subject",
+      "subjectPlaceholder": "Summarise the problem in one line",
+      "subjectRequired": "Enter a subject.",
+      "body": "Details",
+      "bodyPlaceholder": "Tell us when, where and what went wrong. Include your order number if you have one.",
+      "bodyRequired": "Enter the details.",
+      "bodyLimit": "{{count}} / {{max}} characters",
+      "submit": "Submit ticket",
+      "error": "Could not create the ticket. Please try again shortly."
+    },
+    "thread": {
+      "label": "Conversation",
+      "you": "You",
+      "team": "Support team",
+      "customer": "Customer",
+      "backToList": "Back to list",
+      "notFound": "Ticket not found",
+      "loadError": "Could not load this ticket.",
+      "close": "Close ticket",
+      "closeError": "Could not close the ticket.",
+      "closedNotice": "This ticket is closed. Open a new ticket for anything else.",
+      "reply": "Reply",
+      "replyPlaceholder": "Add anything else we should know",
+      "send": "Send",
+      "sendError": "Could not send your message."
+    },
+    "admin": {
+      "title": "Support tickets",
+      "description": "Read and answer user tickets. Replying emails the user.",
+      "refresh": "Refresh",
+      "loadError": "Could not load tickets.",
+      "unread": "Unread",
+      "filter": "Status filter",
+      "all": "All",
+      "tableTitle": "Tickets",
+      "searchPlaceholder": "Search subject, email or name, then press Enter",
+      "empty": "No tickets match.",
+      "new": "New",
+      "user": "User",
+      "updated": "Updated",
+      "details": "Ticket details",
+      "priority": "Priority",
+      "replyPlaceholder": "Write your reply to the user",
+      "sendReply": "Send reply",
+      "emailNotice": "Sending a reply emails {{email}}.",
+      "replyError": "Could not send the reply.",
+      "updateError": "Could not update the ticket.",
+      "delete": "Delete",
+      "deleteTitle": "Delete ticket",
+      "deleteBody": "This ticket and its whole conversation will be deleted permanently.",
+      "deleteError": "Could not delete the ticket.",
+      "cancel": "Cancel",
+      "closedNotice": "This ticket is closed. Set its status to Awaiting reply to answer it."
+    },
+    "manage": {
+      "title": "Support help",
+      "description": "Manage the categories and common questions shown to users before they open a ticket.",
+      "loadError": "Could not load the help content.",
+      "faqsTab": "Questions & answers",
+      "categoriesTab": "Categories",
+      "addFaq": "Add question",
+      "editFaq": "Edit question",
+      "addCategory": "Add category",
+      "editCategory": "Edit category",
+      "emptyFaqs": "No questions yet.",
+      "emptyCategories": "No categories yet.",
+      "question": "Question",
+      "answer": "Answer",
+      "name": "Name",
+      "slug": "Identifier",
+      "slugHint": "1-40 lowercase letters, digits or '-'",
+      "slugInvalid": "Use 1-40 lowercase letters, digits or '-'.",
+      "nameRequired": "Enter a name in at least one language.",
+      "questionRequired": "Enter a question in at least one language.",
+      "answerRequired": "Enter an answer in at least one language.",
+      "sortOrder": "Sort order",
+      "active": "Shown",
+      "inactive": "Hidden",
+      "answerCount": "Questions",
+      "actions": "Actions",
+      "edit": "Edit",
+      "save": "Save",
+      "saveError": "Could not save.",
+      "deleteError": "Could not delete.",
+      "deleteTitle": "Confirm delete",
+      "deleteCategoryBody": "The category '{{name}}' and every question in it will be deleted. Existing tickets are kept.",
+      "deleteFaqBody": "The question '{{name}}' will be deleted.",
+      "lang": {
+        "ko": "한국어 (Korean)",
+        "en": "English",
+        "zh": "中文 (Chinese)"
+      }
+    }
   }
 }

@@ -44,6 +44,7 @@ const ancestorTrails: Record<
   ],
   "/admin/users/:userId": [rootCrumb, { labelKey: "admin.nav.users", href: "/admin/users" }],
   "/admin/orders/:orderId": [rootCrumb, { labelKey: "admin.nav.orders", href: "/admin/orders" }],
+  "/admin/support/:ticketId": [rootCrumb, { labelKey: "admin.nav.support", href: "/admin/support" }],
 };
 
 const nestedLeafLabels: Record<string, string> = {
@@ -66,6 +67,8 @@ const staticPageLabels: Record<string, string> = {
   "/admin/promotions": "admin.nav.promotions",
   "/admin/reset-tickets": "admin.nav.resetTickets",
   "/admin/announcements": "admin.nav.announcements",
+  "/admin/support": "admin.nav.support",
+  "/admin/support/help": "admin.nav.supportHelp",
   "/admin/settings": "admin.nav.settings",
   "/admin/2fa": "admin.nav.twoFactor",
 };
@@ -86,6 +89,8 @@ const helpTopicKeys: Record<string, string> = {
   "/admin/promotions": "admin.help.promotions",
   "/admin/reset-tickets": "admin.help.resetTickets",
   "/admin/announcements": "admin.help.announcements",
+  "/admin/support": "admin.help.support",
+  "/admin/support/help": "admin.help.supportHelp",
   "/admin/settings": "admin.help.settings",
   "/admin/2fa": "admin.help.twoFactor",
 };
@@ -198,6 +203,8 @@ function AdminLayoutShell() {
         { type: "link", text: t("admin.nav.promotions"), href: "/admin/promotions" },
         { type: "link", text: t("admin.nav.resetTickets"), href: "/admin/reset-tickets" },
         { type: "link", text: t("admin.nav.announcements"), href: "/admin/announcements" },
+        { type: "link", text: t("admin.nav.support"), href: "/admin/support" },
+        { type: "link", text: t("admin.nav.supportHelp"), href: "/admin/support/help" },
         { type: "link", text: t("admin.nav.guides"), href: "/admin/guides" },
       ],
     },

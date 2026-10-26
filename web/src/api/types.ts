@@ -1103,3 +1103,96 @@ export interface PublicSubscriptionDomain {
   display_order: number;
   is_default: boolean;
 }
+
+export type SupportStatus = "open" | "answered" | "closed";
+export type SupportPriority = "low" | "normal" | "high";
+export type LocalizedText = Partial<Record<"ko" | "en" | "zh", string>>;
+
+export interface SupportCategory {
+  id: string;
+  slug: string;
+  names: LocalizedText;
+  sort_order: number;
+  is_active: boolean;
+}
+
+export interface SupportFAQ {
+  id: string;
+  category_id: string;
+  questions: LocalizedText;
+  answers: LocalizedText;
+  sort_order: number;
+  is_active: boolean;
+}
+
+export interface SupportHelp {
+  categories: SupportCategory[];
+  faqs: SupportFAQ[];
+}
+
+export interface SupportTicket {
+  id: string;
+  category_id: string;
+  category_names: LocalizedText;
+  subject: string;
+  status: SupportStatus;
+  priority: SupportPriority;
+  unread: boolean;
+  created_at: string;
+  updated_at: string;
+  last_reply_at: string | null;
+}
+
+export interface AdminSupportTicket extends SupportTicket {
+  user_id: string;
+  user_email: string;
+  user_name: string;
+}
+
+export interface SupportMessage {
+  id: string;
+  author_type: "user" | "admin";
+  author_label?: string;
+  body: string;
+  created_at: string;
+}
+
+export interface SupportThread<T extends SupportTicket = SupportTicket> {
+  ticket: T;
+  messages: SupportMessage[];
+}
+
+export interface CreateSupportTicketRequest {
+  category_id: string;
+  subject: string;
+  body: string;
+}
+
+export interface AdminSupportTicketList {
+  tickets: AdminSupportTicket[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface AdminSupportSummary {
+  open: number;
+  answered: number;
+  closed: number;
+  unread: number;
+}
+
+export interface SupportCategoryInput {
+  slug?: string;
+  names?: LocalizedText;
+  sort_order?: number;
+  is_active?: boolean;
+}
+
+export interface SupportFAQInput {
+  category_id?: string;
+  questions?: LocalizedText;
+  answers?: LocalizedText;
+  sort_order?: number;
+  is_active?: boolean;
+}

@@ -48,6 +48,17 @@ import type {
   TwoFAEnableRequest,
   TwoFADisableRequest,
   TwoFAStatus,
+  AdminSupportTicket,
+  AdminSupportTicketList,
+  AdminSupportSummary,
+  SupportThread,
+  SupportMessage,
+  SupportStatus,
+  SupportPriority,
+  SupportCategory,
+  SupportCategoryInput,
+  SupportFAQ,
+  SupportFAQInput,
   Announcement,
   CreateAnnouncementRequest,
   UpdateAnnouncementRequest,
@@ -594,4 +605,79 @@ export function deleteSubscriptionDomain(id: string): Promise<void> {
 export function getSubscriptionDomainHealth(): Promise<SubscriptionDomainHealth[]> {
   applyAdminClient();
   return get<SubscriptionDomainHealth[]>('/api/v1/admin/subscription-domains/health');
+}
+
+export function getSupportSummary(): Promise<AdminSupportSummary> {
+  applyAdminClient();
+  return get<AdminSupportSummary>('/api/v1/admin/support/summary');
+}
+
+export function listSupportTickets(params: { status?: SupportStatus | ''; q?: string; page?: number; limit?: number }): Promise<AdminSupportTicketList> {
+  applyAdminClient();
+  const query = new URLSearchParams();
+  if (params.status) query.set('status', params.status);
+  if (params.q?.trim()) query.set('q', params.q.trim());
+  query.set('page', String(params.page ?? 1));
+  query.set('limit', String(params.limit ?? 20));
+  return get<AdminSupportTicketList>(`/api/v1/admin/support/tickets?${query.toString()}`);
+}
+
+export function getSupportTicket(id: string): Promise<SupportThread<AdminSupportTicket>> {
+  applyAdminClient();
+  return get<SupportThread<AdminSupportTicket>>(`/api/v1/admin/support/tickets/${id}`);
+}
+
+export function replySupportTicket(id: string, body: string): Promise<SupportMessage> {
+  applyAdminClient();
+  return post<SupportMessage>(`/api/v1/admin/support/tickets/${id}/messages`, { body });
+}
+
+export function updateSupportTicket(id: string, req: { status?: SupportStatus; priority?: SupportPriority }): Promise<void> {
+  applyAdminClient();
+  return patch<void>(`/api/v1/admin/support/tickets/${id}`, req);
+}
+
+export function deleteSupportTicket(id: string): Promise<void> {
+  applyAdminClient();
+  return del<void>(`/api/v1/admin/support/tickets/${id}`);
+}
+
+export function listSupportCategories(): Promise<SupportCategory[]> {
+  applyAdminClient();
+  return get<SupportCategory[]>('/api/v1/admin/support/categories');
+}
+
+export function createSupportCategory(req: SupportCategoryInput): Promise<SupportCategory> {
+  applyAdminClient();
+  return post<SupportCategory>('/api/v1/admin/support/categories', req);
+}
+
+export function updateSupportCategory(id: string, req: SupportCategoryInput): Promise<void> {
+  applyAdminClient();
+  return put<void>(`/api/v1/admin/support/categories/${id}`, req);
+}
+
+export function deleteSupportCategory(id: string): Promise<void> {
+  applyAdminClient();
+  return del<void>(`/api/v1/admin/support/categories/${id}`);
+}
+
+export function listSupportFAQs(): Promise<SupportFAQ[]> {
+  applyAdminClient();
+  return get<SupportFAQ[]>('/api/v1/admin/support/faqs');
+}
+
+export function createSupportFAQ(req: SupportFAQInput): Promise<SupportFAQ> {
+  applyAdminClient();
+  return post<SupportFAQ>('/api/v1/admin/support/faqs', req);
+}
+
+export function updateSupportFAQ(id: string, req: SupportFAQInput): Promise<void> {
+  applyAdminClient();
+  return put<void>(`/api/v1/admin/support/faqs/${id}`, req);
+}
+
+export function deleteSupportFAQ(id: string): Promise<void> {
+  applyAdminClient();
+  return del<void>(`/api/v1/admin/support/faqs/${id}`);
 }
