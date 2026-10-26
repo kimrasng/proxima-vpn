@@ -167,6 +167,7 @@ const requiredDynamicKeys = {
   "user.connect.guide.*.4": ["windows","macos","ios","android","linux"],
   "auth.portal.features.*.title": ["fast", "secure", "devices", "usage"],
   "auth.portal.features.*.body": ["fast", "secure", "devices", "usage"],
+  "admin.guides.form.tool.*": ["heading", "bold", "list", "steps", "link"],
   "admin.settings.test.step.*": ["config", "write", "read", "delete", "token", "send"],
   "admin.settings.test.*.ok": ["s3", "telegram"],
   "admin.settings.test.*.fail": ["s3", "telegram"],

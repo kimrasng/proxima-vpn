@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  Alert, Box, Button, ColumnLayout, Container, ContentLayout, FormField, Header, Input, Modal,
+  Alert, Box, Button, Container, ContentLayout, FormField, Header, Input, Modal,
   SegmentedControl, Select, SpaceBetween, StatusIndicator, Table, Textarea, Toggle,
 } from "@cloudscape-design/components";
 import { ApiError } from "../../api/client";
@@ -12,6 +12,19 @@ import {
   type AdminGuide, type GuideCategory, type GuideFormat, type GuideInput,
 } from "../../api/guides";
 import "../../components/guides.css";
+import "./guidesAdmin.css";
+
+// Quick-insert snippets for the editor toolbar; labels are format-neutral glyphs.
+function snippets(format: GuideFormat) {
+  const md = format === "markdown";
+  return [
+    { id: "heading", label: "H2", text: md ? "\n## " : "\n<h2></h2>\n" },
+    { id: "bold", label: "B", text: md ? "****" : "<strong></strong>" },
+    { id: "list", label: "\u2022", text: md ? "\n- " : "\n<ul>\n  <li></li>\n</ul>\n" },
+    { id: "steps", label: "1.", text: md ? "\n1. " : "\n<ol>\n  <li></li>\n</ol>\n" },
+    { id: "link", label: "\ud83d\udd17", text: md ? "[](https://)" : "<a href=\"https://\"></a>" },
+  ];
+}
 
 const emptyGuide: GuideInput = {
   category_id: null, title: "", summary: "", format: "markdown", content: "", is_published: false, sort_order: 0,
@@ -229,66 +242,84 @@ export default function Guides() {
 
       <Modal size="max" visible={editing !== null} onDismiss={() => !saving && setEditing(null)}
         header={editing?.id ? t("admin.guides.editTitle") : t("admin.guides.createTitle")}
-        footer={<Box float="right"><SpaceBetween direction="horizontal" size="xs">
-          <Button variant="link" disabled={saving} onClick={() => setEditing(null)}>{t("admin.guides.cancel")}</Button>
-          <Button variant="primary" loading={saving} onClick={() => void save()}>{t("admin.guides.save")}</Button>
-        </SpaceBetween></Box>}>
+        footer={draft && <div className="guide-modal__footer">
+          <Toggle checked={draft.is_published} onChange={({ detail }) => setDraft({ is_published: detail.checked })}
+            description={draft.is_published ? t("admin.guides.form.publishOnHint") : t("admin.guides.form.publishOffHint")}>
+            {draft.is_published ? t("admin.guides.form.publishOn") : t("admin.guides.form.publishOff")}
+          </Toggle>
+          <SpaceBetween direction="horizontal" size="xs">
+            <Button variant="link" disabled={saving} onClick={() => setEditing(null)}>{t("admin.guides.cancel")}</Button>
+            <Button variant="primary" loading={saving} onClick={() => void save()}>
+              {draft.is_published ? t("admin.guides.form.savePublish") : t("admin.guides.form.saveDraft")}
+            </Button>
+          </SpaceBetween>
+        </div>}>
         {draft && (
-          <SpaceBetween size="l">
-            <ColumnLayout columns={3} minColumnWidth={220}>
-              <FormField label={t("admin.guides.form.title")} errorText={showErrors ? titleError : undefined}>
+          <div className="guide-modal">
+            <div className="guide-modal__meta">
+              <FormField stretch label={t("admin.guides.form.title")} errorText={showErrors ? titleError : undefined}>
                 <Input value={draft.title} onChange={({ detail }) => setDraft({ title: detail.value })} placeholder={t("admin.guides.form.titlePlaceholder")} />
               </FormField>
-              <FormField label={t("admin.guides.form.category")}>
-                <Select
-                  selectedOption={categoryOptions.find((o) => o.value === (draft.category_id ?? "")) ?? null}
-                  options={categoryOptions}
-                  onChange={({ detail }) => setDraft({ category_id: detail.selectedOption.value || null })}
-                />
-              </FormField>
-              <FormField label={t("admin.guides.form.publish")} description={t("admin.guides.form.publishHint")}>
-                <Toggle checked={draft.is_published} onChange={({ detail }) => setDraft({ is_published: detail.checked })}>
-                  {draft.is_published ? t("admin.guides.published") : t("admin.guides.draft")}
-                </Toggle>
-              </FormField>
-            </ColumnLayout>
-            <ColumnLayout columns={2} minColumnWidth={260}>
-              <FormField label={t("admin.guides.form.summary")} description={t("admin.guides.form.summaryHint")}>
-                <Input value={draft.summary} onChange={({ detail }) => setDraft({ summary: detail.value })} />
-              </FormField>
-              <FormField label={t("admin.guides.form.order")} description={t("admin.guides.form.orderHint")}>
-                <Input type="number" inputMode="numeric" value={String(draft.sort_order)}
-                  onChange={({ detail }) => setDraft({ sort_order: Number.parseInt(detail.value, 10) || 0 })} />
-              </FormField>
-            </ColumnLayout>
-            <SpaceBetween direction="horizontal" size="s" alignItems="center">
-              <SegmentedControl
-                selectedId={draft.format}
-                label={t("admin.guides.form.format")}
-                options={[{ id: "markdown", text: "Markdown" }, { id: "html", text: "HTML" }]}
-                onChange={({ detail }) => setDraft({ format: detail.selectedId as GuideFormat })}
-              />
-              <Button iconName="upload" loading={uploading} onClick={() => fileRef.current?.click()}>{t("admin.guides.form.image")}</Button>
-              <input ref={fileRef} type="file" accept="image/*" hidden onChange={(event) => void onImage(event.target.files?.[0])} />
-            </SpaceBetween>
-            <Alert type="info">{t("admin.guides.form.safety")}</Alert>
-            <div className="guide-editor">
-              <div className="guide-editor__source" ref={textareaWrap}>
-                <FormField label={t("admin.guides.form.source")} stretch>
-                  <Textarea rows={22} value={draft.content} onChange={({ detail }) => setDraft({ content: detail.value })}
-                    placeholder={draft.format === "markdown" ? t("admin.guides.form.markdownPlaceholder") : t("admin.guides.form.htmlPlaceholder")} />
+              <div className="guide-modal__meta-row">
+                <FormField stretch label={t("admin.guides.form.category")}>
+                  <Select
+                    selectedOption={categoryOptions.find((o) => o.value === (draft.category_id ?? "")) ?? null}
+                    options={categoryOptions}
+                    onChange={({ detail }) => setDraft({ category_id: detail.selectedOption.value || null })}
+                  />
+                </FormField>
+                <FormField stretch label={t("admin.guides.form.summary")} constraintText={t("admin.guides.form.summaryHint")}>
+                  <Input value={draft.summary} placeholder={t("admin.guides.form.summaryPlaceholder")} onChange={({ detail }) => setDraft({ summary: detail.value })} />
+                </FormField>
+                <FormField stretch label={t("admin.guides.form.order")} constraintText={t("admin.guides.form.orderHint")}>
+                  <Input type="number" inputMode="numeric" value={String(draft.sort_order)}
+                    onChange={({ detail }) => setDraft({ sort_order: Number.parseInt(detail.value, 10) || 0 })} />
                 </FormField>
               </div>
-              <div>
-                <Box variant="awsui-key-label" padding={{ bottom: "xs" }}>{t("admin.guides.form.preview")}</Box>
+            </div>
+
+            <div className="guide-editor">
+              <div className="guide-editor__pane">
+                <div className="guide-editor__toolbar">
+                  <SegmentedControl
+                    selectedId={draft.format}
+                    label={t("admin.guides.form.format")}
+                    options={[{ id: "markdown", text: "Markdown" }, { id: "html", text: "HTML" }]}
+                    onChange={({ detail }) => setDraft({ format: detail.selectedId as GuideFormat })}
+                  />
+                  <span className="guide-editor__sep" aria-hidden="true" />
+                  {snippets(draft.format).map((item) => (
+                    <button key={item.id} type="button" className="guide-editor__tool" title={t(`admin.guides.form.tool.${item.id}`)}
+                      aria-label={t(`admin.guides.form.tool.${item.id}`)} onClick={() => insertAtCursor(item.text)}>{item.label}</button>
+                  ))}
+                  <Button iconName="upload" variant="inline-link" loading={uploading} onClick={() => fileRef.current?.click()}>{t("admin.guides.form.image")}</Button>
+                  <input ref={fileRef} type="file" accept="image/*" hidden onChange={(event) => void onImage(event.target.files?.[0])} />
+                </div>
+                <div className="guide-editor__source" ref={textareaWrap}>
+                  <Textarea rows={22} value={draft.content} ariaLabel={t("admin.guides.form.source")} onChange={({ detail }) => setDraft({ content: detail.value })}
+                    placeholder={draft.format === "markdown" ? t("admin.guides.form.markdownPlaceholder") : t("admin.guides.form.htmlPlaceholder")} />
+                </div>
+                <Box variant="small" color="text-body-secondary">{t("admin.guides.form.safety")}</Box>
+              </div>
+              <div className="guide-editor__pane">
+                <div className="guide-editor__preview-head">
+                  <span>{t("admin.guides.form.previewAsUser")}</span>
+                  <span className={`guide-editor__state guide-editor__state--${draft.is_published ? "on" : "off"}`}>
+                    {draft.is_published ? t("admin.guides.published") : t("admin.guides.draft")}
+                  </span>
+                </div>
                 <div className="guide-editor__preview">
+                  <div className="guide-editor__doc-meta">{categoryName_(draft.category_id)}</div>
+                  <h1 className="guide-editor__doc-title">{draft.title.trim() || t("admin.guides.form.untitled")}</h1>
+                  {draft.summary.trim() && <p className="guide-editor__doc-summary">{draft.summary}</p>}
+                  <hr className="guide-editor__doc-rule" />
                   {previewError ? <Box color="text-status-error">{t("admin.guides.form.previewError")}</Box>
                     : preview ? <GuideContent html={preview} />
                     : <Box color="text-body-secondary">{t("admin.guides.form.previewEmpty")}</Box>}
                 </div>
               </div>
             </div>
-          </SpaceBetween>
+          </div>
         )}
       </Modal>
 
