@@ -27,6 +27,7 @@ export default function UserLayout() {
       items: [
         { type: "link", text: t("user.nav.plan"), href: "/portal/plan" },
         { type: "link", text: t("user.nav.devices"), href: "/portal/devices" },
+        { type: "link", text: t("user.nav.guides"), href: "/portal/guides" },
         { type: "link", text: t("user.nav.orders"), href: "/portal/orders" },
       ],
     },
@@ -95,7 +96,7 @@ export default function UserLayout() {
         }}
         navigation={
           <SideNavigation
-            activeHref={location.pathname}
+            activeHref={location.pathname.startsWith("/portal/guides/") ? "/portal/guides" : location.pathname}
             items={navItems}
             onFollow={(event) => {
               event.preventDefault();

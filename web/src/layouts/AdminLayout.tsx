@@ -198,6 +198,7 @@ function AdminLayoutShell() {
         { type: "link", text: t("admin.nav.promotions"), href: "/admin/promotions" },
         { type: "link", text: t("admin.nav.resetTickets"), href: "/admin/reset-tickets" },
         { type: "link", text: t("admin.nav.announcements"), href: "/admin/announcements" },
+        { type: "link", text: t("admin.nav.guides"), href: "/admin/guides" },
       ],
     },
     {

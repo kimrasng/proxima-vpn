@@ -25,6 +25,7 @@ const UserDetail = lazy(() => import("./pages/admin/UserDetail"));
 const Orders = lazy(() => import("./pages/admin/Orders"));
 const OrderDetail = lazy(() => import("./pages/admin/OrderDetail"));
 const AdminAnnouncements = lazy(() => import("./pages/admin/Announcements"));
+const AdminGuides = lazy(() => import("./pages/admin/Guides"));
 const Settings = lazy(() => import("./pages/admin/Settings"));
 const TwoFactor = lazy(() => import("./pages/admin/TwoFactor"));
 const NodeInbounds = lazy(() => import("./pages/admin/NodeInbounds"));
@@ -48,6 +49,8 @@ const UserOrders = lazy(() => import("./pages/user/Orders"));
 const AccountSettings = lazy(() => import("./pages/user/AccountSettings"));
 const SubscriptionReset = lazy(() => import("./pages/user/SubscriptionReset"));
 const UserAnnouncements = lazy(() => import("./pages/user/Announcements"));
+const UserGuides = lazy(() => import("./pages/user/Guides"));
+const UserGuideDetail = lazy(() => import("./pages/user/GuideDetail"));
 
 export const router = createBrowserRouter([
   {
@@ -90,6 +93,7 @@ export const router = createBrowserRouter([
       { path: "/admin/promotions", element: <Promotions /> },
       { path: "/admin/reset-tickets", element: <AdminResetTickets /> },
       { path: "/admin/announcements", element: <AdminAnnouncements /> },
+      { path: "/admin/guides", element: <AdminGuides /> },
       { path: "/admin/settings", element: <Settings /> },
       { path: "/admin/2fa", element: <TwoFactor /> },
     ],
@@ -110,6 +114,8 @@ export const router = createBrowserRouter([
       { path: "/portal/account", element: <AccountSettings /> },
       { path: "/portal/subscription-reset", element: <SubscriptionReset /> },
       { path: "/portal/announcements", element: <UserAnnouncements /> },
+      { path: "/portal/guides", element: <UserGuides /> },
+      { path: "/portal/guides/:guideId", element: <UserGuideDetail /> },
     ],
   },
   {

@@ -234,7 +234,8 @@
       "orders": "订单管理",
       "promotions": "促销码",
       "subscriptionDomains": "订阅域名",
-      "resetTickets": "重置券"
+      "resetTickets": "重置券",
+      "guides": "指南与文档"
     },
     "dashboard": {
       "title": "仪表盘",
@@ -1856,6 +1857,71 @@
         "plan": "请选择套餐。",
         "expires": "请选择今天或之后的日期。"
       }
+    },
+    "guides": {
+      "title": "指南与文档",
+      "description": "用 Markdown 或 HTML 编写门户“使用说明”中显示的指南。",
+      "manageCategories": "管理分类",
+      "create": "新建指南",
+      "loading": "正在加载指南…",
+      "listTitle": "指南",
+      "loadError": "无法加载指南。",
+      "saved": "指南已保存。",
+      "saveError": "无法保存指南。",
+      "uploadError": "无法上传图片。",
+      "deleted": "指南已删除。",
+      "deleteError": "无法删除指南。",
+      "categoryError": "无法保存分类。",
+      "uncategorized": "未分类",
+      "published": "已发布",
+      "draft": "草稿",
+      "edit": "编辑",
+      "delete": "删除",
+      "cancel": "取消",
+      "save": "保存",
+      "done": "完成",
+      "empty": "暂无指南。",
+      "editTitle": "编辑指南",
+      "createTitle": "新建指南",
+      "deleteTitle": "要删除这篇指南吗？",
+      "deleteBody": "将删除“{{title}}”，此操作无法撤销。",
+      "categoriesTitle": "管理分类",
+      "categoriesHint": "分类会成为用户看到的标签和分组。删除分类后，其中的指南会变为“未分类”。",
+      "noCategories": "暂无分类。",
+      "categoryName": "分类名称",
+      "categoryPlaceholder": "例如：Windows 使用指南",
+      "addCategory": "添加",
+      "moveUp": "上移",
+      "moveDown": "下移",
+      "col": {
+        "title": "标题",
+        "category": "分类",
+        "format": "格式",
+        "status": "状态",
+        "updated": "更新时间",
+        "actions": "操作"
+      },
+      "form": {
+        "title": "标题",
+        "titlePlaceholder": "例如：Clash Verge Windows 安装与使用指南",
+        "titleRequired": "请输入标题。",
+        "category": "分类",
+        "publish": "是否公开",
+        "publishHint": "公开后用户可以看到。",
+        "summary": "摘要",
+        "summaryHint": "在列表卡片上显示一行。留空则显示分类名称。",
+        "order": "排序",
+        "orderHint": "数字越小越靠前。",
+        "format": "编写格式",
+        "image": "插入图片",
+        "safety": "保存时服务器会检查 HTML，自动移除脚本、iframe、事件属性和 javascript: 链接等危险代码。预览也是同样检查后的结果。",
+        "source": "正文",
+        "preview": "预览",
+        "previewError": "无法生成预览。",
+        "previewEmpty": "输入正文后会在这里显示预览。",
+        "markdownPlaceholder": "## 1. 安装应用\n\n- 从下面的链接下载安装文件。\n\n[下载](https://example.com)",
+        "htmlPlaceholder": "<h2>1. 安装应用</h2>\n<p>从下面的链接下载安装文件。</p>"
+      }
     }
   },
   "user": {
@@ -1875,7 +1941,8 @@
       "closeNavigation": "关闭菜单",
       "groupService": "套餐 · 订阅",
       "groupUsage": "使用情况",
-      "orders": "订单记录"
+      "orders": "订单记录",
+      "guides": "使用说明"
     },
     "dashboard": {
       "title": "概览",
@@ -2374,6 +2441,20 @@
       "goDashboard": "返回仪表板",
       "leakPrompt": "链接泄露了吗？",
       "leakLink": "重置订阅链接"
+    },
+    "guides": {
+      "title": "使用说明",
+      "description": "查看适合您设备的安装和连接方法。",
+      "loadError": "无法加载指南。",
+      "empty": "暂无指南。",
+      "emptyHint": "指南发布后会显示在这里。",
+      "filterLabel": "指南分类",
+      "all": "全部",
+      "uncategorized": "其他",
+      "back": "返回列表",
+      "notFound": "找不到该指南",
+      "notFoundHint": "它已被删除或尚未公开。",
+      "updated": "{{date}} 更新"
     }
   },
   "notFound": {

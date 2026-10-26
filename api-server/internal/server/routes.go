@@ -151,6 +151,18 @@ func (s *Server) registerRoutes() {
 	adminAnnouncements.Put("/:id", adminAnnouncementHandler.Update)
 	adminAnnouncements.Delete("/:id", adminAnnouncementHandler.Delete)
 
+	guideHandler := handlers.NewGuideHandler(s.db)
+	adminGuides := admin.Group("/guides")
+	adminGuides.Get("/", guideHandler.ListGuides)
+	adminGuides.Post("/", guideHandler.CreateGuide)
+	adminGuides.Post("/preview", guideHandler.Preview)
+	adminGuides.Get("/categories", guideHandler.ListCategories)
+	adminGuides.Post("/categories", guideHandler.CreateCategory)
+	adminGuides.Put("/categories/:id", guideHandler.UpdateCategory)
+	adminGuides.Delete("/categories/:id", guideHandler.DeleteCategory)
+	adminGuides.Put("/:id", guideHandler.UpdateGuide)
+	adminGuides.Delete("/:id", guideHandler.DeleteGuide)
+
 	adminUploadHandler := handlers.NewAdminUploadHandler(&s.config.Storage, s.config.Server.PanelURL)
 	admin.Post("/uploads/image", adminUploadHandler.UploadImage)
 
@@ -336,6 +348,9 @@ func (s *Server) registerRoutes() {
 	user.Get("/traffic", userPortalHandler.GetTrafficStats)
 	user.Post("/sub-token/regenerate", userPortalHandler.RegenerateSubToken)
 	user.Get("/announcements", userPortalHandler.ListAnnouncements)
+	userGuideHandler := handlers.NewGuideHandler(s.db)
+	user.Get("/guides", userGuideHandler.ListPublished)
+	user.Get("/guides/:id", userGuideHandler.GetPublished)
 
 	subscriptionHandler := handlers.NewSubscriptionHandler(s.db, s.config.Subscription.UpdateInterval)
 	subLimiter := limiter.New(limiter.Config{

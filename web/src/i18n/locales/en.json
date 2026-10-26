@@ -234,7 +234,8 @@
       "orders": "Orders",
       "promotions": "Promotions",
       "subscriptionDomains": "Subscription Domains",
-      "resetTickets": "Reset tickets"
+      "resetTickets": "Reset tickets",
+      "guides": "Guides & docs"
     },
     "dashboard": {
       "title": "Dashboard",
@@ -1856,6 +1857,71 @@
         "plan": "Choose a plan.",
         "expires": "Choose a date from today on."
       }
+    },
+    "guides": {
+      "title": "Guides & docs",
+      "description": "Write the guides shown under 'User guides' in the portal, in Markdown or HTML.",
+      "manageCategories": "Manage categories",
+      "create": "New guide",
+      "loading": "Loading guides…",
+      "listTitle": "Guides",
+      "loadError": "Couldn't load guides.",
+      "saved": "Guide saved.",
+      "saveError": "Couldn't save the guide.",
+      "uploadError": "Couldn't upload the image.",
+      "deleted": "Guide deleted.",
+      "deleteError": "Couldn't delete the guide.",
+      "categoryError": "Couldn't save the category.",
+      "uncategorized": "Uncategorized",
+      "published": "Published",
+      "draft": "Draft",
+      "edit": "Edit",
+      "delete": "Delete",
+      "cancel": "Cancel",
+      "save": "Save",
+      "done": "Done",
+      "empty": "No guides yet.",
+      "editTitle": "Edit guide",
+      "createTitle": "New guide",
+      "deleteTitle": "Delete this guide?",
+      "deleteBody": "'{{title}}' will be deleted. This can't be undone.",
+      "categoriesTitle": "Manage categories",
+      "categoriesHint": "Categories become the tabs and groups users see. Deleting a category keeps its guides as Uncategorized.",
+      "noCategories": "No categories yet.",
+      "categoryName": "Category name",
+      "categoryPlaceholder": "e.g. Windows guides",
+      "addCategory": "Add",
+      "moveUp": "Move up",
+      "moveDown": "Move down",
+      "col": {
+        "title": "Title",
+        "category": "Category",
+        "format": "Format",
+        "status": "Status",
+        "updated": "Updated",
+        "actions": "Actions"
+      },
+      "form": {
+        "title": "Title",
+        "titlePlaceholder": "e.g. Install and use Clash Verge on Windows",
+        "titleRequired": "Enter a title.",
+        "category": "Category",
+        "publish": "Visibility",
+        "publishHint": "Published guides are visible to users.",
+        "summary": "Summary",
+        "summaryHint": "One line on the list card. Leave empty to show the category name.",
+        "order": "Sort order",
+        "orderHint": "Lower numbers come first.",
+        "format": "Format",
+        "image": "Insert image",
+        "safety": "On save the server sanitizes the HTML and strips dangerous code such as scripts, iframes, event attributes and javascript: links. The preview is the same sanitized result.",
+        "source": "Body",
+        "preview": "Preview",
+        "previewError": "Couldn't build the preview.",
+        "previewEmpty": "Start typing to see a preview here.",
+        "markdownPlaceholder": "## 1. Install the app\n\n- Download the installer from the link below.\n\n[Download](https://example.com)",
+        "htmlPlaceholder": "<h2>1. Install the app</h2>\n<p>Download the installer from the link below.</p>"
+      }
     }
   },
   "user": {
@@ -1875,7 +1941,8 @@
       "closeNavigation": "Close navigation",
       "groupService": "Plan & subscription",
       "groupUsage": "Usage",
-      "orders": "Orders"
+      "orders": "Orders",
+      "guides": "User guides"
     },
     "dashboard": {
       "title": "Overview",
@@ -2374,6 +2441,20 @@
       "goDashboard": "Back to dashboard",
       "leakPrompt": "Was this link leaked?",
       "leakLink": "Reset subscription link"
+    },
+    "guides": {
+      "title": "User guides",
+      "description": "Find setup and connection steps for your device.",
+      "loadError": "Couldn't load guides.",
+      "empty": "No guides yet.",
+      "emptyHint": "Guides will appear here once they're published.",
+      "filterLabel": "Guide categories",
+      "all": "All",
+      "uncategorized": "Other",
+      "back": "Back to list",
+      "notFound": "Guide not found",
+      "notFoundHint": "It was deleted or isn't published yet.",
+      "updated": "Updated {{date}}"
     }
   },
   "notFound": {

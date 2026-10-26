@@ -234,7 +234,8 @@
       "orders": "주문 관리",
       "promotions": "프로모션 코드",
       "subscriptionDomains": "구독 도메인",
-      "resetTickets": "리셋권"
+      "resetTickets": "리셋권",
+      "guides": "가이드·문서"
     },
     "dashboard": {
       "title": "대시보드",
@@ -1856,6 +1857,71 @@
         "plan": "플랜을 선택하세요.",
         "expires": "오늘 이후 날짜를 선택하세요."
       }
+    },
+    "guides": {
+      "title": "가이드·문서",
+      "description": "사용자 포털의 '사용 설명서'에 보일 가이드를 Markdown이나 HTML로 작성합니다.",
+      "manageCategories": "카테고리 관리",
+      "create": "새 가이드",
+      "loading": "가이드를 불러오는 중…",
+      "listTitle": "가이드",
+      "loadError": "가이드를 불러오지 못했습니다.",
+      "saved": "가이드를 저장했습니다.",
+      "saveError": "가이드를 저장하지 못했습니다.",
+      "uploadError": "이미지를 올리지 못했습니다.",
+      "deleted": "가이드를 삭제했습니다.",
+      "deleteError": "가이드를 삭제하지 못했습니다.",
+      "categoryError": "카테고리를 저장하지 못했습니다.",
+      "uncategorized": "분류 없음",
+      "published": "공개",
+      "draft": "초안",
+      "edit": "편집",
+      "delete": "삭제",
+      "cancel": "취소",
+      "save": "저장",
+      "done": "완료",
+      "empty": "아직 가이드가 없습니다.",
+      "editTitle": "가이드 편집",
+      "createTitle": "새 가이드",
+      "deleteTitle": "가이드를 삭제할까요?",
+      "deleteBody": "'{{title}}' 가이드를 삭제합니다. 되돌릴 수 없어요.",
+      "categoriesTitle": "카테고리 관리",
+      "categoriesHint": "카테고리는 사용자 화면의 탭과 묶음 순서가 됩니다. 카테고리를 지워도 그 안의 가이드는 '분류 없음'으로 남아요.",
+      "noCategories": "카테고리가 없습니다.",
+      "categoryName": "카테고리 이름",
+      "categoryPlaceholder": "예: Windows 사용 가이드",
+      "addCategory": "추가",
+      "moveUp": "위로",
+      "moveDown": "아래로",
+      "col": {
+        "title": "제목",
+        "category": "카테고리",
+        "format": "형식",
+        "status": "상태",
+        "updated": "수정일",
+        "actions": "작업"
+      },
+      "form": {
+        "title": "제목",
+        "titlePlaceholder": "예: Clash Verge Windows 설치 및 사용 가이드",
+        "titleRequired": "제목을 입력하세요.",
+        "category": "카테고리",
+        "publish": "공개 여부",
+        "publishHint": "공개하면 사용자에게 보입니다.",
+        "summary": "요약",
+        "summaryHint": "목록 카드에 한 줄로 보입니다. 비워 두면 카테고리 이름이 보여요.",
+        "order": "정렬 순서",
+        "orderHint": "작은 숫자가 먼저 보입니다.",
+        "format": "작성 형식",
+        "image": "이미지 넣기",
+        "safety": "저장할 때 서버에서 HTML을 검사해 스크립트, iframe, 이벤트 속성, javascript: 링크 같은 위험한 코드는 자동으로 지웁니다. 미리보기도 같은 검사를 거친 결과입니다.",
+        "source": "본문",
+        "preview": "미리보기",
+        "previewError": "미리보기를 만들지 못했습니다.",
+        "previewEmpty": "본문을 입력하면 여기에 미리보기가 나옵니다.",
+        "markdownPlaceholder": "## 1. 앱 설치\n\n- 아래 링크에서 설치 파일을 받으세요.\n\n[다운로드](https://example.com)",
+        "htmlPlaceholder": "<h2>1. 앱 설치</h2>\n<p>아래 링크에서 설치 파일을 받으세요.</p>"
+      }
     }
   },
   "user": {
@@ -1875,7 +1941,8 @@
       "closeNavigation": "메뉴 닫기",
       "groupService": "플랜 · 구독",
       "groupUsage": "이용 현황",
-      "orders": "주문 내역"
+      "orders": "주문 내역",
+      "guides": "사용 설명서"
     },
     "dashboard": {
       "title": "대시보드",
@@ -2374,6 +2441,20 @@
       "goDashboard": "대시보드로",
       "leakPrompt": "링크가 유출되었나요?",
       "leakLink": "구독 링크 재설정"
+    },
+    "guides": {
+      "title": "사용 설명서",
+      "description": "기기에 맞는 설치와 연결 방법을 확인하세요.",
+      "loadError": "가이드를 불러오지 못했습니다.",
+      "empty": "아직 등록된 가이드가 없어요.",
+      "emptyHint": "가이드가 등록되면 여기에서 볼 수 있어요.",
+      "filterLabel": "가이드 카테고리",
+      "all": "전체",
+      "uncategorized": "기타",
+      "back": "목록으로",
+      "notFound": "가이드를 찾을 수 없어요",
+      "notFoundHint": "삭제되었거나 아직 공개되지 않은 가이드입니다.",
+      "updated": "{{date}} 업데이트"
     }
   },
   "notFound": {
