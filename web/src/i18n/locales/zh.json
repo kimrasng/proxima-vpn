@@ -1252,7 +1252,31 @@
       "durHour": "{{count}} 小时",
       "durMinute": "{{count}} 分钟",
       "durSecond": "{{count}} 秒",
-      "durEquals": "= {{value}}"
+      "durEquals": "= {{value}}",
+      "test": {
+        "elapsed": "耗时 {{ms}} 毫秒",
+        "requestError": "无法发送测试请求。",
+        "step": {
+          "config": "检查输入",
+          "write": "写入测试文件",
+          "read": "读回文件",
+          "delete": "删除测试文件",
+          "token": "检查机器人令牌",
+          "send": "发送测试消息"
+        },
+        "s3": {
+          "button": "测试连接",
+          "hint": "使用上方填写的值，在存储桶中写入、读取并删除一个小文件。无需先保存。",
+          "ok": "备份存储连接正常",
+          "fail": "无法连接备份存储"
+        },
+        "telegram": {
+          "button": "发送测试通知",
+          "hint": "使用上方的机器人和聊天发送一条测试消息。无需先保存。",
+          "ok": "测试通知已发送，请查看 Telegram",
+          "fail": "无法发送 Telegram 通知"
+        }
+      }
     },
     "twoFactor": {
       "title": "双因素认证",

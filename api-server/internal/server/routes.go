@@ -168,6 +168,15 @@ func (s *Server) registerRoutes() {
 	adminSettingsHandler := handlers.NewAdminSettingsHandler(s.db)
 	admin.Get("/settings", adminSettingsHandler.List)
 	admin.Put("/settings", adminSettingsHandler.Update)
+	settingsTestLimiter := limiter.New(limiter.Config{
+		Max: 10, Expiration: time.Minute,
+		KeyGenerator: func(c *fiber.Ctx) string { return "settings-test:" + c.IP() },
+		LimitReached: func(c *fiber.Ctx) error {
+			return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{"error": "too many connection tests, try again in a minute"})
+		},
+	})
+	admin.Post("/settings/test/s3", settingsTestLimiter, adminSettingsHandler.TestS3)
+	admin.Post("/settings/test/telegram", settingsTestLimiter, adminSettingsHandler.TestTelegram)
 
 	adminAnnouncementHandler := handlers.NewAdminAnnouncementHandler(s.db)
 	freeTrials := handlers.NewAdminFreeTrialHandler(s.db)

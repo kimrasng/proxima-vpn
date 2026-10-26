@@ -576,6 +576,28 @@ export function updateNode(id: string, req: UpdateNodeRequest): Promise<Node> {
   return put<Node>(`/api/v1/admin/nodes/${id}`, req);
 }
 
+export interface ConnectionCheck {
+  step: string;
+  ok: boolean;
+  detail?: string;
+}
+
+export interface ConnectionResult {
+  ok: boolean;
+  checks: ConnectionCheck[];
+  elapsed_ms: number;
+}
+
+export function testS3Connection(input: Record<string, string>): Promise<ConnectionResult> {
+  applyAdminClient();
+  return post<ConnectionResult>('/api/v1/admin/settings/test/s3', input);
+}
+
+export function testTelegramConnection(input: Record<string, string>): Promise<ConnectionResult> {
+  applyAdminClient();
+  return post<ConnectionResult>('/api/v1/admin/settings/test/telegram', input);
+}
+
 export function triggerBackup(): Promise<TriggerBackupResponse> {
   applyAdminClient();
   return post<TriggerBackupResponse>('/api/v1/admin/backup/trigger');

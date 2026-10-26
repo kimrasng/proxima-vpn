@@ -4,9 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"strconv"
+	"strings"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/proximavpn/proxima-vpn/api-server/internal/config"
+	"github.com/proximavpn/proxima-vpn/api-server/internal/services"
 )
 
 type AdminSettingsHandler struct {
@@ -105,4 +108,83 @@ func settingValueToString(raw interface{}) string {
 		}
 		return string(b)
 	}
+}
+
+const telegramAPIBase = "https://api.telegram.org"
+
+func (h *AdminSettingsHandler) savedSettings(ctx context.Context, keys ...string) map[string]string {
+	out := map[string]string{}
+	rows, err := h.db.Query(ctx, `SELECT key, value FROM settings WHERE key = ANY($1)`, keys)
+	if err != nil {
+		return out
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var k, v string
+		if rows.Scan(&k, &v) == nil {
+			out[k] = v
+		}
+	}
+	return out
+}
+
+// TestS3 handles POST /api/v1/admin/settings/test/s3. It tests the values in
+// the request (the form as typed, unsaved), filling blank fields from the
+// saved settings, so an admin can check credentials before saving them.
+// @Summary Test the S3 backup connection
+// @Tags admin-settings
+// @Accept json
+// @Produce json
+// @Success 200 {object} services.ConnectionResult
+// @Security BearerAuth
+// @Router /admin/settings/test/s3 [post]
+func (h *AdminSettingsHandler) TestS3(c *fiber.Ctx) error {
+	var body struct {
+		Endpoint  string `json:"s3_endpoint"`
+		Bucket    string `json:"s3_bucket"`
+		AccessKey string `json:"s3_access_key"`
+		SecretKey string `json:"s3_secret_key"`
+		Region    string `json:"s3_region"`
+	}
+	if err := c.BodyParser(&body); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+	}
+	saved := h.savedSettings(c.Context(), "s3_endpoint", "s3_bucket", "s3_access_key", "s3_secret_key", "s3_region")
+	cfg := services.MergeS3(config.S3Config{
+		Endpoint: strings.TrimSpace(body.Endpoint), Bucket: strings.TrimSpace(body.Bucket),
+		AccessKey: strings.TrimSpace(body.AccessKey), SecretKey: strings.TrimSpace(body.SecretKey), Region: strings.TrimSpace(body.Region),
+	}, config.S3Config{
+		Endpoint: saved["s3_endpoint"], Bucket: saved["s3_bucket"], AccessKey: saved["s3_access_key"],
+		SecretKey: saved["s3_secret_key"], Region: saved["s3_region"],
+	})
+	return c.JSON(services.CheckS3Connection(c.Context(), cfg))
+}
+
+// TestTelegram handles POST /api/v1/admin/settings/test/telegram. It checks
+// the bot token and sends one test message to the chat, using the request
+// values and falling back to the saved ones for blank fields.
+// @Summary Send a Telegram test alert
+// @Tags admin-settings
+// @Accept json
+// @Produce json
+// @Success 200 {object} services.ConnectionResult
+// @Security BearerAuth
+// @Router /admin/settings/test/telegram [post]
+func (h *AdminSettingsHandler) TestTelegram(c *fiber.Ctx) error {
+	var body struct {
+		Token  string `json:"telegram_bot_token"`
+		ChatID string `json:"telegram_chat_id"`
+	}
+	if err := c.BodyParser(&body); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+	}
+	saved := h.savedSettings(c.Context(), "telegram_bot_token", "telegram_chat_id")
+	token, chat := strings.TrimSpace(body.Token), strings.TrimSpace(body.ChatID)
+	if token == "" {
+		token = saved["telegram_bot_token"]
+	}
+	if chat == "" {
+		chat = saved["telegram_chat_id"]
+	}
+	return c.JSON(services.CheckTelegramConnection(c.Context(), telegramAPIBase, token, chat))
 }

@@ -1252,7 +1252,31 @@
       "durHour": "{{count}} h",
       "durMinute": "{{count}} min",
       "durSecond": "{{count}} s",
-      "durEquals": "= {{value}}"
+      "durEquals": "= {{value}}",
+      "test": {
+        "elapsed": "took {{ms}} ms",
+        "requestError": "Couldn't send the test request.",
+        "step": {
+          "config": "Check inputs",
+          "write": "Write a test file",
+          "read": "Read it back",
+          "delete": "Delete the test file",
+          "token": "Check bot token",
+          "send": "Send a test message"
+        },
+        "s3": {
+          "button": "Test connection",
+          "hint": "Writes, reads and deletes a small file in the bucket using the values above. No need to save first.",
+          "ok": "The backup storage is reachable",
+          "fail": "Couldn't connect to the backup storage"
+        },
+        "telegram": {
+          "button": "Send test alert",
+          "hint": "Sends one test message with the bot and chat above. No need to save first.",
+          "ok": "Test alert sent. Check Telegram",
+          "fail": "Couldn't send the Telegram alert"
+        }
+      }
     },
     "twoFactor": {
       "title": "2FA Security",
