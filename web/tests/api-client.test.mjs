@@ -141,7 +141,7 @@ for (const loginPath of ['/api/v1/auth/login', '/api/v1/auth/passkey/login/finis
 
 test('promo login target preserves an encoded campaign code', () => {
   const search = '?promo=' + encodeURIComponent('VIP & SAVE/20');
-  assert.equal(postLogin.consumePostLogin('/portal/dashboard', search), '/portal/plan?promo=VIP%20%26%20SAVE%2F20');
+  assert.equal(postLogin.consumePostLogin('/portal/dashboard', search), '/portal/dashboard?promo=VIP+%26+SAVE%2F20');
 });
 
 test('an explicit OAuth continuation takes precedence over a promo', () => {
@@ -151,10 +151,23 @@ test('an explicit OAuth continuation takes precedence over a promo', () => {
 
 test('the session fallback retains the promo across registration navigation', () => {
   postLogin.rememberPostLogin(postLogin.continueTarget('?promo=VIP'));
-  assert.equal(postLogin.consumePostLogin('/portal/dashboard', ''), '/portal/plan?promo=VIP');
+  assert.equal(postLogin.consumePostLogin('/portal/dashboard', ''), '/portal/dashboard?promo=VIP');
   assert.equal(storage.has('session:proxima_post_login'), false);
 });
 
 test('an unsafe continuation cannot redirect off-site and falls back to the promo', () => {
-  assert.equal(postLogin.continueTarget('?continue=%2F%2Fevil.example&promo=VIP'), '/portal/plan?promo=VIP');
+  assert.equal(postLogin.continueTarget('?continue=%2F%2Fevil.example&promo=VIP'), '/portal/dashboard?promo=VIP');
+});
+
+test('a saved promotion survives a fresh sign-in without URL or session state', (t) => {
+  t.mock.method(Date, 'now', () => 1_800_000_000_000);
+  storage.set('proxima_pending_promo', JSON.stringify({ code: 'WELCOME', savedAt: Date.now() }));
+  assert.equal(postLogin.consumePostLogin('/portal/dashboard', ''), '/portal/dashboard?promo=WELCOME');
+});
+
+test('an expired saved promotion does not reopen checkout', (t) => {
+  t.mock.method(Date, 'now', () => 1_800_000_000_000);
+  storage.set('proxima_pending_promo', JSON.stringify({ code: 'EXPIRED', savedAt: Date.now() - 31 * 86400_000 }));
+  assert.equal(postLogin.consumePostLogin('/portal/dashboard', ''), '/portal/dashboard');
+  assert.equal(storage.has('proxima_pending_promo'), false);
 });

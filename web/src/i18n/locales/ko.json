@@ -13,7 +13,34 @@
     "start": "체험 시작하기",
     "keep": "계속 이용",
     "confirm": "자동 결제 해지하기",
-    "cancelHint": "추가 결제만 중단됩니다. 현재 체험 또는 결제된 이용 기간은 그대로 유지됩니다."
+    "cancelHint": "추가 결제만 중단됩니다. 현재 체험 또는 결제된 이용 기간은 그대로 유지됩니다.",
+    "card": {
+      "title": "정기결제 카드",
+      "description": "등록된 카드로 정기 결제가 진행됩니다.",
+      "billingStopped": "자동 결제가 해지되어 추가 결제는 진행되지 않습니다.",
+      "label": "등록된 카드",
+      "none": "등록된 카드가 없습니다.",
+      "unavailable": "Stripe에서 카드 정보를 불러오지 못했습니다.",
+      "edit": "결제 관리",
+      "popupBlocked": "Stripe를 열 수 있도록 브라우저의 팝업을 허용한 뒤 다시 눌러 주세요.",
+      "portalError": "Stripe 결제 관리 화면을 열지 못했습니다. 다시 시도해 주세요.",
+      "refreshError": "변경된 카드 정보를 불러오지 못했습니다. 페이지를 새로고침해 주세요.",
+      "unknownBrand": "카드",
+      "expires": "만료 {{date}}",
+      "credit": "신용카드",
+      "debit": "체크카드",
+      "prepaid": "선불카드",
+      "wallet": "{{wallet}} 지갑",
+      "nextCharge": "다음 결제",
+      "noneScheduled": "예정된 결제가 없습니다.",
+      "every": "{{days}}일마다",
+      "state": "결제 상태",
+      "recurring": "자동 결제 중",
+      "stopped": "자동 결제 해지됨"
+    },
+    "manage": "자동 결제 관리",
+    "extendBlocked": "자동 결제가 걸려 있어 플랜을 따로 연장할 수 없습니다. 이용 기간은 자동 결제로 이어집니다. 직접 연장하려면 먼저 자동 결제를 해지해 주세요.",
+    "extendBlockedShort": "자동 결제 중에는 연장할 수 없습니다"
   },
   "app": {
     "title": "Proxima VPN",
@@ -1934,6 +1961,71 @@
       }
     },
     "promotions": {
+      "page": {
+        "edit": "이름·대상 설정",
+        "title": "프로모션 설정",
+        "desc": "고객에게 보여 줄 이름과 혜택 설명, 이용 대상을 설정합니다.",
+        "error": "설정을 불러오거나 저장하지 못했습니다. 입력값을 확인해 주세요.",
+        "headline": "제목",
+        "headlineHint": "최대 80자. 비워두면 프로모션 혜택을 기본 제목으로 표시합니다.",
+        "headlinePlaceholder": "예: 첫 일주일, 무료로 시작하세요",
+        "description": "설명",
+        "descriptionHint": "최대 300자. 대상 고객과 혜택을 짧게 설명하세요. 비워두면 기본 혜택 안내를 사용합니다.",
+        "descriptionPlaceholder": "예: 처음 가입하는 고객을 위한 7일 무료 체험입니다.",
+        "cta": "버튼 문구",
+        "ctaHint": "최대 30자. 비워두면 프로모션 유형에 맞는 기본 버튼 문구를 사용합니다.",
+        "ctaPlaceholder": "예: 무료 체험 시작하기",
+        "plan": "표시할 플랜",
+        "planAuto": "자동 선택",
+        "planHint": "자동 선택 시 프로모션에 적용 가능한 플랜을 표시합니다. 플랜을 지정해도 기존 할인·이용 조건은 바뀌지 않습니다.",
+        "preview": "저장된 고객 화면 열기",
+        "countries": "접속 국가",
+        "countriesHint": "국가 이름이나 ISO 코드로 검색하세요. 접속 IP의 국가를 기준으로 하며, 선택하지 않으면 모든 국가에서 이용할 수 있습니다.",
+        "browsers": "브라우저",
+        "browsersHint": "Chrome, Safari, Firefox, Edge 또는 알 수 없음을 선택하세요. 선택하지 않으면 모든 브라우저를 허용합니다.",
+        "ip_cidrs": "허용 IP / CIDR",
+        "ip_cidrsHint": "단일 IPv4·IPv6 주소 또는 CIDR 대역을 쉼표나 줄바꿈으로 구분하세요. 앞뒤 공백은 제거됩니다. 비워두면 IP를 제한하지 않습니다.",
+        "email_domains": "허용 이메일 도메인",
+        "email_domainsHint": "@ 없이 도메인만 쉼표나 줄바꿈으로 구분하세요. 앞뒤 공백은 제거됩니다. 혜택 적용 시 계정 이메일을 확인하며, 비워두면 제한하지 않습니다.",
+        "cancel": "취소",
+        "save": "저장",
+        "loading": "프로모션 설정을 불러오는 중입니다.",
+        "loadError": "설정을 불러오지 못했습니다",
+        "loadUnavailable": "현재 연결된 관리자 API가 프로모션 설정 경로를 지원하지 않습니다. API 버전을 확인하고 최신 백엔드로 재시작한 뒤 다시 불러오세요.",
+        "loadErrorHint": "네트워크와 관리자 API 연결을 확인한 뒤 다시 시도하세요. 설정을 불러오기 전에는 편집하거나 저장할 수 없습니다.",
+        "retry": "다시 불러오기",
+        "saveErrorTitle": "저장하지 못했습니다",
+        "saveError": "입력한 내용은 유지됩니다. 연결 상태를 확인한 뒤 저장을 다시 눌러주세요.",
+        "validationError": "표시된 입력 항목을 확인한 뒤 다시 저장하세요. 입력한 내용은 유지됩니다.",
+        "contentTab": "고객에게 보이는 내용",
+        "contentHint": "프로모션 안내 화면의 문구와 표시할 플랜을 설정합니다. 문구를 비워두면 혜택에 맞는 기본 안내를 사용합니다.",
+        "fixedPlan": "무료 체험에 지정된 플랜 사용",
+        "fixedPlanHint": "체험 플랜은 무료 체험 설정에서 변경할 수 있으며, 이 화면에서 따로 바꿀 수 없습니다.",
+        "renewalHint": "카드 등록이 필요한 체험은 종료 후 지정된 플랜과 결제 주기로 자동 유료 갱신됩니다. 문구를 수정해도 체험 기간·결제 주기·갱신 조건은 바뀌지 않으니, 고객 안내에 이 조건을 포함하세요.",
+        "search": "이름 또는 코드로 검색",
+        "noMatches": "일치하는 항목이 없습니다.",
+        "unrestricted": "제한 없음",
+        "removeSelection": "{{name}} 선택 해제",
+        "eligibilityTab": "이용 대상",
+        "eligibilityHint": "설정한 조건 종류는 모두 충족해야 합니다(AND). 같은 종류 안에서는 하나만 일치하면 됩니다(OR). 비워둔 종류는 제한하지 않습니다. 예: 한국·일본 + Chrome은 두 나라 중 한 곳에서 Chrome을 쓰는 고객에게 적용됩니다.",
+        "advanced": "고급 조건 · IP와 이메일 도메인",
+        "ipPlaceholder": "예: 203.0.113.10, 198.51.100.0/24\n2001:db8::/32",
+        "emailPlaceholder": "예: gmail.com, example.com",
+        "textLimit": "{{count}}자 이내로 입력하세요.",
+        "ruleLimit": "조건 종류별로 최대 100개까지 입력할 수 있습니다.",
+        "countryError": "국가 선택을 확인하세요. 두 자리 ISO 국가 코드가 필요합니다.",
+        "browserError": "지원하지 않는 브라우저 값이 있습니다. 기존 선택을 해제하고 목록에서 다시 선택하세요.",
+        "ipError": "올바른 IP 주소 또는 CIDR 대역을 입력하세요. 예: 203.0.113.10, 198.51.100.0/24",
+        "emailError": "@와 이메일 주소 전체가 아닌 도메인만 입력하세요. 예: example.com",
+        "planError": "유효한 플랜을 목록에서 다시 선택하세요.",
+        "browser": {
+          "chrome": "Chrome",
+          "safari": "Safari",
+          "firefox": "Firefox",
+          "edge": "Edge",
+          "unknown": "알 수 없음"
+        }
+      },
       "tabs": {
         "coupon": "쿠폰",
         "freeTrial": "무료 체험",
@@ -2849,7 +2941,38 @@
         "summary": "플랜·사용량",
         "tickets": "리셋권 목록",
         "ticketHistory": "리셋권 사용 기록",
-        "redeem": "리셋권 사용"
+        "redeem": "리셋권 사용",
+        "profileUpdate": "프로필 수정",
+        "subDomains": "구독 도메인",
+        "subRegenerate": "구독 주소 재발급",
+        "traffic": "사용량 통계",
+        "plans": "플랜 목록",
+        "orders": "주문 내역",
+        "receipt": "영수증",
+        "providers": "결제 수단",
+        "trial": "무료 체험 상태",
+        "promoLookup": "프로모션 확인",
+        "orderCreate": "주문 만들기",
+        "orderCancel": "주문 취소",
+        "promoApply": "프로모션 적용",
+        "promoRemove": "프로모션 해제",
+        "checkout": "결제 시작",
+        "checkoutConfirm": "결제 확인",
+        "trialCancel": "체험 해지",
+        "trialConfirm": "체험 확인",
+        "billingPortal": "결제 관리 포털",
+        "devices": "기기 목록",
+        "deviceCreate": "기기 등록",
+        "deviceDelete": "기기 삭제",
+        "faq": "자주 묻는 질문",
+        "supportTickets": "내 문의 목록",
+        "supportThread": "문의 대화 기록",
+        "supportCreate": "문의 작성",
+        "supportReply": "답장 보내기",
+        "supportClose": "문의 종료",
+        "announcements": "공지사항",
+        "guides": "사용 설명서 목록",
+        "guide": "사용 설명서"
       },
       "emptyTitle": "등록된 앱이 없습니다",
       "emptyBody": "자체 앱이나 연동할 서비스를 등록하면 Proxima 계정으로 로그인할 수 있습니다.",
@@ -3052,7 +3175,38 @@
           "summary": "현재 플랜, 데이터 사용량과 한도, 만료일",
           "tickets": "사용할 수 있는 리셋권 목록",
           "ticketHistory": "리셋권 사용 기록",
-          "redeem": "리셋권 하나를 써서 이번 달 데이터 사용량을 초기화합니다. 이미 썼거나 만료된 리셋권은 409"
+          "redeem": "리셋권 하나를 써서 이번 달 데이터 사용량을 초기화합니다. 이미 썼거나 만료된 리셋권은 409",
+          "profileUpdate": "이름(name)과 언어(language)만 바꿉니다. email·password를 보내면 403으로 거절됩니다.",
+          "subDomains": "구독 주소를 쓸 수 있는 도메인 목록",
+          "subRegenerate": "새 구독 주소를 만들고 기존 주소를 무효로 만듭니다.",
+          "traffic": "기간별 데이터 사용량",
+          "plans": "구매할 수 있는 플랜과 가격",
+          "orders": "지금까지의 주문과 결제 상태",
+          "receipt": "주문 하나의 영수증",
+          "providers": "쓸 수 있는 결제 수단",
+          "trial": "무료 체험 구독 현황",
+          "promoLookup": "프로모션 코드 내용 확인",
+          "orderCreate": "플랜 주문을 만듭니다.",
+          "orderCancel": "결제 전 주문을 취소합니다.",
+          "promoApply": "주문에 프로모션 코드를 적용합니다.",
+          "promoRemove": "주문에서 프로모션 코드를 뺍니다.",
+          "checkout": "결제 창 주소를 받습니다. 결제는 사용자가 그 화면에서 직접 승인합니다.",
+          "checkoutConfirm": "결제가 끝났는지 확인하고 플랜을 적용합니다.",
+          "trialCancel": "무료 체험 구독을 해지합니다.",
+          "trialConfirm": "무료 체험 결제 수단 등록을 확인합니다.",
+          "billingPortal": "Stripe 결제 관리 화면 주소를 받습니다.",
+          "devices": "등록된 기기",
+          "deviceCreate": "기기를 새로 등록합니다.",
+          "deviceDelete": "기기를 삭제하고 연결을 끊습니다.",
+          "faq": "문의 카테고리와 FAQ",
+          "supportTickets": "내 문의 티켓 목록",
+          "supportThread": "문의 하나의 전체 대화",
+          "supportCreate": "새 문의를 남깁니다.",
+          "supportReply": "문의에 답장을 남깁니다.",
+          "supportClose": "문의를 종료합니다.",
+          "announcements": "사용자 언어로 된 공지",
+          "guides": "공개된 가이드 목록",
+          "guide": "가이드 하나의 본문"
         }
       },
       "errors": {
@@ -3293,6 +3447,35 @@
   },
   "user": {
     "promo": {
+      "offer": {
+        "title": "프로모션 혜택",
+        "discountBadge": "{{value}}% 할인",
+        "termScope": "선택한 {{days}}일 상품에 프로모션 할인이 적용됩니다.",
+        "trialPeriod": "/ {{days}}일 무료 체험",
+        "afterTrial": "체험 종료 후 {{days}}일마다 {{price}}",
+        "included": "포함",
+        "excluded": "미포함",
+        "cardRequired": "체험을 시작하려면 카드를 등록해야 합니다. 지금 결제되는 금액은 없습니다.",
+        "autoRenew": "체험 종료 후 {{days}}일마다 {{price}}가 자동 결제됩니다. 체험 종료 전에 해지할 수 있습니다.",
+        "noAutoRenew": "체험 종료 후 자동으로 결제되지 않습니다. 계속 이용하려면 요금제를 구매해 주세요."
+      },
+      "notNow": "나중에",
+      "terms": "혜택은 적용 가능한 주문에만 제공됩니다. 최종 금액은 결제 전에 확인할 수 있습니다.",
+      "trialTerms": "카드 등록이 필요합니다. 체험 종료 후 선택한 플랜의 정기 요금이 자동 결제되며, 종료 전에 해지할 수 있습니다.",
+      "haveAccount": "이미 계정이 있나요?",
+      "unit": "/ {{days}}일",
+      "priceLabel": "정가 ${{was}}, 혜택가 ${{now}}",
+      "cta": {
+        "trial": "무료 체험 시작하기",
+        "discount": "혜택 받고 시작하기"
+      },
+      "spec": {
+        "traffic": "데이터 {{value}}",
+        "trafficUnlimited": "데이터 무제한",
+        "speed": "최대 {{value}} Mbps",
+        "speedUnlimited": "속도 제한 없음",
+        "devices": "기기 {{count}}대 동시 연결"
+      },
       "trialBenefit": "{{days}}일 무료 체험",
       "benefitHint": "로그인하면 결제 화면에 코드가 자동으로 입력돼요.",
       "login": "로그인으로 이동",
@@ -3303,7 +3486,13 @@
       "invalidTitle": "사용할 수 없는 프로모션입니다",
       "invalid": "유효하지 않거나 비활성화·만료되었거나 사용 한도에 도달한 코드입니다.",
       "errorTitle": "프로모션을 확인하지 못했습니다",
-      "error": "연결 상태를 확인하고 다시 시도하세요.",
+      "error": {
+        "title": "프로모션 안내",
+        "close": "확인",
+        "invalid": "잘못된 프로모션 코드입니다. 입력한 코드를 확인해 주세요.",
+        "ineligible": "프로모션 이용 조건에 부합하지 않습니다. 적용 대상과 이용 기간을 확인해 주세요.",
+        "unavailable": "프로모션 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요."
+      },
       "retry": "다시 시도",
       "percentBenefit": "{{value}}% 할인",
       "fixedBenefit": "{{value}} 할인",
@@ -3578,6 +3767,8 @@
         "pendingHint": "코드를 적용하면 이 주문에 이미 적용된 코드를 대체합니다.",
         "beforeOrderHint": "기간을 선택하기 전에 코드를 입력하면 주문에 함께 적용됩니다.",
         "discountApplied": "할인 적용됨",
+        "remove": "프로모션 삭제",
+        "removeError": "프로모션을 삭제하지 못했습니다. 잠시 후 다시 시도해 주세요.",
         "savedAmount": "{{amount}} 절약",
         "rejected": {
           "not_found": "존재하지 않는 프로모션 코드입니다.",
@@ -3590,6 +3781,7 @@
           "overall_cap_reached": "프로모션 코드의 사용 한도가 모두 소진되었습니다.",
           "user_cap_reached": "이 프로모션 코드를 사용할 수 있는 횟수를 이미 모두 사용했습니다.",
           "use_trial_redeem": "무료 체험 코드예요. 결제 없이 바로 시작돼요.",
+          "not_eligible": "이 계정이나 접속 환경에는 적용할 수 없는 프로모션입니다.",
           "card_required_unsupported": "카드 등록이 필요한 체험 코드는 아직 사용할 수 없어요. 고객 지원에 문의해 주세요.",
           "active_plan_exists": "이미 이용 중인 플랜이 있어서 무료 체험을 시작할 수 없어요. 무료 체험은 이용 중인 플랜이 없을 때만 쓸 수 있어요."
         },
@@ -3599,8 +3791,8 @@
       "checkoutModal": {
         "title": "결제하기",
         "provider": "결제 수단",
-        "providerStripe": "카드 결제",
-        "providerStripeHint": "Stripe 결제 페이지로 이동해 바로 결제합니다.",
+        "providerStripe": "카드·간편결제",
+        "providerStripeHint": "Stripe에서 접속 국가에 맞는 통화와 사용 가능한 결제수단을 확인합니다.",
         "providerAdmin": "계좌이체 · 수동 확인",
         "providerAdminHint": "주문을 접수하고, 입금이 확인되면 플랜이 적용됩니다.",
         "confirm": "결제 진행",
@@ -3610,7 +3802,7 @@
         "subtotal": "상품 금액",
         "discount": "할인",
         "total": "최종 결제 금액",
-        "codeApplied": "{{code}} 코드가 적용되었습니다.",
+        "codeApplied": "{{code}} 혜택이 적용되었습니다.",
         "confirmAmount": "{{amount}} 결제하기",
         "viewPlans": "요금제 보기",
         "promoPlaceholder": "프로모션 코드 (선택)",
@@ -4121,7 +4313,7 @@
     "oauth": {
       "title": "{{app}}에서 내 Proxima 계정을 사용하려고 합니다",
       "scopesTitle": "허용하면 이 앱이 할 수 있는 일",
-      "never": "비밀번호와 결제 정보는 앱에 전달되지 않습니다. 앱은 아래 권한 안에서만 계정을 사용합니다.",
+      "never": "비밀번호와 카드 번호는 앱에 전달되지 않습니다. 앱은 아래 권한 안에서만 계정을 사용합니다.",
       "redirectLabel": "승인 후 돌아갈 곳",
       "approve": "허용",
       "deny": "거부",
@@ -4165,6 +4357,42 @@
         "reset_tickets_redeem": {
           "title": "리셋권 사용",
           "desc": "앱에서 리셋권을 써서 이번 달 데이터 사용량을 초기화할 수 있습니다."
+        },
+        "profile_write": {
+          "title": "이름·언어 변경",
+          "desc": "표시 이름과 사용 언어를 바꿀 수 있습니다. 이메일과 비밀번호는 바꿀 수 없습니다."
+        },
+        "subscription_write": {
+          "title": "구독 주소 재발급",
+          "desc": "구독 주소를 새로 만들 수 있습니다. 재발급하면 기존 구독 주소는 더 이상 쓸 수 없어 새 주소로 바꿔야 합니다."
+        },
+        "orders_read": {
+          "title": "주문 내역 보기",
+          "desc": "플랜 목록, 주문 내역, 영수증, 무료 체험 상태(등록된 카드의 종류·끝 4자리·만료월 포함)"
+        },
+        "orders_write": {
+          "title": "주문·결제 진행",
+          "desc": "플랜 주문, 결제 창 열기, 주문 취소, 자동 결제 구독 해지, 결제 관리 화면 열기를 할 수 있습니다. 첫 결제는 결제 화면에서 직접 승인하고, 이후 자동 갱신은 따로 묻지 않습니다."
+        },
+        "support_read": {
+          "title": "문의 내역 보기",
+          "desc": "내 문의 티켓과 대화 기록, 자주 묻는 질문"
+        },
+        "support_write": {
+          "title": "문의 작성·답장",
+          "desc": "내 이름으로 문의를 남기고 답장하거나 문의를 종료할 수 있습니다."
+        },
+        "devices_read": {
+          "title": "기기 목록 보기",
+          "desc": "등록된 기기와 기기별 연결 정보"
+        },
+        "devices_write": {
+          "title": "기기 추가·삭제",
+          "desc": "기기를 등록하거나 삭제할 수 있습니다. 삭제한 기기는 바로 연결이 끊깁니다."
+        },
+        "content_read": {
+          "title": "공지·가이드 보기",
+          "desc": "공지사항과 사용 설명서"
         }
       },
       "approvedTitle": "연결을 허용했어요",

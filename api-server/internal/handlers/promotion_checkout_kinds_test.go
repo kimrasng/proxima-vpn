@@ -148,7 +148,7 @@ func TestAffiliateCode_CancelledOrderEarnsNothingAndInactiveIsRejected(t *testin
 	}
 }
 
-func TestFreeTrialCode_OnOrderAsksForTrialRedeem(t *testing.T) {
+func TestFreeTrialCode_AttachesToNormalOrder(t *testing.T) {
 	pool := checkoutKindsDB(t)
 	ctx := context.Background()
 	userID, planID, _ := seedFreeOrderData(t, pool, ctx, uuid.NewString()[:8])
@@ -156,9 +156,17 @@ func TestFreeTrialCode_OnOrderAsksForTrialRedeem(t *testing.T) {
 	orderID := seedPendingOrder(t, pool, userID, planID)
 	h := &UserOrderHandler{db: pool, activity: services.NewActivityService(pool), promotion: services.NewPromotionService(pool)}
 
-	// Given: a trial code. When: applied as a discount. Then: the distinct reason is returned.
-	if reason := rejectReason(h.applyPromotion(ctx, &orderResponse{ID: orderID}, userID, code)); reason != services.RejectUseTrialRedeem {
-		t.Fatalf("reason = %q", reason)
+	// Given a pending normal order, applying a trial keeps that order pending at zero.
+	resp := orderResponse{ID: orderID}
+	if err := h.applyPromotion(ctx, &resp, userID, code); err != nil {
+		t.Fatal(err)
+	}
+	if resp.ID != orderID || resp.PriceCents != 0 || resp.DiscountCents != 1000 || resp.PromotionCode != code || resp.Status != "pending" {
+		t.Fatalf("trial order = %+v", resp)
+	}
+	result, err := services.NewFreeTrialService(pool).RedeemOrder(ctx, userID, code, orderID)
+	if err != nil || result.OrderID != orderID || result.TrialDays != 7 {
+		t.Fatalf("trial checkout = %+v, %v", result, err)
 	}
 }
 

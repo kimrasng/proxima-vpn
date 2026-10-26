@@ -2,12 +2,31 @@ import { get, post, put, del, setClientTokenType } from './client';
 
 export const OAUTH_SCOPES = [
   'profile',
+  'profile:write',
   'subscription:read',
+  'subscription:write',
   'nodes:read',
   'plan:read',
   'reset_tickets:read',
   'reset_tickets:redeem',
+  'orders:read',
+  'orders:write',
+  'support:read',
+  'support:write',
+  'devices:read',
+  'devices:write',
+  'content:read',
 ] as const;
+
+// Scopes that let an app change the account, shown with a warning on consent.
+export const WRITE_SCOPES: readonly string[] = [
+  'profile:write',
+  'subscription:write',
+  'reset_tickets:redeem',
+  'orders:write',
+  'support:write',
+  'devices:write',
+];
 export type OAuthScope = (typeof OAUTH_SCOPES)[number];
 
 // i18n keys cannot contain ":" (it is the namespace separator), so scopes are

@@ -136,7 +136,7 @@ func (s *Server) registerRoutes() {
 	adminUsers.Post("/:id/plan-grants", adminPlanGrantHandler.Grant)
 	adminUsers.Get("/:id/orders/:orderId/receipt", handlers.NewUserCheckoutHandler(s.db, s.payments).AdminReceipt)
 
-	adminOrderHandler := handlers.NewAdminOrderHandler(s.db)
+	adminOrderHandler := handlers.NewAdminOrderHandler(s.db, s.payments)
 	adminOrders := admin.Group("/orders")
 	adminOrders.Get("/", adminOrderHandler.List)
 	adminOrders.Get("/:id/audit", adminOrderHandler.Audit)
@@ -162,6 +162,9 @@ func (s *Server) registerRoutes() {
 	admin.Delete("/affiliates/:id", affiliates.Delete)
 	admin.Get("/affiliates/:id/commissions", affiliates.Commissions)
 	admin.Put("/affiliates/:id/commissions/:commissionId/paid", affiliates.MarkPaid)
+	promoPages := handlers.NewAdminPromoPageHandler(s.db)
+	admin.Get("/promo-pages/:code", promoPages.Get)
+	admin.Put("/promo-pages/:code", promoPages.Put)
 
 	admin.Get("/reset-tickets", resetTicketHandler.ListGrants)
 
@@ -385,6 +388,7 @@ func (s *Server) registerRoutes() {
 
 	user := api.Group("/user")
 	user.Use(middleware.UserJWTMiddleware(s.config.JWT.Secret, s.db))
+	user.Get("/promotions/:code", handlers.NewPromoLandingHandler(s.db).Get)
 
 	userPlanHandler := handlers.NewUserPlanHandler(s.db)
 	user.Get("/plans", userPlanHandler.ListPlans)
@@ -395,11 +399,12 @@ func (s *Server) registerRoutes() {
 	user.Get("/orders", userOrderHandler.List)
 	user.Post("/orders/:id/cancel", userOrderHandler.Cancel)
 	user.Patch("/orders/:id/promotion", userOrderHandler.ApplyPromotion)
+	user.Delete("/orders/:id/promotion", userOrderHandler.RemovePromotion)
 	trialSubscription := handlers.NewUserTrialSubscriptionHandler(s.db, s.payments)
-	user.Post("/free-trials/redeem", trialSubscription.Start)
 	user.Get("/free-trials/subscription", trialSubscription.Current)
 	user.Post("/free-trials/subscription/cancel", trialSubscription.Cancel)
 	user.Post("/free-trials/subscription/confirm", trialSubscription.Confirm)
+	user.Post("/billing/portal", trialSubscription.BillingPortal)
 
 	userCheckoutHandler := handlers.NewUserCheckoutHandler(s.db, s.payments)
 	user.Post("/orders/:id/checkout", userCheckoutHandler.Start)
@@ -476,6 +481,45 @@ func (s *Server) registerRoutes() {
 	clientAPI.Get("/reset-tickets", middleware.RequireScope(services.ScopeResetTicketsRead), resetTicketHandler.ListMine)
 	clientAPI.Get("/reset-tickets/history", middleware.RequireScope(services.ScopeResetTicketsRead), resetTicketHandler.ListMyHistory)
 	clientAPI.Post("/reset-tickets/:id/redeem", middleware.RequireScope(services.ScopeResetTicketsRedeem), resetTicketHandler.Redeem)
+
+	// Everything else the web portal can do, except passkeys, connected-app
+	// management and email/password changes, which stay portal-only.
+	need := middleware.RequireScope
+	clientAPI.Put("/profile", need(services.ScopeProfileWrite), middleware.ProfileFieldsForApps(), userPortalHandler.UpdateProfile)
+	clientAPI.Get("/subscription-domains", need(services.ScopeSubscriptionRead), userSubDomainHandler.List)
+	clientAPI.Post("/sub-token/regenerate", need(services.ScopeSubscriptionWrite), userPortalHandler.RegenerateSubToken)
+	clientAPI.Get("/traffic", need(services.ScopePlanRead), userPortalHandler.GetTrafficStats)
+	clientAPI.Get("/plans", need(services.ScopeOrdersRead), userPlanHandler.ListPlans)
+
+	clientAPI.Get("/orders", need(services.ScopeOrdersRead), userOrderHandler.List)
+	clientAPI.Get("/orders/:id/receipt", need(services.ScopeOrdersRead), userCheckoutHandler.Receipt)
+	clientAPI.Get("/payment-providers", need(services.ScopeOrdersRead), userCheckoutHandler.ListProviders)
+	clientAPI.Get("/free-trials/subscription", need(services.ScopeOrdersRead), trialSubscription.Current)
+	clientAPI.Get("/promotions/:code", need(services.ScopeOrdersRead), handlers.NewPromoLandingHandler(s.db).Get)
+	clientAPI.Post("/orders", need(services.ScopeOrdersWrite), userOrderHandler.Create)
+	clientAPI.Post("/orders/:id/cancel", need(services.ScopeOrdersWrite), userOrderHandler.Cancel)
+	clientAPI.Patch("/orders/:id/promotion", need(services.ScopeOrdersWrite), userOrderHandler.ApplyPromotion)
+	clientAPI.Delete("/orders/:id/promotion", need(services.ScopeOrdersWrite), userOrderHandler.RemovePromotion)
+	clientAPI.Post("/orders/:id/checkout", need(services.ScopeOrdersWrite), userCheckoutHandler.Start)
+	clientAPI.Post("/orders/:id/checkout/confirm", need(services.ScopeOrdersWrite), userCheckoutHandler.Confirm)
+	clientAPI.Post("/free-trials/subscription/cancel", need(services.ScopeOrdersWrite), trialSubscription.Cancel)
+	clientAPI.Post("/free-trials/subscription/confirm", need(services.ScopeOrdersWrite), trialSubscription.Confirm)
+	clientAPI.Post("/billing/portal", need(services.ScopeOrdersWrite), trialSubscription.BillingPortal)
+
+	clientAPI.Get("/devices", need(services.ScopeDevicesRead), userDeviceHandler.List)
+	clientAPI.Post("/devices", need(services.ScopeDevicesWrite), userDeviceHandler.Create)
+	clientAPI.Delete("/devices/:id", need(services.ScopeDevicesWrite), userDeviceHandler.Delete)
+
+	clientAPI.Get("/support/faq", need(services.ScopeSupportRead), supportHandler.ListFAQ)
+	clientAPI.Get("/support/tickets", need(services.ScopeSupportRead), supportHandler.ListTickets)
+	clientAPI.Get("/support/tickets/:id", need(services.ScopeSupportRead), supportHandler.GetTicket)
+	clientAPI.Post("/support/tickets", need(services.ScopeSupportWrite), userSupportLimiter, supportHandler.CreateTicket)
+	clientAPI.Post("/support/tickets/:id/messages", need(services.ScopeSupportWrite), userSupportLimiter, supportHandler.PostMessage)
+	clientAPI.Post("/support/tickets/:id/close", need(services.ScopeSupportWrite), supportHandler.CloseTicket)
+
+	clientAPI.Get("/announcements", need(services.ScopeContentRead), userPortalHandler.ListLocalizedAnnouncements)
+	clientAPI.Get("/guides", need(services.ScopeContentRead), userGuideHandler.ListPublished)
+	clientAPI.Get("/guides/:id", need(services.ScopeContentRead), userGuideHandler.GetPublished)
 
 	subscriptionHandler := handlers.NewSubscriptionHandler(s.db, s.config.Subscription.UpdateInterval)
 	subLimiter := limiter.New(limiter.Config{

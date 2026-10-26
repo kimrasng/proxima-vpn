@@ -391,3 +391,14 @@
     padding-right: 16px;
   }
 }
+
+.oauth-apps__method--put,
+.oauth-apps__method--patch {
+  background: #fff4e5;
+  color: #a35200;
+}
+
+.oauth-apps__method--delete {
+  background: #fdecec;
+  color: #c4161c;
+}

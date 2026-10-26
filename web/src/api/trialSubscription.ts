@@ -1,5 +1,14 @@
 import { get, post, setClientTokenType } from "./client";
 
+export interface PaymentMethodSummary {
+  readonly brand: string;
+  readonly last4: string;
+  readonly exp_month: number;
+  readonly exp_year: number;
+  readonly funding: string;
+  readonly wallet?: string;
+}
+
 export interface TrialSubscription {
   readonly id: string;
   readonly plan_name: string;
@@ -11,25 +20,24 @@ export interface TrialSubscription {
   readonly trial_ends_at: string | null;
   readonly current_period_end: string | null;
   readonly cancel_at_period_end: boolean;
+  /** Card details retrieved from Stripe; null when no card was returned. */
+  readonly payment_method: PaymentMethodSummary | null;
+  readonly payment_method_unavailable?: boolean;
 }
-
-type TrialStart =
-  | { readonly mode: "redirect"; readonly redirect_url: string }
-  | { readonly order_id: string; readonly plan_expires_at: string };
 
 export function currentTrial() {
   setClientTokenType("user");
   return get<TrialSubscription | null>("/api/v1/user/free-trials/subscription");
 }
 
-export function startTrial(code: string) {
-  setClientTokenType("user");
-  return post<TrialStart>("/api/v1/user/free-trials/redeem", { code });
-}
-
 export function cancelTrial() {
   setClientTokenType("user");
   return post<TrialSubscription>("/api/v1/user/free-trials/subscription/cancel", {});
+}
+
+export function openBillingPortal() {
+  setClientTokenType("user");
+  return post<{ readonly url: string }>("/api/v1/user/billing/portal", {});
 }
 
 export function confirmTrial(id: string, sessionId: string) {

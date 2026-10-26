@@ -3,6 +3,7 @@ package payments
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -94,11 +95,12 @@ func (p *StripeProvider) StartCheckout(ctx context.Context, req CheckoutRequest)
 	cancelURL := p.panelURL + "/portal/plan?checkout=cancelled"
 
 	params := &stripe.CheckoutSessionCreateParams{
-		Mode:          stripe.String(string(stripe.CheckoutSessionModePayment)),
-		SuccessURL:    stripe.String(successURL),
-		CancelURL:     stripe.String(cancelURL),
-		CustomerEmail: stripe.String(req.UserEmail),
-		ExpiresAt:     stripe.Int64(req.ExpiresAt.Unix()),
+		AdaptivePricing: &stripe.CheckoutSessionCreateAdaptivePricingParams{Enabled: stripe.Bool(true)},
+		Mode:            stripe.String(string(stripe.CheckoutSessionModePayment)),
+		SuccessURL:      stripe.String(successURL),
+		CancelURL:       stripe.String(cancelURL),
+		CustomerEmail:   stripe.String(req.UserEmail),
+		ExpiresAt:       stripe.Int64(req.ExpiresAt.Unix()),
 		Metadata: map[string]string{
 			"order_id": req.OrderID,
 		},
@@ -128,12 +130,15 @@ func (p *StripeProvider) StartCheckout(ctx context.Context, req CheckoutRequest)
 			},
 		},
 	}
-
 	// When the order carries a promotion discount, create a one-time Stripe
 	// coupon so Stripe's checkout page shows the original price with a
 	// discount line rather than just the reduced total.
 	if req.DiscountCents > 0 {
-		couponName := couponDisplayName(req.PromotionCode)
+		label := strings.TrimSpace(req.PromotionName)
+		if label == "" {
+			label = req.PromotionCode
+		}
+		couponName := couponDisplayName(label)
 		coupon, err := p.client.V1Coupons.Create(ctx, &stripe.CouponCreateParams{
 			AmountOff:      stripe.Int64(req.DiscountCents),
 			Currency:       stripe.String(p.currency),
@@ -162,10 +167,8 @@ func (p *StripeProvider) StartCheckout(ctx context.Context, req CheckoutRequest)
 }
 
 // VerifyWebhook authenticates rawBody against the Stripe-Signature header
-// and translates a paid checkout into a Confirmation. Every other event type,
-// and a session whose PaymentStatus is not yet "paid" (an async payment
-// method still settling - the follow-up arrives later as
-// checkout.session.async_payment_succeeded), returns (nil, nil): authentic,
+// and translates a completed paid or no-cost checkout into a Confirmation.
+// Other events and incomplete or unpaid sessions return (nil, nil): authentic,
 // but nothing for Settle to act on yet.
 func (p *StripeProvider) VerifyWebhook(rawBody []byte, header func(string) string) (*Confirmation, error) {
 	event, err := webhook.ConstructEvent(rawBody, header("Stripe-Signature"), p.webhookSecret)
@@ -193,7 +196,8 @@ func (p *StripeProvider) VerifyWebhook(rawBody []byte, header func(string) strin
 // The session id doubles as the idempotency key, so a webhook arriving later
 // for the same payment still finds the order already claimed and is ignored.
 func (p *StripeProvider) ConfirmSession(ctx context.Context, sessionID string) (*Confirmation, error) {
-	session, err := p.client.V1CheckoutSessions.Retrieve(ctx, sessionID, &stripe.CheckoutSessionRetrieveParams{})
+	params := &stripe.CheckoutSessionRetrieveParams{}
+	session, err := p.client.V1CheckoutSessions.Retrieve(ctx, sessionID, params)
 	if err != nil {
 		return nil, fmt.Errorf("retrieve checkout session: %w", err)
 	}
@@ -204,12 +208,39 @@ func (p *StripeProvider) ConfirmSession(ctx context.Context, sessionID string) (
 	return confirmationFromSession(session, "session:"+session.ID, payload)
 }
 
+// ExpireCheckout closes a hosted session for an explicit order cancellation.
+func (p *StripeProvider) ExpireCheckout(ctx context.Context, sessionID string) error {
+	_, err := p.client.V1CheckoutSessions.Expire(ctx, sessionID, &stripe.CheckoutSessionExpireParams{})
+	if err == nil {
+		return nil
+	}
+	// Stripe rejects expiration once a session is no longer open. Read back
+	// that state to distinguish an idempotent cancellation from completion
+	// racing the cancellation, without retrying the expiration request.
+	var stripeErr *stripe.Error
+	if errors.As(err, &stripeErr) && stripeErr.HTTPStatusCode == 400 {
+		session, readErr := p.client.V1CheckoutSessions.Retrieve(ctx, sessionID, &stripe.CheckoutSessionRetrieveParams{})
+		if readErr != nil {
+			return fmt.Errorf("read checkout session after expiration rejected: %w", readErr)
+		}
+		switch session.Status {
+		case stripe.CheckoutSessionStatusExpired:
+			return nil
+		case stripe.CheckoutSessionStatusComplete:
+			return fmt.Errorf("expire checkout session %s: %w", sessionID, ErrCheckoutComplete)
+		}
+	}
+	return fmt.Errorf("expire checkout session: %w", err)
+}
+
 // confirmationFromSession applies the checks shared by the webhook and the
 // return-from-checkout path. (nil, nil) means the session is authentic but
-// not paid yet (an async method still settling).
+// not complete or paid yet (an async method still settling).
 func confirmationFromSession(session *stripe.CheckoutSession, externalID string, payload []byte) (*Confirmation, error) {
+	if session.Mode != stripe.CheckoutSessionModePayment || session.Status != stripe.CheckoutSessionStatusComplete {
+		return nil, nil
+	}
 	paid := session.PaymentStatus == stripe.CheckoutSessionPaymentStatusPaid
-	// A free plan completes with nothing to collect; only a zero total counts.
 	freeSession := session.PaymentStatus == stripe.CheckoutSessionPaymentStatusNoPaymentRequired && session.AmountTotal == 0
 	if !paid && !freeSession {
 		return nil, nil

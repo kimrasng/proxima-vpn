@@ -17,6 +17,7 @@ import type { FlashbarProps } from "@cloudscape-design/components";
 import { getSignupPolicy, requestSignupEmailCode, setToken, verifySignupEmailCode } from "../../api/auth";
 import type { SignupPolicy } from "../../api/auth";
 import { ApiError } from "../../api/client";
+import { consumePostLogin } from "../../utils/postLogin";
 
 export default function Register() {
   const { t, i18n } = useTranslation();
@@ -108,7 +109,7 @@ export default function Register() {
         window.localStorage.removeItem("proxima_referral_code");
         if (created.token) {
           setToken("user", created.token);
-          navigate("/portal/dashboard", { replace: true });
+          navigate(consumePostLogin("/portal/dashboard"), { replace: true });
         } else {
           navigate("/login", { replace: true });
         }

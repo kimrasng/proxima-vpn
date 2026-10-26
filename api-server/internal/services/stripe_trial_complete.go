@@ -56,7 +56,7 @@ func (s *StripeTrialService) Complete(ctx context.Context, event payments.TrialE
 		state.TrialEnd-state.TrialStart != int64(trialDays)*86400 {
 		return fmt.Errorf("trial checkout differs from local snapshot")
 	}
-	if orderID == nil {
+	if orderID == nil || status == "checkout" {
 		if status != "checkout" {
 			return fmt.Errorf("trial checkout is no longer claimable")
 		}
@@ -74,21 +74,29 @@ func (s *StripeTrialService) Complete(ctx context.Context, event payments.TrialE
 			}
 			state.CancelAtEnd = true
 		}
-		var created string
-		if err := tx.QueryRow(ctx, `INSERT INTO plan_orders
+		if orderID == nil {
+			var created string
+			if err := tx.QueryRow(ctx, `INSERT INTO plan_orders
 			(user_id,plan_id,duration_days,price_cents,provider,provider_session_id,expires_at,free_trial_id)
 			SELECT user_id,plan_id,trial_days,0,'free_trial',$2,
 				NOW()+INTERVAL '1 day',promotion_id
 			FROM stripe_trial_subscriptions WHERE id=$1 RETURNING id::text`,
-			event.LocalID, event.SessionID).Scan(&created); err != nil {
-			return fmt.Errorf("create card trial receipt order: %w", err)
+				event.LocalID, event.SessionID).Scan(&created); err != nil {
+				return fmt.Errorf("create card trial receipt order: %w", err)
+			}
+			orderID = &created
+		} else {
+			if _, err := tx.Exec(ctx, `UPDATE plan_orders SET duration_days=$2,
+				provider='free_trial',provider_session_id=$3 WHERE id=$1 AND status IN ('pending','expired')`,
+				*orderID, trialDays, event.SessionID); err != nil {
+				return fmt.Errorf("finalize trial receipt order: %w", err)
+			}
 		}
-		orderID = &created
 		if _, err := tx.Exec(ctx, `UPDATE stripe_trial_subscriptions SET
 			trial_order_id=$2,subscription_id=$3,customer_id=$4,
 			checkout_session_id=$5,status=$9,trial_ends_at=to_timestamp($6),
 			current_period_end=to_timestamp($7),cancel_at_period_end=$8,updated_at=NOW()
-			WHERE id=$1`, event.LocalID, created, state.ID, state.CustomerID,
+			WHERE id=$1`, event.LocalID, *orderID, state.ID, state.CustomerID,
 			event.SessionID, state.TrialEnd, state.PeriodEnd, state.CancelAtEnd, state.Status); err != nil {
 			return fmt.Errorf("bind trial subscription: %w", err)
 		}

@@ -85,4 +85,18 @@ var promotionKindSchema = []string{
 	)`,
 	`ALTER TABLE stripe_trial_invoices ADD COLUMN IF NOT EXISTS period_start BIGINT`,
 	`ALTER TABLE stripe_trial_invoices ADD COLUMN IF NOT EXISTS period_end BIGINT`,
+	// Admin-authored copy for the public /p/{code} page, keyed by the code string
+	// so one row serves a coupon, trial or partner code alike.
+	`CREATE TABLE IF NOT EXISTS promo_landing_pages (
+		code TEXT PRIMARY KEY,
+		headline TEXT NOT NULL DEFAULT '',
+		description TEXT NOT NULL DEFAULT '',
+		cta_label TEXT NOT NULL DEFAULT '',
+		plan_id UUID REFERENCES plans(id) ON DELETE SET NULL,
+		updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+	)`,
+	`ALTER TABLE promo_landing_pages ADD COLUMN IF NOT EXISTS countries TEXT[] NOT NULL DEFAULT '{}'`,
+	`ALTER TABLE promo_landing_pages ADD COLUMN IF NOT EXISTS browsers TEXT[] NOT NULL DEFAULT '{}'`,
+	`ALTER TABLE promo_landing_pages ADD COLUMN IF NOT EXISTS ip_cidrs TEXT[] NOT NULL DEFAULT '{}'`,
+	`ALTER TABLE promo_landing_pages ADD COLUMN IF NOT EXISTS email_domains TEXT[] NOT NULL DEFAULT '{}'`,
 }

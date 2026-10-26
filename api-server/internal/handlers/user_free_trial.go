@@ -52,7 +52,7 @@ func (h *UserFreeTrialHandler) Redeem(c *fiber.Ctx) error {
 	if code == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "code is required"})
 	}
-	res, err := h.trials.Redeem(c.UserContext(), userID, code)
+	res, err := h.trials.Redeem(c.UserContext(), userID, code, promoVisitor(c))
 	if err != nil {
 		var reject *services.PromotionRejectError
 		if errors.As(err, &reject) {

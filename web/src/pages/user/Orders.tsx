@@ -4,7 +4,6 @@ import { useNavigate } from "react-router-dom";
 import {
   Spinner,
   Alert,
-  Badge,
   Box,
   Button,
   ContentLayout,
@@ -152,9 +151,6 @@ export default function Orders() {
                         <s>{formatPriceCents(item.price_cents + (item.discount_cents ?? 0))}</s>
                       </Box>
                       <Box>{formatPriceCents(item.price_cents)}</Box>
-                      {item.promotion_code && (
-                        <Badge color="green">{item.promotion_code}</Badge>
-                      )}
                     </SpaceBetween>
                   ) : (
                     formatPriceCents(item.price_cents)

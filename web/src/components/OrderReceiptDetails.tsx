@@ -41,10 +41,18 @@ export default function OrderReceiptDetails({ receipt }: { receipt: OrderReceipt
       </div>
 
       <div className="order-receipt__panel" style={{ background: colorBackgroundCellShaded, borderRadius: borderRadiusItem }}>
+        {receipt.discount_cents === 0 && (receipt.promotion_name || receipt.promotion_code) && (
+          <Row label={t("user.promo.benefitLabel")}>{receipt.promotion_name || receipt.promotion_code}</Row>
+        )}
         {receipt.discount_cents > 0 && (
           <>
             <Row label={t("user.orders.receipt.subtotal")}>{formatPriceCents(subtotal)}</Row>
-            <Row label={t("user.orders.receipt.discount")}><Box color="text-status-success">-{formatPriceCents(receipt.discount_cents)}</Box></Row>
+            <Row label={t("user.orders.receipt.discount")}>
+              <SpaceBetween size="xxxs">
+                {(receipt.promotion_name || receipt.promotion_code) && <Box>{receipt.promotion_name || receipt.promotion_code}</Box>}
+                <Box color="text-status-success">-{formatPriceCents(receipt.discount_cents)}</Box>
+              </SpaceBetween>
+            </Row>
             {divider}
           </>
         )}

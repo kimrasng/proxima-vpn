@@ -38,11 +38,20 @@ const ERROR_CODES = [
 
 const SCOPES = [
   "profile",
+  "profile:write",
   "subscription:read",
+  "subscription:write",
   "nodes:read",
   "plan:read",
   "reset_tickets:read",
   "reset_tickets:redeem",
+  "orders:read",
+  "orders:write",
+  "support:read",
+  "support:write",
+  "devices:read",
+  "devices:write",
+  "content:read",
 ] as const;
 
 export default function OAuthDocs() {
@@ -239,7 +248,7 @@ WWW-Authenticate: Bearer error="insufficient_scope", scope="nodes:read"
               <p>{t("admin.oauthDocs.api.body")}</p>
               <div className="oauth-apps__ep-list">
                 {OAUTH_ENDPOINT_GROUPS.find((g) => g.key === "client")!.items.map((ep) => (
-                  <div key={ep.path} className="oauth-apps__ep">
+                  <div key={ep.key} className="oauth-apps__ep">
                     <div className="oauth-apps__ep-head">
                       <span className="oauth-apps__ep-label">{t(`admin.oauthApps.endpoint.${ep.key}`)}</span>
                       {ep.scope && <span className="oauth-apps__chip">{ep.scope}</span>}

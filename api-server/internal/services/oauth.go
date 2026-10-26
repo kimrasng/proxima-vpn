@@ -29,12 +29,23 @@ const (
 	ScopePlanRead           = "plan:read"
 	ScopeResetTicketsRead   = "reset_tickets:read"
 	ScopeResetTicketsRedeem = "reset_tickets:redeem"
+	ScopeProfileWrite       = "profile:write"
+	ScopeSubscriptionWrite  = "subscription:write"
+	ScopeOrdersRead         = "orders:read"
+	ScopeOrdersWrite        = "orders:write"
+	ScopeSupportRead        = "support:read"
+	ScopeSupportWrite       = "support:write"
+	ScopeDevicesRead        = "devices:read"
+	ScopeDevicesWrite       = "devices:write"
+	ScopeContentRead        = "content:read"
 )
 
 // OAuthScopes lists every scope in the order consent screens show them.
 var OAuthScopes = []string{
-	ScopeProfile, ScopeSubscriptionRead, ScopeNodesRead, ScopePlanRead,
-	ScopeResetTicketsRead, ScopeResetTicketsRedeem,
+	ScopeProfile, ScopeProfileWrite, ScopeSubscriptionRead, ScopeSubscriptionWrite,
+	ScopeNodesRead, ScopePlanRead, ScopeResetTicketsRead, ScopeResetTicketsRedeem,
+	ScopeOrdersRead, ScopeOrdersWrite, ScopeSupportRead, ScopeSupportWrite,
+	ScopeDevicesRead, ScopeDevicesWrite, ScopeContentRead,
 }
 
 const (

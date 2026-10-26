@@ -6,6 +6,7 @@ import { formatPriceCents } from "../../utils/planPricing";
 import { ChipPicker, FormSection, SummaryCard } from "./promotionFormParts";
 import { generatePromoCode } from "./promotionFormModel";
 import PromoShareLink from "./PromoShareLink";
+import PromoPageButton from "./PromoPageButton";
 
 const COMMISSION_PRESETS = [5, 10, 15, 20, 30];
 
@@ -92,6 +93,7 @@ export default function AffiliatePartners() {
         { id: "discount", header: t("admin.affiliate.discountValue"), cell: (p) => p.discount_type === "percent" ? `${p.discount_value}%` : formatPriceCents(p.discount_value) },
         { id: "active", header: t("admin.affiliate.active"), cell: (p) => <StatusIndicator type={p.is_active ? "success" : "stopped"}>{p.is_active ? t("admin.affiliate.yes") : t("admin.affiliate.no")}</StatusIndicator> },
         { id: "actions", header: t("admin.affiliate.actions"), cell: (p) => <SpaceBetween direction="horizontal" size="xs">
+          <PromoPageButton code={p.code} />
           <Button variant="inline-link" onClick={() => {
             setForm({ ...p, commission_rate: String(p.commission_rate), discount_value: p.discount_type === "fixed" ? (p.discount_value / 100).toFixed(2) : String(p.discount_value) });
             setShowErrors(false); setError(false); setEditor({ id: p.id });

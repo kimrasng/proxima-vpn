@@ -8,6 +8,7 @@ package payments
 
 import (
 	"context"
+	"errors"
 	"time"
 )
 
@@ -46,6 +47,7 @@ type CheckoutRequest struct {
 	// shows them as a real coupon line on the checkout page.
 	DiscountCents int64
 	PromotionCode string
+	PromotionName string
 }
 
 // CheckoutHandoff is what starting a checkout hands back to the caller.
@@ -139,4 +141,13 @@ type ReceiptProvider interface {
 // is not paid yet.
 type SessionConfirmer interface {
 	ConfirmSession(ctx context.Context, sessionID string) (*Confirmation, error)
+}
+
+// ErrCheckoutComplete means a checkout completed before it could be cancelled.
+var ErrCheckoutComplete = errors.New("checkout session is already complete")
+
+// CheckoutExpirer lets explicit order cancellation also close hosted checkout.
+// Already expired sessions succeed; completed sessions return ErrCheckoutComplete.
+type CheckoutExpirer interface {
+	ExpireCheckout(ctx context.Context, sessionID string) error
 }

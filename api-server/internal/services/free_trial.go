@@ -42,7 +42,11 @@ func NewFreeTrialService(db *pgxpool.Pool) *FreeTrialService {
 // holds the promotion row lock, so the overall and per-user caps stay exact
 // under concurrent redemption. The order then settles through PaymentService
 // like an admin grant, which extends or starts the plan by the purchase rules.
-func (s *FreeTrialService) Redeem(ctx context.Context, userID, code string) (*FreeTrialRedemption, error) {
+func (s *FreeTrialService) Redeem(ctx context.Context, userID, code string, visitors ...PromoVisitor) (*FreeTrialRedemption, error) {
+	return s.RedeemOrder(ctx, userID, code, "", visitors...)
+}
+
+func (s *FreeTrialService) RedeemOrder(ctx context.Context, userID, code, existingOrder string, visitors ...PromoVisitor) (*FreeTrialRedemption, error) {
 	tx, err := s.db.Begin(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("begin trial redeem: %w", err)
@@ -83,13 +87,20 @@ func (s *FreeTrialService) Redeem(ctx context.Context, userID, code string) (*Fr
 		return nil, fmt.Errorf("load trial plan: %w", err)
 	}
 	var hasActivePlan bool
+	var visitor PromoVisitor
+	if len(visitors) > 0 {
+		visitor = visitors[0]
+	}
 	if err := tx.QueryRow(ctx,
-		`SELECT plan_expires_at IS NOT NULL AND plan_expires_at > NOW() FROM users WHERE id = $1 FOR UPDATE`, userID,
-	).Scan(&hasActivePlan); err != nil {
+		`SELECT plan_expires_at IS NOT NULL AND plan_expires_at > NOW(),email FROM users WHERE id = $1 FOR UPDATE`, userID,
+	).Scan(&hasActivePlan, &visitor.Email); err != nil {
 		return nil, fmt.Errorf("load user plan: %w", err)
 	}
 	if hasActivePlan {
 		return nil, &PromotionRejectError{Reason: RejectActivePlan}
+	}
+	if err := CheckPromoEligibility(ctx, tx, code, visitor); err != nil {
+		return nil, err
 	}
 
 	var total, mine int
@@ -106,14 +117,20 @@ func (s *FreeTrialService) Redeem(ctx context.Context, userID, code string) (*Fr
 		return nil, &PromotionRejectError{Reason: RejectUserCapReached}
 	}
 
-	var orderID string
-	err = tx.QueryRow(ctx,
-		`INSERT INTO plan_orders (user_id, plan_id, duration_days, price_cents, status, provider,
+	orderID := existingOrder
+	if existingOrder == "" {
+		err = tx.QueryRow(ctx,
+			`INSERT INTO plan_orders (user_id, plan_id, duration_days, price_cents, status, provider,
 		                          provider_session_id, expires_at, free_trial_id)
 		 VALUES ($1, $2, $3, 0, 'pending', $4, $5, NOW() + INTERVAL '10 minutes', $6)
 		 RETURNING id::text`,
-		userID, *planID, trialDays, ProviderFreeTrial, code, promotionID,
-	).Scan(&orderID)
+			userID, *planID, trialDays, ProviderFreeTrial, code, promotionID,
+		).Scan(&orderID)
+	} else {
+		err = tx.QueryRow(ctx, `UPDATE plan_orders SET duration_days=$4,provider=$5,provider_session_id=$6
+			WHERE id::text=$1 AND user_id=$2 AND plan_id=$3 AND free_trial_id=$7 AND status='pending'
+			RETURNING id::text`, existingOrder, userID, *planID, trialDays, ProviderFreeTrial, code, promotionID).Scan(&orderID)
+	}
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
 		return nil, ErrTrialPendingOrder

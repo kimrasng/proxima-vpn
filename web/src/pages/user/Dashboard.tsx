@@ -12,6 +12,7 @@ import {
 import type { Announcement } from "../../api/types";
 import * as userApi from "../../api/user";
 import DeviceQuickConnect from "../../components/DeviceQuickConnect";
+import { PromoOfferPopup } from "../../components/PromoOfferPopup";
 import { useUserResource } from "../../hooks/useUserResource";
 import "./dashboard.css";
 
@@ -70,6 +71,7 @@ export default function Dashboard() {
         </SpaceBetween>
       }>{t("user.dashboard.title")}</Header>
     }>
+      <PromoOfferPopup />
       <div className="user-dashboard">
       <SpaceBetween size="l">
         {summary.loading ? <Container><Spinner size="large" /></Container> : summary.error ? (

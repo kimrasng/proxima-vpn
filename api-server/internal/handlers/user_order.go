@@ -56,6 +56,7 @@ type orderResponse struct {
 	PriceCents    int64      `json:"price_cents"`
 	DiscountCents int64      `json:"discount_cents,omitempty"`
 	PromotionCode string     `json:"promotion_code,omitempty"`
+	PromotionName string     `json:"promotion_name,omitempty"`
 	Status        string     `json:"status"`
 	CreatedAt     time.Time  `json:"created_at"`
 	ExpiresAt     *time.Time `json:"expires_at,omitempty"`
@@ -117,11 +118,14 @@ func (h *UserOrderHandler) Create(c *fiber.Ctx) error {
 	var planName string
 	var priceCents int64
 	err = tx.QueryRow(ctx,
-		`SELECT p.is_active AND p.advertise AND p.is_advertised, p.name, pp.price_cents
+		`SELECT p.is_active AND ((p.advertise AND p.is_advertised)
+		   OR (EXISTS(SELECT 1 FROM free_trial_promotions ft WHERE ft.code=$3 AND ft.plan_id=p.id
+		      AND ft.duration_days=$2 AND ft.is_active)
+		      AND NOT EXISTS(SELECT 1 FROM promotion_codes WHERE code=$3))), p.name, pp.price_cents
 		 FROM plans p
 		 JOIN plan_prices pp ON pp.plan_id = p.id AND pp.duration_days = $2
 		 WHERE p.id = $1`,
-		req.PlanID, req.DurationDays,
+		req.PlanID, req.DurationDays, req.PromotionCode,
 	).Scan(&planActive, &planName, &priceCents)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -154,6 +158,27 @@ func (h *UserOrderHandler) Create(c *fiber.Ctx) error {
 	}
 	if trialCheckout {
 		return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "complete or cancel your trial checkout first"})
+	}
+
+	// Buying the plan the user already holds extends it. While a Stripe
+	// subscription still bills for it, that one-off charge would stack on the
+	// recurring one, so extension is refused until the subscription is canceled.
+	var extendsCurrent bool
+	if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM users
+		WHERE id=$1 AND plan_id=$2 AND plan_expires_at > NOW())`, userID, req.PlanID).Scan(&extendsCurrent); err != nil {
+		return c.SendStatus(fiber.StatusInternalServerError)
+	}
+	if extendsCurrent {
+		recurring, err := services.HasRecurringBilling(ctx, tx, userID)
+		if err != nil {
+			return c.SendStatus(fiber.StatusInternalServerError)
+		}
+		if recurring {
+			return c.Status(fiber.StatusConflict).JSON(fiber.Map{
+				"error": "recurring billing is active; cancel it before extending this plan",
+				"code":  "recurring_billing_active",
+			})
+		}
 	}
 
 	var resp orderResponse
@@ -201,7 +226,7 @@ func (h *UserOrderHandler) Create(c *fiber.Ctx) error {
 
 	var promotionWarning string
 	if req.PromotionCode != "" {
-		if applyErr := h.applyPromotion(ctx, &resp, userID, req.PromotionCode); applyErr != nil {
+		if applyErr := h.applyPromotion(ctx, &resp, userID, req.PromotionCode, promoVisitor(c)); applyErr != nil {
 			var reject *services.PromotionRejectError
 			if errors.As(applyErr, &reject) {
 				promotionWarning = string(reject.Reason)
@@ -219,7 +244,7 @@ func (h *UserOrderHandler) Create(c *fiber.Ctx) error {
 	// A fully discounted purchase still requires a Stripe checkout record,
 	// even when Stripe is temporarily unavailable. Only a genuinely free
 	// base plan can use the local grant path.
-	if resp.PriceCents == 0 && resp.DiscountCents == 0 && !stripeCheckoutAvailable {
+	if resp.PriceCents == 0 && resp.DiscountCents == 0 && resp.PromotionCode == "" && !stripeCheckoutAvailable {
 		if err := h.settleZeroCostOrder(ctx, resp.ID, userID); err != nil {
 			if errors.Is(err, errOrderNotPending) {
 				return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "order state or price changed; reload the order"})
@@ -248,12 +273,22 @@ var errOrderNotPending = errors.New("order not found, not yours, or already reso
 // applyPromotion serializes every promotion change on the order row. The
 // reservation ledger and the order's price snapshot commit together, so cancel,
 // expiry and payment settlement cannot interleave between check and mutation.
-func (h *UserOrderHandler) applyPromotion(ctx context.Context, resp *orderResponse, userID, code string) error {
+func (h *UserOrderHandler) applyPromotion(ctx context.Context, resp *orderResponse, userID, code string, visitors ...services.PromoVisitor) error {
 	tx, err := h.db.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("begin promotion change: %w", err)
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
+	var visitor services.PromoVisitor
+	if len(visitors) > 0 {
+		visitor = visitors[0]
+	}
+	if err := tx.QueryRow(ctx, `SELECT email FROM users WHERE id=$1`, userID).Scan(&visitor.Email); err != nil {
+		return fmt.Errorf("load promotion account: %w", err)
+	}
+	if err := services.CheckPromoEligibility(ctx, tx, code, visitor); err != nil {
+		return err
+	}
 
 	var updated orderResponse
 	var originalCents int64
@@ -273,6 +308,17 @@ func (h *UserOrderHandler) applyPromotion(ctx context.Context, resp *orderRespon
 	if err != nil {
 		return fmt.Errorf("lock promotion order: %w", err)
 	}
+	var inTrialCheckout bool
+	if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM stripe_trial_subscriptions
+		WHERE trial_order_id=$1 AND status NOT IN ('expired','canceled'))`, updated.ID).Scan(&inTrialCheckout); err != nil {
+		return fmt.Errorf("check trial checkout lock: %w", err)
+	}
+	if inTrialCheckout {
+		return errOrderNotPending
+	}
+	if err := tx.QueryRow(ctx, `SELECT COALESCE((SELECT headline FROM promo_landing_pages WHERE code=$1),'')`, code).Scan(&updated.PromotionName); err != nil {
+		return fmt.Errorf("load promotion name: %w", err)
+	}
 
 	// Coupons win when a string exists in several kinds, matching the public
 	// landing lookup, so the page and checkout always agree on what a code is.
@@ -287,7 +333,7 @@ func (h *UserOrderHandler) applyPromotion(ctx context.Context, resp *orderRespon
 		}
 	}
 	if isTrial {
-		return &services.PromotionRejectError{Reason: services.RejectUseTrialRedeem}
+		return h.applyTrialTx(ctx, tx, resp, &updated, originalCents, userID, code)
 	}
 	isAffiliate := false
 	if !isCoupon {
@@ -337,7 +383,7 @@ func (h *UserOrderHandler) applyPromotion(ctx context.Context, resp *orderRespon
 	updated.DiscountCents = reservation.DiscountCents
 	updated.PriceCents = originalCents - reservation.DiscountCents
 	if _, err := tx.Exec(ctx,
-		`UPDATE plan_orders SET promotion_id = $2, discount_cents = $3, price_cents = $4, affiliate_partner_id = NULL
+		`UPDATE plan_orders SET promotion_id = $2, discount_cents = $3, price_cents = $4, affiliate_partner_id = NULL, free_trial_id=NULL
 		 WHERE id = $1 AND status = 'pending'`,
 		updated.ID, reservation.PromotionID, updated.DiscountCents, updated.PriceCents,
 	); err != nil {
@@ -401,13 +447,14 @@ func (h *UserOrderHandler) List(c *fiber.Ctx) error {
 
 	rows, err := h.db.Query(context.Background(),
 		`SELECT o.id, o.plan_id, p.name, o.duration_days, o.price_cents, o.discount_cents,
-		        COALESCE(pc.code, ap.code, ft.code, ''), o.status,
+		        COALESCE(pc.code, ap.code, ft.code, ''), COALESCE(page.headline, ''), o.status,
 		        o.created_at, o.expires_at, o.provider, o.paid_at, o.cancelled_at
 		 FROM plan_orders o
 		 JOIN plans p ON p.id = o.plan_id
 		 LEFT JOIN promotion_codes pc ON pc.id = o.promotion_id
 		 LEFT JOIN affiliate_partners ap ON ap.id = o.affiliate_partner_id
 		 LEFT JOIN free_trial_promotions ft ON ft.id = o.free_trial_id
+		 LEFT JOIN promo_landing_pages page ON page.code = COALESCE(pc.code, ap.code, ft.code)
 		 WHERE o.user_id = $1
 		 ORDER BY o.created_at DESC`,
 		userID,
@@ -420,7 +467,7 @@ func (h *UserOrderHandler) List(c *fiber.Ctx) error {
 	results := make([]orderResponse, 0)
 	for rows.Next() {
 		var r orderResponse
-		if err := rows.Scan(&r.ID, &r.PlanID, &r.PlanName, &r.DurationDays, &r.PriceCents, &r.DiscountCents, &r.PromotionCode, &r.Status, &r.CreatedAt, &r.ExpiresAt, &r.Provider, &r.PaidAt, &r.CancelledAt); err != nil {
+		if err := rows.Scan(&r.ID, &r.PlanID, &r.PlanName, &r.DurationDays, &r.PriceCents, &r.DiscountCents, &r.PromotionCode, &r.PromotionName, &r.Status, &r.CreatedAt, &r.ExpiresAt, &r.Provider, &r.PaidAt, &r.CancelledAt); err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "internal server error"})
 		}
 		results = append(results, r)
@@ -444,6 +491,13 @@ func (h *UserOrderHandler) List(c *fiber.Ctx) error {
 // @Router /user/orders/{id}/cancel [post]
 func (h *UserOrderHandler) Cancel(c *fiber.Ctx) error {
 	userID := c.Locals("user_id").(string)
+	return h.cancelForOwner(c, userID, services.Record{
+		EventType: services.EventOrderCancelled, Severity: services.SeverityInfo,
+		ActorType: "user", ActorID: userID, TargetType: "plan_order", TargetID: c.Params("id"),
+	})
+}
+
+func (h *UserOrderHandler) cancelForOwner(c *fiber.Ctx, userID string, audit services.Record) error {
 	id := c.Params("id")
 	ctx := context.Background()
 
@@ -453,9 +507,57 @@ func (h *UserOrderHandler) Cancel(c *fiber.Ctx) error {
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
+	var cancelOrderID, cancelStatus, checkoutProvider, checkoutSession string
+	if err := tx.QueryRow(ctx, `SELECT id,status,COALESCE(provider,''),COALESCE(provider_session_id,'')
+		FROM plan_orders WHERE id=$1 AND user_id=$2 FOR UPDATE`, id, userID).
+		Scan(&cancelOrderID, &cancelStatus, &checkoutProvider, &checkoutSession); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return c.SendStatus(fiber.StatusNotFound)
+		}
+		return c.SendStatus(fiber.StatusInternalServerError)
+	}
+	if cancelStatus != "pending" {
+		return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "order is already resolved"})
+	}
+	var trialID, trialSession string
+	if err := tx.QueryRow(ctx, `SELECT id,COALESCE(checkout_session_id,'')
+		FROM stripe_trial_subscriptions WHERE trial_order_id=$1 AND status='checkout'`, id).
+		Scan(&trialID, &trialSession); err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return c.SendStatus(fiber.StatusInternalServerError)
+	}
+	if trialID != "" {
+		if trialSession == "" {
+			return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "checkout status is not yet confirmed"})
+		}
+		checkoutProvider, checkoutSession = payments.ProviderStripe, trialSession
+	}
+	if checkoutProvider == payments.ProviderStripe && checkoutSession != "" {
+		provider, ok := h.providers.Get(checkoutProvider)
+		if !ok {
+			return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{"error": "payment provider unavailable; order remains pending"})
+		}
+		expirer, ok := provider.(payments.CheckoutExpirer)
+		if !ok {
+			return c.SendStatus(fiber.StatusInternalServerError)
+		}
+		if err := expirer.ExpireCheckout(ctx, checkoutSession); err != nil {
+			if errors.Is(err, payments.ErrCheckoutComplete) {
+				return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "checkout is already complete; refresh the order"})
+			}
+			return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{"error": "could not cancel Stripe checkout; order remains pending"})
+		}
+	}
+	if trialID != "" {
+		if _, err := tx.Exec(ctx, `UPDATE stripe_trial_subscriptions SET status='expired',updated_at=NOW()
+			WHERE id=$1 AND status='checkout'`, trialID); err != nil {
+			return c.SendStatus(fiber.StatusInternalServerError)
+		}
+	}
 	tag, err := tx.Exec(ctx,
 		`UPDATE plan_orders SET status = 'cancelled', cancelled_at = NOW()
-		 WHERE id = $1 AND user_id = $2 AND status = 'pending'`,
+		 WHERE id = $1 AND user_id = $2 AND status = 'pending'
+		 AND NOT EXISTS(SELECT 1 FROM stripe_trial_subscriptions t WHERE t.trial_order_id=plan_orders.id
+		 AND t.status NOT IN ('expired','canceled'))`,
 		id, userID,
 	)
 	if err != nil {
@@ -476,14 +578,7 @@ func (h *UserOrderHandler) Cancel(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "internal server error"})
 	}
 
-	h.activity.Log(context.Background(), services.Record{
-		EventType:  services.EventOrderCancelled,
-		Severity:   services.SeverityInfo,
-		ActorType:  "user",
-		ActorID:    userID,
-		TargetType: "plan_order",
-		TargetID:   id,
-	})
+	h.activity.Log(context.Background(), audit)
 
 	return c.JSON(fiber.Map{"message": "order cancelled"})
 }
@@ -496,6 +591,51 @@ func isPendingOrderConflict(err error) bool {
 
 type applyPromotionRequest struct {
 	PromotionCode string `json:"promotion_code"`
+}
+
+func (h *UserOrderHandler) RemovePromotion(c *fiber.Ctx) error {
+	ctx := c.UserContext()
+	userID := c.Locals("user_id").(string)
+	orderID := c.Params("id")
+	tx, err := h.db.Begin(ctx)
+	if err != nil {
+		return c.SendStatus(fiber.StatusInternalServerError)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	var id string
+	if err := tx.QueryRow(ctx, `SELECT id FROM plan_orders
+		WHERE id=$1 AND user_id=$2 AND status='pending' FOR UPDATE`, orderID, userID).Scan(&id); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return c.SendStatus(fiber.StatusNotFound)
+		}
+		return c.SendStatus(fiber.StatusInternalServerError)
+	}
+	var inTrialCheckout bool
+	if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM stripe_trial_subscriptions
+		WHERE trial_order_id=$1 AND status NOT IN ('expired','canceled'))`, id).Scan(&inTrialCheckout); err != nil {
+		return c.SendStatus(fiber.StatusInternalServerError)
+	}
+	if inTrialCheckout {
+		return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "trial checkout already started"})
+	}
+	if err := h.promotion.ReleaseTx(ctx, tx, id); err != nil {
+		return c.SendStatus(fiber.StatusInternalServerError)
+	}
+	var order orderResponse
+	if err := tx.QueryRow(ctx, `UPDATE plan_orders o SET
+		price_cents=o.price_cents+o.discount_cents,discount_cents=0,
+		promotion_id=NULL,affiliate_partner_id=NULL,free_trial_id=NULL
+		FROM plans p WHERE o.id=$1 AND p.id=o.plan_id
+		RETURNING o.id,o.plan_id,p.name,o.duration_days,o.price_cents,
+		o.status,o.created_at,o.expires_at`, id).
+		Scan(&order.ID, &order.PlanID, &order.PlanName, &order.DurationDays, &order.PriceCents,
+			&order.Status, &order.CreatedAt, &order.ExpiresAt); err != nil {
+		return c.SendStatus(fiber.StatusInternalServerError)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return c.SendStatus(fiber.StatusInternalServerError)
+	}
+	return c.JSON(order)
 }
 
 // ApplyPromotion handles PATCH /api/v1/user/orders/:id/promotion, letting a
@@ -532,7 +672,7 @@ func (h *UserOrderHandler) ApplyPromotion(c *fiber.Ctx) error {
 	}
 
 	resp := orderResponse{ID: orderID}
-	if err := h.applyPromotion(ctx, &resp, userID, req.PromotionCode); err != nil {
+	if err := h.applyPromotion(ctx, &resp, userID, req.PromotionCode, promoVisitor(c)); err != nil {
 		if errors.Is(err, errOrderNotPending) {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": errOrderNotPending.Error()})
 		}

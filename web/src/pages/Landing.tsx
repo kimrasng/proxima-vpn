@@ -1,4 +1,5 @@
 import { useTranslation } from "react-i18next";
+import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { resolveLanguage } from "../utils/language";
 import background from "../assets/auth-bg.jpg";
@@ -10,12 +11,15 @@ const LANGUAGES = [
   { id: "zh", text: "中文" },
 ] as const;
 
-export default function Landing() {
+export default function Landing({ offer, authQuery = "" }: {
+  readonly offer?: ReactNode;
+  readonly authQuery?: string;
+}) {
   const { t, i18n } = useTranslation();
   const current = resolveLanguage(i18n.resolvedLanguage ?? i18n.language);
 
   return (
-    <div className="landing">
+    <div className={offer ? "landing landing--offer" : "landing"}>
       <header className="landing__header">
         <Link to="/" className="landing__brand" aria-label={t("auth.portal.name")}>
           Proxima <span className="landing__brand-accent">VPN</span>
@@ -48,17 +52,17 @@ export default function Landing() {
             <li>{t("landing.point3")}</li>
           </ul>
           <div className="landing__actions">
-            <Link to="/register" className="landing__btn landing__btn--primary">
+            <Link to={`/register${authQuery}`} className="landing__btn landing__btn--primary">
               {t("landing.start")}
               <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
                 <path d="M3 8h9.5M8.5 4l4 4-4 4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </Link>
-            <Link to="/login" className="landing__btn landing__btn--ghost">{t("landing.login")}</Link>
+            <Link to={`/login${authQuery}`} className="landing__btn landing__btn--ghost">{t("landing.login")}</Link>
           </div>
         </section>
 
-        <figure className="landing__art" aria-hidden="true" style={{ backgroundImage: `url(${background})` }} />
+        {offer ?? <figure className="landing__art" aria-hidden="true" style={{ backgroundImage: `url(${background})` }} />}
       </main>
 
       <footer className="landing__footer">© {new Date().getFullYear()} Proxima. {t("landing.rights")}</footer>

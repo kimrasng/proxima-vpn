@@ -13,7 +13,34 @@
     "start": "开始免费试用",
     "keep": "保留订阅",
     "confirm": "取消自动续费",
-    "cancelHint": "仅停止后续扣款，当前试用或已付款的使用期限保持不变。"
+    "cancelHint": "仅停止后续扣款，当前试用或已付款的使用期限保持不变。",
+    "card": {
+      "title": "定期扣款的银行卡",
+      "description": "定期费用将从已保存的银行卡扣除。",
+      "billingStopped": "已取消自动扣款，不会产生后续扣费。",
+      "label": "已保存的银行卡",
+      "none": "尚未保存银行卡。",
+      "unavailable": "无法从 Stripe 加载银行卡信息。",
+      "edit": "账单管理",
+      "popupBlocked": "请允许浏览器弹出 Stripe 窗口，然后重试。",
+      "portalError": "无法打开 Stripe 账单管理页面，请重试。",
+      "refreshError": "无法加载更新后的银行卡信息，请刷新页面。",
+      "unknownBrand": "银行卡",
+      "expires": "有效期 {{date}}",
+      "credit": "信用卡",
+      "debit": "借记卡",
+      "prepaid": "预付卡",
+      "wallet": "{{wallet}} 钱包",
+      "nextCharge": "下次扣款",
+      "noneScheduled": "没有待扣款项。",
+      "every": "每 {{days}} 天",
+      "state": "扣款状态",
+      "recurring": "自动扣款中",
+      "stopped": "已取消自动扣款"
+    },
+    "manage": "管理自动扣款",
+    "extendBlocked": "已开启自动扣款，因此无法单独续期此套餐。使用期限将通过订阅自动延续。如需手动续期，请先取消自动扣款。",
+    "extendBlockedShort": "自动扣款期间无法续期"
   },
   "app": {
     "title": "Proxima VPN",
@@ -1934,6 +1961,71 @@
       }
     },
     "promotions": {
+      "page": {
+        "edit": "名称与适用条件",
+        "title": "促销设置",
+        "desc": "设置面向客户的名称、优惠说明和适用条件。",
+        "error": "无法加载或保存设置，请检查输入。",
+        "headline": "标题",
+        "headlineHint": "最多 80 个字符。留空时显示该优惠的默认标题。",
+        "headlinePlaceholder": "例如：首周免费体验",
+        "description": "说明",
+        "descriptionHint": "最多 300 个字符。简要说明适用客户和优惠内容。留空时使用默认优惠说明。",
+        "descriptionPlaceholder": "例如：新用户可免费试用 7 天。",
+        "cta": "按钮文案",
+        "ctaHint": "最多 30 个字符。留空时使用该促销类型的默认按钮文案。",
+        "ctaPlaceholder": "例如：开始免费试用",
+        "plan": "展示套餐",
+        "planAuto": "自动选择",
+        "planHint": "自动选择时展示符合促销条件的套餐。指定套餐不会改变现有折扣或使用条件。",
+        "preview": "打开已保存的客户页面",
+        "countries": "访问国家或地区",
+        "countriesHint": "可按国家或地区名称、ISO 代码搜索。根据访问 IP 判断；不选择则允许所有国家或地区。",
+        "browsers": "浏览器",
+        "browsersHint": "可选择 Chrome、Safari、Firefox、Edge 或未知。不选择则允许所有浏览器。",
+        "ip_cidrs": "允许的 IP / CIDR",
+        "ip_cidrsHint": "使用逗号或换行分隔单个 IPv4、IPv6 地址或 CIDR 网段。自动去除首尾空格；留空则不限制 IP。",
+        "email_domains": "允许的邮箱域名",
+        "email_domainsHint": "仅输入域名，不含 @，使用逗号或换行分隔。自动去除首尾空格；使用优惠时检查账号邮箱，留空则不限制。",
+        "cancel": "取消",
+        "save": "保存",
+        "loading": "正在加载促销设置。",
+        "loadError": "无法加载设置",
+        "loadUnavailable": "当前连接的管理 API 不支持促销设置接口。请检查 API 版本，使用最新后端重启后重新加载。",
+        "loadErrorHint": "请检查网络和管理 API 连接后重试。设置加载成功前无法编辑或保存。",
+        "retry": "重新加载",
+        "saveErrorTitle": "未能保存设置",
+        "saveError": "已保留您输入的内容。请检查连接后再次点击保存。",
+        "validationError": "请检查标记的字段后重新保存。已保留您输入的内容。",
+        "contentTab": "客户可见内容",
+        "contentHint": "设置优惠页面的文案和展示套餐。文案留空时使用该优惠的默认说明。",
+        "fixedPlan": "使用免费试用指定的套餐",
+        "fixedPlanHint": "试用套餐需在免费试用设置中更改，无法在此单独修改。",
+        "renewalHint": "需要绑定银行卡的试用结束后，将按指定套餐和账单周期自动付费续订。修改文案不会改变试用时长、账单周期或续订条件，请在客户说明中写明这些条件。",
+        "search": "按名称或代码搜索",
+        "noMatches": "没有匹配的选项。",
+        "unrestricted": "不限制",
+        "removeSelection": "移除 {{name}}",
+        "eligibilityTab": "适用对象",
+        "eligibilityHint": "必须满足所有已设置的条件类别（AND）；同一类别内匹配任意一个值即可（OR）。留空的类别不限制。例如：韩国、日本 + Chrome，适用于这两个国家中任一国家的 Chrome 用户。",
+        "advanced": "高级条件 · IP 和邮箱域名",
+        "ipPlaceholder": "例如：203.0.113.10, 198.51.100.0/24\n2001:db8::/32",
+        "emailPlaceholder": "例如：gmail.com, example.com",
+        "textLimit": "请输入不超过 {{count}} 个字符。",
+        "ruleLimit": "每类条件最多可填写 100 个值。",
+        "countryError": "请检查国家或地区选项，需使用两位 ISO 代码。",
+        "browserError": "已选择不支持的浏览器。请移除后从列表中重新选择。",
+        "ipError": "请输入有效的 IP 地址或 CIDR 网段，例如 203.0.113.10、198.51.100.0/24。",
+        "emailError": "请仅输入域名，不含 @ 或完整邮箱地址。例如：example.com。",
+        "planError": "请从列表中重新选择有效套餐。",
+        "browser": {
+          "chrome": "Chrome",
+          "safari": "Safari",
+          "firefox": "Firefox",
+          "edge": "Edge",
+          "unknown": "未知"
+        }
+      },
       "tabs": {
         "coupon": "优惠券",
         "freeTrial": "免费试用",
@@ -2849,7 +2941,38 @@
         "summary": "套餐与用量",
         "tickets": "重置券列表",
         "ticketHistory": "重置券使用记录",
-        "redeem": "使用重置券"
+        "redeem": "使用重置券",
+        "profileUpdate": "修改资料",
+        "subDomains": "订阅域名",
+        "subRegenerate": "重新生成订阅链接",
+        "traffic": "流量统计",
+        "plans": "套餐列表",
+        "orders": "订单记录",
+        "receipt": "收据",
+        "providers": "支付方式",
+        "trial": "免费试用状态",
+        "promoLookup": "查看优惠",
+        "orderCreate": "创建订单",
+        "orderCancel": "取消订单",
+        "promoApply": "使用优惠码",
+        "promoRemove": "移除优惠码",
+        "checkout": "发起支付",
+        "checkoutConfirm": "确认支付",
+        "trialCancel": "取消试用",
+        "trialConfirm": "确认试用",
+        "billingPortal": "账单管理",
+        "devices": "设备列表",
+        "deviceCreate": "登记设备",
+        "deviceDelete": "删除设备",
+        "faq": "常见问题",
+        "supportTickets": "我的工单",
+        "supportThread": "工单对话",
+        "supportCreate": "提交工单",
+        "supportReply": "回复",
+        "supportClose": "关闭工单",
+        "announcements": "公告",
+        "guides": "使用说明",
+        "guide": "使用说明详情"
       },
       "emptyTitle": "暂无应用",
       "emptyBody": "注册自有应用或集成后，即可使用 Proxima 账户登录。",
@@ -3052,7 +3175,38 @@
           "summary": "当前套餐、流量用量与上限、到期日",
           "tickets": "可用的重置券列表",
           "ticketHistory": "重置券使用记录",
-          "redeem": "使用一张重置券重置本月流量用量。已使用或已过期的重置券返回 409"
+          "redeem": "使用一张重置券重置本月流量用量。已使用或已过期的重置券返回 409",
+          "profileUpdate": "仅修改 name 和 language。发送 email 或 password 会返回 403。",
+          "subDomains": "订阅链接可用的域名列表",
+          "subRegenerate": "生成新的订阅链接并使旧链接失效。",
+          "traffic": "各时段的数据用量",
+          "plans": "可购买的套餐及价格",
+          "orders": "历史订单和支付状态",
+          "receipt": "单个订单的收据",
+          "providers": "可用的支付方式",
+          "trial": "免费试用订阅状态",
+          "promoLookup": "查看优惠码详情",
+          "orderCreate": "创建套餐订单。",
+          "orderCancel": "取消未支付的订单。",
+          "promoApply": "为订单使用优惠码。",
+          "promoRemove": "从订单中移除优惠码。",
+          "checkout": "返回支付页面地址，由用户在该页面确认付款。",
+          "checkoutConfirm": "确认付款完成并开通套餐。",
+          "trialCancel": "取消免费试用订阅。",
+          "trialConfirm": "确认免费试用的支付方式。",
+          "billingPortal": "返回 Stripe 账单管理页面地址。",
+          "devices": "已登记的设备",
+          "deviceCreate": "登记新设备。",
+          "deviceDelete": "删除设备并断开连接。",
+          "faq": "工单分类和常见问题",
+          "supportTickets": "您的工单列表",
+          "supportThread": "单个工单的完整对话",
+          "supportCreate": "提交新工单。",
+          "supportReply": "在工单中回复。",
+          "supportClose": "关闭工单。",
+          "announcements": "以用户语言显示的公告",
+          "guides": "已发布的指南",
+          "guide": "单篇指南正文"
         }
       },
       "errors": {
@@ -3293,6 +3447,35 @@
   },
   "user": {
     "promo": {
+      "offer": {
+        "title": "您的促销优惠",
+        "discountBadge": "优惠 {{value}}%",
+        "termScope": "促销折扣适用于所选的 {{days}} 天套餐。",
+        "trialPeriod": "/ 免费试用 {{days}} 天",
+        "afterTrial": "试用结束后每 {{days}} 天 {{price}}",
+        "included": "包含",
+        "excluded": "不包含",
+        "cardRequired": "开始试用前需绑定银行卡，目前不会扣款。",
+        "autoRenew": "试用结束后每 {{days}} 天自动扣款 {{price}}。您可以在试用结束前取消。",
+        "noAutoRenew": "试用结束后不会自动扣费。如需继续使用，请购买套餐。"
+      },
+      "notNow": "暂时不用",
+      "terms": "仅适用于符合条件的订单。请在结账前确认最终金额。",
+      "trialTerms": "需要绑定银行卡。试用结束后按所选套餐的正常价格自动续费，可在试用结束前取消。",
+      "haveAccount": "已有账号？",
+      "unit": "/ {{days}} 天",
+      "priceLabel": "原价 ${{was}}，优惠价 ${{now}}",
+      "cta": {
+        "trial": "开始免费试用",
+        "discount": "领取优惠"
+      },
+      "spec": {
+        "traffic": "{{value}} 流量",
+        "trafficUnlimited": "无限流量",
+        "speed": "最高 {{value}} Mbps",
+        "speedUnlimited": "不限速",
+        "devices": "同时连接 {{count}} 台设备"
+      },
       "trialBenefit": "{{days}} 天免费试用",
       "benefitHint": "登录后，结账页面会自动填入代码。",
       "login": "前往登录",
@@ -3303,7 +3486,13 @@
       "invalidTitle": "此促销不可用",
       "invalid": "代码可能无效、已停用、已过期或已达到兑换上限。",
       "errorTitle": "无法验证此促销",
-      "error": "请检查网络连接后重试。",
+      "error": {
+        "title": "促销提示",
+        "close": "确定",
+        "invalid": "促销代码无效，请检查输入的代码。",
+        "ineligible": "您不符合此促销的使用条件，请检查适用对象和有效期。",
+        "unavailable": "暂时无法加载促销信息，请稍后重试。"
+      },
       "retry": "重试",
       "percentBenefit": "{{value}}% 折扣",
       "fixedBenefit": "立减 {{value}}",
@@ -3578,6 +3767,8 @@
         "pendingHint": "应用新的促销码会替换该订单上已有的促销码。",
         "beforeOrderHint": "在选择时长前输入促销码，下单时会一并应用。",
         "discountApplied": "已应用折扣",
+        "remove": "移除优惠",
+        "removeError": "暂时无法移除优惠，请稍后重试。",
         "savedAmount": "已省 {{amount}}",
         "rejected": {
           "not_found": "该促销码不存在。",
@@ -3590,6 +3781,7 @@
           "overall_cap_reached": "该促销码的兑换次数已用完。",
           "user_cap_reached": "你已达到该促销码的可用次数上限。",
           "use_trial_redeem": "这是免费试用代码，无需付款即可开始。",
+          "not_eligible": "此账号或连接环境不符合该优惠的适用条件。",
           "card_required_unsupported": "需要绑卡的试用代码暂时无法使用，请联系客服。",
           "active_plan_exists": "您已有正在使用的套餐，无法开始免费试用。免费试用仅适用于没有有效套餐的账户。"
         },
@@ -3599,8 +3791,8 @@
       "checkoutModal": {
         "title": "结账",
         "provider": "支付方式",
-        "providerStripe": "银行卡",
-        "providerStripeHint": "前往 Stripe 结账页面立即付款。",
+        "providerStripe": "银行卡与电子钱包",
+        "providerStripeHint": "Stripe 根据您的地区显示可用的付款方式和当地货币。",
         "providerAdmin": "银行转账 · 人工确认",
         "providerAdminHint": "订单提交后，确认收款即开通套餐。",
         "confirm": "继续付款",
@@ -3610,7 +3802,7 @@
         "subtotal": "商品金额",
         "discount": "折扣",
         "total": "应付总额",
-        "codeApplied": "已应用代码 {{code}}。",
+        "codeApplied": "已应用 {{code}} 优惠。",
         "confirmAmount": "支付 {{amount}}",
         "viewPlans": "查看套餐",
         "promoPlaceholder": "优惠码（可选）",
@@ -4121,7 +4313,7 @@
     "oauth": {
       "title": "{{app}} 想要使用你的 Proxima 账户",
       "scopesTitle": "允许后，此应用可以",
-      "never": "你的密码和支付信息不会提供给应用。应用只能在以下权限范围内使用你的账户。",
+      "never": "你的密码和完整卡号不会提供给应用。应用只能在以下权限范围内使用你的账户。",
       "redirectLabel": "批准后返回",
       "approve": "允许",
       "deny": "拒绝",
@@ -4165,6 +4357,42 @@
         "reset_tickets_redeem": {
           "title": "使用重置券",
           "desc": "应用可以使用重置券重置本月流量用量。"
+        },
+        "profile_write": {
+          "title": "修改名称和语言",
+          "desc": "可以修改显示名称和使用语言。无法修改邮箱和密码。"
+        },
+        "subscription_write": {
+          "title": "重新生成订阅链接",
+          "desc": "可以生成新的订阅链接。旧链接将无法继续使用，需要换成新链接。"
+        },
+        "orders_read": {
+          "title": "查看订单",
+          "desc": "套餐列表、订单记录、收据和免费试用状态（含已保存卡片的类型、末4位和有效期）"
+        },
+        "orders_write": {
+          "title": "下单并发起支付",
+          "desc": "可以订购套餐、打开支付页面、取消订单、取消自动续费订阅以及打开账单管理页面。首次付款需在支付页面亲自确认，之后的自动续费不会再询问。"
+        },
+        "support_read": {
+          "title": "查看工单",
+          "desc": "您的工单、对话记录和常见问题"
+        },
+        "support_write": {
+          "title": "提交和回复工单",
+          "desc": "可以以您的名义提交工单、回复或关闭工单。"
+        },
+        "devices_read": {
+          "title": "查看设备",
+          "desc": "已登记的设备及其连接信息"
+        },
+        "devices_write": {
+          "title": "添加和删除设备",
+          "desc": "可以登记或删除设备。删除的设备会立即断开连接。"
+        },
+        "content_read": {
+          "title": "查看公告和指南",
+          "desc": "公告和使用说明"
         }
       },
       "approvedTitle": "已允许连接",

@@ -3,10 +3,12 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/proximavpn/proxima-vpn/api-server/internal/services"
 	"github.com/proximavpn/proxima-vpn/pkg/crypto"
 )
 
@@ -39,10 +41,19 @@ type createDeviceRequest struct {
 	Name string `json:"name"`
 }
 
+// hidesConnectionSecrets reports whether the caller is a connected app without
+// subscription:read. The subscription URL embeds the account-wide sub token and
+// the xray UUID is the proxy credential itself, so devices:read must not hand
+// either to an app the user did not allow to read the subscription.
+func hidesConnectionSecrets(c *fiber.Ctx) bool {
+	scopes, viaOAuth := c.Locals("oauth_scopes").([]string)
+	return viaOAuth && !slices.Contains(scopes, services.ScopeSubscriptionRead)
+}
+
 type deviceResponse struct {
 	ID              string    `json:"id"`
 	Name            string    `json:"name"`
-	XrayUUID        string    `json:"xray_uuid"`
+	XrayUUID        string    `json:"xray_uuid,omitempty"`
 	WGPublicKey     string    `json:"wg_public_key,omitempty"`
 	WGAddress       string    `json:"wg_address,omitempty"`
 	SubscriptionURL string    `json:"subscription_url,omitempty"`
@@ -153,6 +164,9 @@ func (h *UserDeviceHandler) Create(c *fiber.Ctx) error {
 		})
 	}
 
+	if hidesConnectionSecrets(c) {
+		resp.XrayUUID = ""
+	}
 	return c.Status(fiber.StatusCreated).JSON(resp)
 }
 
@@ -203,6 +217,9 @@ func (h *UserDeviceHandler) List(c *fiber.Ctx) error {
 		}
 		if subToken != "" {
 			d.SubscriptionURL = fmt.Sprintf("/sub/%s/%s", subToken, d.ID)
+		}
+		if hidesConnectionSecrets(c) {
+			d.SubscriptionURL, d.XrayUUID = "", ""
 		}
 		results = append(results, d)
 	}

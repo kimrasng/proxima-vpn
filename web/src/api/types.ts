@@ -817,6 +817,7 @@ export interface OrderResponse {
   price_cents: number;
   discount_cents?: number;
   promotion_code?: string;
+  promotion_name?: string;
   status: OrderStatus;
   created_at: string;
   expires_at?: string;
@@ -853,6 +854,8 @@ export interface OrderReceipt {
   duration_days: number;
   price_cents: number;
   discount_cents: number;
+  promotion_code?: string;
+  promotion_name?: string;
   currency: string;
   provider: string;
   email: string;
@@ -865,6 +868,7 @@ export interface OrderReceipt {
 }
 
 export type PromotionRejectReason =
+  | 'not_eligible'
   | 'not_found'
   | 'inactive'
   | 'outside_window'

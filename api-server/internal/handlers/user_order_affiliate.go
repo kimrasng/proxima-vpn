@@ -23,7 +23,7 @@ func (h *UserOrderHandler) applyAffiliateTx(ctx context.Context, tx pgx.Tx, resp
 	updated.DiscountCents = reservation.DiscountCents
 	updated.PriceCents = originalCents - reservation.DiscountCents
 	if _, err := tx.Exec(ctx,
-		`UPDATE plan_orders SET promotion_id = NULL, affiliate_partner_id = $2, discount_cents = $3, price_cents = $4
+		`UPDATE plan_orders SET promotion_id = NULL, free_trial_id=NULL, affiliate_partner_id = $2, discount_cents = $3, price_cents = $4
 		 WHERE id = $1 AND status = 'pending'`,
 		updated.ID, reservation.PartnerID, updated.DiscountCents, updated.PriceCents,
 	); err != nil {

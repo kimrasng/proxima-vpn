@@ -237,7 +237,7 @@ export default function OAuthApps() {
                   {group.items.map((ep) => {
                     const url = `${window.location.origin}${ep.path}`;
                     return (
-                      <div key={ep.path} className="oauth-apps__ep">
+                      <div key={ep.key} className="oauth-apps__ep">
                         <div className="oauth-apps__ep-head">
                           <span className="oauth-apps__ep-label">{t(`admin.oauthApps.endpoint.${ep.key}`)}</span>
                           {ep.scope && <span className="oauth-apps__chip">{ep.scope}</span>}

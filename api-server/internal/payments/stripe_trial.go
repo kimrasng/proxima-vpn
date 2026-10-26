@@ -26,6 +26,9 @@ type TrialGateway interface {
 	StartTrial(context.Context, TrialCheckoutRequest) (*CheckoutHandoff, error)
 	CancelTrial(context.Context, string) error
 	ReadTrial(context.Context, string) (*TrialSubscriptionState, error)
+	// ReadPaymentMethod returns the default card, or a card attached to its customer
+	// when no default is configured. It does not change billing defaults.
+	ReadPaymentMethod(context.Context, string) (*PaymentMethodSummary, error)
 	ReadTrialCheckout(context.Context, string) (*TrialEvent, error)
 	TrialCurrency() string
 }
@@ -64,6 +67,56 @@ type TrialSubscriptionState struct {
 	DurationDays int64
 	Quantity     int64
 	ItemID       string
+}
+
+// PaymentMethodSummary is the non-sensitive part of a saved card. Card numbers
+// never reach this process; Stripe only exposes brand, last four and expiry.
+type PaymentMethodSummary struct {
+	Brand    string `json:"brand"`
+	Last4    string `json:"last4"`
+	ExpMonth int64  `json:"exp_month"`
+	ExpYear  int64  `json:"exp_year"`
+	Funding  string `json:"funding"`
+	Wallet   string `json:"wallet,omitempty"`
+}
+
+func (p *StripeProvider) ReadPaymentMethod(ctx context.Context, subscriptionID string) (*PaymentMethodSummary, error) {
+	params := &stripe.SubscriptionRetrieveParams{}
+	params.AddExpand("default_payment_method")
+	params.AddExpand("customer.invoice_settings.default_payment_method")
+	subscription, err := p.client.V1Subscriptions.Retrieve(ctx, subscriptionID, params)
+	if err != nil {
+		return nil, fmt.Errorf("retrieve subscription payment method: %w", err)
+	}
+	method := subscription.DefaultPaymentMethod
+	if method == nil && subscription.Customer != nil && subscription.Customer.InvoiceSettings != nil {
+		method = subscription.Customer.InvoiceSettings.DefaultPaymentMethod
+	}
+	if method == nil && subscription.Customer != nil {
+		listParams := &stripe.PaymentMethodListParams{
+			Customer: stripe.String(subscription.Customer.ID),
+			Type:     stripe.String(string(stripe.PaymentMethodTypeCard)),
+		}
+		listParams.Limit = stripe.Int64(1)
+		for attached, err := range p.client.V1PaymentMethods.List(ctx, listParams).All(ctx) {
+			if err != nil {
+				return nil, fmt.Errorf("list customer payment methods: %w", err)
+			}
+			method = attached
+			break
+		}
+	}
+	if method == nil || method.Card == nil {
+		return nil, nil
+	}
+	summary := &PaymentMethodSummary{
+		Brand: string(method.Card.Brand), Last4: method.Card.Last4,
+		ExpMonth: method.Card.ExpMonth, ExpYear: method.Card.ExpYear, Funding: string(method.Card.Funding),
+	}
+	if method.Card.Wallet != nil {
+		summary.Wallet = string(method.Card.Wallet.Type)
+	}
+	return summary, nil
 }
 
 func (p *StripeProvider) ReadTrial(ctx context.Context, subscriptionID string) (*TrialSubscriptionState, error) {

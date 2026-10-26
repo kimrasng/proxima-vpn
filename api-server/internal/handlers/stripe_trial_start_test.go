@@ -19,6 +19,8 @@ type trialGatewayTest struct {
 	request       payments.TrialCheckoutRequest
 	err           error
 	state         *payments.TrialSubscriptionState
+	method        *payments.PaymentMethodSummary
+	methodErr     error
 	canceledID    string
 	expiredAbsent bool
 }
@@ -44,6 +46,10 @@ func (g *trialGatewayTest) ReadTrial(context.Context, string) (*payments.TrialSu
 		return nil, errTrialGatewayTest
 	}
 	return g.state, nil
+}
+
+func (g *trialGatewayTest) ReadPaymentMethod(context.Context, string) (*payments.PaymentMethodSummary, error) {
+	return g.method, g.methodErr
 }
 
 func (g *trialGatewayTest) ReadTrialCheckout(_ context.Context, id string) (*payments.TrialEvent, error) {
@@ -124,6 +130,12 @@ func TestStripeTrialStartReplacesExpiredClaimOnlyAfterRemoteAbsence(t *testing.T
 	userID, planID, _ := seedFreeOrderData(t, pool, ctx, uuid.NewString()[:8])
 	maximum := 1
 	code := seedTrial(t, pool, planID, &maximum, 1, true)
+	if _, err := pool.Exec(ctx, `INSERT INTO promo_landing_pages(code,countries,browsers,ip_cidrs)
+		VALUES($1,ARRAY['KR'],ARRAY['chrome'],ARRAY['203.0.113.0/24'])`, code); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _, _ = pool.Exec(ctx, `DELETE FROM promo_landing_pages WHERE code=$1`, code) })
+	visitor := services.PromoVisitor{Country: "KR", Browser: "chrome", IP: "203.0.113.5"}
 	t.Cleanup(func() {
 		if _, err := pool.Exec(ctx, `DELETE FROM stripe_trial_subscriptions WHERE user_id=$1`, userID); err != nil {
 			t.Error(err)
@@ -135,7 +147,7 @@ func TestStripeTrialStartReplacesExpiredClaimOnlyAfterRemoteAbsence(t *testing.T
 	}
 	gateway := &trialGatewayTest{err: errTrialGatewayTest}
 	service := services.NewStripeTrialService(pool, gateway)
-	if _, err := service.Start(ctx, userID, code); !errors.Is(err, errTrialGatewayTest) {
+	if _, err := service.Start(ctx, userID, code, visitor); !errors.Is(err, errTrialGatewayTest) {
 		t.Fatal(err)
 	}
 	original := gateway.request.ID
@@ -146,7 +158,7 @@ func TestStripeTrialStartReplacesExpiredClaimOnlyAfterRemoteAbsence(t *testing.T
 		t.Fatal(err)
 	}
 	gateway.err, gateway.expiredAbsent = nil, true
-	if _, err := service.Start(ctx, userID, code); err != nil {
+	if _, err := service.Start(ctx, userID, code, visitor); err != nil {
 		t.Fatalf("uncreated expired session stranded its cap slot: %v", err)
 	}
 	if gateway.request.ID == original {

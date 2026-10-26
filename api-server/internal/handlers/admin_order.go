@@ -2,10 +2,11 @@ package handlers
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/proximavpn/proxima-vpn/api-server/internal/payments"
 	"github.com/proximavpn/proxima-vpn/api-server/internal/services"
@@ -20,16 +21,21 @@ type AdminOrderHandler struct {
 	payments  *services.PaymentService
 	promotion *services.PromotionService
 	activity  *services.ActivityService
+	providers payments.Registry
 }
 
 // NewAdminOrderHandler creates a new AdminOrderHandler.
-func NewAdminOrderHandler(db *pgxpool.Pool) *AdminOrderHandler {
-	return &AdminOrderHandler{
+func NewAdminOrderHandler(db *pgxpool.Pool, providers ...payments.Registry) *AdminOrderHandler {
+	h := &AdminOrderHandler{
 		db:        db,
 		payments:  services.NewPaymentService(db),
 		promotion: services.NewPromotionService(db),
 		activity:  services.NewActivityService(db),
 	}
+	if len(providers) > 0 {
+		h.providers = providers[0]
+	}
+	return h
 }
 
 // adminOrderItem is one row of the admin order list. Existing keys and types
@@ -186,24 +192,16 @@ func (h *AdminOrderHandler) Cancel(c *fiber.Ctx) error {
 	id := c.Params("id")
 	adminID := c.Locals("admin_id").(string)
 
-	tag, err := h.db.Exec(context.Background(),
-		`UPDATE plan_orders SET status = 'cancelled', cancelled_at = NOW()
-		 WHERE id = $1 AND status = 'pending'`,
-		id,
-	)
+	var ownerID string
+	err := h.db.QueryRow(c.UserContext(), `SELECT user_id FROM plan_orders WHERE id=$1`, id).Scan(&ownerID)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "order not found or already resolved"})
+		}
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "internal server error"})
 	}
-	if tag.RowsAffected() == 0 {
-		return c.Status(fiber.StatusConflict).JSON(fiber.Map{
-			"error": "order not found or already resolved",
-		})
-	}
-	if err := h.promotion.Release(context.Background(), id); err != nil {
-		fmt.Printf("promotions: failed to release order %s on admin cancel: %v\n", id, err)
-	}
-
-	h.activity.Log(context.Background(), services.Record{
+	cancel := &UserOrderHandler{db: h.db, promotion: h.promotion, providers: h.providers, activity: h.activity}
+	return cancel.cancelForOwner(c, ownerID, services.Record{
 		EventType:  services.EventOrderCancelled,
 		Severity:   services.SeverityInfo,
 		ActorType:  "admin",
@@ -212,6 +210,4 @@ func (h *AdminOrderHandler) Cancel(c *fiber.Ctx) error {
 		TargetType: "plan_order",
 		TargetID:   id,
 	})
-
-	return c.JSON(fiber.Map{"message": "order cancelled"})
 }

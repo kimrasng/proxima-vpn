@@ -53,7 +53,7 @@ func (h *UserTrialSubscriptionHandler) Start(c *fiber.Ctx) error {
 	if !ok {
 		return c.Status(503).JSON(fiber.Map{"error": "Stripe subscription billing is unavailable"})
 	}
-	handoff, err := service.Start(c.UserContext(), c.Locals("user_id").(string), code)
+	handoff, err := service.Start(c.UserContext(), c.Locals("user_id").(string), code, promoVisitor(c))
 	if err != nil {
 		return trialSubscriptionError(c, err)
 	}
@@ -61,7 +61,11 @@ func (h *UserTrialSubscriptionHandler) Start(c *fiber.Ctx) error {
 }
 
 func (h *UserTrialSubscriptionHandler) Current(c *fiber.Ctx) error {
-	service := services.NewStripeTrialService(h.db, nil)
+	service, ok := h.service()
+	if !ok {
+		// Stripe is not configured: still report the subscription row, just without a card.
+		service = services.NewStripeTrialService(h.db, nil)
+	}
 	result, err := service.Current(c.UserContext(), c.Locals("user_id").(string))
 	if err != nil {
 		return trialSubscriptionError(c, err)

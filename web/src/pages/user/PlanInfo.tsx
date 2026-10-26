@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   ContentLayout,
@@ -28,6 +29,7 @@ import {
 import "./planInfo.css";
 import ResetTickets from "../../components/ResetTickets";
 import TrialSubscriptionPanel from "../../components/TrialSubscriptionPanel";
+import { PromoOfferError, type PromoOfferFailure } from "../../components/PromoOfferError";
 import type {
   UserProfile,
   UserPlanItem,
@@ -37,7 +39,8 @@ import type {
 } from "../../api/types";
 import * as userApi from "../../api/user";
 import { ApiError } from "../../api/client";
-import { getPromoLanding } from "../../api/promotionKinds";
+import { getPromoLanding, type PromoLandingInfo } from "../../api/promotionKinds";
+import { clearPromo, promoDashboardTarget } from "../../utils/pendingPromo";
 import { planSavings, formatPriceCents } from "../../utils/planPricing";
 
 function formatBytes(bytes: number): string {
@@ -52,6 +55,7 @@ function formatBytes(bytes: number): string {
 // than a transport failure, so it has to be read off the error body.
 function isPromotionRejectReason(value: unknown): value is PromotionRejectReason {
 	return (
+		value === "not_eligible" ||
 		value === "not_found" ||
 		value === "inactive" ||
 		value === "outside_window" ||
@@ -67,6 +71,13 @@ function isPromotionRejectReason(value: unknown): value is PromotionRejectReason
 	);
 }
 
+// A 409 from order creation is either "you already have a pending order" or
+// "automatic billing is on"; the server names the second with a code.
+function conflictMessage(err: ApiError, t: TFunction): string {
+  const code = typeof err.body === "object" && err.body !== null ? (err.body as { code?: unknown }).code : undefined;
+  return code === "recurring_billing_active" ? t("trialSubscription.extendBlocked") : t("user.plan.order.conflict");
+}
+
 function rejectionFromError(err: unknown): PromotionRejectReason | null {
 	if (!(err instanceof ApiError) || err.status !== 400 || typeof err.body !== "object" || err.body === null) {
 		return null;
@@ -74,6 +85,11 @@ function rejectionFromError(err: unknown): PromotionRejectReason | null {
 	const error = Object.entries(err.body).find(([key]) => key === "error")?.[1];
 	const reason = Object.entries(err.body).find(([key]) => key === "reason")?.[1];
 	return error === "promotion_rejected" && isPromotionRejectReason(reason) ? reason : null;
+}
+
+function promotionFailure(reason: PromotionRejectReason): PromoOfferFailure {
+  if (reason === "not_found" || reason === "inactive" || reason === "outside_window" || reason === "overall_cap_reached") return "invalid";
+  return reason === "card_required_unsupported" ? "unavailable" : "ineligible";
 }
 
 // What the checkout modal is paying for: a fresh plan/duration pick, or an
@@ -99,16 +115,33 @@ export default function PlanInfo() {
   const [searchParams] = useSearchParams();
   const incomingPromo = searchParams.get("promo")?.trim() ?? "";
   const [recurringBilling, setRecurringBilling] = useState(false);
-  const [incomingKind, setIncomingKind] = useState<{ code: string; type: string } | null>(null);
+  const [incomingKind, setIncomingKind] = useState<PromoLandingInfo | null>(null);
   useEffect(() => {
     if (!incomingPromo) return;
+    if (searchParams.get("resume") !== "1") {
+      const duration = Number(searchParams.get("duration_days")) || undefined;
+      navigate(promoDashboardTarget(incomingPromo, duration), { replace: true });
+      return;
+    }
     let active = true;
-    void getPromoLanding(incomingPromo).then(
-      (promo) => { if (active) setIncomingKind({ code: incomingPromo, type: promo.type }); },
-      () => { if (active) setIncomingKind({ code: incomingPromo, type: "invalid" }); },
+    void getPromoLanding(incomingPromo, i18n.resolvedLanguage ?? i18n.language, true).then(
+      (promo) => {
+        if (!active) return;
+        if (promo.is_valid) setIncomingKind(promo);
+        else {
+          clearPromo();
+          navigate("/portal/dashboard?promo_error=ineligible", { replace: true });
+        }
+      },
+      (error: unknown) => {
+        if (active) {
+          clearPromo();
+          navigate(`/portal/dashboard?promo_error=${error instanceof ApiError && error.status === 404 ? "invalid" : "unavailable"}`, { replace: true });
+        }
+      },
     );
     return () => { active = false; };
-  }, [incomingPromo]);
+  }, [incomingPromo, navigate, searchParams, i18n.resolvedLanguage, i18n.language]);
   const openedIncomingPromo = useRef<string | null>(null);
   const appliedIncomingPromo = useRef<string | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -121,6 +154,7 @@ export default function PlanInfo() {
   const [selectedDurations, setSelectedDurations] = useState<Record<string, number>>({});
   const [checkout, setCheckout] = useState<CheckoutTarget | null>(null);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
+  const [promoFailure, setPromoFailure] = useState<PromoOfferFailure | null>(null);
   const [providerName, setProviderName] = useState<string | undefined>();
   const [cancelModal, setCancelModal] = useState<OrderResponse | null>(null);
   const [promotionCode, setPromotionCode] = useState("");
@@ -253,7 +287,7 @@ export default function PlanInfo() {
     setCheckout(target);
     setCheckoutError(null);
     setPromotionCode(appliedIncomingPromo.current === incomingPromo ? "" : incomingPromo);
-    setAppliedCode(target.discountCents > 0 ? (target.order?.promotion_code || "") : null);
+    setAppliedCode(target.discountCents > 0 ? (target.order?.promotion_name || target.order?.promotion_code || "") : null);
     setProviderName((current) =>
       current && providers.some((provider) => provider.name === current)
         ? current
@@ -287,24 +321,10 @@ export default function PlanInfo() {
   const handleApplyCode = useCallback(async () => {
     if (!checkout || applying || submitting) return;
     const code = promotionCode.trim();
-    if (!code) return;
+    if (!code) { setPromoFailure("invalid"); return; }
     setApplying(true);
     setCheckoutError(null);
     try {
-      const landing = await getPromoLanding(code).catch(() => null);
-      if (landing?.type === "trial") {
-        try {
-          const trial = await userApi.redeemFreeTrial(code);
-          setCheckout(null);
-          setPromotionCode("");
-          setCheckoutReturn({ kind: "trial", planName: trial.plan_name, days: trial.trial_days, until: trial.plan_expires_at });
-        } catch (err) {
-          const reason = rejectionFromError(err);
-          setCheckoutError(reason ? t(`user.plan.promotion.rejected.${reason}`)
-            : err instanceof ApiError && err.status === 409 ? t("user.plan.promotion.trialPending") : t("user.plan.promotion.error"));
-        }
-        return;
-      }
       let order: OrderResponse;
       if (checkout.order) {
         try {
@@ -312,7 +332,7 @@ export default function PlanInfo() {
         } catch (err) {
           const reason = rejectionFromError(err);
           if (!reason) throw err;
-          setCheckoutError(t(`user.plan.promotion.rejected.${reason}`));
+          setPromoFailure(promotionFailure(reason));
           return;
         }
       } else {
@@ -324,59 +344,85 @@ export default function PlanInfo() {
         order = result.order;
         if (result.promotion_rejected) {
           setCheckout({ ...checkout, order, priceCents: order.price_cents, discountCents: order.discount_cents ?? 0 });
-          setCheckoutError(t(`user.plan.promotion.rejected.${result.promotion_rejected}`));
+          setPromoFailure(promotionFailure(result.promotion_rejected));
           setOrders(await userApi.listMyOrders());
           return;
         }
         setOrders(await userApi.listMyOrders());
       }
       setCheckout({ ...checkout, order, priceCents: order.price_cents, discountCents: order.discount_cents ?? 0 });
-      setAppliedCode(code);
+      setAppliedCode(order.promotion_name || code);
       setPromotionCode("");
     } catch (err) {
-      setCheckoutError(
-        err instanceof ApiError && err.status === 409 ? t("user.plan.order.conflict") : t("user.plan.promotion.error"),
-      );
+      const reason = rejectionFromError(err);
+      if (reason) setPromoFailure(promotionFailure(reason));
+      else if (err instanceof ApiError && err.status === 409) setCheckoutError(conflictMessage(err, t));
+      else setPromoFailure(err instanceof ApiError && err.status === 404 ? "invalid" : "unavailable");
     } finally {
       setApplying(false);
     }
   }, [checkout, applying, submitting, promotionCode, t]);
 
+  const handleRemovePromotion = async () => {
+    if (!checkout?.order || applying || submitting) return;
+    setApplying(true);
+    setCheckoutError(null);
+    try {
+      const order = await userApi.removePromotionFromOrder(checkout.order.id);
+      setCheckout({ ...checkout, order, priceCents: order.price_cents, discountCents: order.discount_cents ?? 0 });
+      setAppliedCode(null);
+      setPromotionCode("");
+      setIncomingKind(null);
+      setOrders(await userApi.listMyOrders());
+    } catch {
+      setCheckoutError(t("user.plan.promotion.removeError"));
+    } finally {
+      setApplying(false);
+    }
+  };
+
   useEffect(() => {
-    if (loading || !incomingPromo || openedIncomingPromo.current === incomingPromo) return;
-    if (incomingKind?.code !== incomingPromo || incomingKind.type === "trial" || incomingKind.type === "invalid") return;
+    if (searchParams.get("resume") !== "1") return;
+    if (loading || !profile || !incomingPromo || openedIncomingPromo.current === incomingPromo) return;
+    if (incomingKind?.code !== incomingPromo || !incomingKind.plan) return;
     if (checkout) {
       openedIncomingPromo.current = incomingPromo;
       return;
     }
-    // A landing-page link carries no plan of its own: resume a pending order
-    // when one exists, otherwise open the first purchasable plan and price.
     const pending = orders.find((order) => order.status === "pending");
-    const plan = plans.find((item) => item.purchasable && item.prices.length > 0);
-    const price = plan?.prices[0];
+    const target = incomingKind.plan;
+    const requestedDays = Number(searchParams.get("duration_days"));
+    const availablePrices = target.prices ?? [];
+    const selectedPrice = availablePrices.find((price) => price.duration_days === requestedDays)
+      ?? availablePrices.find((price) => price.duration_days === target.duration_days);
+    const durationDays = selectedPrice?.duration_days ?? target.duration_days;
+    const priceCents = selectedPrice?.price_cents ?? target.price_cents;
+    if (pending && (pending.plan_id !== target.id || pending.duration_days !== durationDays)) return;
+    clearPromo();
     if (pending) {
       openedIncomingPromo.current = incomingPromo;
       openCheckout({
         planId: pending.plan_id, planName: pending.plan_name, durationDays: pending.duration_days,
         priceCents: pending.price_cents, discountCents: pending.discount_cents ?? 0, order: pending,
       });
-    } else if (plan && price) {
+    } else {
       openedIncomingPromo.current = incomingPromo;
       openCheckout({
-        planId: plan.id, planName: plan.name, durationDays: price.duration_days,
-        priceCents: price.price_cents, discountCents: 0, order: null,
+        planId: target.id, planName: target.name, durationDays,
+        priceCents, discountCents: 0, order: null,
       });
     }
     // openCheckout closes over the same state these dependencies cover.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, incomingPromo, incomingKind, checkout, orders, plans, providers]);
+  }, [loading, incomingPromo, incomingKind, checkout, orders, plans, providers, profile, searchParams]);
 
   useEffect(() => {
-    if (incomingKind?.code !== incomingPromo || incomingKind.type === "trial" || incomingKind.type === "invalid") return;
+    if (searchParams.get("resume") !== "1") return;
+    if (incomingKind?.code !== incomingPromo) return;
     if (!checkout || !incomingPromo || promotionCode !== incomingPromo || applying || submitting || appliedIncomingPromo.current === incomingPromo) return;
     appliedIncomingPromo.current = incomingPromo;
     void handleApplyCode();
-  }, [checkout, incomingPromo, incomingKind, promotionCode, applying, submitting, handleApplyCode]);
+  }, [checkout, incomingPromo, incomingKind, promotionCode, applying, submitting, handleApplyCode, searchParams]);
 
   // Hands an existing pending order to the chosen provider. A redirect provider
   // (Stripe) leaves the SPA; a manual one only records the choice, so the order
@@ -422,7 +468,7 @@ export default function PlanInfo() {
           } catch (err) {
             const reason = rejectionFromError(err);
             if (!reason) throw err;
-            setCheckoutError(t(`user.plan.promotion.rejected.${reason}`));
+            setPromoFailure(promotionFailure(reason));
             stripeTab?.close();
             return;
           }
@@ -439,7 +485,7 @@ export default function PlanInfo() {
           // user can fix the code or pay the full price; reloading the whole page
           // here would unmount the modal mid-decision.
           setCheckout({ ...checkout, order, priceCents: order.price_cents, discountCents: order.discount_cents ?? 0 });
-          setCheckoutError(t(`user.plan.promotion.rejected.${result.promotion_rejected}`));
+          setPromoFailure(promotionFailure(result.promotion_rejected));
           setOrders(await userApi.listMyOrders());
           stripeTab?.close();
           return;
@@ -456,7 +502,7 @@ export default function PlanInfo() {
     } catch (err) {
       stripeTab?.close();
       setCheckoutError(
-        err instanceof ApiError && err.status === 409 ? t("user.plan.order.conflict") : t("user.plan.order.error"),
+        err instanceof ApiError && err.status === 409 ? conflictMessage(err, t) : t("user.plan.order.error"),
       );
     } finally {
       setSubmitting(false);
@@ -567,9 +613,11 @@ export default function PlanInfo() {
                 </Box>
               </div>
             </div>
-            {!recurringBilling && <Box variant="small" color="text-body-secondary" margin={{ top: "m" }}>
-              {t("user.plan.current.note")}
-            </Box>}
+            {recurringBilling
+              ? <Alert type="info">{t("trialSubscription.extendBlocked")}</Alert>
+              : <Box variant="small" color="text-body-secondary" margin={{ top: "m" }}>
+                {t("user.plan.current.note")}
+              </Box>}
           </Container>
         )}
 
@@ -597,7 +645,7 @@ export default function PlanInfo() {
                 <SpaceBetween direction="horizontal" size="xs" alignItems="center">
                   <Box variant="awsui-key-label">
                     {t("user.plan.promotion.discountApplied")}
-                    {pendingOrder.promotion_code ? ` (${pendingOrder.promotion_code})` : ""}
+                    {pendingOrder.promotion_code ? ` (${pendingOrder.promotion_name || pendingOrder.promotion_code})` : ""}
                   </Box>
                   <Box color="text-status-inactive">
                     <s>{formatPriceCents(pendingOrder.price_cents + (pendingOrder.discount_cents ?? 0))}</s>
@@ -758,7 +806,7 @@ export default function PlanInfo() {
                               fullWidth
                               iconName={isExtension(item.id) ? "redo" : "add-plus"}
                               ariaLabel={`${isExtension(item.id) ? t("user.plan.extend.button") : t("user.plan.order.placeOrder")} ${item.name}`}
-                              disabled={submitting || pendingOrder !== null}
+                              disabled={submitting || pendingOrder !== null || (recurringBilling && isExtension(item.id))}
                               onClick={() =>
                                 openCheckout({
                                   planId: item.id,
@@ -772,7 +820,12 @@ export default function PlanInfo() {
                             >
                               {isExtension(item.id) ? t("user.plan.extend.button") : t("user.plan.order.placeOrder")}
                             </Button>
-                            {isExtension(item.id) && !pendingOrder && (
+                            {isExtension(item.id) && recurringBilling && (
+                              <Box variant="small" color="text-status-inactive" textAlign="center">
+                                {t("trialSubscription.extendBlockedShort")}
+                              </Box>
+                            )}
+                            {isExtension(item.id) && !pendingOrder && !recurringBilling && (
                               <Box variant="small" color="text-body-secondary" textAlign="center">
                                 {t("user.plan.extend.cardHint", { date: formatDate(extendedUntil(selectedPrice.duration_days)) })}
                               </Box>
@@ -969,6 +1022,18 @@ export default function PlanInfo() {
             </Alert>
           ) : checkout && (
             <SpaceBetween size="l">
+              {incomingKind?.type === "trial" && incomingKind.plan?.id === checkout.planId && (
+                <Alert type="info" header={t("user.promo.trialBenefit", { days: incomingKind.trial_days })}>
+                  <SpaceBetween size="xxs">
+                    {incomingKind.headline && <Box>{incomingKind.headline}</Box>}
+                    <Box>{t(incomingKind.requires_card === true ? "user.promo.trialTerms" : "user.promo.offer.noAutoRenew")}</Box>
+                    {incomingKind.requires_card === true && <Box>{t("trialSubscription.billing", {
+                      price: formatPriceCents(incomingKind.plan.price_cents),
+                      days: incomingKind.plan.duration_days,
+                    })}</Box>}
+                  </SpaceBetween>
+                </Alert>
+              )}
               <div className="plan-info__receipt" style={{ background: colorBackgroundCellShaded, borderRadius: borderRadiusItem }}>
                 <div className="plan-info__receipt-item">
                   <div>
@@ -996,11 +1061,19 @@ export default function PlanInfo() {
                   </div>
                   )}
                 <div className="plan-info__receipt-promo">
-                  <div className="plan-info__promo">
+                  {appliedCode ? <SpaceBetween size="xs">
+                    <Box variant="small" color="text-status-success">
+                      {t("user.plan.checkoutModal.codeApplied", { code: appliedCode })}
+                    </Box>
+                    <Button variant="link" loading={applying} disabled={submitting}
+                      onClick={() => void handleRemovePromotion()}>
+                      {t("user.plan.promotion.remove")}
+                    </Button>
+                  </SpaceBetween> : <div className="plan-info__promo">
                     <Input
                       value={promotionCode}
                       disabled={submitting || applying}
-                      placeholder={appliedCode ? t("user.plan.checkoutModal.replaceCode") : t("user.plan.checkoutModal.promoPlaceholder")}
+                      placeholder={t("user.plan.checkoutModal.promoPlaceholder")}
                       ariaLabel={t("user.plan.promotion.label")}
                       onChange={({ detail }) => setPromotionCode(detail.value)}
                       onKeyDown={({ detail }) => {
@@ -1009,17 +1082,12 @@ export default function PlanInfo() {
                     />
                     <Button
                       loading={applying}
-                      disabled={!promotionCode.trim() || submitting || (checkout.order === null && pendingOrder !== null)}
+                      disabled={submitting || (checkout.order === null && pendingOrder !== null)}
                       onClick={() => void handleApplyCode()}
                     >
                       {t("user.plan.promotion.apply")}
                     </Button>
-                  </div>
-                  {appliedCode && (
-                    <Box variant="small" color="text-status-success" margin={{ top: "xxs" }}>
-                      {t("user.plan.checkoutModal.codeApplied", { code: appliedCode })}
-                    </Box>
-                  )}
+                  </div>}
                 </div>
                 </div>
                 <div className="plan-info__receipt-total" style={{ borderBlockStart: `1px solid ${colorBorderDividerDefault}` }}>
@@ -1091,6 +1159,7 @@ export default function PlanInfo() {
         </Modal>
       </SpaceBetween>
       </div>
+      <PromoOfferError failure={promoFailure} onDismiss={() => setPromoFailure(null)} />
     </ContentLayout>
   );
 }

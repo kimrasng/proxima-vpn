@@ -7,6 +7,7 @@ import type { Plan } from "../../api/types";
 import { ChipPicker, FormSection, SummaryCard } from "./promotionFormParts";
 import { generatePromoCode } from "./promotionFormModel";
 import PromoShareLink from "./PromoShareLink";
+import PromoPageButton from "./PromoPageButton";
 
 const TRIAL_DAY_PRESETS = [3, 7, 14, 30];
 const DURATION_PRESETS = [30, 90, 180, 365];
@@ -95,6 +96,7 @@ export default function FreeTrialPromotions() {
         { id: "cap", header: t("admin.freeTrial.maxRedemptions"), cell: (p) => p.max_redemptions ?? t("admin.freeTrial.unlimited") },
         { id: "active", header: t("admin.freeTrial.active"), cell: (p) => <StatusIndicator type={p.is_active ? "success" : "stopped"}>{p.is_active ? t("admin.freeTrial.yes") : t("admin.freeTrial.no")}</StatusIndicator> },
         { id: "actions", header: t("admin.freeTrial.actions"), cell: (p) => <SpaceBetween direction="horizontal" size="xs">
+          <PromoPageButton code={p.code} fixedPlan />
           <Button variant="inline-link" onClick={() => {
             setForm({ ...p, plan_id: p.plan_id ?? "", duration_days: String(p.duration_days), trial_days: String(p.trial_days),
               max_redemptions: p.max_redemptions === null ? "" : String(p.max_redemptions), max_redemptions_per_user: String(p.max_redemptions_per_user) });

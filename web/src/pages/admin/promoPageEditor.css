@@ -1,0 +1,13 @@
+/* Cloudscape owns modal sizing, spacing, themes and the single body scrollbar. */
+.promo-page-editor {
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
+.promo-page-editor__label {
+  font-weight: normal;
+}
+
+.promo-page-editor__code {
+  overflow-wrap: anywhere;
+}

@@ -83,11 +83,49 @@ export interface PromoLandingInfo {
   discount_description: string;
   plan_name?: string;
   trial_days?: number;
+  requires_card?: boolean;
   discount_type?: "percent" | "fixed";
   discount_value?: number;
   valid_until?: string;
   is_valid: boolean;
+  is_eligible?: boolean;
+  ineligible_reason?: string;
+  plan?: PromoLandingPlan;
+  headline?: string;
+  description?: string;
+  cta_label?: string;
 }
-export function getPromoLanding(code: string) {
-  return get<PromoLandingInfo>(`/api/v1/promo/${encodeURIComponent(code)}`);
+export interface PromoLandingPlan {
+  id: string;
+  name: string;
+  duration_days: number;
+  price_cents: number;
+  traffic_limit: number | null;
+  speed_limit: number | null;
+  max_devices: number;
+  features: { text: string; included: boolean }[];
+  prices: { duration_days: number; price_cents: number }[];
+}
+export function getPromoLanding(code: string, lang?: string, authenticated = false) {
+  if (authenticated) setClientTokenType("user");
+  const query = lang ? `?lang=${encodeURIComponent(lang)}` : "";
+  return get<PromoLandingInfo>(`/api/v1/${authenticated ? "user/promotions" : "promo"}/${encodeURIComponent(code)}${query}`);
+}
+export interface PromoPage {
+  countries: string[];
+  browsers: string[];
+  ip_cidrs: string[];
+  email_domains: string[];
+  headline: string;
+  description: string;
+  cta_label: string;
+  plan_id: string | null;
+}
+export function getPromoPage(code: string) {
+  setClientTokenType("admin");
+  return get<PromoPage>(`/api/v1/admin/promo-pages/${encodeURIComponent(code)}`);
+}
+export function savePromoPage(code: string, page: PromoPage) {
+  setClientTokenType("admin");
+  return put<PromoPage>(`/api/v1/admin/promo-pages/${encodeURIComponent(code)}`, page);
 }

@@ -8,11 +8,13 @@ import {
   ColumnLayout,
   ContentLayout,
   Header,
+  Modal,
   SpaceBetween,
   Spinner,
 } from "@cloudscape-design/components";
-import { getOrderAudit } from "../../api/admin";
-import type { AdminOrderAudit } from "../../api/types";
+import { getOrderAudit, getUserOrderReceipt } from "../../api/admin";
+import type { AdminOrderAudit, OrderReceipt } from "../../api/types";
+import OrderReceiptDetails from "../../components/OrderReceiptDetails";
 import { useManualRefresh } from "../../hooks/useManualRefresh";
 import { usePublishBreadcrumbLeaf } from "../../hooks/useBreadcrumbLeaf";
 import { formatTime } from "../../utils/relativeTime";
@@ -49,6 +51,10 @@ function OrderDetailPage() {
   const [audit, setAudit] = useState<AdminOrderAudit | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [receiptVisible, setReceiptVisible] = useState(false);
+  const [receipt, setReceipt] = useState<OrderReceipt | null>(null);
+  const [receiptLoading, setReceiptLoading] = useState(false);
+  const [receiptError, setReceiptError] = useState(false);
 
   usePublishBreadcrumbLeaf(
     audit ? `${audit.order.plan_name} · ${audit.order.user_email}` : null,
@@ -67,6 +73,21 @@ function OrderDetailPage() {
   }, [orderId, t]);
 
   const { refreshing, lastUpdated, refresh } = useManualRefresh(fetchAudit, REFRESH_INTERVAL);
+
+  const openReceipt = async () => {
+    if (!audit || audit.order.status !== "paid") return;
+    setReceiptVisible(true);
+    setReceipt(null);
+    setReceiptError(false);
+    setReceiptLoading(true);
+    try {
+      setReceipt(await getUserOrderReceipt(audit.order.user_id, audit.order.id));
+    } catch {
+      setReceiptError(true);
+    } finally {
+      setReceiptLoading(false);
+    }
+  };
 
   if (loading && !audit) {
     return (
@@ -102,6 +123,15 @@ function OrderDetailPage() {
           }
           actions={
             <SpaceBetween direction="horizontal" size="xs">
+              {audit.order.status === "paid" && (
+                <Button
+                  variant="primary"
+                  loading={receiptLoading}
+                  onClick={() => void openReceipt()}
+                >
+                  {t("admin.userDetail.grant.viewReceipt")}
+                </Button>
+              )}
               <Button
                 iconName="refresh"
                 ariaLabel={t("admin.orderDetail.refresh")}
@@ -136,6 +166,59 @@ function OrderDetailPage() {
 
         <PaymentEventsSection events={audit.payment_events} />
       </SpaceBetween>
+
+      <Modal
+        visible={receiptVisible}
+        onDismiss={() => setReceiptVisible(false)}
+        header={t("admin.userDetail.grant.receiptTitle")}
+        closeAriaLabel={t("admin.userDetail.grant.close")}
+        footer={
+          <Box float="right">
+            <SpaceBetween direction="horizontal" size="xs">
+              <Button onClick={() => setReceiptVisible(false)}>
+                {t("admin.userDetail.grant.close")}
+              </Button>
+              {receipt?.receipt_url && (
+                <Button
+                  variant="primary"
+                  href={receipt.receipt_url}
+                  target="_blank"
+                  iconName="external"
+                  iconAlign="right"
+                >
+                  {t(receipt.receipt_url.includes("invoice.stripe.com")
+                    ? "admin.userDetail.grant.openInvoice"
+                    : "admin.userDetail.grant.openStripe")}
+                </Button>
+              )}
+            </SpaceBetween>
+          </Box>
+        }
+      >
+        <div className="order-audit-view">
+          {receiptLoading ? (
+            <Box textAlign="center" padding="l">
+              <SpaceBetween size="s">
+                <Spinner />
+                <Box>{t("common.loading")}</Box>
+              </SpaceBetween>
+            </Box>
+          ) : receiptError ? (
+            <Alert
+              type="error"
+              action={
+                <Button onClick={() => void openReceipt()}>
+                  {t("admin.userDetail.resetTickets.retry")}
+                </Button>
+              }
+            >
+              {t("admin.userDetail.grant.receiptError")}
+            </Alert>
+          ) : receipt && (
+            <OrderReceiptDetails receipt={receipt} />
+          )}
+        </div>
+      </Modal>
     </ContentLayout>
   );
 }

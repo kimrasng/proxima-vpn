@@ -4,6 +4,8 @@
 // shared 401 handler, which only knows to send the user to /login. Only
 // same-origin absolute paths are accepted, so a crafted value can never send a
 // freshly signed-in user to another site.
+import { pendingPromo, promoDashboardTarget } from './pendingPromo';
+
 const KEY = 'proxima_post_login';
 
 export function isSafePath(path: string): boolean {
@@ -14,6 +16,8 @@ export function isSafePath(path: string): boolean {
 }
 
 export function rememberPostLogin(path: string): void {
+  const stored = sessionStorage.getItem(KEY);
+  if (stored?.startsWith('/oauth/authorize') && path.startsWith('/portal/dashboard?promo=')) return;
   if (isSafePath(path)) sessionStorage.setItem(KEY, path);
 }
 
@@ -27,13 +31,18 @@ export function continueTarget(search: string): string | null {
   const value = params.get('continue');
   if (value && isSafePath(value)) return value;
   const promo = params.get('promo')?.trim();
-  return promo ? `/portal/plan?promo=${encodeURIComponent(promo)}` : null;
+  const durationDays = Number(params.get('duration_days')) || undefined;
+  return promo ? promoDashboardTarget(promo, durationDays) : null;
 }
 
 export function consumePostLogin(fallback: string, search = window.location.search): string {
   const fromUrl = continueTarget(search);
   const stored = sessionStorage.getItem(KEY);
   sessionStorage.removeItem(KEY);
+  const explicitContinue = new URLSearchParams(search).get('continue');
+  if (explicitContinue && isSafePath(explicitContinue)) return explicitContinue;
+  if (stored && isSafePath(stored)) return stored;
   if (fromUrl) return fromUrl;
-  return stored && isSafePath(stored) ? stored : fallback;
+  const promo = pendingPromo();
+  return promo ? promoDashboardTarget(promo) : fallback;
 }

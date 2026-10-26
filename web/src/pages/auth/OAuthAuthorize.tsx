@@ -8,6 +8,7 @@ import {
   decideOAuthAuthorize,
   getOAuthAuthorize,
   scopeKey,
+  WRITE_SCOPES,
   type OAuthAuthorizeError,
   type OAuthAuthorizeInfo,
 } from "../../api/oauth";
@@ -188,8 +189,8 @@ export default function OAuthAuthorize() {
               <div className="oauth-consent__section-title">{t("auth.oauth.scopesTitle")}</div>
               <ul className="oauth-consent__scopes">
                 {view.info.scopes.map((scope) => (
-                  <li key={scope} className={scope === "reset_tickets:redeem" ? "oauth-consent__scope--write" : undefined}>
-                    <Icon name={scope === "reset_tickets:redeem" ? "edit" : "check"} />
+                  <li key={scope} className={WRITE_SCOPES.includes(scope) ? "oauth-consent__scope--write" : undefined}>
+                    <Icon name={WRITE_SCOPES.includes(scope) ? "edit" : "check"} />
                     <div>
                       <div className="oauth-consent__scope-title">{t(`auth.oauth.scope.${scopeKey(scope)}.title`)}</div>
                       <div className="oauth-consent__scope-desc">{t(`auth.oauth.scope.${scopeKey(scope)}.desc`)}</div>

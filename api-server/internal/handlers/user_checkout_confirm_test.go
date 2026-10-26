@@ -145,3 +145,17 @@ func TestConfirmCheckout_SettlesPaidSessionOnce(t *testing.T) {
 		t.Fatalf("another user's order: got %d, want 404", code)
 	}
 }
+
+func TestReceiptProviderName(t *testing.T) {
+	cases := []struct{ provider, session, want string }{
+		{"free_trial", "cs_test_123", "stripe"},
+		{"free_trial", "SPRING24", "free_trial"},
+		{"stripe", "cs_test_123", "stripe"},
+		{"manual", "", "manual"},
+	}
+	for _, tc := range cases {
+		if got := receiptProviderName(tc.provider, tc.session); got != tc.want {
+			t.Errorf("receiptProviderName(%q, %q) = %q, want %q", tc.provider, tc.session, got, tc.want)
+		}
+	}
+}

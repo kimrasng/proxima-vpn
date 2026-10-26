@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -168,21 +169,23 @@ func (h *UserCheckoutHandler) Start(c *fiber.Ctx) error {
 	}
 
 	ctx := context.Background()
-	var planID, planName, userEmail, promoCode string
+	var planID, planName, userEmail, promoCode, promoName string
 	var durationDays int
 	var priceCents, discountCents int64
 	var expiresAt sql.NullTime
 	err := h.db.QueryRow(ctx,
 		`SELECT o.plan_id, p.name, u.email, o.duration_days, o.price_cents,
-		        o.discount_cents, COALESCE(pc.code, ap.code, ''), o.expires_at
+		        o.discount_cents, COALESCE(pc.code, ap.code, ft.code, ''), COALESCE(page.headline, ''), o.expires_at
 		 FROM plan_orders o
 		 JOIN plans p ON p.id = o.plan_id
 		 JOIN users u ON u.id = o.user_id
 		 LEFT JOIN promotion_codes pc ON pc.id = o.promotion_id
 		 LEFT JOIN affiliate_partners ap ON ap.id = o.affiliate_partner_id
+		 LEFT JOIN free_trial_promotions ft ON ft.id = o.free_trial_id
+		 LEFT JOIN promo_landing_pages page ON page.code = COALESCE(pc.code, ap.code, ft.code)
 		 WHERE o.id = $1 AND o.user_id = $2 AND o.status = 'pending'`,
 		orderID, userID,
-	).Scan(&planID, &planName, &userEmail, &durationDays, &priceCents, &discountCents, &promoCode, &expiresAt)
+	).Scan(&planID, &planName, &userEmail, &durationDays, &priceCents, &discountCents, &promoCode, &promoName, &expiresAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
@@ -192,6 +195,36 @@ func (h *UserCheckoutHandler) Start(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "internal server error"})
 	}
 
+	if promoCode != "" {
+		visitor := promoVisitor(c)
+		visitor.Email = userEmail
+		if err := services.CheckPromoEligibility(ctx, h.db, promoCode, visitor); err != nil {
+			return trialSubscriptionError(c, err)
+		}
+		var isTrial, requiresCard bool
+		if err := h.db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM plan_orders WHERE id=$1 AND free_trial_id IS NOT NULL),
+			COALESCE((SELECT t.requires_card FROM plan_orders o JOIN free_trial_promotions t ON t.id=o.free_trial_id WHERE o.id=$1),false)`,
+			orderID).Scan(&isTrial, &requiresCard); err != nil {
+			return c.SendStatus(500)
+		}
+		if isTrial {
+			if !requiresCard {
+				if _, err := services.NewFreeTrialService(h.db).RedeemOrder(ctx, userID, promoCode, orderID, visitor); err != nil {
+					return trialSubscriptionError(c, err)
+				}
+				return c.JSON(startCheckoutResponse{Provider: services.ProviderFreeTrial, Mode: string(payments.ModeManual)})
+			}
+			gateway, ok := provider.(payments.TrialGateway)
+			if !ok {
+				return c.Status(400).JSON(fiber.Map{"error": "trial requires Stripe card registration"})
+			}
+			handoff, err := services.NewStripeTrialService(h.db, gateway).StartForOrder(ctx, userID, promoCode, orderID, visitor)
+			if err != nil {
+				return trialSubscriptionError(c, err)
+			}
+			return c.JSON(startCheckoutResponse{Provider: provider.Name(), Mode: string(handoff.Mode), RedirectURL: handoff.RedirectURL})
+		}
+	}
 	req2 := payments.CheckoutRequest{
 		OrderID:       orderID,
 		UserID:        userID,
@@ -201,6 +234,7 @@ func (h *UserCheckoutHandler) Start(c *fiber.Ctx) error {
 		PriceCents:    priceCents,
 		DiscountCents: discountCents,
 		PromotionCode: promoCode,
+		PromotionName: promoName,
 	}
 	if expiresAt.Valid {
 		req2.ExpiresAt = expiresAt.Time
@@ -262,17 +296,19 @@ func (h *UserCheckoutHandler) ListProviders(c *fiber.Ctx) error {
 }
 
 type orderReceiptResponse struct {
-	OrderID      string     `json:"order_id"`
-	PlanName     string     `json:"plan_name"`
-	DurationDays int        `json:"duration_days"`
-	PriceCents   int64      `json:"price_cents"`
-	Discount     int64      `json:"discount_cents"`
-	Currency     string     `json:"currency"`
-	Provider     string     `json:"provider"`
-	Email        string     `json:"email"`
-	PaidAt       *time.Time `json:"paid_at"`
-	CreatedAt    time.Time  `json:"created_at"`
-	ReceiptURL   string     `json:"receipt_url,omitempty"`
+	OrderID       string     `json:"order_id"`
+	PlanName      string     `json:"plan_name"`
+	DurationDays  int        `json:"duration_days"`
+	PriceCents    int64      `json:"price_cents"`
+	Discount      int64      `json:"discount_cents"`
+	PromotionCode string     `json:"promotion_code,omitempty"`
+	PromotionName string     `json:"promotion_name,omitempty"`
+	Currency      string     `json:"currency"`
+	Provider      string     `json:"provider"`
+	Email         string     `json:"email"`
+	PaidAt        *time.Time `json:"paid_at"`
+	CreatedAt     time.Time  `json:"created_at"`
+	ReceiptURL    string     `json:"receipt_url,omitempty"`
 	// Note is the administrator's reason for a granted order; empty otherwise.
 	Note          string     `json:"note,omitempty"`
 	ExpiresBefore *time.Time `json:"plan_expires_before,omitempty"`
@@ -323,14 +359,20 @@ func (h *UserCheckoutHandler) writeReceipt(c *fiber.Ctx, orderID, userID string)
 	err := h.db.QueryRow(ctx,
 		`SELECT o.id, p.name, o.duration_days, o.price_cents, o.discount_cents,
 		        o.provider, o.provider_session_id, u.email, o.paid_at,
-		        o.granted_plan_expires_before, o.granted_plan_expires_after, o.created_at
+		        o.granted_plan_expires_before, o.granted_plan_expires_after, o.created_at,
+		        COALESCE(pc.code, ap.code, ft.code, ''), COALESCE(page.headline, '')
 		 FROM plan_orders o
 		 JOIN plans p ON p.id = o.plan_id
 		 JOIN users u ON u.id = o.user_id
+		 LEFT JOIN promotion_codes pc ON pc.id = o.promotion_id
+		 LEFT JOIN affiliate_partners ap ON ap.id = o.affiliate_partner_id
+		 LEFT JOIN free_trial_promotions ft ON ft.id = o.free_trial_id
+		 LEFT JOIN promo_landing_pages page ON page.code = COALESCE(pc.code, ap.code, ft.code)
 		 WHERE o.id = $1 AND o.user_id = $2 AND o.status = 'paid'`,
 		orderID, userID,
 	).Scan(&r.OrderID, &r.PlanName, &r.DurationDays, &r.PriceCents, &r.Discount,
-		&r.Provider, &sessionID, &r.Email, &r.PaidAt, &r.ExpiresBefore, &r.ExpiresAfter, &r.CreatedAt)
+		&r.Provider, &sessionID, &r.Email, &r.PaidAt, &r.ExpiresBefore, &r.ExpiresAfter, &r.CreatedAt,
+		&r.PromotionCode, &r.PromotionName)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "paid order not found"})
@@ -347,7 +389,7 @@ func (h *UserCheckoutHandler) writeReceipt(c *fiber.Ctx, orderID, userID string)
 		r.Note, sessionID = sessionID, ""
 	}
 	if sessionID != "" {
-		if provider, ok := h.registry.Get(r.Provider); ok {
+		if provider, ok := h.registry.Get(receiptProviderName(r.Provider, sessionID)); ok {
 			if rp, ok := provider.(payments.ReceiptProvider); ok {
 				url, err := rp.ReceiptURL(ctx, sessionID)
 				if err != nil {
@@ -359,4 +401,15 @@ func (h *UserCheckoutHandler) writeReceipt(c *fiber.Ctx, orderID, userID string)
 		}
 	}
 	return c.JSON(r)
+}
+
+// receiptProviderName names the provider that issued an order's receipt. A card
+// free trial is stored as provider "free_trial" but its session is a Stripe
+// Checkout Session, so its invoice has to be read from Stripe; a trial redeemed
+// without a card keeps its promotion code there and has no remote receipt.
+func receiptProviderName(orderProvider, sessionID string) string {
+	if orderProvider == services.ProviderFreeTrial && strings.HasPrefix(sessionID, "cs_") {
+		return payments.ProviderStripe
+	}
+	return orderProvider
 }

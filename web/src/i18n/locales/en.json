@@ -13,7 +13,34 @@
     "start": "Start free trial",
     "keep": "Keep subscription",
     "confirm": "Cancel automatic billing",
-    "cancelHint": "Only future billing stops. Your current trial or paid access remains available."
+    "cancelHint": "Only future billing stops. Your current trial or paid access remains available.",
+    "card": {
+      "title": "Card on file",
+      "description": "Recurring payments are charged to your saved card.",
+      "billingStopped": "Automatic billing is canceled. No further charges are scheduled.",
+      "label": "Saved card",
+      "none": "No card is saved.",
+      "unavailable": "Card details could not be loaded from Stripe.",
+      "edit": "Billing portal",
+      "popupBlocked": "Allow browser popups for Stripe, then try again.",
+      "portalError": "Stripe billing management could not be opened. Please try again.",
+      "refreshError": "The updated card could not be loaded. Please refresh the page.",
+      "unknownBrand": "Card",
+      "expires": "Expires {{date}}",
+      "credit": "Credit",
+      "debit": "Debit",
+      "prepaid": "Prepaid",
+      "wallet": "{{wallet}} wallet",
+      "nextCharge": "Next charge",
+      "noneScheduled": "No charge is scheduled.",
+      "every": "every {{days}} days",
+      "state": "Billing",
+      "recurring": "Automatic billing on",
+      "stopped": "Automatic billing canceled"
+    },
+    "manage": "Manage billing",
+    "extendBlocked": "Automatic billing is on, so this plan cannot be extended separately. Your access continues through the subscription. To extend by hand, cancel automatic billing first.",
+    "extendBlockedShort": "Unavailable while automatic billing is on"
   },
   "app": {
     "title": "Proxima VPN",
@@ -1934,6 +1961,71 @@
       }
     },
     "promotions": {
+      "page": {
+        "edit": "Name & eligibility",
+        "title": "Promotion settings",
+        "desc": "Set the customer-facing name, offer description and eligibility.",
+        "error": "Could not load or save these settings. Check your input.",
+        "headline": "Headline",
+        "headlineHint": "Up to 80 characters. Leave blank to use the offer’s default headline.",
+        "headlinePlaceholder": "Example: Start with a free week",
+        "description": "Description",
+        "descriptionHint": "Up to 300 characters. Briefly describe the audience and benefit. Leave blank for the default offer description.",
+        "descriptionPlaceholder": "Example: A 7-day free trial for new customers.",
+        "cta": "Button label",
+        "ctaHint": "Up to 30 characters. Leave blank to use the default button label for this promotion type.",
+        "ctaPlaceholder": "Example: Start free trial",
+        "plan": "Displayed plan",
+        "planAuto": "Automatic selection",
+        "planHint": "Automatic selection shows an eligible plan. Choosing a plan does not change the promotion’s discount or usage rules.",
+        "preview": "Open saved customer page",
+        "countries": "Visitor countries",
+        "countriesHint": "Search by country name or ISO code. Uses the visitor IP’s country; leave empty to allow all countries.",
+        "browsers": "Browsers",
+        "browsersHint": "Choose Chrome, Safari, Firefox, Edge, or Unknown. Leave empty to allow all browsers.",
+        "ip_cidrs": "Allowed IPs / CIDRs",
+        "ip_cidrsHint": "Separate individual IPv4/IPv6 addresses or CIDR ranges with commas or new lines. Surrounding spaces are trimmed. Leave blank for no IP restriction.",
+        "email_domains": "Allowed email domains",
+        "email_domainsHint": "Enter domains without @, separated by commas or new lines. Surrounding spaces are trimmed. The account email is checked when applying the offer; leave blank for no restriction.",
+        "cancel": "Cancel",
+        "save": "Save",
+        "loading": "Loading promotion settings.",
+        "loadError": "Could not load settings",
+        "loadUnavailable": "The connected admin API does not support the promotion settings endpoint. Check the API version, restart with the latest backend, then retry loading.",
+        "loadErrorHint": "Check your network and admin API connection, then retry. Editing and saving are unavailable until settings load.",
+        "retry": "Retry loading",
+        "saveErrorTitle": "Settings were not saved",
+        "saveError": "Your edits are preserved. Check your connection, then select Save again.",
+        "validationError": "Check the highlighted fields and save again. Your edits are preserved.",
+        "contentTab": "Customer-facing content",
+        "contentHint": "Set the offer page copy and displayed plan. Leave copy blank to use the default text for the offer.",
+        "fixedPlan": "Uses the plan assigned to the free trial",
+        "fixedPlanHint": "Change the trial plan in the free trial settings, not in this editor.",
+        "renewalHint": "Trials that require a card automatically renew as a paid subscription on the assigned plan and billing cycle. Editing this copy does not change the trial length, billing cycle, or renewal terms; include those terms in the customer-facing text.",
+        "search": "Search by name or code",
+        "noMatches": "No matching options.",
+        "unrestricted": "Unrestricted",
+        "removeSelection": "Remove {{name}}",
+        "eligibilityTab": "Eligibility",
+        "eligibilityHint": "All configured categories must match (AND). Within each category, any one value may match (OR). Empty categories are unrestricted. For example, Korea/Japan + Chrome allows Chrome users in either country.",
+        "advanced": "Advanced rules · IP and email domains",
+        "ipPlaceholder": "Example: 203.0.113.10, 198.51.100.0/24\n2001:db8::/32",
+        "emailPlaceholder": "Example: gmail.com, example.com",
+        "textLimit": "Enter no more than {{count}} characters.",
+        "ruleLimit": "Each category supports up to 100 values.",
+        "countryError": "Check the country selection. Two-letter ISO country codes are required.",
+        "browserError": "An unsupported browser is selected. Remove it and choose from the list.",
+        "ipError": "Enter valid IP addresses or CIDR ranges, such as 203.0.113.10 or 198.51.100.0/24.",
+        "emailError": "Enter only a domain, not @ or a full email address. Example: example.com.",
+        "planError": "Select a valid plan from the list.",
+        "browser": {
+          "chrome": "Chrome",
+          "safari": "Safari",
+          "firefox": "Firefox",
+          "edge": "Edge",
+          "unknown": "Unknown"
+        }
+      },
       "tabs": {
         "coupon": "Coupon",
         "freeTrial": "Free Trial",
@@ -2849,7 +2941,38 @@
         "summary": "Plan and usage",
         "tickets": "Reset tickets",
         "ticketHistory": "Reset ticket history",
-        "redeem": "Use a reset ticket"
+        "redeem": "Use a reset ticket",
+        "profileUpdate": "Update profile",
+        "subDomains": "Subscription domains",
+        "subRegenerate": "Reissue subscription link",
+        "traffic": "Traffic usage",
+        "plans": "Plans",
+        "orders": "Orders",
+        "receipt": "Receipt",
+        "providers": "Payment methods",
+        "trial": "Free trial",
+        "promoLookup": "Look up promotion",
+        "orderCreate": "Create order",
+        "orderCancel": "Cancel order",
+        "promoApply": "Apply promotion",
+        "promoRemove": "Remove promotion",
+        "checkout": "Start checkout",
+        "checkoutConfirm": "Confirm checkout",
+        "trialCancel": "Cancel trial",
+        "trialConfirm": "Confirm trial",
+        "billingPortal": "Billing portal",
+        "devices": "Devices",
+        "deviceCreate": "Add device",
+        "deviceDelete": "Remove device",
+        "faq": "FAQ",
+        "supportTickets": "My tickets",
+        "supportThread": "Ticket conversation",
+        "supportCreate": "Open ticket",
+        "supportReply": "Reply",
+        "supportClose": "Close ticket",
+        "announcements": "Announcements",
+        "guides": "Guides",
+        "guide": "Guide"
       },
       "emptyTitle": "No apps yet",
       "emptyBody": "Register your own app or an integration so it can sign in with Proxima accounts.",
@@ -3052,7 +3175,38 @@
           "summary": "Current plan, data used and limit, expiry date",
           "tickets": "Reset tickets the user can use",
           "ticketHistory": "Reset ticket history",
-          "redeem": "Uses one reset ticket to reset this month's data usage. A used or expired ticket returns 409"
+          "redeem": "Uses one reset ticket to reset this month's data usage. A used or expired ticket returns 409",
+          "profileUpdate": "Changes name and language only. Sending email or password is rejected with 403.",
+          "subDomains": "Domains the subscription link can use",
+          "subRegenerate": "Creates a new subscription link and retires the old one.",
+          "traffic": "Data usage over time",
+          "plans": "Plans you can buy and their prices",
+          "orders": "Order history and payment status",
+          "receipt": "The receipt for one order",
+          "providers": "Available payment methods",
+          "trial": "Free trial subscription status",
+          "promoLookup": "Details of a promotion code",
+          "orderCreate": "Creates a plan order.",
+          "orderCancel": "Cancels an unpaid order.",
+          "promoApply": "Applies a promotion code to an order.",
+          "promoRemove": "Removes the promotion code from an order.",
+          "checkout": "Returns the payment page URL. The user approves the payment there.",
+          "checkoutConfirm": "Checks the payment finished and applies the plan.",
+          "trialCancel": "Cancels the free trial subscription.",
+          "trialConfirm": "Confirms the free trial payment setup.",
+          "billingPortal": "Returns the Stripe billing portal URL.",
+          "devices": "Registered devices",
+          "deviceCreate": "Registers a new device.",
+          "deviceDelete": "Removes a device and disconnects it.",
+          "faq": "Support categories and FAQ",
+          "supportTickets": "Your support tickets",
+          "supportThread": "The full conversation of one ticket",
+          "supportCreate": "Opens a new ticket.",
+          "supportReply": "Adds a reply to a ticket.",
+          "supportClose": "Closes a ticket.",
+          "announcements": "Announcements in the user's language",
+          "guides": "Published guides",
+          "guide": "The body of one guide"
         }
       },
       "errors": {
@@ -3293,6 +3447,35 @@
   },
   "user": {
     "promo": {
+      "offer": {
+        "title": "Your promotion offer",
+        "discountBadge": "{{value}}% OFF",
+        "termScope": "The promotion discount applies to the selected {{days}}-day purchase.",
+        "trialPeriod": "/ {{days}}-day free trial",
+        "afterTrial": "After the trial: {{price}} every {{days}} days",
+        "included": "Included",
+        "excluded": "Not included",
+        "cardRequired": "Register a card to start the trial. Nothing is charged now.",
+        "autoRenew": "After the trial, {{price}} is charged automatically every {{days}} days. You can cancel before the trial ends.",
+        "noAutoRenew": "There is no automatic charge after the trial. Purchase a plan to continue."
+      },
+      "notNow": "Not now",
+      "terms": "Available for eligible orders only. Review your final total before checkout.",
+      "trialTerms": "A card is required. Your selected plan renews automatically at its regular price after the trial. Cancel before the trial ends to avoid a charge.",
+      "haveAccount": "Already have an account?",
+      "unit": "/ {{days}} days",
+      "priceLabel": "Regular price ${{was}}, offer price ${{now}}",
+      "cta": {
+        "trial": "Start free trial",
+        "discount": "Get this offer"
+      },
+      "spec": {
+        "traffic": "{{value}} data",
+        "trafficUnlimited": "Unlimited data",
+        "speed": "Up to {{value}} Mbps",
+        "speedUnlimited": "No speed limit",
+        "devices": "{{count}} simultaneous devices"
+      },
       "trialBenefit": "{{days}}-day free trial",
       "benefitHint": "After you sign in, the code is entered on the checkout screen for you.",
       "login": "Go to login",
@@ -3303,7 +3486,13 @@
       "invalidTitle": "This promotion is not available",
       "invalid": "The code may be invalid, inactive, expired, or fully redeemed.",
       "errorTitle": "Could not check this promotion",
-      "error": "Check your connection and try again.",
+      "error": {
+        "title": "Promotion notice",
+        "close": "OK",
+        "invalid": "This promotion code is invalid. Please check the code you entered.",
+        "ineligible": "You do not meet this promotion's eligibility requirements. Check the audience and validity period.",
+        "unavailable": "We could not load this promotion. Please try again shortly."
+      },
       "retry": "Try again",
       "percentBenefit": "{{value}}% off",
       "fixedBenefit": "{{value}} off",
@@ -3578,6 +3767,8 @@
         "pendingHint": "Applying a code replaces any code already on this order.",
         "beforeOrderHint": "Enter a code before choosing a duration and it will be applied to the order.",
         "discountApplied": "Discount applied",
+        "remove": "Remove promotion",
+        "removeError": "Could not remove the promotion. Please try again shortly.",
         "savedAmount": "You save {{amount}}",
         "rejected": {
           "not_found": "That promotion code does not exist.",
@@ -3590,6 +3781,7 @@
           "overall_cap_reached": "That promotion code has reached its redemption limit.",
           "user_cap_reached": "You have already used that promotion code the maximum number of times.",
           "use_trial_redeem": "This is a free-trial code. It starts without payment.",
+          "not_eligible": "This account or connection is not eligible for this promotion.",
           "card_required_unsupported": "Trial codes that need a saved card can't be used yet. Please contact support.",
           "active_plan_exists": "You already have an active plan, so the free trial can't start. Free trials are only for accounts without a running plan."
         },
@@ -3599,8 +3791,8 @@
       "checkoutModal": {
         "title": "Checkout",
         "provider": "Payment method",
-        "providerStripe": "Card",
-        "providerStripeHint": "Pay now on the Stripe checkout page.",
+        "providerStripe": "Card & wallets",
+        "providerStripeHint": "Stripe shows available payment methods and local currencies for your location.",
         "providerAdmin": "Bank transfer · manual",
         "providerAdminHint": "Your order is placed and the plan starts once payment is confirmed.",
         "confirm": "Continue to payment",
@@ -3610,7 +3802,7 @@
         "subtotal": "Subtotal",
         "discount": "Discount",
         "total": "Total due",
-        "codeApplied": "Code {{code}} applied.",
+        "codeApplied": "{{code}} offer applied.",
         "confirmAmount": "Pay {{amount}}",
         "viewPlans": "View plans",
         "promoPlaceholder": "Promotion code (optional)",
@@ -4121,7 +4313,7 @@
     "oauth": {
       "title": "{{app}} wants to use your Proxima account",
       "scopesTitle": "If you allow it, this app can",
-      "never": "Your password and payment details are never shared. The app can only use your account within the permissions below.",
+      "never": "Your password and full card number are never shared. The app can only use your account within the permissions below.",
       "redirectLabel": "Returns to",
       "approve": "Allow",
       "deny": "Deny",
@@ -4165,6 +4357,42 @@
         "reset_tickets_redeem": {
           "title": "Use reset tickets",
           "desc": "The app can use a reset ticket to reset this month's data usage."
+        },
+        "profile_write": {
+          "title": "Change name and language",
+          "desc": "Can change your display name and language. It cannot change your email or password."
+        },
+        "subscription_write": {
+          "title": "Reissue subscription link",
+          "desc": "Can create a new subscription link. The old link stops working and has to be replaced with the new one."
+        },
+        "orders_read": {
+          "title": "View orders",
+          "desc": "Plans, order history, receipts and free trial status, including the saved card's brand, last 4 digits and expiry"
+        },
+        "orders_write": {
+          "title": "Place orders and start payment",
+          "desc": "Can order plans, open checkout, cancel orders, cancel a recurring subscription and open the billing portal. You approve the first payment on the payment page; later automatic renewals are not asked again."
+        },
+        "support_read": {
+          "title": "View support tickets",
+          "desc": "Your support tickets, their conversations and the FAQ"
+        },
+        "support_write": {
+          "title": "Write and reply to tickets",
+          "desc": "Can open tickets, reply and close them on your behalf."
+        },
+        "devices_read": {
+          "title": "View devices",
+          "desc": "Your registered devices and their connection details"
+        },
+        "devices_write": {
+          "title": "Add and remove devices",
+          "desc": "Can register or remove devices. A removed device is disconnected right away."
+        },
+        "content_read": {
+          "title": "View announcements and guides",
+          "desc": "Announcements and user guides"
         }
       },
       "approvedTitle": "Connection allowed",

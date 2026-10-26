@@ -1,4 +1,4 @@
-import { get, post, put, patch, setClientTokenType } from './client';
+import { get, post, put, patch, del, setClientTokenType } from './client';
 import type {
   UserProfile,
   UpdateProfileRequest,
@@ -105,16 +105,9 @@ export function applyPromotionToOrder(orderId: string, code: string): Promise<Or
   });
 }
 
-export interface FreeTrialRedeemResult {
-  order_id: string;
-  plan_name: string;
-  trial_days: number;
-  plan_expires_at: string;
-}
-
-export function redeemFreeTrial(code: string): Promise<FreeTrialRedeemResult> {
+export function removePromotionFromOrder(orderId: string): Promise<OrderResponse> {
   applyUserClient();
-  return post<FreeTrialRedeemResult>('/api/v1/user/free-trials/redeem', { code });
+  return del<OrderResponse>(`/api/v1/user/orders/${orderId}/promotion`);
 }
 
 export function listMyOrders(): Promise<OrderResponse[]> {

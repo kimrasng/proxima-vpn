@@ -22,6 +22,7 @@ import type { Plan, PromotionCode } from "../../api/types";
 import { formatPriceCents } from "../../utils/planPricing";
 import { focusFirstInvalid, hasFieldErrors } from "../../utils/formValidation";
 import PromotionFormFields from "./PromotionFormFields";
+import PromoPageButton from "./PromoPageButton";
 import {
   emptyPromotionForm,
   formatKst,
@@ -212,6 +213,7 @@ export default function CouponPromotions() {
               header: t("admin.promotions.col.actions"),
               cell: (item) => (
                 <SpaceBetween direction="horizontal" size="xs">
+                  <PromoPageButton code={item.code} />
                   <Button variant="inline-link" onClick={() => handleEditOpen(item)}>
                     {t("admin.promotions.edit")}
                   </Button>

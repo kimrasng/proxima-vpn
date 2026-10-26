@@ -222,7 +222,8 @@ func TestApplyPromotion_CancelWaitsForAtomicReservation(t *testing.T) {
 	patch := startPromotionRequest(t, f, "PATCH", "/promotion", code)
 	patchPID := waitPromotionBlockedBy(t, pool, lock.Conn().PgConn().PID(), "promotion_codes")
 	cancel := startPromotionRequest(t, f, "POST", "/cancel", "")
-	waitPromotionBlockedBy(t, pool, patchPID, "UPDATE plan_orders")
+	// Cancel takes the order row lock first, so it waits on the in-flight patch.
+	waitPromotionBlockedBy(t, pool, patchPID, "FROM plan_orders WHERE id=$1 AND user_id=$2 FOR UPDATE")
 	if err := lock.Commit(context.Background()); err != nil {
 		t.Fatal(err)
 	}
