@@ -135,10 +135,10 @@ export default function PlanInfo() {
       setProfile(profileData);
       setPlans(planList);
       setOrders(orderList);
-      return orderList;
       // Manual bank transfer is hidden from customers for now; only hosted
       // checkout (Stripe) is offered. Admins still settle orders manually.
       setProviders(providerList.filter((provider) => provider.mode === "redirect"));
+      return orderList;
     } catch {
       setFlash([{ type: "error", content: t("user.plan.loadError"), dismissible: true, onDismiss: () => setFlash([]) }]);
       return null;
@@ -540,12 +540,16 @@ export default function PlanInfo() {
             {t("user.plan.availablePlans")}
           </Header>
           <div className="plan-how">
-            {[1, 2, 3].map((n) => (
-              <div key={n} className="plan-how__step">
-                <span className="plan-how__num" aria-hidden>{n}</span>
+            {[
+              { title: t("user.plan.how.step1Title"), body: t("user.plan.how.step1Body") },
+              { title: t("user.plan.how.step2Title"), body: t("user.plan.how.step2Body") },
+              { title: t("user.plan.how.step3Title"), body: t("user.plan.how.step3Body") },
+            ].map((step, index) => (
+              <div key={index} className="plan-how__step">
+                <span className="plan-how__num" aria-hidden>{index + 1}</span>
                 <div>
-                  <Box fontWeight="bold">{t(`user.plan.how.step${n}Title`)}</Box>
-                  <Box variant="small" color="text-body-secondary">{t(`user.plan.how.step${n}Body`)}</Box>
+                  <Box fontWeight="bold">{step.title}</Box>
+                  <Box variant="small" color="text-body-secondary">{step.body}</Box>
                 </div>
               </div>
             ))}
@@ -705,10 +709,16 @@ export default function PlanInfo() {
 
         <Container header={<Header variant="h2">{t("user.plan.faq.title")}</Header>}>
           <div className="plan-faq">
-            {[1, 2, 3, 4, 5].map((n) => (
-              <details key={n} className="plan-faq__item">
-                <summary>{t(`user.plan.faq.q${n}`)}</summary>
-                <Box variant="p" color="text-body-secondary">{t(`user.plan.faq.a${n}`)}</Box>
+            {[
+              { q: t("user.plan.faq.q1"), a: t("user.plan.faq.a1") },
+              { q: t("user.plan.faq.q2"), a: t("user.plan.faq.a2") },
+              { q: t("user.plan.faq.q3"), a: t("user.plan.faq.a3") },
+              { q: t("user.plan.faq.q4"), a: t("user.plan.faq.a4") },
+              { q: t("user.plan.faq.q5"), a: t("user.plan.faq.a5") },
+            ].map((item, index) => (
+              <details key={index} className="plan-faq__item">
+                <summary>{item.q}</summary>
+                <Box variant="p" color="text-body-secondary">{item.a}</Box>
               </details>
             ))}
           </div>
