@@ -189,7 +189,7 @@ export default function Dashboard() {
               <SpaceBetween size="s">
                 {nodes.error ? <Alert type="error" action={<Button onClick={nodes.refresh}>{t("user.dashboard.retry")}</Button>}>
                   {t("user.nodes.loadError")}
-                </Alert> : nodes.loading ? <Spinner /> : !hasPlan ? (
+                </Alert> : nodes.loading ? <Spinner /> : data && !hasPlan ? (
                   <Box color="text-body-secondary">{t("user.dashboard.serverNeedsPlan")}</Box>
                 ) : (nodes.data?.length ?? 0) === 0 ? (
                   <Box color="text-body-secondary">{t("user.nodes.empty")}</Box>

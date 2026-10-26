@@ -38,7 +38,7 @@ test.describe("passkey authentication", () => {
       },
     });
 
-    await page.goto("/portal/account");
+    await page.goto("/portal/account?tab=security");
     await expect(page.getByRole("heading", { name: "Passkeys" })).toBeVisible();
     await page.getByRole("button", { name: "Add a passkey" }).click();
     await page.getByRole("textbox", { name: "Current password", exact: true }).last().fill("wrong-password");
@@ -56,7 +56,7 @@ test.describe("passkey authentication", () => {
     await page.getByRole("button", { name: "Sign in with a passkey" }).click();
     await expect(page).toHaveURL(/\/portal\/dashboard/, { timeout: 15_000 });
 
-    await page.goto("/portal/account");
+    await page.goto("/portal/account?tab=security");
     await page.getByRole("button", { name: "Remove", exact: true }).click();
     await expect(page.getByText(/Remove “E2E test key”/)).toBeVisible();
     await page.getByRole("button", { name: "Remove", exact: true }).last().click();

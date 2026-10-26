@@ -42,7 +42,8 @@ test.describe("PHS-027 user subscription domains", () => {
       json: { name: "Browser fixture", email: "fixture@example.test", sub_token: "fixture/token+value" },
     }));
     await page.goto("/portal/devices");
-    await expect(page.getByText(en.user.devices.noPlan, { exact: true })).toBeVisible();
+    await expect(page.getByText(en.user.devices.noPlanTitle, { exact: true })).toBeVisible();
+    await expect(page.getByText(en.user.devices.noPlanHint, { exact: true })).toBeVisible();
     await expect(page.locator("code")).toHaveCount(0);
     await expect(page.getByRole("tab")).toHaveCount(0);
   });

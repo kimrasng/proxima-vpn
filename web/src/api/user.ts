@@ -49,14 +49,18 @@ export function getSummary(): Promise<UserSummary> {
   return get<UserSummary>('/api/v1/user/summary');
 }
 
-export function listResetTickets(): Promise<ResetTicket[]> {
+// A malformed body must not reach components that map over the list: the
+// reset-ticket card renders on the dashboard, and a throw there blanks it.
+export async function listResetTickets(): Promise<ResetTicket[]> {
   applyUserClient();
-  return get<ResetTicket[]>('/api/v1/user/reset-tickets');
+  const response = await get<unknown>('/api/v1/user/reset-tickets');
+  return Array.isArray(response) ? (response as ResetTicket[]) : [];
 }
 
-export function listResetTicketHistory(): Promise<UserResetTicket[]> {
+export async function listResetTicketHistory(): Promise<UserResetTicket[]> {
   applyUserClient();
-  return get<UserResetTicket[]>('/api/v1/user/reset-tickets/history');
+  const response = await get<unknown>('/api/v1/user/reset-tickets/history');
+  return Array.isArray(response) ? (response as UserResetTicket[]) : [];
 }
 
 export function redeemResetTicket(id: string): Promise<RedeemResetTicketResult> {

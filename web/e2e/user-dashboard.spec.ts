@@ -20,7 +20,7 @@ const overview: UserSummary = {
 };
 const profile: UserProfile = {
   id: "dashboard-user", name: "Browser fixture", email: "fixture@example.test",
-  status: "active", language: "en", plan_name: "Everyday Plus",
+  status: "active", language: "en", plan_id: "plus", plan_name: "Everyday Plus",
   traffic_used: 25 * GB, traffic_limit: 100 * GB, plan_expires_at: EXPIRES,
   // Reserved characters prove the token is percent-encoded once into the path.
   sub_token: "account/token+secret",
@@ -80,7 +80,7 @@ async function mockDashboard(page: Page, language = "en") {
     announcements: [{ ...bulletin }], nodes: nodes.map((node) => ({ ...node })),
     plans, orders: [] as OrderResponse[],
     failures: new Set<string>(), reads: new Map<string, number>(),
-    orderPosts: [] as CreateOrderRequest[], unexpectedWrites: [] as string[],
+    orderPosts: [] as CreateOrderRequest[], checkoutPosts: [] as unknown[], unexpectedWrites: [] as string[],
   };
   await page.route("**/api/v1/user/**", async (route) => {
     const request = route.request();
@@ -95,7 +95,7 @@ async function mockDashboard(page: Page, language = "en") {
         summary: state.summary, profile: state.profile,
         "subscription-domains": publicDomains, nodes: state.nodes,
         announcements: state.announcements, plans: state.plans, orders: state.orders,
-        "payment-providers": [{ name: "manual", mode: "manual" }],
+        "payment-providers": [{ name: "stripe", mode: "redirect" }],
       };
       await route.fulfill({ json: responses[path] ?? {} });
     } else if (request.method() === "POST" && path === "orders") {
@@ -104,6 +104,9 @@ async function mockDashboard(page: Page, language = "en") {
       const order = { ...pendingOrder, plan_id: body.plan_id, duration_days: body.duration_days };
       state.orders = [order];
       await route.fulfill({ status: 201, json: order });
+    } else if (request.method() === "POST" && /\/orders\/[^/]+\/checkout$/.test(new URL(request.url()).pathname)) {
+      state.checkoutPosts.push(request.postDataJSON());
+      await route.fulfill({ json: { mode: "redirect", redirect_url: "https://checkout.stripe.test/session" } });
     } else {
       state.unexpectedWrites.push(`${request.method()} ${request.url()}`);
       await route.fulfill({ status: 405, json: { error: "unexpected fixture mutation" } });
@@ -127,6 +130,11 @@ function accountUrlInput(page: Page, label = en.user.devices.accountUrl) {
   return page.getByRole("textbox", { name: label, exact: true });
 }
 
+// The subscriber already holds Everyday Plus, so its card offers an extension.
+function extendButton(page: Page, planName = "Everyday Plus") {
+  return page.getByRole("button", { name: `${en.user.plan.extend.button} ${planName}`, exact: true });
+}
+
 function purchaseButton(page: Page, planName = "Everyday Plus") {
   return page.getByRole("button", { name: `${en.user.plan.order.placeOrder} ${planName}`, exact: true });
 }
@@ -138,16 +146,14 @@ test.describe("mocked user dashboard and purchase journey", () => {
     const state = await mockDashboard(page);
     await openOverview(page);
     await expect(page.getByRole("heading", { name: "Everyday Plus", exact: true })).toBeVisible();
-    await expect(page.getByText(en.user.dashboard.monthlyTraffic, { exact: true })).toBeVisible();
-    await expect(page.getByText("25.0 GB of 100.0 GB used", { exact: true })).toBeVisible();
-    await expect(page.getByText("100.0 GB per month", { exact: true })).toBeVisible();
-    await expect(page.getByText("75.0 GB remaining", { exact: true })).toBeVisible();
+    await expect(page.getByText(en.user.dashboard.monthlyRemaining, { exact: true })).toBeVisible();
+    await expect(page.getByText("75.0 GB", { exact: true })).toBeVisible();
+    await expect(page.getByText("25.0 GB of 100.0 GB used this month", { exact: true })).toBeVisible();
     await expect(page.getByText("10 days left", { exact: true })).toBeVisible();
     // The registered-devices tile (devices / max_devices) is gone.
     await expect(page.getByText("2 of 4", { exact: true })).toHaveCount(0);
-    await page.getByRole("button", { name: en.user.dashboard.connections, exact: true }).click();
+    await expect(page.getByText(en.user.dashboard.connections, { exact: true })).toBeVisible();
     await expect(page.getByText("2 of 5", { exact: true })).toBeVisible();
-    await expect(page.getByText("1 of 2 online", { exact: true })).toBeVisible();
     await expect(accountUrlInput(page)).toHaveValue(accountUrl("blocked.example.test"));
     await expect(page.getByRole("button", { name: "Add Device" })).toHaveCount(0);
     await expect(page.getByRole("dialog")).toHaveCount(0);
@@ -181,10 +187,10 @@ test.describe("mocked user dashboard and purchase journey", () => {
     await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(selected);
   });
 
-  test("subscription details link opens the account subscription page", async ({ page }) => {
+  test("the supported-apps link opens the account subscription page", async ({ page }) => {
     await mockDashboard(page);
     await openOverview(page);
-    await page.getByRole("button", { name: en.user.dashboard.subscriptionDetails, exact: true }).click();
+    await page.getByRole("button", { name: en.user.dashboard.supportedApps, exact: true }).click();
     await expect(page).toHaveURL(/\/portal\/devices$/);
     await expect(page.getByRole("heading", { name: en.user.devices.title, exact: true })).toBeVisible();
   });
@@ -195,11 +201,11 @@ test.describe("mocked user dashboard and purchase journey", () => {
     state.profile = { ...profile, plan_name: undefined, plan_expires_at: undefined };
     await openOverview(page);
     await expect(page.getByRole("heading", { name: en.user.dashboard.noPlanTitle, exact: true })).toBeVisible();
-    await expect(page.getByText(en.user.dashboard.noPlanDescription, { exact: true })).toBeVisible();
+    await expect(page.getByText(en.user.dashboard.heroDescription, { exact: true })).toBeVisible();
     await expect(page.getByText(en.user.dashboard.connectNeedsPlan, { exact: true })).toBeVisible();
-    await page.getByRole("button", { name: en.user.dashboard.browsePlans, exact: true }).first().click();
+    await page.getByRole("button", { name: en.user.dashboard.viewPlans, exact: true }).first().click();
     await expect(page).toHaveURL(/\/portal\/plan$/);
-    await expect(page.getByRole("heading", { name: en.user.plan.availablePlans, exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: new RegExp(`^${en.user.plan.availablePlans}`) })).toBeVisible();
     await expect(purchaseButton(page)).toBeEnabled();
     expect(state.orderPosts).toEqual([]);
   });
@@ -237,7 +243,6 @@ test.describe("mocked user dashboard and purchase journey", () => {
     await expect(page.getByText("0 B", { exact: true })).toBeVisible();
     await expect(page.getByText(en.user.dashboard.trafficUnlimited, { exact: true })).toBeVisible();
     await expect(page.getByText(en.user.dashboard.noExpiry, { exact: true })).toBeVisible();
-    await page.getByRole("button", { name: en.user.dashboard.connections, exact: true }).click();
     await expect(page.getByText("0 · No limit", { exact: true })).toBeVisible();
     await expect(accountUrlInput(page)).toHaveValue(accountUrl("blocked.example.test"));
     await expect(page.getByRole("heading", { name: en.user.dashboard.noPlanTitle, exact: true })).toHaveCount(0);
@@ -322,33 +327,34 @@ test.describe("mocked user dashboard and purchase journey", () => {
     await expect(page.getByRole("dialog")).toHaveCount(0);
   });
 
-  test("an active subscriber sees the catalog and confirms the chosen duration before createOrder", async ({ page }, testInfo) => {
+  test("an active subscriber sees the catalog and confirms the chosen duration before paying", async ({ page, context }, testInfo) => {
     const state = await mockDashboard(page);
     await page.setViewportSize({ width: 1280, height: 1000 });
     await page.goto("/portal/plan");
     await expect(page.getByRole("heading", { name: en.user.plan.currentPlan, exact: true })).toBeVisible();
-    await expect(page.getByRole("heading", { name: en.user.plan.availablePlans, exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: new RegExp(`^${en.user.plan.availablePlans}`) })).toBeVisible();
     await expect(page.getByText(en.user.plan.order.notPurchasable, { exact: true })).toHaveCount(2);
     await expect(purchaseButton(page, "Unpriced preview")).toHaveCount(0);
     await expect(purchaseButton(page, "Managed enterprise")).toHaveCount(0);
-    await choose(page, en.user.plan.order.chooseDuration, "90 days · $30.00");
-    await purchaseButton(page).click();
+    await page.getByRole("radio", { name: /^90 days/ }).click();
+    await extendButton(page).click();
     const review = page.getByRole("dialog");
-    await expect(review.getByText(en.user.plan.order.reviewTitle, { exact: true })).toBeVisible();
-    await expect(review.getByText("90 days", { exact: true })).toBeVisible();
-    await expect(review.getByText("$30.00", { exact: true })).toBeVisible();
-    await expect(review.getByText(en.user.plan.order.reviewHint, { exact: true })).toBeVisible();
+    await expect(review.getByText("$30.00").first()).toBeVisible();
+    await expect(review.getByText(en.user.plan.checkoutModal.providerStripe, { exact: true })).toBeVisible();
+    await expect(review.getByText(en.user.plan.checkoutModal.noProviders, { exact: true })).toHaveCount(0);
     expect(state.orderPosts).toEqual([]);
     await testInfo.attach("purchase-confirmation", { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });
     await review.getByRole("button", { name: en.user.plan.order.dismiss, exact: true }).click();
     await expect(page.getByRole("dialog")).toHaveCount(0);
     expect(state.orderPosts).toEqual([]);
-    await purchaseButton(page).click();
-    await page.getByRole("dialog").getByRole("button", { name: en.user.plan.order.confirmOrder, exact: true }).click();
-    await expect(page.getByText(en.user.plan.order.placed, { exact: true })).toBeVisible();
+    await extendButton(page).click();
+    // Paying reserves a tab synchronously, then points it at the Stripe session.
+    const stripeTab = context.waitForEvent("page");
+    await page.getByRole("dialog").getByRole("button", { name: "Pay $30.00 and extend", exact: true }).click();
+    await (await stripeTab).close();
+    await expect(page.getByRole("dialog").getByText(en.user.plan.paying.title, { exact: true }).first()).toBeVisible();
     expect(state.orderPosts).toEqual([{ plan_id: "plus", duration_days: 90 }]);
-    await expect(page.getByRole("dialog")).toHaveCount(0);
-    await expect(purchaseButton(page)).toBeDisabled();
+    expect(state.checkoutPosts).toEqual([{ provider: "stripe" }]);
     expect(state.unexpectedWrites).toEqual([]);
   });
 
@@ -356,10 +362,10 @@ test.describe("mocked user dashboard and purchase journey", () => {
     const state = await mockDashboard(page);
     state.orders = [{ ...pendingOrder }];
     await page.goto("/portal/plan");
-    await expect(page.getByRole("heading", { name: en.user.plan.availablePlans, exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: new RegExp(`^${en.user.plan.availablePlans}`) })).toBeVisible();
     await expect(page.getByText("Your Everyday Plus order (90 days, $30.00) is awaiting payment confirmation.", { exact: true })).toBeVisible();
-    await expect(purchaseButton(page)).toBeDisabled();
-    await expect(page.getByRole("button", { name: new RegExp(en.user.plan.order.chooseDuration) })).toBeDisabled();
+    await expect(extendButton(page)).toBeDisabled();
+    for (const radio of await page.getByRole("radio").all()) await expect(radio).toBeDisabled();
     await expect(page.getByText(en.user.plan.order.blockedByPending, { exact: true })).toBeVisible();
     await expect(page.getByText(en.user.plan.order.notPurchasable, { exact: true })).toHaveCount(2);
     await expect(page.getByRole("dialog")).toHaveCount(0);
@@ -373,10 +379,10 @@ test.describe("mocked user dashboard and purchase journey", () => {
       await mockDashboard(page, "ko");
       await openOverview(page, ko.user.dashboard.title);
       await expect(page.getByRole("heading", { name: "Everyday Plus", exact: true })).toBeVisible();
-      await expect(page.getByText(ko.user.dashboard.monthlyTraffic, { exact: true })).toBeVisible();
+      await expect(page.getByText(ko.user.dashboard.monthlyRemaining, { exact: true })).toBeVisible();
       await expect(page.getByRole("heading", { name: ko.user.dashboard.quickConnect, exact: true })).toBeVisible();
       await expect(accountUrlInput(page, ko.user.devices.accountUrl)).toHaveValue(accountUrl("blocked.example.test"));
-      await expect(page.getByRole("button", { name: ko.user.dashboard.subscriptionDetails, exact: true })).toBeVisible();
+      await expect(page.getByRole("button", { name: ko.user.dashboard.supportedApps, exact: true })).toBeVisible();
       await expect(page.getByRole("heading", { name: ko.user.dashboard.serverStatus, exact: true })).toBeVisible();
       await expect(page.getByRole("button", { name: bulletin.title, exact: true })).toBeVisible();
       expect(await page.evaluate(() => document.body.classList.contains("awsui-dark-mode"))).toBe(theme === "dark");

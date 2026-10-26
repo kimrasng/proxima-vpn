@@ -20,6 +20,12 @@ async function mockUser(page: Page) {
   await page.route("**/api/v1/admin/users/address-user/login-history?*", (route) => route.fulfill({ json: [] }));
 }
 
+// Tunnel sessions and client addresses live on the "Connections & sessions" tab.
+async function openSessionsTab(page: Page) {
+  await page.goto("/admin/users/address-user");
+  await page.getByRole("tab", { name: "Connections & sessions", exact: true }).click();
+}
+
 function addressSection(page: Page) {
   return page.locator("div").filter({
     has: page.getByRole("heading", { name: "Observed client addresses", exact: true }),
@@ -35,7 +41,7 @@ for (const snapshot of [
   test(`observed addresses: complete=${snapshot.complete}, count=${snapshot.count}`, async ({ page }) => {
     await mockUser(page);
     await page.route("**/api/v1/admin/users/address-user/client-addresses", (route) => route.fulfill({ json: snapshot }));
-    await page.goto("/admin/users/address-user");
+    await openSessionsTab(page);
     const section = addressSection(page);
     await expect(section.getByText("Observed address count", { exact: true })).toBeVisible();
     // Same NAT counts once, an IPv6 /64 counts once, and this is not a device count.
@@ -71,7 +77,7 @@ for (const snapshot of [
     await page.route("**/api/v1/admin/users/address-user/client-addresses", (route) => route.fulfill({ json: {
       complete: true, addresses: ["203.0.113.8"], count: 1,
     } }));
-    await page.goto("/admin/users/address-user");
+    await openSessionsTab(page);
     const section = sessionSection(page);
     await expect(section.getByText(/same IP address or UUID/)).toBeVisible();
     await expect(section.getByText(/not a count of physical devices/)).toBeVisible();
@@ -90,7 +96,7 @@ for (const snapshot of [
 test("over-limit sessions warn but never claim a completed block", async ({ page }) => {
   await mockUser(page);
   await page.route("**/api/v1/admin/users/address-user/tunnel-sessions", (route) => route.fulfill({ json: { complete: true, count: 2, limit: 1, over_limit: true, enforced: false } }));
-  await page.goto("/admin/users/address-user");
+  await openSessionsTab(page);
   const section = sessionSection(page);
   await expect(section.getByText("Plan session limit", { exact: true })).toBeVisible();
   await expect(section.getByText(/Observed sessions exceed the plan limit/)).toBeVisible();
@@ -104,7 +110,7 @@ test("failed address refresh clears the count without hiding user details", asyn
     failed ? { status: 503, json: { error: "unavailable" } }
       : { json: { complete: true, addresses: ["203.0.113.8"], count: 1 } },
   ));
-  await page.goto("/admin/users/address-user");
+  await openSessionsTab(page);
   const section = addressSection(page);
   await expect(section.getByText("1", { exact: true })).toBeVisible();
   failed = true;
@@ -112,6 +118,7 @@ test("failed address refresh clears the count without hiding user details", asyn
   await expect(section.getByText(/Unable to load client addresses/)).toBeVisible();
   await expect(section.getByText("1", { exact: true })).toHaveCount(0);
   await expect(section.getByText("Unknown", { exact: true }).first()).toBeVisible();
+  await page.getByRole("tab", { name: "Overview", exact: true }).click();
   await expect(page.getByText("address@example.test", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Save changes" })).toBeVisible();
 });
