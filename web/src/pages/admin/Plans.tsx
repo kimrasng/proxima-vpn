@@ -13,7 +13,6 @@ import {
   Modal,
   SpaceBetween,
   Spinner,
-  StatusIndicator,
 } from "@cloudscape-design/components";
 import {
   listPlans,
@@ -311,74 +310,103 @@ export default function Plans() {
     );
   }
 
+  const openCreate = () => { setError(null); setShowErrors(false); setForm(emptyForm); setInitialForm(JSON.stringify(emptyForm)); setCreateModal(true); };
+
   return (
-    <ContentLayout header={<Header variant="h1">{t("admin.plans.title")}</Header>}>
+    <ContentLayout
+      header={
+        <Header
+          variant="h1"
+          counter={`(${plans.length})`}
+          description={t("admin.plans.list.description")}
+          actions={<Button variant="primary" iconName="add-plus" disabled={detailLoading} onClick={openCreate}>{t("admin.plans.create")}</Button>}
+        >
+          {t("admin.plans.title")}
+        </Header>
+      }
+    >
       <SpaceBetween size="l">
-        <ConcurrencyModeHint />
+        <div className="plans-list__policy"><ConcurrencyModeHint /></div>
         {error && (
           <Flashbar items={[{ type: "error", content: error, dismissible: true, onDismiss: () => setError(null) }]} />
         )}
 
-        <div className="plans-list">
-          <Header
-            actions={
-              <Button variant="primary" disabled={detailLoading} onClick={() => { setError(null); setShowErrors(false); setForm(emptyForm); setInitialForm(JSON.stringify(emptyForm)); setCreateModal(true); }}>
-                {t("admin.plans.create")}
-              </Button>
-            }
-            counter={`(${plans.length})`}
-          >
-            {t("admin.plans.title")}
-          </Header>
-          {plans.length === 0 ? <Box textAlign="center">{t("admin.plans.empty")}</Box> : (
-            <ul className="plans-list__items">
-              {plans.map(item => (
+        {plans.length === 0 ? (
+          <Container>
+            <Box textAlign="center" padding="l">
+              <SpaceBetween size="s">
+                <Box variant="h3" padding="n">{t("admin.plans.empty")}</Box>
+                <Box color="text-body-secondary">{t("admin.plans.list.emptyBody")}</Box>
+                <Button iconName="add-plus" onClick={openCreate}>{t("admin.plans.create")}</Button>
+              </SpaceBetween>
+            </Box>
+          </Container>
+        ) : (
+          <ul className="plans-list__items">
+            {plans.map(item => {
+              const publishable = item.advertise && item.is_active && item.purchasable;
+              const pub = item.is_advertised ? "published" : item.advertise ? "ready" : "private";
+              const guide = item.is_advertised
+                ? t("admin.plans.list.publishedHint")
+                : !item.is_active ? t("admin.plans.list.needActive")
+                : !item.purchasable ? t("admin.plans.list.needPrice")
+                : !item.advertise ? t("admin.plans.list.needAdvertise")
+                : t("admin.plans.list.readyHint");
+              const concurrent = item.max_concurrent === null ? item.max_devices : item.max_concurrent;
+              return (
                 <li key={item.id}>
                   <Container>
-                    <div className="plans-list__heading">
-                      <div className="plans-list__identity">
-                        <h2 className="plans-list__name">{item.name}</h2>
-                        <div className="plans-list__publication">
-                          <Box variant="small" color="text-body-secondary">{t("admin.plans.editor.publication")}</Box>
-                          <StatusIndicator type={item.is_advertised ? "success" : "stopped"}>
-                            {t(item.is_advertised ? "admin.plans.editor.published" : item.advertise ? "admin.plans.editor.ready" : "admin.plans.editor.private")}
-                          </StatusIndicator>
+                    <div className={`plans-list__card${item.is_active ? "" : " plans-list__card--inactive"}`}>
+                      <div className="plans-list__heading">
+                        <div className="plans-list__identity">
+                          <h2 className="plans-list__name">{item.name}</h2>
+                          <div className="plans-list__badges">
+                            <span className={`plans-pill plans-pill--${pub}`}>{t(`admin.plans.editor.${pub}`)}</span>
+                            <span className={`plans-pill plans-pill--${item.is_active ? "on" : "off"}`}>{t(item.is_active ? "admin.plans.list.active" : "admin.plans.list.inactive")}</span>
+                            <span className={`plans-pill plans-pill--${item.purchasable ? "on" : "warn"}`}>{t(item.purchasable ? "admin.plans.list.priced" : "admin.plans.purchasableNo")}</span>
+                          </div>
+                        </div>
+                        <div className="plans-list__actions">
+                          {!item.is_advertised && publishable && (
+                            <Button variant="primary" disabled={actionLoading || detailLoading} onClick={() => setPublishModal(item)}>{t("admin.plans.editor.publish")}</Button>
+                          )}
+                          <Button iconName="edit" disabled={detailLoading} onClick={() => void handleEditOpen(item)}>{t("admin.plans.edit")}</Button>
+                          <ButtonDropdown
+                            variant="icon"
+                            ariaLabel={`${t("admin.plans.col.actions")}: ${item.name}`}
+                            expandToViewport
+                            items={[
+                              { id: "routes", text: t("admin.routeManagement.manage"), disabled: detailLoading },
+                              { id: "publish", text: t(item.is_advertised ? "admin.plans.editor.unpublish" : "admin.plans.editor.publish"), disabled: actionLoading || detailLoading || (!item.is_advertised && !publishable) },
+                              { id: "delete", text: t("admin.plans.delete") },
+                            ]}
+                            onItemClick={({ detail }) => {
+                              if (detail.id === "routes") void handleEditOpen(item, true);
+                              if (detail.id === "publish") setPublishModal(item);
+                              if (detail.id === "delete") setDeleteModal(item);
+                            }}
+                          />
                         </div>
                       </div>
-                      <ButtonDropdown
-                        variant="inline-icon"
-                        ariaLabel={`${t("admin.plans.col.actions")}: ${item.name}`}
-                        expandToViewport
-                        items={[
-                          { id: "edit", text: t("admin.plans.edit"), disabled: detailLoading },
-                          { id: "routes", text: t("admin.routeManagement.manage"), disabled: detailLoading },
-                          { id: "publish", text: t(item.is_advertised ? "admin.plans.editor.unpublish" : "admin.plans.editor.publish"), disabled: actionLoading || detailLoading || (!item.is_advertised && (!item.advertise || !item.is_active || !item.purchasable)) },
-                          { id: "delete", text: t("admin.plans.delete") },
-                        ]}
-                        onItemClick={({ detail }) => {
-                          if (detail.id === "edit") void handleEditOpen(item);
-                          if (detail.id === "routes") void handleEditOpen(item, true);
-                          if (detail.id === "publish") setPublishModal(item);
-                          if (detail.id === "delete") setDeleteModal(item);
-                        }}
-                      />
+
+                      <dl className="plans-list__stats">
+                        <div><dt>{t("admin.plans.editor.monthlyTraffic")}</dt><dd>{formatTraffic(item.traffic_limit, t("admin.plans.unlimited"))}</dd></div>
+                        <div><dt>{t("admin.plans.editor.assignmentDuration")}</dt><dd>{t("common.duration.days", { count: item.duration_days })}</dd></div>
+                        <div><dt>{t("admin.plans.list.devices")}</dt><dd>{t("admin.plans.list.devicesValue", { count: item.max_devices })}<small>{t("admin.plans.list.concurrentValue", { count: concurrent })}</small></dd></div>
+                        <div><dt>{t("admin.plans.col.speedLimit")}</dt><dd>{formatSpeed(item.speed_limit, t("admin.plans.unlimited"))}<small>{t("admin.plans.list.perSlot")}</small></dd></div>
+                      </dl>
+
+                      <div className="plans-list__footer">
+                        <span className="plans-list__group">{t("admin.plans.col.nodeGroup")} <strong>{item.node_group_name ?? "-"}</strong></span>
+                        <span className={`plans-list__guide${publishable || item.is_advertised ? "" : " plans-list__guide--todo"}`}>{guide}</span>
+                      </div>
                     </div>
-                    <dl className="plans-list__details">
-                      <div><dt>{t("admin.plans.col.trafficLimit")}</dt><dd>{formatTraffic(item.traffic_limit, t("admin.plans.unlimited"))}</dd></div>
-                      <div><dt>{t("admin.plans.col.duration")}</dt><dd>{t("common.duration.days", { count: item.duration_days })}</dd></div>
-                      <div><dt>{t("admin.plans.col.maxDevices")}</dt><dd>{item.max_devices}</dd></div>
-                      <div><dt>{t("admin.plans.col.maxConcurrent")}</dt><dd>{item.max_concurrent === null ? item.max_devices : item.max_concurrent}</dd></div>
-                      <div><dt>{t("admin.plans.col.speedLimit")}</dt><dd>{formatSpeed(item.speed_limit, t("admin.plans.unlimited"))}</dd></div>
-                      <div><dt>{t("admin.plans.col.nodeGroup")}</dt><dd>{item.node_group_name ?? "-"}</dd></div>
-                      <div><dt>{t("admin.plans.col.active")}</dt><dd>{item.is_active ? t("admin.plans.yes") : t("admin.plans.no")}</dd></div>
-                      <div><dt>{t("admin.plans.col.purchasable")}</dt><dd><StatusIndicator type={item.purchasable ? "success" : "stopped"}>{t(item.purchasable ? "admin.plans.purchasableYes" : "admin.plans.purchasableNo")}</StatusIndicator></dd></div>
-                    </dl>
                   </Container>
                 </li>
-              ))}
-            </ul>
-          )}
-        </div>
+              );
+            })}
+          </ul>
+        )}
 
         <Modal visible={publishModal !== null} onDismiss={() => !actionLoading && setPublishModal(null)} header={t(publishModal?.is_advertised ? "admin.plans.editor.unpublish" : "admin.plans.editor.publish")} footer={<Box float="right"><SpaceBetween direction="horizontal" size="xs"><Button disabled={actionLoading} onClick={() => setPublishModal(null)}>{t("admin.plans.cancel")}</Button><Button variant="primary" loading={actionLoading} onClick={() => void handlePublish()}>{t(publishModal?.is_advertised ? "admin.plans.editor.unpublish" : "admin.plans.editor.publish")}</Button></SpaceBetween></Box>}>
           {t(publishModal?.is_advertised ? "admin.plans.editor.unpublishConfirm" : "admin.plans.editor.publishConfirm", { name: publishModal?.name })}
