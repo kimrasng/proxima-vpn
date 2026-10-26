@@ -1,0 +1,14 @@
+.promo-offer,
+.promo-offer-error {
+  min-width: 0;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+dialog:has(.promo-offer-popup) [class*="awsui_dialog_"] {
+  width: fit-content !important;
+  min-width: min(320px, calc(100vw - 32px)) !important;
+  max-width: min(480px, calc(100vw - 32px)) !important;
+}
+
+[class*="awsui_dialog_"]:has(> div [class*="awsui_content_"] .promo-offer-popup) { width: fit-content !important; min-width: min(320px, calc(100vw - 32px)) !important; max-width: min(480px, calc(100vw - 32px)) !important; }
