@@ -369,7 +369,7 @@ test.describe("admin CRUD", () => {
 
     // --- plan referencing that group ---
     await page.goto("/admin/plans");
-    await page.getByRole("button", { name: "Create Plan" }).click();
+    await page.getByRole("button", { name: "Create Plan", exact: true }).first().click();
     await page.getByRole("textbox", { name: "Plan Name" }).fill(planName);
 
     // duration / devices are required and must be positive (see

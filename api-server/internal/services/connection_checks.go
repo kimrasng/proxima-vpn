@@ -187,7 +187,7 @@ func telegramCall(ctx context.Context, client *http.Client, base, token, method 
 		if envelope.Description != "" {
 			return errors.New(envelope.Description)
 		}
-		return fmt.Errorf("Telegram returned HTTP %d", resp.StatusCode)
+		return fmt.Errorf("telegram returned HTTP %d", resp.StatusCode)
 	}
 	return json.Unmarshal(raw, out)
 }

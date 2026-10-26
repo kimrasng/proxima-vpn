@@ -40,9 +40,10 @@ func (p *StripeProvider) ReadTrialCheckout(ctx context.Context, sessionID string
 		return nil, fmt.Errorf("retrieve trial checkout: %w", err)
 	}
 	kind := "checkout.session.completed"
-	if session.Status == stripe.CheckoutSessionStatusExpired {
+	switch session.Status {
+	case stripe.CheckoutSessionStatusExpired:
 		kind = "checkout.session.expired"
-	} else if session.Status == stripe.CheckoutSessionStatusOpen {
+	case stripe.CheckoutSessionStatusOpen:
 		kind = "checkout.session.open"
 	}
 	return trialEventFromSession(session, "session:"+session.ID, kind)

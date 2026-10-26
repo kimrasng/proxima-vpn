@@ -11,7 +11,7 @@ import (
 	"github.com/proximavpn/proxima-vpn/api-server/internal/services"
 )
 
-var errTrialGatewayTest = errors.New("Stripe unavailable")
+var errTrialGatewayTest = errors.New("stripe unavailable")
 
 func (g *trialGatewayTest) TrialCurrency() string { return "usd" }
 
