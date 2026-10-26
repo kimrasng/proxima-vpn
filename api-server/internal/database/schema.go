@@ -291,6 +291,17 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) (migrateErr error) {
 			ON node_metrics_history(node_id, recorded_at DESC)`,
 		`ALTER TABLE announcements ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ`,
 		`ALTER TABLE announcements ADD COLUMN IF NOT EXISTS image_url TEXT`,
+		`ALTER TABLE announcements ADD COLUMN IF NOT EXISTS format TEXT NOT NULL DEFAULT 'markdown' CHECK (format IN ('markdown','html'))`,
+		`ALTER TABLE announcements ADD COLUMN IF NOT EXISTS rendered_html TEXT NOT NULL DEFAULT ''`,
+		`CREATE TABLE IF NOT EXISTS announcement_translations (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			announcement_id UUID NOT NULL REFERENCES announcements(id) ON DELETE CASCADE,
+			language TEXT NOT NULL CHECK (language IN ('ko','en','zh')),
+			title TEXT NOT NULL,
+			content TEXT NOT NULL,
+			rendered_html TEXT NOT NULL DEFAULT '',
+			UNIQUE(announcement_id, language)
+		)`,
 		`ALTER TABLE nodes ADD COLUMN IF NOT EXISTS xray_target_version TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE users ADD COLUMN IF NOT EXISTS telegram_id BIGINT UNIQUE`,
 		// Per-device WireGuard identity. wg_private_key/wg_public_key are the

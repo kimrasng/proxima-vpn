@@ -1114,6 +1114,10 @@ export interface Announcement {
   rendered_html?: string;
   content_html?: string;
   translations?: { language: string; title: string; content: string }[];
+  format?: string;
+  rendered_html?: string;
+  content_html?: string;
+  translations?: { language: string; title: string; content: string }[];
   image_url?: string | null;
   is_active: boolean;
   expires_at?: string | null;
@@ -1125,6 +1129,8 @@ export interface CreateAnnouncementRequest {
   content: string;
   format?: string;
   translations?: { language: string; title: string; content: string }[];
+  format?: string;
+  translations?: { language: string; title: string; content: string }[];
   image_url?: string | null;
   expires_at?: string | null;
 }
@@ -1132,6 +1138,8 @@ export interface CreateAnnouncementRequest {
 export interface UpdateAnnouncementRequest {
   title?: string;
   content?: string;
+  format?: string;
+  translations?: { language: string; title: string; content: string }[];
   format?: string;
   translations?: { language: string; title: string; content: string }[];
   image_url?: string | null;

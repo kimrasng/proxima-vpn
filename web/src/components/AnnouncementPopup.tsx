@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Box, Button, Modal, SpaceBetween } from "@cloudscape-design/components";
 import { listAnnouncements } from "../api/user";
 import type { Announcement } from "../api/types";
+import GuideContent from "./GuideContent";
 
 const DISMISSED_KEY = "proxima_dismissed_announcements";
 
@@ -22,20 +23,23 @@ function addDismissed(id: string): void {
 }
 
 export default function AnnouncementPopup() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [queue, setQueue] = useState<Announcement[]>([]);
   const [current, setCurrent] = useState<Announcement | null>(null);
 
   useEffect(() => {
-    listAnnouncements()
+    let cancelled = false;
+    listAnnouncements(i18n.resolvedLanguage ?? i18n.language)
       .then((items) => {
+        if (cancelled) return;
         const dismissed = getDismissed();
         const pending = items.filter((a) => !dismissed.has(a.id));
         setQueue(pending);
-        if (pending.length > 0) setCurrent(pending[0] ?? null);
+        setCurrent(pending[0] ?? null);
       })
       .catch(() => {});
-  }, []);
+    return () => { cancelled = true; };
+  }, [i18n.resolvedLanguage, i18n.language]);
 
   const handleClose = () => {
     if (!current) return;
@@ -75,7 +79,7 @@ export default function AnnouncementPopup() {
             style={{ width: "100%", maxHeight: 240, objectFit: "cover", borderRadius: 8 }}
           />
         )}
-        <Box>{current.content}</Box>
+        {current.content_html ? <GuideContent html={current.content_html} /> : <Box>{current.content}</Box>}
         {queue.length > 1 && (
           <Box color="text-status-inactive" fontSize="body-s">
             {t("user.announcements.moreAnnouncements", { count: queue.length - 1 })}

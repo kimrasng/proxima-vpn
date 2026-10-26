@@ -1,0 +1,21 @@
+.announcement-editor-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.announcement-editor-grid > *,
+.announcement-editor-preview {
+  min-width: 0;
+}
+
+.announcement-editor-preview {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 900px) {
+  .announcement-editor-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

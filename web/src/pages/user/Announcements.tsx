@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import PortalEmpty from "../../components/PortalEmpty";
+import GuideContent from "../../components/GuideContent";
 import { useTranslation } from "react-i18next";
 import {
   ContentLayout,
@@ -21,19 +22,20 @@ export default function Announcements() {
   const [flash, setFlash] = useState<FlashbarProps.MessageDefinition[]>([]);
 
   useEffect(() => {
+    let cancelled = false;
     const load = async () => {
       try {
-        const data = await userApi.listAnnouncements();
-        setAnnouncements(data.filter((a) => a.is_active));
+        const data = await userApi.listAnnouncements(i18n.resolvedLanguage ?? i18n.language);
+        if (!cancelled) setAnnouncements(data.filter((a) => a.is_active));
       } catch {
-        setFlash([{ type: "error", content: t("user.announcements.loadError"), dismissible: true, onDismiss: () => setFlash([]) }]);
+        if (!cancelled) setFlash([{ type: "error", content: t("user.announcements.loadError"), dismissible: true, onDismiss: () => setFlash([]) }]);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
     void load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    return () => { cancelled = true; };
+  }, [i18n.resolvedLanguage, i18n.language, t]);
 
   if (loading) {
     return (
@@ -59,7 +61,9 @@ export default function Announcements() {
             sections: [
               {
                 id: "content",
-                content: (item) => <Box variant="p">{item.content}</Box>,
+                content: (item) => item.content_html
+                  ? <GuideContent html={item.content_html} />
+                  : <Box variant="p">{item.content}</Box>,
               },
               {
                 id: "date",

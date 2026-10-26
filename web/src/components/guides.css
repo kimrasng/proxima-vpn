@@ -1,5 +1,5 @@
 .guide-content {
-  color: var(--color-text-body-default, #16191f);
+  color: inherit;
   font-size: 15px;
   line-height: 1.75;
   word-break: keep-all;

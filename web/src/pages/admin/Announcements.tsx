@@ -2,18 +2,24 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Box,
+  Alert,
+  Badge,
   Button,
   ContentLayout,
+  DatePicker,
   Flashbar,
   FormField,
   Header,
   Input,
   Modal,
+  SegmentedControl,
   SpaceBetween,
   Spinner,
   StatusIndicator,
   Table,
+  Tabs,
   Textarea,
+  TimeInput,
   Toggle,
 } from "@cloudscape-design/components";
 import {
@@ -22,9 +28,12 @@ import {
   updateAnnouncement,
   deleteAnnouncement,
   uploadAnnouncementImage,
+  previewAnnouncement,
 } from "../../api/admin";
 import type { Announcement } from "../../api/types";
 import { focusFirstInvalid, hasFieldErrors } from "../../utils/formValidation";
+import GuideContent from "../../components/GuideContent";
+import "./announcementsAdmin.css";
 
 export default function Announcements() {
   const { t } = useTranslation();
@@ -41,12 +50,23 @@ export default function Announcements() {
 
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
+  const [format, setFormat] = useState("markdown");
+  const [language, setLanguage] = useState("base");
+  const [translations, setTranslations] = useState<NonNullable<Announcement["translations"]>>([]);
+  const [preview, setPreview] = useState<{ html: string; error: boolean; loading: boolean }>({ html: "", error: false, loading: false });
+  const textareaWrap = useRef<HTMLDivElement>(null);
+  const activeTranslation = translations.find((item) => item.language === language);
+  const activeTitle = language === "base" ? title : activeTranslation?.title ?? "";
+  const activeContent = language === "base" ? content : activeTranslation?.content ?? "";
+  const editorOpen = createModal || editModal !== null;
   const [imageUrl, setImageUrl] = useState("");
   const [expiresAt, setExpiresAt] = useState("");
   const [showFormErrors, setShowFormErrors] = useState(false);
   const formErrors = {
     title: title.trim() ? undefined : t("admin.announcements.form.titleRequired"),
     content: content.trim() ? undefined : t("admin.announcements.form.contentRequired"),
+    translations: translations.some((item) => Boolean(item.title.trim()) !== Boolean(item.content.trim()))
+      ? t("admin.announcements.translationRequired") : undefined,
   };
   const checkForm = () => {
     setShowFormErrors(true);
@@ -55,6 +75,38 @@ export default function Announcements() {
   };
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!editorOpen) return;
+    let cancelled = false;
+    const handle = window.setTimeout(() => {
+      setPreview({ html: "", error: false, loading: true });
+      void previewAnnouncement(format, activeContent).then(
+        ({ html }) => { if (!cancelled) setPreview({ html, error: false, loading: false }); },
+        () => { if (!cancelled) setPreview({ html: "", error: true, loading: false }); },
+      );
+    }, 300);
+    return () => { cancelled = true; window.clearTimeout(handle); };
+  }, [editorOpen, format, activeContent, language]);
+
+  const setEditorField = (field: "title" | "content", value: string) => {
+    if (language === "base") {
+      if (field === "title") setTitle(value);
+      else setContent(value);
+      return;
+    }
+    setTranslations((current) => {
+      const existing = current.find((item) => item.language === language) ?? { language, title: "", content: "" };
+      return [...current.filter((item) => item.language !== language), { ...existing, [field]: value }];
+    });
+  };
+
+  const insertSnippet = (snippet: string) => {
+    const textarea = textareaWrap.current?.querySelector("textarea");
+    const start = textarea?.selectionStart ?? activeContent.length;
+    const end = textarea?.selectionEnd ?? activeContent.length;
+    setEditorField("content", activeContent.slice(0, start) + snippet + activeContent.slice(end));
+  };
 
   const fetchAnnouncements = useCallback(async () => {
     try {
@@ -75,6 +127,10 @@ export default function Announcements() {
   const resetForm = () => {
     setTitle("");
     setContent("");
+    setFormat("markdown");
+    setLanguage("base");
+    setTranslations([]);
+    setPreview({ html: "", error: false, loading: false });
     setImageUrl("");
     setExpiresAt("");
   };
@@ -98,6 +154,8 @@ export default function Announcements() {
       await createAnnouncement({
         title,
         content,
+        format,
+        translations: translations.filter((item) => item.title.trim() && item.content.trim()),
         image_url: imageUrl || null,
         expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
       });
@@ -118,6 +176,8 @@ export default function Announcements() {
       await updateAnnouncement(editModal.id, {
         title,
         content,
+        format,
+        translations: translations.filter((item) => item.title.trim() && item.content.trim()),
         image_url: imageUrl || null,
         expires_at: expiresAt ? new Date(expiresAt).toISOString() : "",
       });
@@ -163,8 +223,15 @@ export default function Announcements() {
   const openEdit = (item: Announcement) => {
     setTitle(item.title);
     setContent(item.content);
+    setFormat(item.format ?? "markdown");
+    setLanguage("base");
+    setTranslations(item.translations ?? []);
+    setPreview({ html: "", error: false, loading: false });
     setImageUrl(item.image_url ?? "");
-    setExpiresAt(item.expires_at ? new Date(item.expires_at).toISOString().slice(0, 16) : "");
+    const expiry = item.expires_at ? new Date(item.expires_at) : null;
+    setExpiresAt(expiry
+      ? `${expiry.getFullYear()}-${String(expiry.getMonth() + 1).padStart(2, "0")}-${String(expiry.getDate()).padStart(2, "0")}T${String(expiry.getHours()).padStart(2, "0")}:${String(expiry.getMinutes()).padStart(2, "0")}`
+      : "");
     setShowFormErrors(false);
     setEditModal(item);
   };
@@ -179,12 +246,43 @@ export default function Announcements() {
 
   const formFields = (
     <SpaceBetween size="m">
-      <FormField label={t("admin.announcements.form.title")} errorText={showFormErrors ? formErrors.title : undefined}>
-        <Input value={title} onChange={({ detail }) => setTitle(detail.value)} />
+      <FormField label={t("admin.announcements.format")}>
+        <SegmentedControl selectedId={format} onChange={({ detail }) => setFormat(detail.selectedId)}
+          options={[{ id: "markdown", text: "Markdown" }, { id: "html", text: "HTML" }]} />
       </FormField>
-      <FormField label={t("admin.announcements.form.content")} errorText={showFormErrors ? formErrors.content : undefined}>
-        <Textarea value={content} onChange={({ detail }) => setContent(detail.value)} rows={6} />
-      </FormField>
+      <Tabs activeTabId={language} onChange={({ detail }) => setLanguage(detail.activeTabId)} tabs={[
+        { id: "base", label: t("admin.announcements.languageBase") },
+        { id: "ko", label: t("admin.announcements.languageKo") },
+        { id: "en", label: t("admin.announcements.languageEn") },
+        { id: "zh", label: t("admin.announcements.languageZh") },
+      ]} />
+      {showFormErrors && formErrors.translations && <Alert type="error">{formErrors.translations}</Alert>}
+      {showFormErrors && (formErrors.title || formErrors.content) && language !== "base" &&
+        <Alert type="error">{t("admin.announcements.baseRequired")}</Alert>}
+      <div className="announcement-editor-grid">
+        <SpaceBetween size="m">
+          <FormField label={t("admin.announcements.form.title")} errorText={showFormErrors && language === "base" ? formErrors.title : undefined}>
+            <Input value={activeTitle} onChange={({ detail }) => setEditorField("title", detail.value)} />
+          </FormField>
+          <SpaceBetween direction="horizontal" size="xs">
+            <Button onClick={() => insertSnippet(format === "markdown" ? "\n## " : "\n<h2></h2>\n")}>{t("admin.announcements.insertHeading")}</Button>
+            <Button onClick={() => insertSnippet(format === "markdown" ? "**text**" : "<strong>text</strong>")}>{t("admin.announcements.insertBold")}</Button>
+            <Button onClick={() => insertSnippet(format === "markdown" ? "[text](https://)" : '<a href="https://">text</a>')}>{t("admin.announcements.insertLink")}</Button>
+            <Button onClick={() => insertSnippet(format === "markdown" ? "![](https://)" : '<img src="https://" alt="">')}>{t("admin.announcements.insertImage")}</Button>
+          </SpaceBetween>
+          <div ref={textareaWrap}>
+            <FormField label={t("admin.announcements.form.content")} errorText={showFormErrors && language === "base" ? formErrors.content : undefined}>
+              <Textarea value={activeContent} onChange={({ detail }) => setEditorField("content", detail.value)} rows={14} />
+            </FormField>
+          </div>
+        </SpaceBetween>
+        <section className="announcement-editor-preview" aria-label={t("admin.announcements.preview")} aria-busy={preview.loading}>
+          <Header variant="h3">{t("admin.announcements.preview")}</Header>
+          {preview.loading ? <Spinner /> : preview.error
+            ? <Alert type="error">{t("admin.announcements.previewError")}</Alert>
+            : <GuideContent html={preview.html} />}
+        </section>
+      </div>
       <FormField
         label={t("admin.announcements.form.image")}
         description={t("admin.announcements.form.imageDesc")}
@@ -223,13 +321,13 @@ export default function Announcements() {
         label={t("admin.announcements.form.expiresAt")}
         description={t("admin.announcements.form.expiresAtDesc")}
       >
-        <input
-          type="datetime-local"
-          value={expiresAt}
-          onChange={(e) => setExpiresAt(e.target.value)}
-          style={{ width: "100%", padding: "6px 8px", borderRadius: 4, border: "1px solid #aab7b8", fontSize: 14 }}
-        />
+        <DatePicker value={expiresAt.split("T")[0] ?? ""} placeholder="YYYY/MM/DD"
+          onChange={({ detail }) => setExpiresAt(detail.value ? `${detail.value}T${expiresAt.split("T")[1] || "23:59"}` : "")} />
       </FormField>
+      {expiresAt && <FormField label={t("admin.announcements.expiryTime")}>
+        <TimeInput value={expiresAt.split("T")[1] ?? ""} format="hh:mm" placeholder="hh:mm"
+          onChange={({ detail }) => setExpiresAt(`${expiresAt.split("T")[0]}T${detail.value}`)} />
+      </FormField>}
     </SpaceBetween>
   );
 
@@ -252,6 +350,7 @@ export default function Announcements() {
           items={announcements}
           columnDefinitions={[
             { id: "title", header: t("admin.announcements.col.title"), cell: (item) => item.title },
+            { id: "format", header: t("admin.announcements.format"), cell: (item) => <Badge>{item.format === "html" ? "HTML" : "Markdown"}</Badge> },
             {
               id: "active",
               header: t("admin.announcements.col.active"),
@@ -288,34 +387,15 @@ export default function Announcements() {
         />
 
         <Modal
-          visible={createModal}
-          onDismiss={() => setCreateModal(false)}
-          header={t("admin.announcements.createTitle")}
-          size="medium"
+          visible={editorOpen}
+          onDismiss={() => { setCreateModal(false); setEditModal(null); }}
+          header={editModal ? t("admin.announcements.editTitle") : t("admin.announcements.createTitle")}
+          size="max"
           footer={
             <Box float="right">
               <SpaceBetween direction="horizontal" size="xs">
-                <Button onClick={() => setCreateModal(false)}>{t("admin.announcements.cancel")}</Button>
-                <Button variant="primary" loading={actionLoading} onClick={() => void handleCreate()}>
-                  {t("admin.announcements.save")}
-                </Button>
-              </SpaceBetween>
-            </Box>
-          }
-        >
-          {formFields}
-        </Modal>
-
-        <Modal
-          visible={editModal !== null}
-          onDismiss={() => setEditModal(null)}
-          header={t("admin.announcements.editTitle")}
-          size="medium"
-          footer={
-            <Box float="right">
-              <SpaceBetween direction="horizontal" size="xs">
-                <Button onClick={() => setEditModal(null)}>{t("admin.announcements.cancel")}</Button>
-                <Button variant="primary" loading={actionLoading} onClick={() => void handleEdit()}>
+                <Button onClick={() => { setCreateModal(false); setEditModal(null); }}>{t("admin.announcements.cancel")}</Button>
+                <Button variant="primary" loading={actionLoading} onClick={() => void (editModal ? handleEdit() : handleCreate())}>
                   {t("admin.announcements.save")}
                 </Button>
               </SpaceBetween>

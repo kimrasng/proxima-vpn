@@ -84,9 +84,10 @@ export function listAvailableNodes(): Promise<AvailableNode[]> {
   return get<AvailableNode[]>('/api/v1/user/nodes');
 }
 
-export function listAnnouncements(): Promise<Announcement[]> {
+export function listAnnouncements(lang?: string): Promise<Announcement[]> {
   applyUserClient();
-  return get<Announcement[]>('/api/v1/user/announcements');
+  const query = lang ? `?lang=${encodeURIComponent(lang.split("-")[0] ?? lang)}` : '';
+  return get<Announcement[]>(`/api/v1/user/announcements${query}`);
 }
 
 // The endpoint answers with a bare order, or wraps it alongside the reason a

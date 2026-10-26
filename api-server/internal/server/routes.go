@@ -160,6 +160,7 @@ func (s *Server) registerRoutes() {
 	adminAnnouncements := admin.Group("/announcements")
 	adminAnnouncements.Get("/", adminAnnouncementHandler.List)
 	adminAnnouncements.Post("/", adminAnnouncementHandler.Create)
+	adminAnnouncements.Post("/preview", adminAnnouncementHandler.Preview)
 	adminAnnouncements.Put("/:id", adminAnnouncementHandler.Update)
 	adminAnnouncements.Delete("/:id", adminAnnouncementHandler.Delete)
 
@@ -387,7 +388,7 @@ func (s *Server) registerRoutes() {
 	user.Put("/profile", userPortalHandler.UpdateProfile)
 	user.Get("/traffic", userPortalHandler.GetTrafficStats)
 	user.Post("/sub-token/regenerate", userPortalHandler.RegenerateSubToken)
-	user.Get("/announcements", userPortalHandler.ListAnnouncements)
+	user.Get("/announcements", userPortalHandler.ListLocalizedAnnouncements)
 	userGuideHandler := handlers.NewGuideHandler(s.db)
 	user.Get("/guides", userGuideHandler.ListPublished)
 	user.Get("/guides/:id", userGuideHandler.GetPublished)
