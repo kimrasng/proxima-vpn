@@ -46,6 +46,10 @@
   gap: 8px;
 }
 
+.support-ticket-back {
+  margin-inline-start: -4px;
+}
+
 .support-ticket-title {
   display: flex;
   flex-wrap: wrap;

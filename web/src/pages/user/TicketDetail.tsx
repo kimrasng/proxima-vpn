@@ -85,7 +85,7 @@ export default function TicketDetail() {
     <ContentLayout
       header={
         <SpaceBetween size="xxs">
-          <Button variant="link" iconName="angle-left" onClick={back}>{t("support.thread.backToList")}</Button>
+          <Button variant="link" iconName="angle-left" className="support-ticket-back" onClick={back}>{t("support.thread.backToList")}</Button>
           <Header
             variant="h1"
             description={
