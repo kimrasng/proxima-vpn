@@ -154,6 +154,23 @@ func (s *Server) registerRoutes() {
 	guideHandler := handlers.NewGuideHandler(s.db)
 	adminGuides := admin.Group("/guides")
 	adminGuides.Get("/", guideHandler.ListGuides)
+	supportHandler := handlers.NewSupportHandler(s.db, s.mailer, s.config.Server.PanelURL)
+	adminSupport := admin.Group("/support")
+	adminSupport.Get("/summary", supportHandler.AdminSummary)
+	adminSupport.Get("/tickets", supportHandler.AdminListTickets)
+	adminSupport.Get("/tickets/:id", supportHandler.AdminGetTicket)
+	adminSupport.Post("/tickets/:id/messages", supportHandler.AdminReply)
+	adminSupport.Patch("/tickets/:id", supportHandler.AdminUpdateTicket)
+	adminSupport.Delete("/tickets/:id", supportHandler.AdminDeleteTicket)
+	adminSupport.Get("/categories", supportHandler.AdminListCategories)
+	adminSupport.Post("/categories", supportHandler.AdminCreateCategory)
+	adminSupport.Put("/categories/:id", supportHandler.AdminUpdateCategory)
+	adminSupport.Delete("/categories/:id", supportHandler.AdminDeleteCategory)
+	adminSupport.Get("/faqs", supportHandler.AdminListFAQs)
+	adminSupport.Post("/faqs", supportHandler.AdminCreateFAQ)
+	adminSupport.Put("/faqs/:id", supportHandler.AdminUpdateFAQ)
+	adminSupport.Delete("/faqs/:id", supportHandler.AdminDeleteFAQ)
+
 	adminGuides.Post("/", guideHandler.CreateGuide)
 	adminGuides.Post("/preview", guideHandler.Preview)
 	adminGuides.Get("/categories", guideHandler.ListCategories)
@@ -368,6 +385,21 @@ func (s *Server) registerRoutes() {
 	sub := s.app.Group("/sub")
 	sub.Get("/:sub_token/:device_id", subLimiter, subscriptionHandler.GetSubscription)
 	sub.Get("/:sub_token", subLimiter, subscriptionHandler.GetAccountSubscription)
+
+	userSupportLimiter := limiter.New(limiter.Config{
+		Max: 30, Expiration: time.Minute,
+		KeyGenerator: func(c *fiber.Ctx) string { return c.Locals("user_id").(string) },
+		LimitReached: func(c *fiber.Ctx) error {
+			return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{"error": "too many support requests, try again shortly"})
+		},
+	})
+	userSupport := user.Group("/support")
+	userSupport.Get("/faq", supportHandler.ListFAQ)
+	userSupport.Get("/tickets", supportHandler.ListTickets)
+	userSupport.Post("/tickets", userSupportLimiter, supportHandler.CreateTicket)
+	userSupport.Get("/tickets/:id", supportHandler.GetTicket)
+	userSupport.Post("/tickets/:id/messages", userSupportLimiter, supportHandler.PostMessage)
+	userSupport.Post("/tickets/:id/close", supportHandler.CloseTicket)
 
 	// Outside /api/v1 and outside any JWT-protected group: a hosted payment
 	// provider authenticates its callback with a signature, not a bearer
