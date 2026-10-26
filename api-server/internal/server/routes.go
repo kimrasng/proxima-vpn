@@ -165,14 +165,6 @@ func (s *Server) registerRoutes() {
 
 	admin.Get("/reset-tickets", resetTicketHandler.ListGrants)
 
-	oauthHandler := handlers.NewOAuthHandler(s.db, s.config.Server.PanelURL)
-	oauthApps := admin.Group("/oauth-apps")
-	oauthApps.Get("/", oauthHandler.ListClients)
-	oauthApps.Get("/scopes", oauthHandler.Scopes)
-	oauthApps.Post("/", oauthHandler.CreateClient)
-	oauthApps.Put("/:id", oauthHandler.UpdateClient)
-	oauthApps.Post("/:id/secret", oauthHandler.RotateSecret)
-	oauthApps.Delete("/:id", oauthHandler.DeleteClient)
 	admin.Post("/reset-tickets", resetTicketHandler.Grant)
 
 	adminSettingsHandler := handlers.NewAdminSettingsHandler(s.db)
@@ -431,29 +423,17 @@ func (s *Server) registerRoutes() {
 	user.Get("/guides", userGuideHandler.ListPublished)
 	user.Get("/guides/:id", userGuideHandler.GetPublished)
 
-	user.Get("/oauth/authorize", oauthHandler.AuthorizeInfo)
-	user.Post("/oauth/authorize", oauthHandler.AuthorizeDecision)
-	user.Get("/oauth/grants", oauthHandler.ListGrants)
-	user.Delete("/oauth/grants/:client_id", oauthHandler.RevokeGrant)
 
 	// Token endpoints authenticate the client app, not a user session, and are
 	// limited per address so a secret cannot be guessed at line rate.
-	oauthTokenLimiter := limiter.New(limiter.Config{
 		Max: 60, Expiration: time.Minute,
 		KeyGenerator: func(c *fiber.Ctx) string { return c.IP() },
 		LimitReached: func(c *fiber.Ctx) error {
 			return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{"error": "slow_down", "error_description": "too many token requests"})
 		},
 	})
-	oauthPublic := api.Group("/oauth")
-	oauthPublic.Post("/token", oauthTokenLimiter, oauthHandler.Token)
-	oauthPublic.Post("/revoke", oauthTokenLimiter, oauthHandler.Revoke)
 
-	// /api/v1/client is the OAuth resource API: the portal's own handlers,
 	// each behind the scope that covers it.
-	clientAPI := api.Group("/client", middleware.OAuthBearerMiddleware(oauthHandler.Service()))
-	clientAPI.Get("/profile", middleware.RequireScope(services.ScopeProfile), oauthHandler.ClientProfile)
-	clientAPI.Get("/subscription", middleware.RequireScope(services.ScopeSubscriptionRead), oauthHandler.ClientSubscription)
 	clientAPI.Get("/nodes", middleware.RequireScope(services.ScopeNodesRead), userPlanHandler.ListNodes)
 	clientAPI.Get("/summary", middleware.RequireScope(services.ScopePlanRead), userPortalHandler.GetSummary)
 	clientAPI.Get("/reset-tickets", middleware.RequireScope(services.ScopeResetTicketsRead), resetTicketHandler.ListMine)
