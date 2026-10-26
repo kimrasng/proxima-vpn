@@ -260,6 +260,31 @@ func (h *UserOrderHandler) applyPromotion(ctx context.Context, resp *orderRespon
 		return fmt.Errorf("lock promotion order: %w", err)
 	}
 
+	// Coupons win when a string exists in several kinds, matching the public
+	// landing lookup, so the page and checkout always agree on what a code is.
+	var isCoupon bool
+	if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM promotion_codes WHERE code = $1)`, code).Scan(&isCoupon); err != nil {
+		return fmt.Errorf("look up coupon code: %w", err)
+	}
+	isTrial := false
+	if !isCoupon {
+		if isTrial, err = services.IsFreeTrialCodeTx(ctx, tx, code); err != nil {
+			return err
+		}
+	}
+	if isTrial {
+		return &services.PromotionRejectError{Reason: services.RejectUseTrialRedeem}
+	}
+	isAffiliate := false
+	if !isCoupon {
+		if isAffiliate, err = services.IsAffiliateCodeTx(ctx, tx, code); err != nil {
+			return err
+		}
+	}
+	if isAffiliate {
+		return h.applyAffiliateTx(ctx, tx, resp, &updated, originalCents, userID, code)
+	}
+
 	// Replacing A with B must lock both codes in the same order as replacing
 	// B with A on another order, rather than deadlocking on opposite swaps.
 	rows, err := tx.Query(ctx,
@@ -298,7 +323,7 @@ func (h *UserOrderHandler) applyPromotion(ctx context.Context, resp *orderRespon
 	updated.DiscountCents = reservation.DiscountCents
 	updated.PriceCents = originalCents - reservation.DiscountCents
 	if _, err := tx.Exec(ctx,
-		`UPDATE plan_orders SET promotion_id = $2, discount_cents = $3, price_cents = $4
+		`UPDATE plan_orders SET promotion_id = $2, discount_cents = $3, price_cents = $4, affiliate_partner_id = NULL
 		 WHERE id = $1 AND status = 'pending'`,
 		updated.ID, reservation.PromotionID, updated.DiscountCents, updated.PriceCents,
 	); err != nil {

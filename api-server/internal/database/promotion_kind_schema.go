@@ -33,4 +33,17 @@ var promotionKindSchema = []string{
 		created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 	)`,
 	`CREATE INDEX IF NOT EXISTS idx_affiliate_commissions_partner ON affiliate_commissions(partner_id, created_at)`,
+	// One commission per paid order, so a replayed settlement cannot pay twice.
+	`CREATE UNIQUE INDEX IF NOT EXISTS idx_affiliate_commissions_order ON affiliate_commissions(order_id) WHERE order_id IS NOT NULL`,
+	// Which partner referred the order; set while pending, read when it is paid.
+	`ALTER TABLE plan_orders ADD COLUMN IF NOT EXISTS affiliate_partner_id UUID REFERENCES affiliate_partners(id)`,
+	`ALTER TABLE plan_orders ADD COLUMN IF NOT EXISTS free_trial_id UUID REFERENCES free_trial_promotions(id)`,
+	`CREATE TABLE IF NOT EXISTS free_trial_redemptions (
+		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+		promotion_id UUID NOT NULL REFERENCES free_trial_promotions(id),
+		user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		order_id UUID NOT NULL UNIQUE REFERENCES plan_orders(id) ON DELETE CASCADE,
+		created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+	)`,
+	`CREATE INDEX IF NOT EXISTS idx_free_trial_redemptions_promo_user ON free_trial_redemptions(promotion_id, user_id)`,
 }

@@ -199,6 +199,9 @@ func (s *PaymentService) Settle(ctx context.Context, conf payments.Confirmation)
 		return &SettleResult{Outcome: SettleIgnored, Reason: "amount_mismatch"}, nil
 	}
 
+	if err := recordAffiliateCommissionTx(ctx, tx, conf.OrderID); err != nil {
+		return nil, err
+	}
 	if err := tx.Commit(ctx); err != nil {
 		return nil, fmt.Errorf("commit settle claim: %w", err)
 	}
@@ -272,6 +275,9 @@ func (s *PaymentService) revertFailedSettle(ctx context.Context, orderID, eventI
 		orderID,
 	); err != nil {
 		fmt.Printf("payments: failed to revert order %s after grant error: %v\n", orderID, err)
+	}
+	if _, err := s.db.Exec(ctx, `DELETE FROM affiliate_commissions WHERE order_id = $1 AND status = 'pending'`, orderID); err != nil {
+		fmt.Printf("payments: failed to drop commission for reverted order %s: %v\n", orderID, err)
 	}
 	if _, err := s.db.Exec(ctx,
 		`UPDATE payment_events SET outcome = 'failed', reason = $2, processed_at = NOW() WHERE id = $1`,

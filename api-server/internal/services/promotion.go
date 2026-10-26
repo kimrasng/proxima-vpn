@@ -45,6 +45,15 @@ const (
 	RejectUserNotAllowed    PromotionRejectReason = "user_not_allowed"
 	RejectOverallCapReached PromotionRejectReason = "overall_cap_reached"
 	RejectUserCapReached    PromotionRejectReason = "user_cap_reached"
+	// RejectUseTrialRedeem: the code is a free-trial code, which grants a plan
+	// through FreeTrialService.Redeem instead of discounting an order.
+	RejectUseTrialRedeem PromotionRejectReason = "use_trial_redeem"
+	// RejectCardRequiredUnsupported: the trial asks for a saved card, which the
+	// panel cannot collect yet, so the code is refused rather than granted free.
+	RejectCardRequiredUnsupported PromotionRejectReason = "card_required_unsupported"
+	// RejectActivePlan: free trials are for users without a running plan, so a
+	// trial can never convert paid time on one plan into time on another.
+	RejectActivePlan PromotionRejectReason = "active_plan_exists"
 )
 
 // PromotionRejectError is returned by Reserve when a code fails an
