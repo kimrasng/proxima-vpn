@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   ContentLayout,
   Header,
@@ -91,6 +91,10 @@ const STATUS_LABEL_KEYS: Record<string, string> = {
 export default function PlanInfo() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const incomingPromo = searchParams.get("promo")?.trim() ?? "";
+  const openedIncomingPromo = useRef<string | null>(null);
+  const appliedIncomingPromo = useRef<string | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [plans, setPlans] = useState<UserPlanItem[]>([]);
   const [orders, setOrders] = useState<OrderResponse[]>([]);
@@ -222,7 +226,7 @@ export default function PlanInfo() {
   const openCheckout = (target: CheckoutTarget) => {
     setCheckout(target);
     setCheckoutError(null);
-    setPromotionCode("");
+    setPromotionCode(appliedIncomingPromo.current === incomingPromo ? "" : incomingPromo);
     setAppliedCode(target.discountCents > 0 ? (target.order?.promotion_code || "") : null);
     setProviderName((current) =>
       current && providers.some((provider) => provider.name === current)
@@ -254,7 +258,7 @@ export default function PlanInfo() {
   // Applying a code needs a real order: the server alone knows eligibility and
   // the discount, so the first Apply places the pending order and later ones
   // replace the code on it. The totals shown are always the server's.
-  const handleApplyCode = async () => {
+  const handleApplyCode = useCallback(async () => {
     if (!checkout || applying || submitting) return;
     const code = promotionCode.trim();
     if (!code) return;
@@ -296,7 +300,41 @@ export default function PlanInfo() {
     } finally {
       setApplying(false);
     }
-  };
+  }, [checkout, applying, submitting, promotionCode, t]);
+
+  useEffect(() => {
+    if (loading || !incomingPromo || openedIncomingPromo.current === incomingPromo) return;
+    if (checkout) {
+      openedIncomingPromo.current = incomingPromo;
+      return;
+    }
+    // A landing-page link carries no plan of its own: resume a pending order
+    // when one exists, otherwise open the first purchasable plan and price.
+    const pending = orders.find((order) => order.status === "pending");
+    const plan = plans.find((item) => item.purchasable && item.prices.length > 0);
+    const price = plan?.prices[0];
+    if (pending) {
+      openedIncomingPromo.current = incomingPromo;
+      openCheckout({
+        planId: pending.plan_id, planName: pending.plan_name, durationDays: pending.duration_days,
+        priceCents: pending.price_cents, discountCents: pending.discount_cents ?? 0, order: pending,
+      });
+    } else if (plan && price) {
+      openedIncomingPromo.current = incomingPromo;
+      openCheckout({
+        planId: plan.id, planName: plan.name, durationDays: price.duration_days,
+        priceCents: price.price_cents, discountCents: 0, order: null,
+      });
+    }
+    // openCheckout closes over the same state these dependencies cover.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, incomingPromo, checkout, orders, plans, providers]);
+
+  useEffect(() => {
+    if (!checkout || !incomingPromo || promotionCode !== incomingPromo || applying || submitting || appliedIncomingPromo.current === incomingPromo) return;
+    appliedIncomingPromo.current = incomingPromo;
+    void handleApplyCode();
+  }, [checkout, incomingPromo, promotionCode, applying, submitting, handleApplyCode]);
 
   // Hands an existing pending order to the chosen provider. A redirect provider
   // (Stripe) leaves the SPA; a manual one only records the choice, so the order
@@ -425,7 +463,9 @@ export default function PlanInfo() {
   // Buying the plan the user already holds extends it: the server adds the new
   // term on top of the current expiry and keeps usage and the reset date.
   const isExtension = (planId: string) => hasPlan && profile?.plan_id === planId;
-  const formatDate = (value: Date) => value.toLocaleDateString(i18n.resolvedLanguage ?? i18n.language);
+  // Non-breaking spaces keep a date such as "2026. 12. 25." on one line.
+  const formatDate = (value: Date) =>
+    value.toLocaleDateString(i18n.resolvedLanguage ?? i18n.language).replace(/ /g, "\u00a0");
   const extendedUntil = (days: number) => {
     const base = profile?.plan_expires_at ? new Date(profile.plan_expires_at) : new Date();
     return new Date(Math.max(base.getTime(), Date.now()) + days * 86400000);
@@ -742,6 +782,7 @@ export default function PlanInfo() {
             </Box>
           ) : undefined}
         >
+          <div className="plan-info-modal">
           {checkoutReturn?.kind === "confirming" || checkoutReturn?.kind === undefined ? (
             <Box textAlign="center" padding="l">
               <SpaceBetween size="s" alignItems="center">
@@ -772,6 +813,7 @@ export default function PlanInfo() {
               )}
             </SpaceBetween>
           )}
+          </div>
         </Modal>
 
         <Modal
@@ -792,6 +834,7 @@ export default function PlanInfo() {
             </Box>
           }
         >
+          <div className="plan-info-modal">
           {paying && (
             <SpaceBetween size="m">
               <StatusIndicator type="in-progress">{t("user.plan.paying.standby")}</StatusIndicator>
@@ -799,6 +842,7 @@ export default function PlanInfo() {
               <Box variant="small" color="text-body-secondary">{t("user.plan.paying.reopenHint")}</Box>
             </SpaceBetween>
           )}
+          </div>
         </Modal>
 
         <Modal
@@ -841,6 +885,7 @@ export default function PlanInfo() {
             </Box>
           )}
         >
+          <div className="plan-info-modal">
           {placedOrder ? (
             <SpaceBetween size="l">
               <Box textAlign="center" padding={{ top: "s" }}>
@@ -973,6 +1018,7 @@ export default function PlanInfo() {
               {checkoutError && <Alert type="error">{checkoutError}</Alert>}
             </SpaceBetween>
           )}
+          </div>
         </Modal>
 
         <Modal
@@ -990,10 +1036,12 @@ export default function PlanInfo() {
             </Box>
           }
         >
+          <div className="plan-info-modal">
           {t("user.plan.order.cancelMessage", {
             plan: cancelModal?.plan_name,
             days: cancelModal?.duration_days,
           })}
+          </div>
         </Modal>
       </SpaceBetween>
       </div>

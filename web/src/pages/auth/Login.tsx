@@ -1,7 +1,8 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
+  Alert,
   Box,
   Button,
   Container,
@@ -18,11 +19,18 @@ import { userLogin, setToken } from "../../api/auth";
 import { ApiError } from "../../api/client";
 import PortalHighlights from "../../components/PortalHighlights";
 import AuthLink from "../../components/AuthLink";
+import { consumePostLogin, continueTarget, rememberPostLogin } from "../../utils/postLogin";
 import PasskeyLoginButton from "../../components/PasskeyLoginButton";
 
 export default function Login() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const location = useLocation();
+  const resumingOAuth = continueTarget(location.search)?.startsWith("/oauth/authorize") ?? false;
+  useEffect(() => {
+    const target = continueTarget(location.search);
+    if (target) rememberPostLogin(target);
+  }, [location.search]);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -45,7 +53,7 @@ export default function Login() {
     try {
       const res = await userLogin({ email, password });
       setToken("user", res.token);
-      navigate("/portal/dashboard", { replace: true });
+      navigate(consumePostLogin("/portal/dashboard"), { replace: true });
     } catch (err) {
       const body = err instanceof ApiError ? (err.body as { error?: string } | undefined) : undefined;
       setFlash([
@@ -76,6 +84,9 @@ export default function Login() {
       </Box>
 
       <SpaceBetween size="l">
+        {resumingOAuth && (
+          <Alert type="info" header={t("auth.login.oauthContinueTitle")}>{t("auth.login.oauthContinueBody")}</Alert>
+        )}
         {flash.length > 0 && <Flashbar items={flash} i18nStrings={{ ariaLabel: t("admin.notifications.title") }} />}
         <div className="auth-layout__card">
         <Container header={<Header variant="h1">{t("auth.login.title")}</Header>}>

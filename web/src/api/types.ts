@@ -1277,6 +1277,7 @@ export interface PublicSubscriptionDomain {
   is_default: boolean;
 }
 
+
 export type SupportStatus = "open" | "answered" | "closed";
 export type SupportPriority = "low" | "normal" | "high";
 export type LocalizedText = Partial<Record<"ko" | "en" | "zh", string>>;

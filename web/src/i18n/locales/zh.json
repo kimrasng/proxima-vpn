@@ -46,6 +46,74 @@
     "create": "创建"
   },
   "admin": {
+    "freeTrial": {
+      "title": "免费试用促销",
+      "create": "创建免费试用",
+      "edit": "编辑免费试用",
+      "delete": "删除免费试用",
+      "code": "代码",
+      "plan": "套餐",
+      "selectPlan": "选择套餐",
+      "durationDays": "套餐时长（天）",
+      "trialDays": "试用时长（天）",
+      "requiresCard": "需要绑定支付卡",
+      "maxRedemptions": "总兑换上限",
+      "perUser": "每位用户兑换上限",
+      "active": "启用",
+      "yes": "是",
+      "no": "否",
+      "unlimited": "不限",
+      "unlimitedHint": "留空表示不限制总次数。",
+      "actions": "操作",
+      "save": "保存",
+      "cancel": "取消",
+      "empty": "暂无免费试用促销。请创建一个。",
+      "loading": "正在加载免费试用促销",
+      "error": "请求失败。请检查输入和代码是否重复。",
+      "retry": "重试",
+      "validation": "请输入有效值。天数和兑换上限必须为正整数。",
+      "deleteConfirm": "删除免费试用代码 {{code}}？"
+    },
+    "affiliate": {
+      "title": "联盟合作伙伴",
+      "create": "创建合作伙伴",
+      "edit": "编辑合作伙伴",
+      "delete": "删除合作伙伴",
+      "name": "合作伙伴名称",
+      "code": "代码",
+      "commissionRate": "佣金比例（%）",
+      "discountType": "折扣类型",
+      "discountValue": "客户折扣",
+      "percent": "百分比",
+      "fixed": "固定金额",
+      "fixedHint": "以美元分为单位输入（100 = USD 1.00）。",
+      "active": "启用",
+      "yes": "是",
+      "no": "否",
+      "actions": "操作",
+      "save": "保存",
+      "cancel": "取消",
+      "close": "关闭",
+      "empty": "暂无合作伙伴。请创建一个。",
+      "loading": "正在加载联盟信息",
+      "error": "请求失败。请检查输入、重复代码或关联的佣金记录。",
+      "retry": "重试",
+      "validation": "请输入有效值。佣金比例为 0 至 100，折扣值必须为正整数（百分比不超过 100）。",
+      "deleteConfirm": "删除合作伙伴 {{name}}？有佣金记录的合作伙伴无法删除。",
+      "totalOrders": "总订单数",
+      "totalRevenue": "总收入",
+      "commissionOwed": "待付佣金",
+      "commissionPaid": "已付佣金",
+      "noCommissions": "该合作伙伴暂无佣金记录。",
+      "order": "订单",
+      "orderAmount": "订单金额",
+      "commission": "佣金",
+      "status": "状态",
+      "pending": "待支付",
+      "paid": "已支付",
+      "markPaid": "标记为已支付",
+      "payConfirm": "将 {{amount}} 佣金标记为已支付？此操作只记录付款，不会转账。"
+    },
     "uuidEvictions": {
       "title": "UUID 封禁确认",
       "description": "因在线 UUID 上限而封禁的设备和各出口的应用确认状态。",
@@ -236,10 +304,12 @@
       "promotions": "促销码",
       "subscriptionDomains": "订阅域名",
       "resetTickets": "重置券",
+      "routing": "路由规则",
       "guides": "指南与文档",
       "support": "客服工单",
       "supportHelp": "工单帮助管理",
-      "routing": "路由规则",
+      "oauthApps": "OAuth 应用",
+      "oauthDocs": "OAuth 接入文档",
       "admins": "管理员账户"
     },
     "dashboard": {
@@ -379,6 +449,13 @@
         "node.inbound_toggled": "启用或停用了入站",
         "user.passkey_added": "添加了通行密钥。",
         "user.passkey_removed": "删除了通行密钥。",
+        "plan.order_created": "已创建订单。",
+        "plan.order_paid": "订单已付款。",
+        "plan.order_cancelled": "订单已取消。",
+        "plan.order_expired": "订单因超过付款期限而过期。",
+        "plan.payment_ignored": "已忽略无法处理的付款通知。",
+        "plan.promotion_applied": "已应用促销。",
+        "plan.promotion_created": "已创建促销。",
         "plan.reset_ticket_granted": "已发放重置券。",
         "plan.reset_ticket_used": "已使用重置券重置流量用量。",
         "plan.reset_ticket_revoked": "已收回重置券。"
@@ -940,6 +1017,22 @@
         "langFilled": "已填写",
         "langEmpty": "未填写",
         "textPlaceholder": "显示在套餐卡片上的文案"
+      },
+      "list": {
+        "description": "创建和管理客户可购买的套餐。按 创建套餐 → 设置价格 → 准备推广 → 正式推广 的顺序操作后，套餐会显示在客户控制台。",
+        "emptyBody": "创建第一个套餐并设置价格后，客户即可直接购买。",
+        "active": "运营中",
+        "inactive": "未启用",
+        "priced": "已设价格",
+        "devices": "设备",
+        "devicesValue": "可登记 {{count}} 台",
+        "concurrentValue": "同时在线 {{count}} 台",
+        "perSlot": "每台设备（UUID 槽位）",
+        "publishedHint": "已显示在客户控制台，可以购买。",
+        "readyHint": "已准备就绪。点击「正式推广」即可向客户展示。",
+        "needActive": "该套餐未启用。请在编辑中启用后再推广。",
+        "needPrice": "尚未设置价格，客户无法购买。请在编辑中添加价格。",
+        "needAdvertise": "仅限管理员分配。如需销售，请在编辑中开启准备推广。"
       }
     },
     "users": {
@@ -1074,7 +1167,7 @@
       "updateInterval": "更新间隔",
       "backup": "备份设置",
       "backupSchedule": "备份计划",
-      "cronHint": "Cron 表达式（例如 0 2 * * *）",
+      "cronHint": "Cron 表达式，顺序为 分 时 日 月 星期。0 2 * * * = 每天凌晨 2 点，0 */6 * * * = 每 6 小时",
       "s3Bucket": "S3 存储桶",
       "s3Endpoint": "S3 端点",
       "s3Region": "区域",
@@ -1083,7 +1176,38 @@
       "telegram": "Telegram",
       "telegramEnabled": "启用 Telegram 通知",
       "telegramBotToken": "机器人令牌",
-      "telegramChatId": "聊天 ID"
+      "telegramChatId": "聊天 ID",
+      "description": "应用于整个服务的运营设置。修改后需点击「保存设置」才会生效。",
+      "unsaved": "有尚未保存的更改",
+      "discard": "放弃更改",
+      "fixErrors": "请先修正标红的项目。",
+      "registrationDesc": "设置新用户能否自行注册，以及可以使用哪些邮箱注册。",
+      "selfRegistrationHint": "关闭后将无法在注册页面注册，只有管理员可以添加用户。已有用户仍可正常登录。",
+      "signupDomainsOff": "未开启域名限制，任何邮箱都可以注册。打开上方开关后此列表才会生效。",
+      "securityDesc": "设置登录保持有效的时长。",
+      "sessionTimeoutHint": "同时适用于管理员和用户。新值从下次登录开始生效，已登录的会话保持原有的过期时间。",
+      "subscriptionDesc": "VPN 应用重新获取订阅信息的间隔。",
+      "updateIntervalHint": "应用会按此间隔重新加载订阅链接以更新服务器列表。间隔过短会增加服务器负载。建议 3600 秒（1 小时）。",
+      "telegramDesc": "通过 Telegram 接收节点故障、新用户注册、即将到期等运营通知。",
+      "telegramEnabledHint": "开启后，通知将通过下方的机器人和聊天发送。",
+      "telegramBotTokenHint": "在 Telegram 的 @BotFather 创建机器人后获得的令牌。",
+      "telegramChatIdHint": "接收通知的个人或群组的聊天 ID。群组 ID 通常以 -100 开头。",
+      "backupDesc": "定期将数据库备份到兼容 S3 的存储（AWS S3、Cloudflare R2、MinIO 等）。",
+      "backupConfigured": "已连接",
+      "backupNotConfigured": "未设置",
+      "s3EndpointHint": "存储地址。R2 或 MinIO 请填写对应服务的端点。",
+      "s3RegionHint": "例如 ap-northeast-2。Cloudflare R2 请填写 auto。",
+      "s3BucketHint": "存放备份文件的存储桶，需提前创建。",
+      "s3KeyHint": "请使用对此存储桶有写入权限的密钥。",
+      "runBackupHint": "使用已保存的连接信息立即备份。",
+      "runBackupNeedsSave": "请先保存修改后的备份设置再执行备份。",
+      "runBackupNeedsConfig": "填写并保存端点、存储桶、访问密钥和私密密钥后即可执行备份。",
+      "invalidSeconds": "请输入不小于 1 的整数（秒）。",
+      "durDay": "{{count}} 天",
+      "durHour": "{{count}} 小时",
+      "durMinute": "{{count}} 分钟",
+      "durSecond": "{{count}} 秒",
+      "durEquals": "= {{value}}"
     },
     "twoFactor": {
       "title": "双因素认证",
@@ -1129,9 +1253,11 @@
       "promotions": "创建和管理促销码。可以限制总兑换次数和每位用户的兑换次数、仅适用于指定套餐或时长、要求最低订单金额，或仅限首次购买使用。",
       "subscriptionDomains": "管理向用户公开的订阅域名，并查看服务端的 DNS、TLS 和证书健康状态。",
       "resetTickets": "发放流量重置券并查看发放记录。可以发给指定用户、正在使用某套餐的用户或所有用户。用户在仪表板使用重置券，将本月流量用量清零。",
+      "routing": "编辑 Clash Meta 订阅中的代理组、规则集和规则顺序。保存后在下次订阅更新时生效。",
       "support": "查看并回复用户提交的工单。回复后会向用户邮箱发送通知。",
       "supportHelp": "管理用户提交工单前看到的分类与常见问题，可分别填写韩语、英语和中文。",
-      "routing": "编辑 Clash Meta 订阅中的代理组、规则集和规则顺序。保存后在下次订阅更新时生效。",
+      "oauthApps": "注册使用 Proxima 账户登录的自有或第三方应用，并为每个应用设置权限和允许的回调地址。",
+      "oauthDocs": "说明创建 OAuth 应用并接入登录、令牌与资源 API 的完整流程。",
       "admins": "邀请管理员、管理角色与状态，并修改自己的姓名和密码。只有所有者可以管理其他管理员。"
     },
     "notifications": {
@@ -1562,7 +1688,8 @@
         "receiptTitle": "收据",
         "receiptError": "无法加载收据。",
         "close": "关闭",
-        "openStripe": "打开 Stripe 收据"
+        "openStripe": "打开 Stripe 收据",
+        "openInvoice": "查看 Stripe 发票"
       },
       "device": {
         "desktop": "桌面",
@@ -1722,6 +1849,11 @@
       }
     },
     "promotions": {
+      "tabs": {
+        "coupon": "优惠券",
+        "freeTrial": "免费试用",
+        "affiliate": "联盟"
+      },
       "title": "促销码",
       "subtitle": "用户结账时可以使用的折扣码。",
       "create": "创建促销码",
@@ -1796,7 +1928,64 @@
         "firstPurchaseOnlyHint": "对已有已付款订单的用户拒绝此促销码。",
         "active": "状态",
         "activeOn": "启用",
-        "activeOff": "停用"
+        "activeOff": "停用",
+        "generate": "自动生成",
+        "discountTypePercentLong": "按 % 折扣",
+        "discountTypeFixedLong": "按 $ 金额减免",
+        "allDurationsExample": "例如：30, 90（留空表示所有时长）",
+        "activeLabel": "允许使用此代码",
+        "activeHint": "关闭后，即使仍在有效期内也无法使用此代码。",
+        "durationAll": "适用于所有时长的套餐。如需限定时长，请在下方选择。",
+        "durationPicked": "仅适用于 {{list}} 天的套餐。",
+        "daysChip": "{{count}} 天",
+        "customDays": "自定义（天）",
+        "addDays": "添加时长",
+        "usersAll": "所有用户都可以使用。如需限定用户，请按邮箱搜索并添加。",
+        "usersPicked": "仅所选的 {{count}} 位用户可以使用。",
+        "userSearch": "按邮箱或姓名搜索用户",
+        "userLoading": "加载中…",
+        "userEmpty": "没有匹配的用户。",
+        "userTypeMore": "请至少输入 2 个字符。"
+      },
+      "section": {
+        "discount": "优惠内容",
+        "discountDesc": "设置客户结账时输入的代码和优惠力度。",
+        "window": "有效期",
+        "windowDesc": "仅在此期间内可以使用代码。所有时间均按韩国标准时间（KST）计算。",
+        "limits": "使用限制",
+        "limitsDesc": "设置代码可使用的次数以及适用的最低订单金额。",
+        "target": "适用范围",
+        "targetDesc": "留空的项目对所有人不设限制。"
+      },
+      "summary": {
+        "noCode": "未填写代码",
+        "noDiscount": "请输入优惠值",
+        "percent": "{{value}}% 折扣",
+        "fixed": "减 ${{value}}",
+        "noWindow": "未设置有效期",
+        "totalUnlimited": "总次数不限",
+        "total": "总计 {{count}} 次",
+        "perUser": "每人 {{count}} 次",
+        "minOrder": "订单满 ${{value}}",
+        "allPlans": "所有套餐",
+        "plans": "{{count}} 个套餐",
+        "durations": "{{list}} 天套餐",
+        "users": "指定 {{count}} 位用户",
+        "firstOnly": "仅限首次购买"
+      },
+      "window": {
+        "fromToday": "从今天起",
+        "custom": "自定义",
+        "todayPrefix": "从今天起",
+        "amountLabel": "时长",
+        "unitLabel": "单位",
+        "unitDays": "天",
+        "unitMonths": "个月",
+        "apply": "应用",
+        "days": "{{count}} 天",
+        "months": "{{count}} 个月",
+        "oneYear": "1 年",
+        "span": "共可使用 {{count}} 天（KST）"
       }
     },
     "subscriptionDomains": {
@@ -1893,71 +2082,6 @@
         "user": "请从列表中选择用户。",
         "plan": "请选择套餐。",
         "expires": "请选择今天或之后的日期。"
-      }
-    },
-    "guides": {
-      "title": "指南与文档",
-      "description": "用 Markdown 或 HTML 编写门户“使用说明”中显示的指南。",
-      "manageCategories": "管理分类",
-      "create": "新建指南",
-      "loading": "正在加载指南…",
-      "listTitle": "指南",
-      "loadError": "无法加载指南。",
-      "saved": "指南已保存。",
-      "saveError": "无法保存指南。",
-      "uploadError": "无法上传图片。",
-      "deleted": "指南已删除。",
-      "deleteError": "无法删除指南。",
-      "categoryError": "无法保存分类。",
-      "uncategorized": "未分类",
-      "published": "已发布",
-      "draft": "草稿",
-      "edit": "编辑",
-      "delete": "删除",
-      "cancel": "取消",
-      "save": "保存",
-      "done": "完成",
-      "empty": "暂无指南。",
-      "editTitle": "编辑指南",
-      "createTitle": "新建指南",
-      "deleteTitle": "要删除这篇指南吗？",
-      "deleteBody": "将删除“{{title}}”，此操作无法撤销。",
-      "categoriesTitle": "管理分类",
-      "categoriesHint": "分类会成为用户看到的标签和分组。删除分类后，其中的指南会变为“未分类”。",
-      "noCategories": "暂无分类。",
-      "categoryName": "分类名称",
-      "categoryPlaceholder": "例如：Windows 使用指南",
-      "addCategory": "添加",
-      "moveUp": "上移",
-      "moveDown": "下移",
-      "col": {
-        "title": "标题",
-        "category": "分类",
-        "format": "格式",
-        "status": "状态",
-        "updated": "更新时间",
-        "actions": "操作"
-      },
-      "form": {
-        "title": "标题",
-        "titlePlaceholder": "例如：Clash Verge Windows 安装与使用指南",
-        "titleRequired": "请输入标题。",
-        "category": "分类",
-        "publish": "是否公开",
-        "publishHint": "公开后用户可以看到。",
-        "summary": "摘要",
-        "summaryHint": "在列表卡片上显示一行。留空则显示分类名称。",
-        "order": "排序",
-        "orderHint": "数字越小越靠前。",
-        "format": "编写格式",
-        "image": "插入图片",
-        "safety": "保存时服务器会检查 HTML，自动移除脚本、iframe、事件属性和 javascript: 链接等危险代码。预览也是同样检查后的结果。",
-        "source": "正文",
-        "preview": "预览",
-        "previewError": "无法生成预览。",
-        "previewEmpty": "输入正文后会在这里显示预览。",
-        "markdownPlaceholder": "## 1. 安装应用\n\n- 从下面的链接下载安装文件。\n\n[下载](https://example.com)",
-        "htmlPlaceholder": "<h2>1. 安装应用</h2>\n<p>从下面的链接下载安装文件。</p>"
       }
     },
     "routing": {
@@ -2524,6 +2648,385 @@
         "rules": "规则（{{count}}）"
       }
     },
+    "guides": {
+      "title": "指南与文档",
+      "description": "用 Markdown 或 HTML 编写门户“使用说明”中显示的指南。",
+      "manageCategories": "管理分类",
+      "create": "新建指南",
+      "loading": "正在加载指南…",
+      "listTitle": "指南",
+      "loadError": "无法加载指南。",
+      "saved": "指南已保存。",
+      "saveError": "无法保存指南。",
+      "uploadError": "无法上传图片。",
+      "deleted": "指南已删除。",
+      "deleteError": "无法删除指南。",
+      "categoryError": "无法保存分类。",
+      "uncategorized": "未分类",
+      "published": "已发布",
+      "draft": "草稿",
+      "edit": "编辑",
+      "delete": "删除",
+      "cancel": "取消",
+      "save": "保存",
+      "done": "完成",
+      "empty": "暂无指南。",
+      "editTitle": "编辑指南",
+      "createTitle": "新建指南",
+      "deleteTitle": "要删除这篇指南吗？",
+      "deleteBody": "将删除“{{title}}”，此操作无法撤销。",
+      "categoriesTitle": "管理分类",
+      "categoriesHint": "分类会成为用户看到的标签和分组。删除分类后，其中的指南会变为“未分类”。",
+      "noCategories": "暂无分类。",
+      "categoryName": "分类名称",
+      "categoryPlaceholder": "例如：Windows 使用指南",
+      "addCategory": "添加",
+      "moveUp": "上移",
+      "moveDown": "下移",
+      "col": {
+        "title": "标题",
+        "category": "分类",
+        "format": "格式",
+        "status": "状态",
+        "updated": "更新时间",
+        "actions": "操作"
+      },
+      "form": {
+        "title": "标题",
+        "titlePlaceholder": "例如：Clash Verge Windows 安装与使用指南",
+        "titleRequired": "请输入标题。",
+        "category": "分类",
+        "publish": "是否公开",
+        "publishHint": "公开后用户可以看到。",
+        "summary": "摘要",
+        "summaryHint": "在列表卡片上显示一行。留空则显示分类名称。",
+        "order": "排序",
+        "orderHint": "数字越小越靠前。",
+        "format": "编写格式",
+        "image": "插入图片",
+        "safety": "保存时服务器会检查 HTML，自动移除脚本、iframe、事件属性和 javascript: 链接等危险代码。预览也是同样检查后的结果。",
+        "source": "正文",
+        "preview": "预览",
+        "previewError": "无法生成预览。",
+        "previewEmpty": "输入正文后会在这里显示预览。",
+        "markdownPlaceholder": "## 1. 安装应用\n\n- 从下面的链接下载安装文件。\n\n[下载](https://example.com)",
+        "htmlPlaceholder": "<h2>1. 安装应用</h2>\n<p>从下面的链接下载安装文件。</p>",
+        "publishOn": "向用户公开",
+        "publishOff": "保存为草稿",
+        "publishOnHint": "保存后会立即显示在使用说明列表中。",
+        "publishOffHint": "保存后仅管理员可见。",
+        "savePublish": "保存并公开",
+        "saveDraft": "保存草稿",
+        "summaryPlaceholder": "例如：从安装到首次连接只需 5 分钟。",
+        "previewAsUser": "用户看到的页面",
+        "untitled": "请输入标题",
+        "tool": {
+          "heading": "小标题",
+          "bold": "加粗",
+          "list": "项目符号列表",
+          "steps": "编号列表",
+          "link": "链接"
+        }
+      }
+    },
+    "oauthApps": {
+      "title": "OAuth 应用",
+      "description": "注册使用 Proxima 账户登录的应用（包括自有应用），管理其权限、回调地址和客户端密钥。",
+      "create": "创建应用",
+      "createTitle": "新建 OAuth 应用",
+      "editTitle": "编辑 {{name}}",
+      "listTitle": "已注册的应用",
+      "howTitle": "接入方式",
+      "how": {
+        "step1Title": "注册应用",
+        "step1Body": "在此创建应用并设置回调地址和权限，系统会发放 Client ID 和密钥。",
+        "step2Title": "登录请求",
+        "step2Body": "应用将用户引导至 /oauth/authorize，用户登录 Proxima 并批准权限。",
+        "step3Title": "交换授权码",
+        "step3Body": "在令牌端点用回调收到的 code 换取 1 小时有效的访问令牌和刷新令牌。",
+        "step4Title": "调用 API",
+        "step4Body": "带上 Authorization: Bearer 头调用 /api/v1/client/*，只能使用已批准的权限。"
+      },
+      "endpointsTitle": "端点",
+      "endpoint": {
+        "authorize": "授权（在浏览器中打开）",
+        "token": "签发 / 刷新令牌",
+        "revoke": "吊销令牌",
+        "api": "资源 API",
+        "profile": "基本资料",
+        "subscription": "订阅链接",
+        "nodes": "节点状态",
+        "summary": "套餐与用量",
+        "tickets": "重置券列表",
+        "ticketHistory": "重置券使用记录",
+        "redeem": "使用重置券"
+      },
+      "emptyTitle": "暂无应用",
+      "emptyBody": "注册自有应用或集成后，即可使用 Proxima 账户登录。",
+      "col": {
+        "name": "应用",
+        "clientId": "Client ID",
+        "type": "类型",
+        "redirects": "允许的回调地址",
+        "scopes": "允许的权限",
+        "users": "已连接用户",
+        "status": "状态",
+        "created": "创建日期"
+      },
+      "type": {
+        "confidential": "服务器应用（使用密钥）",
+        "public": "移动 / 桌面应用（PKCE）"
+      },
+      "typeDesc": {
+        "confidential": "适用于能安全保存密钥的后端服务器。交换令牌时需要 Client secret。",
+        "public": "适用于无法隐藏密钥的移动和桌面应用，只通过 PKCE（S256）认证。"
+      },
+      "usersCount": "{{count}} 人",
+      "active": "使用中",
+      "inactive": "已停用",
+      "rotate": "重新生成密钥",
+      "copied": "已复制",
+      "copyFailed": "无法复制",
+      "field": {
+        "name": "应用名称",
+        "nameHint": "会原样显示在用户的授权页面上。",
+        "description": "说明",
+        "descriptionHint": "显示在授权页面应用名称下方的一行说明。（可选）",
+        "type": "应用类型",
+        "typeHint": "根据应用能否安全隐藏密钥来选择。",
+        "redirects": "允许的回调地址",
+        "redirectsHint": "登录后接收 code 的地址，请求中的地址必须与此处某一项完全一致。可使用 https、自定义协议（proxima://…）或回环 http（127.0.0.1，端口不限）。最多 10 个。",
+        "redirectN": "回调地址 {{n}}",
+        "scopes": "允许的权限",
+        "scopesHint": "应用可请求的最大范围。用户只会看到并批准应用实际请求的权限。",
+        "active": "启用",
+        "activeHint": "停用后，此应用的所有令牌立即失效，并禁止新的登录。"
+      },
+      "addRedirect": "添加回调地址",
+      "removeRedirect": "删除回调地址",
+      "redirect": {
+        "required": "请输入回调地址。",
+        "invalid": "不是有效的绝对地址。",
+        "http": "http 仅可用于 127.0.0.1、::1 或 localhost，其他情况请使用 https。",
+        "fragment": "不能包含 # 之后的片段。",
+        "duplicate": "该地址已存在。"
+      },
+      "nameRequired": "请输入应用名称。",
+      "scopesRequired": "请至少选择一项权限。",
+      "toPublicWarn": "改为公开应用后，现有密钥会立即删除，应用只能通过 PKCE 获取令牌。",
+      "toConfidentialWarn": "改为服务器应用会发放新密钥，保存后只显示一次。",
+      "created": "已创建 {{name}}。",
+      "updated": "已保存 {{name}}。",
+      "deleted": "已删除 {{name}}。",
+      "saveError": "无法保存。",
+      "loadError": "无法加载应用列表。",
+      "secretTitle": "客户端密钥",
+      "secretOnce": "此密钥只显示这一次。关闭前请保存到安全的地方（如服务器环境变量）。丢失后需要重新生成。",
+      "secretUse": "请求令牌时通过 HTTP Basic（client_id:client_secret）或在请求体中以 client_id、client_secret 发送。不要放进应用代码或代码仓库。",
+      "secretDone": "已保存",
+      "rotateTitle": "要重新生成密钥吗？",
+      "rotateBody": "{{name}} 的现有密钥将立即失效。请把应用服务器配置改为新密钥后才能继续获取令牌。已签发的令牌保持有效。",
+      "deleteTitle": "要删除此应用吗？",
+      "deleteBody": "删除 {{name}} 会吊销 {{count}} 位已连接用户的全部令牌，且无法恢复。",
+      "docs": "接入文档",
+      "endpointGroup": {
+        "oauth": "OAuth 端点",
+        "client": "资源 API（Bearer 令牌）"
+      }
+    },
+    "oauthDocs": {
+      "title": "OAuth 接入文档",
+      "description": "从头到尾说明自有应用或外部服务如何用 Proxima 账户登录并使用用户数据。",
+      "back": "返回 OAuth 应用",
+      "toc": "目录",
+      "copy": "复制",
+      "col": {
+        "scope": "权限",
+        "desc": "说明",
+        "param": "参数",
+        "required": "必填",
+        "code": "错误码",
+        "meaning": "含义与处理"
+      },
+      "required": {
+        "yes": "必填",
+        "no": "可选"
+      },
+      "overview": {
+        "title": "整体流程",
+        "body": "Proxima 使用 OAuth 2.0 授权码模式（含 PKCE）。应用不会拿到用户密码，只能在用户于 Proxima 页面亲自批准的范围内读取或修改账户数据。",
+        "step1Title": "注册应用",
+        "step1Body": "管理员创建 OAuth 应用并设置回调地址和允许的权限，获得 Client ID（服务器应用还会获得 Client secret）。",
+        "step2Title": "请求登录与授权",
+        "step2Body": "应用将用户引导至 /oauth/authorize，用户登录 Proxima 并在授权页面点击允许。",
+        "step3Title": "回调收到 code",
+        "step3Body": "Proxima 将 code 和 state 附加到已注册的回调地址并跳转回来。code 10 分钟内仅可使用一次。",
+        "step4Title": "交换令牌",
+        "step4Body": "应用将 code 发送到令牌端点，换取访问令牌和刷新令牌。",
+        "step5Title": "调用 API 与刷新",
+        "step5Body": "带上 Authorization: Bearer 头调用 /api/v1/client/*，过期后用刷新令牌获取新令牌。",
+        "fact": {
+          "codeLabel": "授权码",
+          "codeValue": "10 分钟 · 一次性",
+          "accessLabel": "访问令牌",
+          "accessValue": "1 小时",
+          "refreshLabel": "刷新令牌",
+          "refreshValue": "30 天 · 每次使用都会更换"
+        }
+      },
+      "register": {
+        "title": "注册应用",
+        "body": "在 OAuth 应用页面点击“创建应用”，设置名称、类型、回调地址和允许的权限。名称会原样显示在用户授权页面上。",
+        "confidential": "适用于后端服务器等能安全保存密钥的场景。获取令牌时用 Client ID 和 Client secret 认证。密钥只在创建时显示一次，请立即保存到服务器环境变量。",
+        "public": "适用于用户可以查看代码、无法隐藏密钥的移动和桌面应用。只通过 PKCE（S256）认证，且必须使用 PKCE。",
+        "redirectTitle": "回调地址规则",
+        "redirect1": "请求中的 redirect_uri 必须与已注册的值逐字完全一致。",
+        "redirect2": "https 地址不限；http 仅可用于本机地址（127.0.0.1、::1、localhost）。",
+        "redirect3": "本机 http 地址端口不同也可匹配，以便桌面应用每次运行时使用空闲端口。",
+        "redirect4": "可以使用 proxima://oauth/callback 这样的应用专用协议。带 # 片段、包含账号密码的地址以及 javascript: 等危险协议会被拒绝。",
+        "scopesTitle": "权限（scope）列表"
+      },
+      "authorize": {
+        "title": "登录与授权请求",
+        "body": "在用户的浏览器（或应用内调用的系统浏览器）中打开以下地址。实际发送时需连成一行。",
+        "pkceTitle": "生成 PKCE",
+        "pkceBody": "每次请求生成随机的 code_verifier 并保存在应用内，将其 SHA-256 值转为 base64url 作为 code_challenge 发送。获取令牌时需一并发送原始 verifier。",
+        "callbackTitle": "回调响应",
+        "callbackBody": "用户允许时返回 code 和 state，拒绝时返回 error=access_denied。务必核对返回的 state 与发送的是否一致。应用或回调地址本身无效的请求不会跳回应用，而会停在 Proxima 错误页面。"
+      },
+      "param": {
+        "response_type": "固定为 code",
+        "client_id": "OAuth 应用页面中的 Client ID",
+        "redirect_uri": "已注册的回调地址之一（需 URL 编码）",
+        "scope": "以空格分隔的权限。留空则请求该应用允许的全部权限。",
+        "state": "防止 CSRF 的随机值，会原样返回到回调。",
+        "code_challenge": "PKCE 值。移动和桌面应用必填",
+        "code_challenge_method": "固定为 S256"
+      },
+      "token": {
+        "title": "交换令牌",
+        "body": "将回调收到的 code 以 POST 发送到令牌端点。请求体可以是 application/x-www-form-urlencoded 或 JSON。",
+        "publicTitle": "移动 / 桌面应用（无密钥）",
+        "confidentialTitle": "服务器应用（HTTP Basic 认证）",
+        "responseTitle": "成功响应",
+        "note": "redirect_uri 必须与授权请求时相同。同一个 code 使用两次会失败，并且用该 code 已签发的令牌也会全部失效。响应带有 Cache-Control: no-store。"
+      },
+      "refresh": {
+        "title": "刷新与吊销令牌",
+        "body": "访问令牌过期（1 小时）后，用刷新令牌换取新的令牌对。传入 scope 可以缩小范围，但不能扩大。",
+        "note": "每次刷新时刷新令牌也会更换，应用必须保存新值。再次使用已被替换的旧刷新令牌会被视为盗用，该次登录产生的所有令牌都会失效。",
+        "revokeTitle": "退出登录（吊销令牌）",
+        "revokeBody": "用户在应用中退出登录时，请将刷新令牌或访问令牌发送到吊销端点使其立即失效。发送未知令牌也会返回 200。"
+      },
+      "api": {
+        "title": "资源 API",
+        "body": "每个请求都要带上 Authorization: Bearer {access_token} 头。令牌缺少相应权限时返回 403 insufficient_scope。",
+        "exampleTitle": "调用示例",
+        "ep": {
+          "profile": "姓名、邮箱、账户状态、语言",
+          "subscription": "订阅链接及各公开订阅域名下的地址",
+          "nodes": "用户套餐可用节点的名称、国家和状态",
+          "summary": "当前套餐、流量用量与上限、到期日",
+          "tickets": "可用的重置券列表",
+          "ticketHistory": "重置券使用记录",
+          "redeem": "使用一张重置券重置本月流量用量。已使用或已过期的重置券返回 409"
+        }
+      },
+      "errors": {
+        "title": "错误响应",
+        "body": "错误按 OAuth 标准格式（{ error, error_description }）返回。令牌无效时返回 401 并附带 WWW-Authenticate 头。"
+      },
+      "error": {
+        "invalid_request": "缺少必填值或格式错误，请检查请求参数。",
+        "invalid_client": "Client ID 或密钥错误，或应用已停用。（401）",
+        "invalid_grant": "code 或刷新令牌已过期或被重复使用，或 redirect_uri、PKCE verifier 不匹配。请重新开始登录。",
+        "invalid_scope": "请求了应用未允许的权限，或刷新时试图扩大范围。",
+        "unsupported_grant_type": "grant_type 仅支持 authorization_code 和 refresh_token。",
+        "access_denied": "用户在授权页面点击了拒绝。",
+        "invalid_token": "访问令牌已过期或被吊销，或用户断开了连接、修改了密码、应用被停用。请刷新或重新登录。（401）",
+        "insufficient_scope": "令牌缺少此 API 所需的权限。（403）",
+        "slow_down": "令牌请求过多，请稍后再试。（429）"
+      },
+      "security": {
+        "title": "安全检查清单",
+        "item1": "Client secret 只放在服务器上，不要放进应用代码、代码仓库或日志。一旦泄露，请立即点击“重新生成密钥”。",
+        "item2": "移动和桌面应用请使用“移动 / 桌面应用（PKCE）”类型创建，并且每次请求都使用新的 code_verifier。",
+        "item3": "每次请求生成新的 state，并在回调中务必核对。",
+        "item4": "只请求需要的权限。像使用重置券（reset_tickets:redeem）这样会修改数据的权限，仅在确有需要时使用。",
+        "item5": "将令牌保存在设备的安全存储（Keychain、Keystore 等）中，退出登录时调用吊销端点。",
+        "item6": "用户修改密码、在“已连接的应用”中断开连接，或管理员停用应用时，现有令牌会立即失效。收到 401 时请让用户重新登录。"
+      },
+      "responses": {
+        "title": "响应示例（成功与失败）",
+        "body": "每个端点实际返回的响应。成功为绿色，失败为红色，失败涵盖服务器可能返回的所有情况。数值仅为示例。",
+        "success": "成功",
+        "failure": "失败",
+        "redirect": "重定向",
+        "authorizeNote": "此端点不返回 JSON，而是让浏览器回到应用的 redirect_uri。如果 client_id 或 redirect_uri 本身有误，就没有安全的地方可以跳转，因此由授权页面显示错误。",
+        "ep": {
+          "authorize": "授权结果（应用被跳转回的地址）",
+          "token": "签发令牌（authorization_code）",
+          "refresh": "刷新令牌（refresh_token）",
+          "revoke": "撤销令牌",
+          "common": "所有资源 API 共有的错误"
+        },
+        "when": {
+          "a_ok": "用户已同意。code 有效期 10 分钟，只能使用一次。",
+          "a_denied": "用户在授权页面拒绝了请求。",
+          "a_scope": "应用请求了未被允许的 scope。",
+          "a_pkce": "公开应用没有使用 PKCE（S256），或 code_challenge 格式不正确。",
+          "a_type": "response_type 不是 code。",
+          "t_ok": "code 已换成令牌。访问令牌有效 1 小时，刷新令牌有效 30 天。",
+          "t_grant": "code 错误、已过期或已使用。redirect_uri 与授权请求不一致或用户修改过密码时也一样。同一个 code 用两次，会使它签发的令牌全部失效。",
+          "t_pkce": "code_verifier 与授权请求中的 code_challenge 不匹配。",
+          "t_req": "code 为空。",
+          "t_nogrant": "没有发送 grant_type。",
+          "t_type": "不支持的 grant_type。只支持 authorization_code 和 refresh_token。",
+          "t_client": "Client ID 或密钥错误，或应用已停用。使用 Basic 认证时还会返回 WWW-Authenticate。",
+          "t_slow": "同一地址一分钟内请求超过 60 次。",
+          "r_ok": "新的令牌对。刷新令牌也会更换，请保存新值。",
+          "r_grant": "刷新令牌错误、已过期或已撤销。重复使用已更换的旧值会得到同样的错误，并撤销该次登录的所有令牌。请重新登录。",
+          "r_scope": "传入的 scope 比最初授予的范围更宽。",
+          "r_req": "refresh_token 为空。",
+          "v_ok": "已撤销。发送未知或空的令牌同样返回 200。",
+          "v_client": "Client ID 或密钥错误。",
+          "p_ok": "带有 profile scope 的令牌。",
+          "s_ok": "每个公开的订阅域名对应一个地址，url 为默认域名的地址。",
+          "s_none": "该账号还没有订阅链接。",
+          "n_ok": "用户套餐可使用的节点。status 为 online、offline 等。",
+          "n_empty": "用户没有套餐，或套餐没有节点组。",
+          "m_ok": "traffic_used 和 traffic_limit 单位为字节。没有流量上限的套餐 traffic_limit 为 null。",
+          "k_ok": "尚未使用且未过期的重置券。",
+          "k_empty": "没有可用的重置券。",
+          "h_ok": "最多最近 20 条，按使用时间从新到旧。",
+          "h_empty": "还没有使用过重置券。",
+          "d_ok": "已使用重置券并重置本月用量。reset_bytes 为被清零的用量（字节）。",
+          "d_404": "该 ticket id 不存在，或不属于此用户。",
+          "d_used": "该重置券已被使用。",
+          "d_expired": "该重置券已过期。",
+          "d_noplan": "没有正在运行且有流量上限的套餐，没有可重置的用量。",
+          "server": "服务器内部错误，请稍后重试。",
+          "c_missing": "缺少 Authorization 头，或不是 Bearer 格式。",
+          "c_invalid": "访问令牌错误、已过期或已撤销。用户断开应用、修改密码或应用被停用时也一样。请用刷新令牌刷新。",
+          "c_scope": "令牌缺少此 API 所需的 scope。响应中的 scope 即为所需权限。"
+        }
+      },
+      "builder": {
+        "title": "生成授权 URL",
+        "body": "填写各项后，下方 URL 会即时生成。复制的 URL 可作为单行粘贴。",
+        "required": "必填。",
+        "redirectHint": "必须与应用登记的 redirect URI 逐字一致。",
+        "scopeHint": "在应用允许的范围内选择。全不选则请求应用允许的全部权限。",
+        "scopeEmpty": "未选择任何权限，因此不发送 scope，即请求应用允许的全部权限。",
+        "stateHint": "每次请求使用新的随机值，并在返回后核对 state 是否一致。",
+        "pkce": "使用 PKCE（公开应用必须）",
+        "challengeHint": "code_verifier 的 SHA-256 经 base64url 编码，共 43 个字符。",
+        "generate": "重新生成 verifier、challenge 和 state",
+        "insecure": "当前页面不是安全来源，无法自动生成。请通过 https 或 localhost 打开，或手动填写。",
+        "verifierHint": "换取令牌时需要发送此值。离开本页面后会消失，请现在保存。",
+        "open": "在新标签页中打开"
+      }
+    },
     "account": {
       "menu": "我的账户",
       "profile": "账户设置",
@@ -2666,6 +3169,24 @@
     }
   },
   "user": {
+    "promo": {
+      "title": "畅享连接，尽享专属优惠。",
+      "subtitle": "使用 Proxima VPN 促销，选择适合您的套餐。",
+      "trialBenefit": "{{days}} 天免费试用",
+      "benefitHint": "登录后在结账页面查看优惠和适用条件。",
+      "claim": "登录并领取优惠",
+      "login": "前往登录",
+      "secure": "加密连接",
+      "devices": "支持多设备",
+      "support": "客户支持门户",
+      "footer": "Proxima VPN · 自由连接，随心选择。",
+      "loading": "正在验证促销",
+      "invalidTitle": "此促销不可用",
+      "invalid": "代码可能无效、已停用、已过期或已达到兑换上限。",
+      "errorTitle": "无法验证此促销",
+      "error": "请检查网络连接后重试。",
+      "retry": "重试"
+    },
     "nav": {
       "dashboard": "概览",
       "devices": "订阅",
@@ -2761,7 +3282,11 @@
       "nextResetIn": "流量重置：{{date}}（{{days}} 天 {{hours}} 小时后）",
       "nextResetInHours": "流量重置：{{date}}（{{hours}} 小时后）",
       "trafficUsedSummary": "本月已用 {{used}}，共 {{limit}}",
-      "nextResetAfterTerm": "下次重置：{{date}}（续期套餐后生效）"
+      "nextResetAfterTerm": "下次重置：{{date}}（续期套餐后生效）",
+      "useTicket": "使用重置券",
+      "seePlans": "查看套餐",
+      "ticketHint": "你有 {{count}} 张重置券，可以立即重置。",
+      "planDetails": "套餐详情"
     },
     "devices": {
       "accountUrl": "账户订阅 URL",
@@ -2823,7 +3348,7 @@
       "availablePlans": "可用套餐",
       "selectPlan": "选择",
       "loadError": "加载套餐信息失败",
-      "subtitle": "选择套餐和使用期限。",
+      "subtitle": "查看当前套餐，续期或更换为其他套餐。",
       "noPlanHint": "在下方选择套餐，付款完成后即可使用 VPN。",
       "noPlansAvailable": "目前没有可购买的套餐。",
       "perDays": "/ {{days}} 天",
@@ -2886,7 +3411,8 @@
           "method": "支付方式",
           "methodPanel": "面板",
           "openStripe": "查看 Stripe 收据",
-          "error": "无法加载收据"
+          "error": "无法加载收据",
+          "openInvoice": "查看 Stripe 发票"
         }
       },
       "promotion": {
@@ -2955,29 +3481,6 @@
         "confirmAmount": "支付 {{amount}} 并续期",
         "done": "付款完成，套餐已续期。"
       },
-      "paying": {
-        "title": "支付进行中",
-        "standby": "已在新标签页中打开 Stripe 支付页面。",
-        "body": "请在新标签页中为 {{plan}} 支付 {{amount}}。支付完成后套餐会自动生效。",
-        "reopenHint": "如果您关闭了窗口或窗口未打开，可以重新打开。",
-        "reopen": "重新打开支付窗口",
-        "dismiss": "关闭"
-      },
-      "return": {
-        "confirming": "正在确认支付结果…",
-        "paidTitle": "支付完成",
-        "extensionTitle": "套餐已续期",
-        "pendingTitle": "正在确认支付",
-        "cancelledTitle": "支付已取消",
-        "failedTitle": "无法确认支付",
-        "paidBody": "{{plan}} 已生效，可使用至 {{until}}。",
-        "extensionBody": "在当前期限后追加了 {{days}} 天，可使用至 {{until}}。",
-        "pendingBody": "支付似乎尚未完成。支付完成后套餐会自动生效，请稍后查看。",
-        "cancelledBody": "订单仍处于待支付状态，您可以随时继续支付。",
-        "failedBody": "因网络问题无法确认支付结果，请稍后查看。",
-        "autoHint": "用量和每月重置日期保持不变。",
-        "ok": "确定"
-      },
       "current": {
         "description": "当前套餐剩余的流量和时间。",
         "dataLeft": "本月剩余流量",
@@ -3010,6 +3513,29 @@
         "a4": "从套餐开始之日起，每月同一天重置为零。如果提前用完，可以用重置券立即重置。",
         "q5": "什么是重置券？",
         "a5": "可将本月流量用量立即归零的券。可通过活动或客服获得，并在上方“重置券”区域使用。"
+      },
+      "paying": {
+        "title": "支付进行中",
+        "standby": "已在新标签页中打开 Stripe 支付页面。",
+        "body": "请在新标签页中为 {{plan}} 支付 {{amount}}。支付完成后套餐会自动生效。",
+        "reopenHint": "如果您关闭了窗口或窗口未打开，可以重新打开。",
+        "reopen": "重新打开支付窗口",
+        "dismiss": "关闭"
+      },
+      "return": {
+        "confirming": "正在确认支付结果…",
+        "paidTitle": "支付完成",
+        "extensionTitle": "套餐已续期",
+        "pendingTitle": "正在确认支付",
+        "cancelledTitle": "支付已取消",
+        "failedTitle": "无法确认支付",
+        "paidBody": "{{plan}} 已生效，可使用至 {{until}}。",
+        "extensionBody": "在当前期限后追加了 {{days}} 天，可使用至 {{until}}。",
+        "pendingBody": "支付似乎尚未完成。支付完成后套餐会自动生效，请稍后查看。",
+        "cancelledBody": "订单仍处于待支付状态，您可以随时继续支付。",
+        "failedBody": "因网络问题无法确认支付结果，请稍后查看。",
+        "autoHint": "用量和每月重置日期保持不变。",
+        "ok": "确定"
       }
     },
     "account": {
@@ -3041,7 +3567,8 @@
         "label": "账户设置标签",
         "profile": "个人资料",
         "security": "登录与安全",
-        "subscription": "订阅链接"
+        "subscription": "订阅链接",
+        "apps": "已连接的应用"
       },
       "profileHint": "显示名称和登录邮箱。",
       "emailHint": "用于登录和通知，无法更改。",
@@ -3063,7 +3590,22 @@
       "linkLeakTitle": "链接泄露了吗？",
       "linkLeakBody": "如果有陌生设备在连接，或你把链接分享到了别处，可以换成新链接。",
       "linkLeakAction": "重置订阅链接",
-      "noSubscriptionYet": "购买套餐后会生成订阅链接。"
+      "noSubscriptionYet": "购买套餐后会生成订阅链接。",
+      "apps": {
+        "title": "已连接的应用",
+        "hint": "使用你的 Proxima 账户登录过的应用。断开后，该应用将无法再访问你的信息。",
+        "emptyTitle": "没有已连接的应用",
+        "emptyBody": "使用 Proxima 账户登录的应用会显示在这里。",
+        "grantedAt": "{{date}} 连接",
+        "lastUsed": "最近使用 {{date}}",
+        "neverUsed": "尚无使用记录",
+        "revoke": "断开连接",
+        "revokeTitle": "要断开此应用吗？",
+        "revokeBody": "{{app}} 的登录和令牌会立即取消。如需再次使用，请在应用中重新登录。",
+        "revoked": "已断开 {{app}}。",
+        "revokeError": "无法断开连接。",
+        "loadError": "无法加载已连接的应用。"
+      }
     },
     "announcements": {
       "title": "公告",
@@ -3184,6 +3726,101 @@
       "leakPrompt": "链接泄露了吗？",
       "leakLink": "重置订阅链接"
     },
+    "connect": {
+      "description": "在此设备上设置 VPN。先选地址，再点你使用的应用，即可一步添加配置。",
+      "recommended": "推荐",
+      "addToApp": "将配置添加到 {{app}}",
+      "copyForApp": "复制 {{app}} 用地址",
+      "step1Title": "1. 选择订阅地址",
+      "step1Body": "订阅地址是 VPN 应用下载服务器列表用的个人链接。各地址内容相同，只是域名不同。如果某个地址在你的网络（公司、学校或部分国家）打不开，请换一个。切换后无需重新注册或刷新页面。",
+      "addressGroup": "选择订阅地址",
+      "address": "地址 {{n}}",
+      "currentLink": "当前订阅链接",
+      "copyCurrent": "复制当前地址",
+      "qr": "二维码",
+      "addressHint": "如果已添加的地址被屏蔽，请在应用中删除旧订阅，再用其他地址重新添加。无论用哪个地址，用量和设备数都一样计算。",
+      "step2Title": "2. 一键添加到应用",
+      "step2Body": "选择本设备的系统，再点你使用的应用。应用会打开并把上面的地址添加为配置。若未安装应用则不会有反应，请先用下方出现的链接安装。",
+      "platform": "操作系统",
+      "os": {
+        "windows": "Windows",
+        "macos": "macOS",
+        "ios": "iOS",
+        "android": "Android",
+        "linux": "Linux"
+      },
+      "install": "安装 {{app}}",
+      "comingSoon": "{{app}} 应用即将推出此系统版本。",
+      "guideTitle": "{{os}} 连接指南",
+      "guide": {
+        "windows": {
+          "1": "安装 Clash Verge Rev 或 Hiddify。点上方应用即可看到下载链接。",
+          "2": "先运行一次应用，再回到本页点应用图标。浏览器询问是否打开应用时选“打开”。",
+          "3": "在应用的配置（订阅）页出现 Proxima 后选中它，并开启系统代理或 TUN 模式。",
+          "4": "打开任意网站确认连接。韩国服务自动走韩国服务器，其余走日本服务器。"
+        },
+        "macos": {
+          "1": "安装 Clash Verge Rev（免费）或 sing-box。首次运行时若 macOS 要求确认，选“打开”。",
+          "2": "在本页点应用图标，并允许 Safari 或 Chrome 打开应用。",
+          "3": "在配置列表中选择 Proxima 并开启系统代理。首次开启可能需要输入管理员密码。",
+          "4": "可通过菜单栏的应用图标切换服务器。若无法连接，请用其他订阅地址重新添加。"
+        },
+        "ios": {
+          "1": "在 App Store 安装 Shadowrocket、Streisand 或 sing-box。Shadowrocket 和 Quantumult X 为付费应用。",
+          "2": "用 iPhone 的 Safari 打开本页并点应用图标。弹出“在应用中打开？”时点“打开”。",
+          "3": "在应用中确认添加订阅后打开连接开关。首次会弹出“添加 VPN 配置”，请允许并用密码或面容 ID 确认。",
+          "4": "状态栏出现 VPN 图标即表示已连接。服务器列表会自动更新。"
+        },
+        "android": {
+          "1": "安装 Hiddify（Play 商店）、FlClash 或 v2rayNG。请用手机浏览器打开本页。",
+          "2": "点应用图标，应用会打开并添加订阅。v2rayNG 添加后请在菜单中点一次“更新订阅”。",
+          "3": "点连接按钮，并在“连接请求”窗口中点确定。",
+          "4": "通知栏出现钥匙图标即表示已连接。把应用的电池用量设为“无限制”可避免被系统关闭。"
+        },
+        "linux": {
+          "1": "安装 Clash Verge Rev（.deb/.rpm/AppImage）或 Hiddify。",
+          "2": "先运行一次应用，再点应用图标。若桌面环境不支持一键链接，请点“复制当前地址”并粘贴到应用的导入配置中。",
+          "3": "选择 Proxima 配置并开启系统代理或 TUN 模式。TUN 需要管理员权限。",
+          "4": "在终端执行 curl https://www.google.com 等命令确认连接。"
+        }
+      },
+      "troubleTitle": "无法连接时",
+      "trouble1": "点应用图标没有反应，说明应用未安装或浏览器阻止了打开。请点“复制当前地址”后手动粘贴到应用中。",
+      "trouble2": "添加订阅后一个服务器都没有时，请选择其他地址（地址 2、地址 3）重新添加。",
+      "trouble3": "套餐到期或流量用完后将无法连接。请在上方查看剩余流量和到期日。",
+      "trouble4": "如果链接泄露，请用下方“重置订阅链接”生成新链接，并在所有设备上重新添加。",
+      "qrHint": "可用其他设备（如手机）上的 VPN 应用扫码添加订阅。二维码中是你当前选择的地址。",
+      "moreGuide": "查看更多指南",
+      "whatTitle": "订阅地址的作用",
+      "whatBody": "VPN 应用通过订阅地址获取 Proxima 的服务器列表和分流规则。一个地址即可连接所有设备和应用；服务器增加或变更时，应用会自动获取新列表。服务器会自动识别应用类型，无需为每个应用准备不同地址。",
+      "testAddresses": "测试地址",
+      "testing": "正在检查各地址在当前网络能否打开…",
+      "reachable": "当前网络可打开",
+      "unreachable": "当前网络被屏蔽",
+      "addressHintFull": "点“测试地址”会检查各地址在当前网络能否打开，并自动选择第一个可用的地址。标记 ✕ 的地址在此网络被屏蔽，请换用其他地址。无论用哪个地址，用量和设备数都一样计算。",
+      "appsTitle": "{{os}} 可用的应用",
+      "appsBody": "支持一键添加的应用，点上方图标即可自动导入配置。“粘贴地址”类应用点图标会复制地址，请粘贴到应用的添加订阅页面。",
+      "oneTap": "支持一键添加",
+      "pasteOnly": "粘贴地址",
+      "installShort": "安装",
+      "soonShort": "即将推出",
+      "launch": {
+        "openingTitle": "正在打开 {{app}}",
+        "openingBody": "正在打开 {{app}}。浏览器询问是否打开应用时，请选“打开”。",
+        "openedTitle": "{{app}} 已打开",
+        "openedBody": "在应用中确认“导入”或“添加”即可完成配置添加，然后在应用中开启连接。",
+        "notOpenedTitle": "{{app}} 没有打开",
+        "notOpenedBody": "等待了几秒，{{app}} 仍未打开。可能此设备未安装该应用，或浏览器阻止了打开。",
+        "installHeader": "请先安装 {{app}}",
+        "installSteps": "用下方的安装按钮安装 {{app}} 并运行一次，然后在此窗口点“再次打开”即可添加配置。",
+        "copiedTitle": "已复制 {{app}} 用地址",
+        "copiedBody": "{{app}} 不支持一键导入链接。请打开 {{app}}，在添加订阅页面粘贴复制的地址。",
+        "retry": "再次打开",
+        "manual": "如果已安装应用但仍无法打开，请复制地址并手动粘贴到应用的添加订阅页面。"
+      },
+      "guideFollows": "以下步骤对应第 2 步中选择的系统。要设置其他设备，请在第 2 步更改系统。",
+      "selectedDomain": "已选域名"
+    },
     "guides": {
       "title": "使用说明",
       "description": "查看适合您设备的安装和连接方法。",
@@ -3216,7 +3853,9 @@
       "submit": "登录",
       "registerLink": "没有账户？注册",
       "forgotPassword": "忘记密码？",
-      "error": "登录失败，请检查您的凭据。"
+      "error": "登录失败，请检查您的凭据。",
+      "oauthContinueTitle": "请登录以继续连接应用",
+      "oauthContinueBody": "登录后会直接回到刚才的授权页面。"
     },
     "adminLogin": {
       "title": "管理员登录",
@@ -3319,6 +3958,63 @@
       "loginButton": "使用通行密钥登录",
       "cancelled": "已取消通行密钥登录。",
       "loginError": "通行密钥登录失败。"
+    },
+    "oauth": {
+      "title": "{{app}} 想要使用你的 Proxima 账户",
+      "scopesTitle": "允许后，此应用可以",
+      "never": "你的密码和支付信息不会提供给应用。应用只能在以下权限范围内使用你的账户。",
+      "redirectLabel": "批准后返回",
+      "approve": "允许",
+      "deny": "拒绝",
+      "revokeHint": "可随时在 账户设置 › 已连接的应用 中断开连接。",
+      "approved": "已批准",
+      "returning": "正在返回应用",
+      "returningHint": "如果应用没有自动打开，请点击下方按钮。",
+      "openApp": "返回应用",
+      "errorTitle": "无法处理此连接请求",
+      "error": {
+        "invalid_client": "该应用未注册或已停用。",
+        "invalid_request": "应用发送的连接请求无效，请联系应用提供方。",
+        "other": "请稍后再试。",
+        "invalid_scope": "应用请求了未被允许的权限。",
+        "unsupported_response_type": "不支持此类连接请求。",
+        "server_error": "服务器无法处理该请求，请稍后再试。"
+      },
+      "errorHint": "请在应用中重新开始登录；如果问题持续，请联系应用提供方。",
+      "toDashboard": "前往仪表板",
+      "scope": {
+        "profile": {
+          "title": "查看基本资料",
+          "desc": "姓名、邮箱、账户状态和语言"
+        },
+        "subscription_read": {
+          "title": "查看订阅链接",
+          "desc": "添加到 VPN 应用的订阅地址，应用可借此直接连接节点。"
+        },
+        "nodes_read": {
+          "title": "查看节点状态",
+          "desc": "你可使用的服务器列表及是否在线"
+        },
+        "plan_read": {
+          "title": "查看套餐和用量",
+          "desc": "当前套餐、剩余流量和到期日"
+        },
+        "reset_tickets_read": {
+          "title": "查看重置券",
+          "desc": "持有的重置券及使用记录"
+        },
+        "reset_tickets_redeem": {
+          "title": "使用重置券",
+          "desc": "应用可以使用重置券重置本月流量用量。"
+        }
+      },
+      "approvedTitle": "已允许连接",
+      "closeHint": "回到应用后即可关闭此窗口。",
+      "signedInAs": "将使用此账户连接",
+      "switchAccount": "使用其他账户",
+      "errorDetail": "错误代码",
+      "errorHintReturn": "返回应用后，应用可以收到此错误并重新尝试。",
+      "backToApp": "返回应用"
     }
   },
   "landing": {
@@ -3384,6 +4080,9 @@
       "noAnswers": "该分类暂无提示，请在下一步留言。",
       "solved": "已解决",
       "stillNeedHelp": "仍未解决",
+      "solvedTitle": "太好了，问题已解决！",
+      "solvedBody": "无需提交工单。之后如有其他问题，随时可以先在这里查找答案。",
+      "solvedOk": "好的",
       "contactTitle": "请告诉我们发生了什么",
       "subject": "标题",
       "subjectPlaceholder": "用一句话概括问题",
@@ -3409,7 +4108,8 @@
       "reply": "回复",
       "replyPlaceholder": "请补充你想告诉我们的内容",
       "send": "发送",
-      "sendError": "无法发送消息。"
+      "sendError": "无法发送消息。",
+      "createdAt": "{{time}} 提交"
     },
     "admin": {
       "title": "客服工单",
@@ -3488,7 +4188,25 @@
         "ko": "한국어 (韩语)",
         "en": "English (英语)",
         "zh": "中文"
-      }
+      },
+      "langGuide": "切换语言标签，为同一个问题填写翻译。如果没有用户所用语言的内容，将显示其他语言。",
+      "contentLang": "编写语言",
+      "langDone": "已填写",
+      "langPartial": "部分填写",
+      "langEmpty": "未填写",
+      "questionIn": "问题（{{lang}}）",
+      "answerIn": "答案（{{lang}}）",
+      "questionPlaceholder": "例如：付款后套餐没有生效。",
+      "answerPlaceholder": "请按步骤写出用户可以直接照做的方法。换行会原样显示。",
+      "answerHint": "换行会原样显示。多行短句更易阅读。",
+      "sortHint": "数字越小越靠前。",
+      "activeHint": "会显示在用户帮助中。",
+      "inactiveHint": "已隐藏，用户看不到。",
+      "preview": "用户看到的效果",
+      "previewHint": "{{lang}} 用户在「{{category}}」分类下看到的效果。点击问题可展开答案。",
+      "previewEmpty": "输入问题或答案后，这里会显示预览。",
+      "previewHidden": "当前为隐藏状态，用户实际看不到。",
+      "noCategory": "未选择分类"
     }
   }
 }

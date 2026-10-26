@@ -46,6 +46,74 @@
     "create": "Create"
   },
   "admin": {
+    "freeTrial": {
+      "title": "Free trial promotions",
+      "create": "Create free trial",
+      "edit": "Edit free trial",
+      "delete": "Delete free trial",
+      "code": "Code",
+      "plan": "Plan",
+      "selectPlan": "Choose a plan",
+      "durationDays": "Plan duration (days)",
+      "trialDays": "Trial duration (days)",
+      "requiresCard": "Requires a payment card",
+      "maxRedemptions": "Maximum redemptions",
+      "perUser": "Redemptions per user",
+      "active": "Active",
+      "yes": "Yes",
+      "no": "No",
+      "unlimited": "Unlimited",
+      "unlimitedHint": "Leave blank for no overall limit.",
+      "actions": "Actions",
+      "save": "Save",
+      "cancel": "Cancel",
+      "empty": "No free trial promotions. Create one to get started.",
+      "loading": "Loading free trial promotions",
+      "error": "Could not complete the request. Check the fields and whether the code is already in use.",
+      "retry": "Retry",
+      "validation": "Enter a valid value. Day counts and redemption limits must be positive whole numbers.",
+      "deleteConfirm": "Delete free trial code {{code}}?"
+    },
+    "affiliate": {
+      "title": "Affiliate partners",
+      "create": "Create partner",
+      "edit": "Edit partner",
+      "delete": "Delete partner",
+      "name": "Partner name",
+      "code": "Code",
+      "commissionRate": "Commission rate (%)",
+      "discountType": "Discount type",
+      "discountValue": "Customer discount",
+      "percent": "Percentage",
+      "fixed": "Fixed amount",
+      "fixedHint": "Enter an amount in USD cents (100 = USD 1.00).",
+      "active": "Active",
+      "yes": "Yes",
+      "no": "No",
+      "actions": "Actions",
+      "save": "Save",
+      "cancel": "Cancel",
+      "close": "Close",
+      "empty": "No affiliate partners. Create one to get started.",
+      "loading": "Loading affiliate data",
+      "error": "Could not complete the request. Check the fields, duplicate codes, or linked commission records.",
+      "retry": "Retry",
+      "validation": "Enter a valid value. Rates must be 0 to 100, and discounts must be positive whole numbers (at most 100 for percentages).",
+      "deleteConfirm": "Delete partner {{name}}? Partners with commission records cannot be deleted.",
+      "totalOrders": "Total orders",
+      "totalRevenue": "Total revenue",
+      "commissionOwed": "Commission owed",
+      "commissionPaid": "Commission paid",
+      "noCommissions": "No commissions recorded for this partner.",
+      "order": "Order",
+      "orderAmount": "Order amount",
+      "commission": "Commission",
+      "status": "Status",
+      "pending": "Pending",
+      "paid": "Paid",
+      "markPaid": "Mark as paid",
+      "payConfirm": "Mark {{amount}} in commission as paid? This records a payment; it does not transfer funds."
+    },
     "uuidEvictions": {
       "title": "UUID eviction acknowledgments",
       "description": "Devices evicted for online UUID limits and each Exit acknowledgment.",
@@ -236,10 +304,12 @@
       "promotions": "Promotions",
       "subscriptionDomains": "Subscription Domains",
       "resetTickets": "Reset tickets",
+      "routing": "Routing rules",
       "guides": "Guides & docs",
       "support": "Support tickets",
       "supportHelp": "Support help",
-      "routing": "Routing rules",
+      "oauthApps": "OAuth apps",
+      "oauthDocs": "OAuth integration guide",
       "admins": "Admin accounts"
     },
     "dashboard": {
@@ -379,6 +449,13 @@
         "node.inbound_toggled": "enabled or disabled an inbound",
         "user.passkey_added": "added a passkey.",
         "user.passkey_removed": "removed a passkey.",
+        "plan.order_created": "An order was created.",
+        "plan.order_paid": "An order was paid.",
+        "plan.order_cancelled": "An order was cancelled.",
+        "plan.order_expired": "An order expired before payment.",
+        "plan.payment_ignored": "A payment notification was ignored.",
+        "plan.promotion_applied": "A promotion was applied.",
+        "plan.promotion_created": "A promotion was created.",
         "plan.reset_ticket_granted": "A reset ticket was granted.",
         "plan.reset_ticket_used": "A reset ticket was used to reset data usage.",
         "plan.reset_ticket_revoked": "A reset ticket was revoked."
@@ -940,6 +1017,22 @@
         "langFilled": "Filled",
         "langEmpty": "Empty",
         "textPlaceholder": "Text shown on the plan card"
+      },
+      "list": {
+        "description": "Create and manage the plans customers can buy. Go from create plan → add prices → ready to advertise → advertise, and the plan appears on the customer dashboard.",
+        "emptyBody": "Create your first plan and add a price so customers can buy it right away.",
+        "active": "Active",
+        "inactive": "Inactive",
+        "priced": "Priced",
+        "devices": "Devices",
+        "devicesValue": "{{count}} registered",
+        "concurrentValue": "{{count}} at once",
+        "perSlot": "per device (UUID slot)",
+        "publishedHint": "Shown on the customer dashboard and available to buy.",
+        "readyHint": "Ready to go. Select Advertise to show it to customers.",
+        "needActive": "This plan is inactive. Activate it in Edit before advertising.",
+        "needPrice": "No price yet, so customers can't buy it. Add a price in Edit.",
+        "needAdvertise": "Admin assignment only. Turn on ready to advertise in Edit to sell it."
       }
     },
     "users": {
@@ -1057,7 +1150,7 @@
       "s3SecretKey": "Secret Key",
       "s3Region": "Region",
       "backupSchedule": "Backup Schedule",
-      "cronHint": "Cron expression (e.g. 0 2 * * *)",
+      "cronHint": "A cron expression: minute hour day month weekday. 0 2 * * * = every day at 2 AM, 0 */6 * * * = every 6 hours",
       "telegram": "Telegram",
       "telegramEnabled": "Enable Telegram Notifications",
       "telegramBotToken": "Bot Token",
@@ -1083,7 +1176,38 @@
       "backupDownload": "Download",
       "backupTriggerSuccess": "Backup started successfully",
       "backupTriggerError": "Failed to start backup",
-      "noBackups": "No backups available"
+      "noBackups": "No backups available",
+      "description": "Operational settings that apply to the whole service. Changes take effect after you select Save settings.",
+      "unsaved": "You have unsaved changes",
+      "discard": "Discard changes",
+      "fixErrors": "Fix the fields marked in red first.",
+      "registrationDesc": "Choose whether new users can create their own accounts and which email addresses they can use.",
+      "selfRegistrationHint": "When off, the sign-up page is closed and only admins can add users. Existing users can still sign in.",
+      "signupDomainsOff": "Domain restriction is off, so any email can sign up. Turn on the switch above to apply this list.",
+      "securityDesc": "How long a sign-in stays valid.",
+      "sessionTimeoutHint": "Applies to both admins and users. A new value takes effect from the next sign-in; existing sessions keep their original expiry.",
+      "subscriptionDesc": "How often VPN apps re-fetch the subscription.",
+      "updateIntervalHint": "Apps reload the subscription URL at this interval to refresh the server list. Very short intervals add server load. Recommended: 3600 seconds (1 hour).",
+      "telegramDesc": "Get operational alerts such as node outages, new sign-ups and upcoming expiries in Telegram.",
+      "telegramEnabledHint": "When on, alerts are sent through the bot and chat below.",
+      "telegramBotTokenHint": "The token you get when you create a bot with Telegram's @BotFather.",
+      "telegramChatIdHint": "The chat ID of the person or group that receives alerts. Group IDs usually start with -100.",
+      "backupDesc": "Back up the database on a schedule to S3-compatible storage (AWS S3, Cloudflare R2, MinIO and others).",
+      "backupConfigured": "Connected",
+      "backupNotConfigured": "Not set up",
+      "s3EndpointHint": "The storage address. For R2 or MinIO, use that service's endpoint.",
+      "s3RegionHint": "For example ap-northeast-2. For Cloudflare R2, enter auto.",
+      "s3BucketHint": "The bucket that stores backup files. Create it beforehand.",
+      "s3KeyHint": "Use a key with write access to this bucket.",
+      "runBackupHint": "Back up right now using the saved connection details.",
+      "runBackupNeedsSave": "Save your backup changes before running a backup.",
+      "runBackupNeedsConfig": "Enter and save the endpoint, bucket, access key and secret key to run a backup.",
+      "invalidSeconds": "Enter a whole number of seconds, 1 or more.",
+      "durDay": "{{count}} d",
+      "durHour": "{{count}} h",
+      "durMinute": "{{count}} min",
+      "durSecond": "{{count}} s",
+      "durEquals": "= {{value}}"
     },
     "twoFactor": {
       "title": "2FA Security",
@@ -1129,9 +1253,11 @@
       "promotions": "Create and manage promotion codes. A code can cap total and per-user redemptions, apply only to selected plans or durations, require a minimum order, or be limited to first purchases.",
       "subscriptionDomains": "Manage public subscription domains and review service-side DNS, TLS, and certificate health.",
       "resetTickets": "Grant data reset tickets and review past grants. Tickets can go to one user, everyone currently on a plan, or every account. Users spend a ticket on their dashboard to reset this month's data usage to zero.",
+      "routing": "Edit the proxy groups, rule sets and rule order served in Clash Meta subscriptions. Changes apply on the next subscription refresh.",
       "support": "Read and answer tickets from users. Replying sends the user an email notification.",
       "supportHelp": "Manage the categories and frequently asked questions shown before a user opens a ticket. Each can be written in Korean, English and Chinese.",
-      "routing": "Edit the proxy groups, rule sets and rule order served in Clash Meta subscriptions. Changes apply on the next subscription refresh.",
+      "oauthApps": "Register first- and third-party apps that sign in with Proxima accounts, and set each app's permissions and allowed callback URLs.",
+      "oauthDocs": "Explains the whole flow of creating an OAuth app and integrating sign-in, tokens and the resource API.",
       "admins": "Invite admins, manage their roles and status, and change your own name and password. Only owners can manage other admins."
     },
     "notifications": {
@@ -1562,7 +1688,8 @@
         "receiptTitle": "Receipt",
         "receiptError": "Couldn't load the receipt.",
         "close": "Close",
-        "openStripe": "Open Stripe receipt"
+        "openStripe": "Open Stripe receipt",
+        "openInvoice": "View Stripe invoice"
       },
       "device": {
         "desktop": "Desktop",
@@ -1722,6 +1849,11 @@
       }
     },
     "promotions": {
+      "tabs": {
+        "coupon": "Coupon",
+        "freeTrial": "Free Trial",
+        "affiliate": "Affiliate"
+      },
       "title": "Promotion codes",
       "subtitle": "Discount codes customers can apply at checkout.",
       "create": "Create promotion",
@@ -1796,7 +1928,64 @@
         "firstPurchaseOnlyHint": "Reject the code for customers who have already paid for an order.",
         "active": "Status",
         "activeOn": "Active",
-        "activeOff": "Inactive"
+        "activeOff": "Inactive",
+        "generate": "Generate",
+        "discountTypePercentLong": "% off",
+        "discountTypeFixedLong": "$ off",
+        "allDurationsExample": "e.g. 30, 90 (empty = all durations)",
+        "activeLabel": "Code can be used",
+        "activeHint": "When off, the code can't be entered even within its valid window.",
+        "durationAll": "Applies to every term. Pick terms below to limit it.",
+        "durationPicked": "Applies only to {{list}}-day terms.",
+        "daysChip": "{{count}} days",
+        "customDays": "Custom (days)",
+        "addDays": "Add term",
+        "usersAll": "Anyone can use it. Search by email to limit it to specific users.",
+        "usersPicked": "Only the {{count}} selected users can use it.",
+        "userSearch": "Search users by email or name",
+        "userLoading": "Loading…",
+        "userEmpty": "No matching users.",
+        "userTypeMore": "Type at least 2 characters."
+      },
+      "section": {
+        "discount": "Discount",
+        "discountDesc": "The code customers enter at checkout and how much it takes off.",
+        "window": "Valid window",
+        "windowDesc": "The code only works within this window. All times are Korea Standard Time (KST).",
+        "limits": "Usage limits",
+        "limitsDesc": "How many times the code can be used and the minimum order it applies to.",
+        "target": "Who it applies to",
+        "targetDesc": "Anything left empty applies to everyone without restriction."
+      },
+      "summary": {
+        "noCode": "No code yet",
+        "noDiscount": "Enter a discount",
+        "percent": "{{value}}% off",
+        "fixed": "${{value}} off",
+        "noWindow": "No valid window yet",
+        "totalUnlimited": "Unlimited total",
+        "total": "{{count}} uses total",
+        "perUser": "{{count}} per user",
+        "minOrder": "Orders ${{value}}+",
+        "allPlans": "All plans",
+        "plans": "{{count}} plans",
+        "durations": "{{list}}-day terms",
+        "users": "{{count}} selected users",
+        "firstOnly": "First purchase only"
+      },
+      "window": {
+        "fromToday": "From today",
+        "custom": "Custom",
+        "todayPrefix": "From today for",
+        "amountLabel": "Length",
+        "unitLabel": "Unit",
+        "unitDays": "Days",
+        "unitMonths": "Months",
+        "apply": "Apply",
+        "days": "{{count}} days",
+        "months": "{{count}} months",
+        "oneYear": "1 year",
+        "span": "Usable for {{count}} days in total (KST)"
       }
     },
     "subscriptionDomains": {
@@ -1893,71 +2082,6 @@
         "user": "Pick a user from the list.",
         "plan": "Choose a plan.",
         "expires": "Choose a date from today on."
-      }
-    },
-    "guides": {
-      "title": "Guides & docs",
-      "description": "Write the guides shown under 'User guides' in the portal, in Markdown or HTML.",
-      "manageCategories": "Manage categories",
-      "create": "New guide",
-      "loading": "Loading guides…",
-      "listTitle": "Guides",
-      "loadError": "Couldn't load guides.",
-      "saved": "Guide saved.",
-      "saveError": "Couldn't save the guide.",
-      "uploadError": "Couldn't upload the image.",
-      "deleted": "Guide deleted.",
-      "deleteError": "Couldn't delete the guide.",
-      "categoryError": "Couldn't save the category.",
-      "uncategorized": "Uncategorized",
-      "published": "Published",
-      "draft": "Draft",
-      "edit": "Edit",
-      "delete": "Delete",
-      "cancel": "Cancel",
-      "save": "Save",
-      "done": "Done",
-      "empty": "No guides yet.",
-      "editTitle": "Edit guide",
-      "createTitle": "New guide",
-      "deleteTitle": "Delete this guide?",
-      "deleteBody": "'{{title}}' will be deleted. This can't be undone.",
-      "categoriesTitle": "Manage categories",
-      "categoriesHint": "Categories become the tabs and groups users see. Deleting a category keeps its guides as Uncategorized.",
-      "noCategories": "No categories yet.",
-      "categoryName": "Category name",
-      "categoryPlaceholder": "e.g. Windows guides",
-      "addCategory": "Add",
-      "moveUp": "Move up",
-      "moveDown": "Move down",
-      "col": {
-        "title": "Title",
-        "category": "Category",
-        "format": "Format",
-        "status": "Status",
-        "updated": "Updated",
-        "actions": "Actions"
-      },
-      "form": {
-        "title": "Title",
-        "titlePlaceholder": "e.g. Install and use Clash Verge on Windows",
-        "titleRequired": "Enter a title.",
-        "category": "Category",
-        "publish": "Visibility",
-        "publishHint": "Published guides are visible to users.",
-        "summary": "Summary",
-        "summaryHint": "One line on the list card. Leave empty to show the category name.",
-        "order": "Sort order",
-        "orderHint": "Lower numbers come first.",
-        "format": "Format",
-        "image": "Insert image",
-        "safety": "On save the server sanitizes the HTML and strips dangerous code such as scripts, iframes, event attributes and javascript: links. The preview is the same sanitized result.",
-        "source": "Body",
-        "preview": "Preview",
-        "previewError": "Couldn't build the preview.",
-        "previewEmpty": "Start typing to see a preview here.",
-        "markdownPlaceholder": "## 1. Install the app\n\n- Download the installer from the link below.\n\n[Download](https://example.com)",
-        "htmlPlaceholder": "<h2>1. Install the app</h2>\n<p>Download the installer from the link below.</p>"
       }
     },
     "routing": {
@@ -2524,6 +2648,385 @@
         "rules": "Rules ({{count}})"
       }
     },
+    "guides": {
+      "title": "Guides & docs",
+      "description": "Write the guides shown under 'User guides' in the portal, in Markdown or HTML.",
+      "manageCategories": "Manage categories",
+      "create": "New guide",
+      "loading": "Loading guides…",
+      "listTitle": "Guides",
+      "loadError": "Couldn't load guides.",
+      "saved": "Guide saved.",
+      "saveError": "Couldn't save the guide.",
+      "uploadError": "Couldn't upload the image.",
+      "deleted": "Guide deleted.",
+      "deleteError": "Couldn't delete the guide.",
+      "categoryError": "Couldn't save the category.",
+      "uncategorized": "Uncategorized",
+      "published": "Published",
+      "draft": "Draft",
+      "edit": "Edit",
+      "delete": "Delete",
+      "cancel": "Cancel",
+      "save": "Save",
+      "done": "Done",
+      "empty": "No guides yet.",
+      "editTitle": "Edit guide",
+      "createTitle": "New guide",
+      "deleteTitle": "Delete this guide?",
+      "deleteBody": "'{{title}}' will be deleted. This can't be undone.",
+      "categoriesTitle": "Manage categories",
+      "categoriesHint": "Categories become the tabs and groups users see. Deleting a category keeps its guides as Uncategorized.",
+      "noCategories": "No categories yet.",
+      "categoryName": "Category name",
+      "categoryPlaceholder": "e.g. Windows guides",
+      "addCategory": "Add",
+      "moveUp": "Move up",
+      "moveDown": "Move down",
+      "col": {
+        "title": "Title",
+        "category": "Category",
+        "format": "Format",
+        "status": "Status",
+        "updated": "Updated",
+        "actions": "Actions"
+      },
+      "form": {
+        "title": "Title",
+        "titlePlaceholder": "e.g. Install and use Clash Verge on Windows",
+        "titleRequired": "Enter a title.",
+        "category": "Category",
+        "publish": "Visibility",
+        "publishHint": "Published guides are visible to users.",
+        "summary": "Summary",
+        "summaryHint": "One line on the list card. Leave empty to show the category name.",
+        "order": "Sort order",
+        "orderHint": "Lower numbers come first.",
+        "format": "Format",
+        "image": "Insert image",
+        "safety": "On save the server sanitizes the HTML and strips dangerous code such as scripts, iframes, event attributes and javascript: links. The preview is the same sanitized result.",
+        "source": "Body",
+        "preview": "Preview",
+        "previewError": "Couldn't build the preview.",
+        "previewEmpty": "Start typing to see a preview here.",
+        "markdownPlaceholder": "## 1. Install the app\n\n- Download the installer from the link below.\n\n[Download](https://example.com)",
+        "htmlPlaceholder": "<h2>1. Install the app</h2>\n<p>Download the installer from the link below.</p>",
+        "publishOn": "Published to users",
+        "publishOff": "Keep as draft",
+        "publishOnHint": "Appears in the guide list as soon as you save.",
+        "publishOffHint": "Only admins can see it after saving.",
+        "savePublish": "Save and publish",
+        "saveDraft": "Save draft",
+        "summaryPlaceholder": "e.g. From install to first connection in 5 minutes.",
+        "previewAsUser": "What users will see",
+        "untitled": "Enter a title",
+        "tool": {
+          "heading": "Heading",
+          "bold": "Bold",
+          "list": "Bulleted list",
+          "steps": "Numbered list",
+          "link": "Link"
+        }
+      }
+    },
+    "oauthApps": {
+      "title": "OAuth apps",
+      "description": "Register apps (including your own) that sign in with Proxima accounts, and manage their scopes, callback URLs and client secrets.",
+      "create": "Create app",
+      "createTitle": "New OAuth app",
+      "editTitle": "Edit {{name}}",
+      "listTitle": "Registered apps",
+      "howTitle": "How it works",
+      "how": {
+        "step1Title": "Register",
+        "step1Body": "Create the app here with its callback URLs and scopes. You get a client ID and secret.",
+        "step2Title": "Sign-in request",
+        "step2Body": "The app sends the user to /oauth/authorize, where they sign in to Proxima and approve the scopes.",
+        "step3Title": "Code exchange",
+        "step3Body": "The code returned to the callback is exchanged at the token endpoint for a 1-hour access token and a refresh token.",
+        "step4Title": "Call the API",
+        "step4Body": "Call /api/v1/client/* with an Authorization: Bearer header. Only approved scopes work."
+      },
+      "endpointsTitle": "Endpoints",
+      "endpoint": {
+        "authorize": "Authorize (open in a browser)",
+        "token": "Issue / refresh tokens",
+        "revoke": "Revoke token",
+        "api": "Resource API",
+        "profile": "Basic profile",
+        "subscription": "Subscription link",
+        "nodes": "Node status",
+        "summary": "Plan and usage",
+        "tickets": "Reset tickets",
+        "ticketHistory": "Reset ticket history",
+        "redeem": "Use a reset ticket"
+      },
+      "emptyTitle": "No apps yet",
+      "emptyBody": "Register your own app or an integration so it can sign in with Proxima accounts.",
+      "col": {
+        "name": "App",
+        "clientId": "Client ID",
+        "type": "Type",
+        "redirects": "Allowed callback URLs",
+        "scopes": "Allowed scopes",
+        "users": "Connected users",
+        "status": "Status",
+        "created": "Created"
+      },
+      "type": {
+        "confidential": "Server app (uses a secret)",
+        "public": "Mobile / desktop app (PKCE)"
+      },
+      "typeDesc": {
+        "confidential": "For backends that can keep a secret safe. The client secret is required when exchanging tokens.",
+        "public": "For mobile and desktop apps that cannot hide a secret. Authenticates with PKCE (S256) only."
+      },
+      "usersCount": "{{count}} users",
+      "active": "Active",
+      "inactive": "Disabled",
+      "rotate": "Rotate secret",
+      "copied": "Copied",
+      "copyFailed": "Could not copy",
+      "field": {
+        "name": "App name",
+        "nameHint": "Shown as-is on the user's consent screen.",
+        "description": "Description",
+        "descriptionHint": "One line shown under the app name on the consent screen. (optional)",
+        "type": "App type",
+        "typeHint": "Pick based on whether the app can keep a secret hidden.",
+        "redirects": "Allowed callback URLs",
+        "redirectsHint": "Where the code is sent after sign-in. A request must match one of these exactly. Use https, a custom scheme (proxima://…), or loopback http (127.0.0.1, any port). Up to 10.",
+        "redirectN": "Callback URL {{n}}",
+        "scopes": "Allowed scopes",
+        "scopesHint": "The most this app may ask for. Users only see and approve what the app requests.",
+        "active": "Enabled",
+        "activeHint": "Disabling rejects every token of this app immediately and blocks new sign-ins."
+      },
+      "addRedirect": "Add callback URL",
+      "removeRedirect": "Remove callback URL",
+      "redirect": {
+        "required": "Enter a callback URL.",
+        "invalid": "Not a valid absolute URL.",
+        "http": "http is only allowed on 127.0.0.1, ::1 or localhost. Use https otherwise.",
+        "fragment": "A #fragment is not allowed.",
+        "duplicate": "This URL is already listed."
+      },
+      "nameRequired": "Enter an app name.",
+      "scopesRequired": "Choose at least one scope.",
+      "toPublicWarn": "Switching to a public app deletes the current secret right away; the app can then only get tokens with PKCE.",
+      "toConfidentialWarn": "Switching to a server app issues a new secret, shown once after saving.",
+      "created": "Created {{name}}.",
+      "updated": "Saved {{name}}.",
+      "deleted": "Deleted {{name}}.",
+      "saveError": "Could not save.",
+      "loadError": "Could not load apps.",
+      "secretTitle": "Client secret",
+      "secretOnce": "This secret is shown only once. Store it somewhere safe (such as a server environment variable) before closing. If you lose it, rotate it.",
+      "secretUse": "Send it with token requests via HTTP Basic (client_id:client_secret) or as client_id and client_secret in the body. Never ship it in app code or a repository.",
+      "secretDone": "I've saved it",
+      "rotateTitle": "Rotate the secret?",
+      "rotateBody": "The current secret for {{name}} stops working immediately. Update the app server with the new secret to keep getting tokens. Tokens already issued stay valid.",
+      "deleteTitle": "Delete this app?",
+      "deleteBody": "Deleting {{name}} revokes the tokens of all {{count}} connected users. This cannot be undone.",
+      "docs": "Integration guide",
+      "endpointGroup": {
+        "oauth": "OAuth endpoints",
+        "client": "Resource API (Bearer token)"
+      }
+    },
+    "oauthDocs": {
+      "title": "OAuth integration guide",
+      "description": "How your own app or a partner service signs users in with their Proxima account and uses their data, end to end.",
+      "back": "Back to OAuth apps",
+      "toc": "Contents",
+      "copy": "Copy",
+      "col": {
+        "scope": "Scope",
+        "desc": "Description",
+        "param": "Parameter",
+        "required": "Required",
+        "code": "Error code",
+        "meaning": "Meaning and fix"
+      },
+      "required": {
+        "yes": "Required",
+        "no": "Optional"
+      },
+      "overview": {
+        "title": "How it works",
+        "body": "Proxima uses the OAuth 2.0 authorization code flow with PKCE. Your app never sees the user's password; it can only read or change account data within what the user approved on the Proxima screen.",
+        "step1Title": "Register the app",
+        "step1Body": "An admin creates an OAuth app with its callback URLs and allowed scopes, and receives a client ID (plus a client secret for server apps).",
+        "step2Title": "Ask the user to sign in",
+        "step2Body": "Your app sends the user to /oauth/authorize. They sign in to Proxima and press Allow on the consent screen.",
+        "step3Title": "Receive a code",
+        "step3Body": "Proxima redirects to your registered callback with code and state. The code works once, for 10 minutes.",
+        "step4Title": "Exchange it",
+        "step4Body": "Your app posts the code to the token endpoint and gets an access token and a refresh token.",
+        "step5Title": "Call the API, refresh",
+        "step5Body": "Call /api/v1/client/* with an Authorization: Bearer header, and get new tokens with the refresh token when they expire.",
+        "fact": {
+          "codeLabel": "Authorization code",
+          "codeValue": "10 minutes · single use",
+          "accessLabel": "Access token",
+          "accessValue": "1 hour",
+          "refreshLabel": "Refresh token",
+          "refreshValue": "30 days · replaced on every use"
+        }
+      },
+      "register": {
+        "title": "Register an app",
+        "body": "On the OAuth apps page, press Create app and set the name, type, callback URLs and allowed scopes. The name is shown as-is on the consent screen.",
+        "confidential": "For backends that can keep a secret hidden. Token requests authenticate with the client ID and client secret. The secret is shown once at creation, so store it in a server environment variable right away.",
+        "public": "For mobile and desktop apps whose code users can inspect, so a secret cannot be hidden. They authenticate with PKCE (S256) only, and PKCE is mandatory.",
+        "redirectTitle": "Callback URL rules",
+        "redirect1": "The redirect_uri in a request must match a registered value exactly, character for character.",
+        "redirect2": "https URLs are allowed anywhere; http is allowed only on this device (127.0.0.1, ::1, localhost).",
+        "redirect3": "Loopback http URLs match on any port, for desktop apps that bind a free port at runtime.",
+        "redirect4": "App schemes such as proxima://oauth/callback are allowed. #fragments, embedded credentials and dangerous schemes such as javascript: are rejected.",
+        "scopesTitle": "Scopes"
+      },
+      "authorize": {
+        "title": "Sign-in request",
+        "body": "Open this URL in the user's browser (or the system browser from your app). Send it as one line.",
+        "pkceTitle": "Creating PKCE values",
+        "pkceBody": "Generate a random code_verifier per request and keep it in the app. Send its SHA-256 hash, base64url-encoded, as code_challenge. Send the original verifier with the token request.",
+        "callbackTitle": "Callback response",
+        "callbackBody": "On Allow you get code and state; on Deny you get error=access_denied. Always check that state matches what you sent. Requests with an unknown app or unregistered callback stop on a Proxima error page and never redirect back."
+      },
+      "param": {
+        "response_type": "Always code",
+        "client_id": "The client ID from the OAuth apps page",
+        "redirect_uri": "One of the registered callback URLs (URL-encoded)",
+        "scope": "Space-separated scopes. Empty requests every scope the app is allowed.",
+        "state": "Random value against CSRF, returned unchanged to the callback.",
+        "code_challenge": "PKCE value. Required for mobile and desktop apps",
+        "code_challenge_method": "Always S256"
+      },
+      "token": {
+        "title": "Token exchange",
+        "body": "POST the code from the callback to the token endpoint. The body can be application/x-www-form-urlencoded or JSON.",
+        "publicTitle": "Mobile / desktop app (no secret)",
+        "confidentialTitle": "Server app (HTTP Basic)",
+        "responseTitle": "Success response",
+        "note": "Send the same redirect_uri as in the authorize request. Reusing a code fails and also revokes every token already issued from it. Responses carry Cache-Control: no-store."
+      },
+      "refresh": {
+        "title": "Refresh and revoke",
+        "body": "When the access token expires (1 hour), exchange the refresh token for a new pair. scope may narrow the grant but never widen it.",
+        "note": "Every refresh also replaces the refresh token; store the new one. Reusing an already-replaced refresh token is treated as theft and ends every token from that sign-in.",
+        "revokeTitle": "Sign out (revoke)",
+        "revokeBody": "When the user signs out of your app, send the refresh or access token to the revoke endpoint to end it immediately. Unknown tokens still return 200."
+      },
+      "api": {
+        "title": "Resource API",
+        "body": "Send Authorization: Bearer {access_token} with every request. A token without the needed scope gets 403 insufficient_scope.",
+        "exampleTitle": "Example",
+        "ep": {
+          "profile": "Name, email, account status, language",
+          "subscription": "Subscription link and its URL on each public subscription domain",
+          "nodes": "Name, country and status of the nodes the user's plan can use",
+          "summary": "Current plan, data used and limit, expiry date",
+          "tickets": "Reset tickets the user can use",
+          "ticketHistory": "Reset ticket history",
+          "redeem": "Uses one reset ticket to reset this month's data usage. A used or expired ticket returns 409"
+        }
+      },
+      "errors": {
+        "title": "Error responses",
+        "body": "Errors follow the OAuth format ({ error, error_description }). An invalid token returns 401 with a WWW-Authenticate header."
+      },
+      "error": {
+        "invalid_request": "A required value is missing or malformed. Check the request parameters.",
+        "invalid_client": "Wrong client ID or secret, or the app is disabled. (401)",
+        "invalid_grant": "The code or refresh token expired or was reused, or redirect_uri / the PKCE verifier does not match. Start sign-in again.",
+        "invalid_scope": "A scope the app is not allowed, or a refresh that tried to widen the scope.",
+        "unsupported_grant_type": "Only authorization_code and refresh_token are supported.",
+        "access_denied": "The user pressed Deny on the consent screen.",
+        "invalid_token": "The access token expired or was revoked, the user disconnected the app, changed their password, or the app was disabled. Refresh or sign in again. (401)",
+        "insufficient_scope": "The token lacks the scope this API needs. (403)",
+        "slow_down": "Too many token requests. Try again shortly. (429)"
+      },
+      "security": {
+        "title": "Security checklist",
+        "item1": "Keep the client secret on servers only, never in app code, repositories or logs. If it leaks, press Rotate secret at once.",
+        "item2": "Create mobile and desktop apps with the Mobile / desktop (PKCE) type and use a new code_verifier for every request.",
+        "item3": "Generate a fresh state per request and always compare it in the callback.",
+        "item4": "Request only the scopes you need. Use write scopes such as reset_tickets:redeem only when necessary.",
+        "item5": "Store tokens in the device's secure storage (Keychain, Keystore) and call the revoke endpoint on sign-out.",
+        "item6": "Changing the password, disconnecting the app, or an admin disabling the app ends existing tokens at once. On 401, ask the user to sign in again."
+      },
+      "responses": {
+        "title": "Response examples (success and failure)",
+        "body": "The responses each endpoint actually returns. Success is green and failure is red; the failures cover every case the server can produce. Values are samples.",
+        "success": "Success",
+        "failure": "Failure",
+        "redirect": "Redirect",
+        "authorizeNote": "This endpoint does not return JSON; it sends the browser back to the app's redirect_uri. If client_id or redirect_uri itself is wrong there is nowhere safe to send the user, so the consent page shows the error instead.",
+        "ep": {
+          "authorize": "Authorization result (the URL the app is sent back to)",
+          "token": "Token issue (authorization_code)",
+          "refresh": "Token refresh (refresh_token)",
+          "revoke": "Token revoke",
+          "common": "Errors shared by every resource API"
+        },
+        "when": {
+          "a_ok": "The user approved. The code is valid for 10 minutes and works once.",
+          "a_denied": "The user denied the request on the consent page.",
+          "a_scope": "The app asked for a scope it is not allowed to use.",
+          "a_pkce": "A public app sent no PKCE (S256), or the code_challenge is malformed.",
+          "a_type": "response_type is not code.",
+          "t_ok": "The code was exchanged. The access token lasts 1 hour and the refresh token 30 days.",
+          "t_grant": "The code is wrong, expired or already used. The same happens when redirect_uri differs from the authorize request or the password changed. Using a code twice also revokes the tokens issued from it.",
+          "t_pkce": "code_verifier does not match the code_challenge from the authorize request.",
+          "t_req": "code is empty.",
+          "t_nogrant": "grant_type was not sent.",
+          "t_type": "Unsupported grant_type. Only authorization_code and refresh_token work.",
+          "t_client": "The client ID or secret is wrong, or the app is disabled. With Basic auth, WWW-Authenticate is returned too.",
+          "t_slow": "More than 60 requests in a minute from one address.",
+          "r_ok": "A new token pair. The refresh token changes too, so store the new one.",
+          "r_grant": "The refresh token is wrong, expired or revoked. Reusing an already rotated token gives the same error and also revokes everything from that sign-in. Start the sign-in over.",
+          "r_scope": "The scope you passed is wider than the one first granted.",
+          "r_req": "refresh_token is empty.",
+          "v_ok": "Revoked. Unknown or empty tokens also get 200.",
+          "v_client": "The client ID or secret is wrong.",
+          "p_ok": "A token with the profile scope.",
+          "s_ok": "One URL per public subscription domain; url is the default domain's.",
+          "s_none": "The account has no subscription link yet.",
+          "n_ok": "Nodes the user's plan can use. status is online, offline and so on.",
+          "n_empty": "The user has no plan, or the plan has no node group.",
+          "m_ok": "traffic_used and traffic_limit are bytes. A plan without a cap has traffic_limit null.",
+          "k_ok": "Tickets that are unused and not expired.",
+          "k_empty": "No usable reset tickets.",
+          "h_ok": "Up to the latest 20, newest use first.",
+          "h_empty": "No tickets used yet.",
+          "d_ok": "The ticket was spent and this month's usage reset. reset_bytes is the amount cleared, in bytes.",
+          "d_404": "The ticket id does not exist or does not belong to this user.",
+          "d_used": "The ticket was already used.",
+          "d_expired": "The ticket has expired.",
+          "d_noplan": "There is no running plan with a data cap, so there is nothing to reset.",
+          "server": "Internal server error. Try again shortly.",
+          "c_missing": "The Authorization header is missing or is not a Bearer token.",
+          "c_invalid": "The access token is wrong, expired or revoked. The same happens when the user disconnected the app, changed their password or the app was disabled. Refresh it with the refresh token.",
+          "c_scope": "The token lacks the scope this API needs. The scope in the response is the one required."
+        }
+      },
+      "builder": {
+        "title": "Build an authorize URL",
+        "body": "Fill in the values and the URL below updates as you type. The copied URL pastes as a single line.",
+        "required": "Required.",
+        "redirectHint": "Must match a redirect URI registered for the app, character for character.",
+        "scopeHint": "Pick from what the app is allowed. Leave all unchecked to request everything the app is allowed.",
+        "scopeEmpty": "Nothing is checked, so scope is left out. That requests everything the app is allowed.",
+        "stateHint": "Use a fresh random value per request and check the returned state matches.",
+        "pkce": "Use PKCE (required for public apps)",
+        "challengeHint": "The SHA-256 of the code_verifier, base64url-encoded. 43 characters.",
+        "generate": "Generate a new verifier, challenge and state",
+        "insecure": "This page is not on a secure origin, so generating is unavailable. Open it over https or localhost, or type the values in.",
+        "verifierHint": "Send this at token exchange. It disappears when you leave this page, so save it now.",
+        "open": "Open in a new tab"
+      }
+    },
     "account": {
       "menu": "My account",
       "profile": "Account settings",
@@ -2666,6 +3169,24 @@
     }
   },
   "user": {
+    "promo": {
+      "title": "Your next connection comes with a benefit.",
+      "subtitle": "Use your Proxima VPN promotion and choose the plan that fits you.",
+      "trialBenefit": "{{days}}-day free trial",
+      "benefitHint": "Sign in to review the benefit and eligibility at checkout.",
+      "claim": "Log in and claim your benefit",
+      "login": "Go to login",
+      "secure": "Encrypted connection",
+      "devices": "Multiple devices",
+      "support": "Support portal",
+      "footer": "Proxima VPN · Your connection, your way.",
+      "loading": "Checking your promotion",
+      "invalidTitle": "This promotion is not available",
+      "invalid": "The code may be invalid, inactive, expired, or fully redeemed.",
+      "errorTitle": "Could not check this promotion",
+      "error": "Check your connection and try again.",
+      "retry": "Try again"
+    },
     "nav": {
       "dashboard": "Dashboard",
       "devices": "Subscription",
@@ -2761,7 +3282,11 @@
       "nextResetIn": "Data resets {{date}} (in {{days}}d {{hours}}h)",
       "nextResetInHours": "Data resets {{date}} (in {{hours}}h)",
       "trafficUsedSummary": "{{used}} of {{limit}} used this month",
-      "nextResetAfterTerm": "Next reset {{date}} (if you extend your plan)"
+      "nextResetAfterTerm": "Next reset {{date}} (if you extend your plan)",
+      "useTicket": "Use a reset ticket",
+      "seePlans": "See plans",
+      "ticketHint": "You have {{count}} reset ticket(s) to reset it now.",
+      "planDetails": "Plan details"
     },
     "devices": {
       "accountUrl": "Account subscription URL",
@@ -2823,7 +3348,7 @@
       "availablePlans": "Available Plans",
       "selectPlan": "Select",
       "loadError": "Failed to load plan information",
-      "subtitle": "Choose a plan and billing period.",
+      "subtitle": "Check your plan, extend it, or switch to another plan.",
       "noPlanHint": "Pick a plan below; you can use the VPN as soon as payment completes.",
       "noPlansAvailable": "No plans are available for purchase right now.",
       "perDays": "/ {{days}} days",
@@ -2886,7 +3411,8 @@
           "method": "Payment method",
           "methodPanel": "Panel",
           "openStripe": "View Stripe receipt",
-          "error": "Failed to load the receipt"
+          "error": "Failed to load the receipt",
+          "openInvoice": "View Stripe invoice"
         }
       },
       "promotion": {
@@ -2955,29 +3481,6 @@
         "confirmAmount": "Pay {{amount}} and extend",
         "done": "Payment complete. Your plan has been extended."
       },
-      "paying": {
-        "title": "Payment in progress",
-        "standby": "The Stripe checkout page opened in a new tab.",
-        "body": "Pay {{amount}} for {{plan}} in the new tab. Your plan is applied automatically when the payment completes.",
-        "reopenHint": "If you closed the window or it never opened, you can open it again.",
-        "reopen": "Reopen checkout",
-        "dismiss": "Close"
-      },
-      "return": {
-        "confirming": "Checking your payment…",
-        "paidTitle": "Payment complete",
-        "extensionTitle": "Your plan was extended",
-        "pendingTitle": "Checking your payment",
-        "cancelledTitle": "Payment cancelled",
-        "failedTitle": "Couldn't verify the payment",
-        "paidBody": "{{plan}} is active. You can use it until {{until}}.",
-        "extensionBody": "{{days}} days were added after your current term. You can use the plan until {{until}}.",
-        "pendingBody": "The payment does not look complete yet. Your plan applies automatically once it is, so please check back soon.",
-        "cancelledBody": "The order stays pending. You can continue paying whenever you're ready.",
-        "failedBody": "A network problem kept us from verifying the payment. Please check back shortly.",
-        "autoHint": "Your usage and the monthly reset date stay as they are.",
-        "ok": "OK"
-      },
       "current": {
         "description": "Data and time left on the plan you're using now.",
         "dataLeft": "Data left this month",
@@ -3010,6 +3513,29 @@
         "a4": "Usage resets to zero on the same day each month, counted from the day your plan started. If you run out earlier, a reset ticket resets it immediately.",
         "q5": "What is a reset ticket?",
         "a5": "A coupon that sets this month's data usage back to zero right away. You can get one from promotions or support and use it in the Reset tickets section above."
+      },
+      "paying": {
+        "title": "Payment in progress",
+        "standby": "The Stripe checkout page opened in a new tab.",
+        "body": "Pay {{amount}} for {{plan}} in the new tab. Your plan is applied automatically when the payment completes.",
+        "reopenHint": "If you closed the window or it never opened, you can open it again.",
+        "reopen": "Reopen checkout",
+        "dismiss": "Close"
+      },
+      "return": {
+        "confirming": "Checking your payment…",
+        "paidTitle": "Payment complete",
+        "extensionTitle": "Your plan was extended",
+        "pendingTitle": "Checking your payment",
+        "cancelledTitle": "Payment cancelled",
+        "failedTitle": "Couldn't verify the payment",
+        "paidBody": "{{plan}} is active. You can use it until {{until}}.",
+        "extensionBody": "{{days}} days were added after your current term. You can use the plan until {{until}}.",
+        "pendingBody": "The payment does not look complete yet. Your plan applies automatically once it is, so please check back soon.",
+        "cancelledBody": "The order stays pending. You can continue paying whenever you're ready.",
+        "failedBody": "A network problem kept us from verifying the payment. Please check back shortly.",
+        "autoHint": "Your usage and the monthly reset date stay as they are.",
+        "ok": "OK"
       }
     },
     "account": {
@@ -3041,7 +3567,8 @@
         "label": "Account settings tabs",
         "profile": "Profile",
         "security": "Sign-in & security",
-        "subscription": "Subscription link"
+        "subscription": "Subscription link",
+        "apps": "Connected apps"
       },
       "profileHint": "Your display name and sign-in email.",
       "emailHint": "Used for sign-in and notices. It can't be changed.",
@@ -3063,7 +3590,22 @@
       "linkLeakTitle": "Was your link leaked?",
       "linkLeakBody": "If an unknown device is connecting or you shared the link somewhere, switch to a new link.",
       "linkLeakAction": "Reset subscription link",
-      "noSubscriptionYet": "Your subscription link is created when you buy a plan."
+      "noSubscriptionYet": "Your subscription link is created when you buy a plan.",
+      "apps": {
+        "title": "Connected apps",
+        "hint": "Apps that signed in with your Proxima account. Disconnecting an app stops it from accessing your information.",
+        "emptyTitle": "No connected apps",
+        "emptyBody": "Apps you sign in to with your Proxima account will appear here.",
+        "grantedAt": "Connected {{date}}",
+        "lastUsed": "Last used {{date}}",
+        "neverUsed": "Not used yet",
+        "revoke": "Disconnect",
+        "revokeTitle": "Disconnect this app?",
+        "revokeBody": "{{app}} will be signed out and its tokens revoked immediately. Sign in from the app again to reconnect.",
+        "revoked": "Disconnected {{app}}.",
+        "revokeError": "Could not disconnect.",
+        "loadError": "Could not load connected apps."
+      }
     },
     "announcements": {
       "title": "Announcements",
@@ -3184,6 +3726,101 @@
       "leakPrompt": "Was this link leaked?",
       "leakLink": "Reset subscription link"
     },
+    "connect": {
+      "description": "Set up the VPN on this device. Pick an address, then tap your app to add the profile in one step.",
+      "recommended": "Recommended",
+      "addToApp": "Add profile to {{app}}",
+      "copyForApp": "Copy address for {{app}}",
+      "step1Title": "1. Choose a subscription address",
+      "step1Body": "The subscription address is your personal link that VPN apps use to download the server list. Every address has the same content on a different domain. If one address does not open on your network (work, school or some countries), pick another. Switching does not require signing up again or refreshing.",
+      "addressGroup": "Subscription address",
+      "address": "Address {{n}}",
+      "currentLink": "Current subscription link",
+      "copyCurrent": "Copy current address",
+      "qr": "QR code",
+      "addressHint": "If an address you already added gets blocked, delete that subscription in the app and add another address. Usage and device count are the same whichever address you use.",
+      "step2Title": "2. Add it to your app",
+      "step2Body": "Choose this device's operating system and tap the app you use. The app opens and adds the address above as a profile. If the app is not installed nothing happens, so install it first with the link that appears below.",
+      "platform": "Operating system",
+      "os": {
+        "windows": "Windows",
+        "macos": "macOS",
+        "ios": "iOS",
+        "android": "Android",
+        "linux": "Linux"
+      },
+      "install": "Install {{app}}",
+      "comingSoon": "The {{app}} app for this system is coming soon.",
+      "guideTitle": "{{os}} setup guide",
+      "guide": {
+        "windows": {
+          "1": "Install Clash Verge Rev or Hiddify. Tap the app above to get the download link.",
+          "2": "Run the app once, come back to this page and tap its icon. When the browser asks to open the app, choose Open.",
+          "3": "When Proxima appears under Profiles (Subscriptions), select it and turn on System Proxy or TUN mode.",
+          "4": "Open any website to check the connection. Korean services go through Korean servers and everything else through Japanese servers automatically."
+        },
+        "macos": {
+          "1": "Install Clash Verge Rev (free) or sing-box. If macOS asks for confirmation on first launch, choose Open.",
+          "2": "Tap the app icon on this page and allow Safari or Chrome to open the app.",
+          "3": "Pick Proxima in the profile list and turn on System Proxy. The first time you may be asked for your admin password.",
+          "4": "Switch servers from the app's menu-bar icon. If it won't connect, add the profile again with another subscription address."
+        },
+        "ios": {
+          "1": "Install Shadowrocket, Streisand or sing-box from the App Store. Shadowrocket and Quantumult X are paid apps.",
+          "2": "Open this page in Safari on your iPhone and tap the app icon. When asked 'Open in app?', tap Open.",
+          "3": "Confirm the subscription in the app and switch the connection on. The first time, allow 'Add VPN Configurations' and confirm with your passcode or Face ID.",
+          "4": "A VPN icon in the status bar means you're connected. The server list updates by itself."
+        },
+        "android": {
+          "1": "Install Hiddify (Play Store), FlClash or v2rayNG. Open this page in your phone's browser.",
+          "2": "Tap the app icon; the app opens and adds the subscription. In v2rayNG, tap 'Update subscription' once afterwards.",
+          "3": "Tap Connect and accept the 'Connection request' dialog.",
+          "4": "A key icon in the notification bar means you're connected. Set the app's battery usage to Unrestricted so Android does not stop it."
+        },
+        "linux": {
+          "1": "Install Clash Verge Rev (.deb/.rpm/AppImage) or Hiddify.",
+          "2": "Run the app once, then tap its icon. If your desktop doesn't support one-tap links, use 'Copy current address' and paste it into the app's profile import.",
+          "3": "Select the Proxima profile and turn on System Proxy or TUN mode. TUN needs administrator rights.",
+          "4": "Check the connection from a terminal, for example curl https://www.google.com."
+        }
+      },
+      "troubleTitle": "If it doesn't connect",
+      "trouble1": "If tapping an app icon does nothing, the app is not installed or the browser blocked it. Tap 'Copy current address' and paste it into the app yourself.",
+      "trouble2": "If the subscription was added but has no servers, pick another address (Address 2, Address 3) and add it again.",
+      "trouble3": "An expired plan or used-up data stops the connection. Check data left and the expiry date above.",
+      "trouble4": "If your link leaked, create a new one with 'Reset subscription link' below and add it to every device again.",
+      "qrHint": "Scan this with the VPN app on another device (such as your phone) to add the subscription. The QR contains the address you picked.",
+      "moreGuide": "More guides",
+      "whatTitle": "What the subscription address does",
+      "whatBody": "VPN apps use the subscription address to download Proxima's server list and routing rules. One address connects every device and app, and when servers are added or changed the app picks up the new list by itself. The server recognises each app, so you never need a different address per app.",
+      "testAddresses": "Test addresses",
+      "testing": "Checking which addresses open on this network…",
+      "reachable": "Opens on this network",
+      "unreachable": "Blocked on this network",
+      "addressHintFull": "'Test addresses' checks which addresses open on your current network and picks the first one that works. An address marked ✕ is blocked here, so use another. Usage and device count are the same whichever address you use.",
+      "appsTitle": "Apps for {{os}}",
+      "appsBody": "Apps with one-tap import get the profile automatically when you tap their icon above. For paste-only apps, tapping the icon copies the address; paste it into the app's add-subscription screen.",
+      "oneTap": "One-tap import",
+      "pasteOnly": "Paste the address",
+      "installShort": "Install",
+      "soonShort": "Coming soon",
+      "launch": {
+        "openingTitle": "Opening {{app}}",
+        "openingBody": "Opening {{app}}. If the browser asks to open the app, choose Open.",
+        "openedTitle": "{{app}} opened",
+        "openedBody": "Confirm 'Import' or 'Add' in the app to finish adding the profile, then turn the connection on.",
+        "notOpenedTitle": "{{app}} didn't open",
+        "notOpenedBody": "We waited a few seconds but {{app}} didn't open. It may not be installed on this device, or the browser blocked it.",
+        "installHeader": "Install {{app}} first",
+        "installSteps": "Use the install button below to install {{app}} and run it once. Then tap 'Open again' here to add the profile.",
+        "copiedTitle": "Address copied for {{app}}",
+        "copiedBody": "{{app}} does not support one-tap import links. Open {{app}} and paste the copied address on its add-subscription screen.",
+        "retry": "Open again",
+        "manual": "If the app is installed but still won't open, copy the address and paste it into the app's add-subscription screen yourself."
+      },
+      "guideFollows": "These steps follow the system chosen in step 2. To set up another device, change the system there.",
+      "selectedDomain": "Selected domain"
+    },
     "guides": {
       "title": "User guides",
       "description": "Find setup and connection steps for your device.",
@@ -3216,7 +3853,9 @@
       "submit": "Sign In",
       "registerLink": "Don't have an account? Register",
       "forgotPassword": "Forgot password?",
-      "error": "Login failed. Please check your credentials."
+      "error": "Login failed. Please check your credentials.",
+      "oauthContinueTitle": "Sign in to continue connecting the app",
+      "oauthContinueBody": "After you sign in, you'll return straight to the permission screen."
     },
     "adminLogin": {
       "title": "Admin Login",
@@ -3319,6 +3958,63 @@
       "loginButton": "Sign in with a passkey",
       "cancelled": "Passkey sign-in was cancelled.",
       "loginError": "Passkey sign-in failed."
+    },
+    "oauth": {
+      "title": "{{app}} wants to use your Proxima account",
+      "scopesTitle": "If you allow it, this app can",
+      "never": "Your password and payment details are never shared. The app can only use your account within the permissions below.",
+      "redirectLabel": "Returns to",
+      "approve": "Allow",
+      "deny": "Deny",
+      "revokeHint": "You can disconnect it any time in Account settings › Connected apps.",
+      "approved": "Approved",
+      "returning": "Returning to the app",
+      "returningHint": "If the app doesn't open automatically, select the button below.",
+      "openApp": "Return to app",
+      "errorTitle": "This request can't be completed",
+      "error": {
+        "invalid_client": "This app is not registered or has been disabled.",
+        "invalid_request": "The connection request from the app is invalid. Please contact the app's provider.",
+        "other": "Please try again shortly.",
+        "invalid_scope": "The app asked for a permission it isn't allowed to use.",
+        "unsupported_response_type": "This kind of connection request isn't supported.",
+        "server_error": "The server couldn't handle the request. Please try again shortly."
+      },
+      "errorHint": "Start sign-in again from the app, or contact the app's provider if it keeps happening.",
+      "toDashboard": "Go to dashboard",
+      "scope": {
+        "profile": {
+          "title": "See your basic profile",
+          "desc": "Name, email, account status and language"
+        },
+        "subscription_read": {
+          "title": "See your subscription link",
+          "desc": "The subscription URL you add to VPN apps, so the app can connect to nodes directly."
+        },
+        "nodes_read": {
+          "title": "See node status",
+          "desc": "The servers available to you and whether they are online"
+        },
+        "plan_read": {
+          "title": "See your plan and usage",
+          "desc": "Current plan, data left and expiry date"
+        },
+        "reset_tickets_read": {
+          "title": "See your reset tickets",
+          "desc": "Reset tickets you hold and their history"
+        },
+        "reset_tickets_redeem": {
+          "title": "Use reset tickets",
+          "desc": "The app can use a reset ticket to reset this month's data usage."
+        }
+      },
+      "approvedTitle": "Connection allowed",
+      "closeHint": "You can close this window once you're back in the app.",
+      "signedInAs": "Connecting this account",
+      "switchAccount": "Use another account",
+      "errorDetail": "Error code",
+      "errorHintReturn": "Go back to the app so it can receive this error and try again.",
+      "backToApp": "Back to the app"
     }
   },
   "landing": {
@@ -3384,6 +4080,9 @@
       "noAnswers": "There is no guidance for this category. Leave us a message in the next step.",
       "solved": "That solved it",
       "stillNeedHelp": "Still need help",
+      "solvedTitle": "Great, glad that fixed it!",
+      "solvedBody": "You don't need to open a ticket. If anything else comes up, you can always look here first.",
+      "solvedOk": "Done",
       "contactTitle": "Tell us what happened",
       "subject": "Subject",
       "subjectPlaceholder": "Summarise the problem in one line",
@@ -3409,7 +4108,8 @@
       "reply": "Reply",
       "replyPlaceholder": "Add anything else we should know",
       "send": "Send",
-      "sendError": "Could not send your message."
+      "sendError": "Could not send your message.",
+      "createdAt": "Opened {{time}}"
     },
     "admin": {
       "title": "Support tickets",
@@ -3488,7 +4188,25 @@
         "ko": "한국어 (Korean)",
         "en": "English",
         "zh": "中文 (Chinese)"
-      }
+      },
+      "langGuide": "Switch language tabs to translate the same question. If there is no text in a user's language, another language is shown.",
+      "contentLang": "Content language",
+      "langDone": "Done",
+      "langPartial": "Partial",
+      "langEmpty": "Empty",
+      "questionIn": "Question ({{lang}})",
+      "answerIn": "Answer ({{lang}})",
+      "questionPlaceholder": "e.g. I paid but my plan wasn't applied.",
+      "answerPlaceholder": "Write steps users can follow right away. Line breaks are kept.",
+      "answerHint": "Line breaks are shown as written. Several short lines read best.",
+      "sortHint": "Smaller numbers appear first.",
+      "activeHint": "Shown in the user help.",
+      "inactiveHint": "Hidden from users.",
+      "preview": "What users see",
+      "previewHint": "How it appears to {{lang}} users under {{category}}. Select the question to expand the answer.",
+      "previewEmpty": "Enter a question or answer to see the preview here.",
+      "previewHidden": "It's hidden right now, so users won't actually see it.",
+      "noCategory": "No category selected"
     }
   }
 }
