@@ -239,7 +239,8 @@
       "guides": "Guides & docs",
       "support": "Support tickets",
       "supportHelp": "Support help",
-      "routing": "Routing rules"
+      "routing": "Routing rules",
+      "admins": "Admin accounts"
     },
     "dashboard": {
       "title": "Dashboard",
@@ -1116,7 +1117,8 @@
       "resetTickets": "Grant data reset tickets and review past grants. Tickets can go to one user, everyone currently on a plan, or every account. Users spend a ticket on their dashboard to reset this month's data usage to zero.",
       "support": "Read and answer tickets from users. Replying sends the user an email notification.",
       "supportHelp": "Manage the categories and frequently asked questions shown before a user opens a ticket. Each can be written in Korean, English and Chinese.",
-      "routing": "Edit the proxy groups, rule sets and rule order served in Clash Meta subscriptions. Changes apply on the next subscription refresh."
+      "routing": "Edit the proxy groups, rule sets and rule order served in Clash Meta subscriptions. Changes apply on the next subscription refresh.",
+      "admins": "Invite admins, manage their roles and status, and change your own name and password. Only owners can manage other admins."
     },
     "notifications": {
       "title": "Notifications"
@@ -2507,6 +2509,146 @@
         "providers": "Rule sets ({{count}})",
         "rules": "Rules ({{count}})"
       }
+    },
+    "account": {
+      "menu": "My account",
+      "profile": "Account settings",
+      "team": "Manage admin team",
+      "logout": "Sign out"
+    },
+    "admins": {
+      "title": "Admin accounts",
+      "description": "Add admins and split permissions so several people can run the service together. Support tickets can be assigned to admins.",
+      "tab": {
+        "team": "Admin team",
+        "profile": "My account"
+      },
+      "loading": "Loading admins...",
+      "loadError": "Could not load admin information.",
+      "empty": "No admins.",
+      "stat": {
+        "total": "Total admins",
+        "owners": "Owners",
+        "active": "Active",
+        "no2fa": "Without 2FA"
+      },
+      "role": {
+        "owner": "Owner",
+        "admin": "Admin"
+      },
+      "roleHelp": {
+        "owner": "Everything an admin can do, plus adding, editing and deleting admin accounts and resetting their passwords. At least one must always be active.",
+        "admin": "Full access to operations such as nodes, users, payments and support, but cannot manage other admin accounts."
+      },
+      "tableTitle": "Admins",
+      "tableHint": "Role and status changes apply from that admin's next request.",
+      "add": "Add admin",
+      "col": {
+        "who": "Admin",
+        "role": "Role",
+        "status": "Status",
+        "tickets": "Assigned tickets",
+        "lastLogin": "Last sign-in",
+        "actions": "Actions"
+      },
+      "you": "You",
+      "active": "Active",
+      "disabled": "Disabled",
+      "twofaOn": "2FA on",
+      "twofaOff": "2FA off",
+      "never": "Never",
+      "openTickets": "{{count}} open",
+      "actionsFor": "Actions for {{name}}",
+      "action": {
+        "edit": "Edit name and role",
+        "reset": "Reset password",
+        "disable": "Disable",
+        "enable": "Re-enable",
+        "delete": "Delete"
+      },
+      "lock": {
+        "self": "You cannot disable or delete your own account here.",
+        "lastOwner": "This is the last active owner. Make someone else an owner first.",
+        "useProfile": "Change your own password from the My account tab."
+      },
+      "createTitle": "Add admin",
+      "editTitle": "Edit admin",
+      "create": "Add and get a temporary password",
+      "save": "Save",
+      "field": {
+        "email": "Email",
+        "emailHint": "Used to sign in. It cannot be changed later.",
+        "name": "Name",
+        "nameHint": "Shown as the ticket assignee and in activity logs.",
+        "namePlaceholder": "e.g. Alex Kim",
+        "role": "Role"
+      },
+      "createNote": "A temporary password is shown once after adding. Share it through a safe channel and ask them to change it after their first sign-in.",
+      "confirm": {
+        "reset": {
+          "title": "Reset this password?",
+          "body": "A new temporary password is created and this admin is signed out on every device immediately.",
+          "cta": "Reset"
+        },
+        "delete": {
+          "title": "Delete this admin?",
+          "body": "The account is deleted permanently and signed out right away. Their {{count}} assigned tickets become unassigned. This cannot be undone.",
+          "cta": "Delete"
+        },
+        "disable": {
+          "title": "Disable this admin?",
+          "body": "They are signed out immediately and cannot sign in again. The account and its history stay, so you can re-enable it later.",
+          "cta": "Disable"
+        },
+        "enable": {
+          "title": "Re-enable this admin?",
+          "body": "This admin can sign in again with their existing password.",
+          "cta": "Enable"
+        }
+      },
+      "secret": {
+        "createdTitle": "Admin added",
+        "resetTitle": "Password reset",
+        "once": "The temporary password is shown only now. Copy it before closing.",
+        "password": "Temporary password",
+        "copied": "Copied",
+        "copyFailed": "Could not copy",
+        "next": "They sign in at the admin login page with this email and temporary password, then change it under My account.",
+        "done": "Copied, close"
+      },
+      "error": {
+        "generic": "The request failed. Try again in a moment.",
+        "email_taken": "An admin with this email already exists.",
+        "invalid_email": "Enter a valid email address.",
+        "invalid_name": "Names can be up to 60 characters.",
+        "last_owner": "At least one active owner must remain.",
+        "self_demote": "You cannot remove your own owner role.",
+        "self_disable": "You cannot disable your own account.",
+        "self_delete": "You cannot delete your own account.",
+        "wrong_password": "The current password is incorrect.",
+        "weak_password": "Passwords need at least 10 characters.",
+        "same_password": "Choose a different password from your current one.",
+        "use_profile": "Change your own password from the My account tab.",
+        "not_found": "Admin not found. Refresh the list."
+      },
+      "profile": {
+        "info": "My details",
+        "infoHint": "Your name is shown as the ticket assignee and in activity logs.",
+        "pwChanged": "Password changed",
+        "nameHint": "Leave empty to show the part of your email before @.",
+        "nameSaved": "Name saved.",
+        "password": "Change password",
+        "passwordHint": "Confirm your current password to set a new one.",
+        "current": "Current password",
+        "new": "New password",
+        "confirm": "Confirm new password",
+        "rule": "At least {{min}} characters",
+        "mismatch": "The new passwords do not match.",
+        "signOutNote": "Changing it signs you out on every other device except this browser.",
+        "change": "Change password",
+        "passwordChanged": "Password changed. Every other session has been signed out."
+      },
+      "notOwner": "Only owners can manage the admin team. Ask an owner if you need access."
     }
   },
   "user": {
@@ -3282,7 +3424,18 @@
       "cancel": "Cancel",
       "closedNotice": "This ticket is closed. Set its status to Awaiting reply to answer it.",
       "notifyUser": "Email the user about this reply",
-      "notifyUserHint": "When checked, {{email}} gets an email saying a new reply was added. When unchecked, the reply is only saved on the ticket."
+      "notifyUserHint": "When checked, {{email}} gets an email saying a new reply was added. When unchecked, the reply is only saved on the ticket.",
+      "assigneeFilter": "Assignee filter",
+      "assignee": {
+        "all": "All",
+        "mine": "Mine",
+        "unassigned": "Unassigned"
+      },
+      "assigneeCol": "Assignee",
+      "unassigned": "Unassigned",
+      "me": "me",
+      "assignMe": "Assign to me",
+      "assignError": "Could not change the assignee."
     },
     "manage": {
       "title": "Support help",

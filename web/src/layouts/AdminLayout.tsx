@@ -19,8 +19,9 @@ import {
 import { useTheme } from "../hooks/useTheme";
 import { BreadcrumbLeafProvider } from "../hooks/BreadcrumbLeafProvider";
 import { useBreadcrumbLeafValue } from "../hooks/useBreadcrumbLeaf";
-import { getDashboardAlerts } from "../api/admin";
-import type { AlertSeverity, DashboardAlerts } from "../api/types";
+import { getAdminMe, getDashboardAlerts } from "../api/admin";
+import { removeToken } from "../api/auth";
+import type { AdminAccount, AlertSeverity, DashboardAlerts } from "../api/types";
 
 const badgePollInterval = 60000;
 
@@ -88,6 +89,7 @@ const staticPageLabels: Record<string, string> = {
   "/admin/support/help": "admin.nav.supportHelp",
   "/admin/settings": "admin.nav.settings",
   "/admin/2fa": "admin.nav.twoFactor",
+  "/admin/admins": "admin.nav.admins",
 };
 
 const helpTopicKeys: Record<string, string> = {
@@ -111,6 +113,7 @@ const helpTopicKeys: Record<string, string> = {
   "/admin/support/help": "admin.help.supportHelp",
   "/admin/settings": "admin.help.settings",
   "/admin/2fa": "admin.help.twoFactor",
+  "/admin/admins": "admin.help.admins",
 };
 
 function indicatorType(severity: AlertSeverity) {
@@ -165,8 +168,13 @@ function AdminLayoutShell() {
   const [foldedGroups, setFoldedGroups] = useState<ReadonlySet<string>>(new Set());
   const [seenActiveGroup, setSeenActiveGroup] = useState<string | undefined>(undefined);
 
+  const [me, setMe] = useState<AdminAccount | null>(null);
+
   const alertCount = alerts?.total ?? 0;
 
+  useEffect(() => {
+    getAdminMe().then((res) => setMe(res.admin)).catch(() => setMe(null));
+  }, [location.pathname]);
 
   useEffect(() => {
     const load = async () => {
@@ -233,6 +241,7 @@ function AdminLayoutShell() {
       title: t("admin.nav.group.system"),
       links: [
         { text: t("admin.nav.settings"), href: "/admin/settings" },
+        { text: t("admin.nav.admins"), href: "/admin/admins" },
         { text: t("admin.nav.twoFactor"), href: "/admin/2fa" },
       ],
     },
@@ -409,6 +418,25 @@ function AdminLayoutShell() {
               { id: "zh", text: "中文" },
             ],
             onItemClick: ({ detail }) => changeLanguage(detail.id),
+          },
+          {
+            type: "menu-dropdown",
+            text: me ? me.name.trim() || me.email : t("admin.account.menu"),
+            description: me ? `${me.email} · ${t(`admin.admins.role.${me.role}`)}` : undefined,
+            iconName: "user-profile",
+            items: [
+              { id: "profile", text: t("admin.account.profile") },
+              ...(me?.role === "owner" ? [{ id: "team", text: t("admin.account.team") }] : []),
+              { id: "logout", text: t("admin.account.logout") },
+            ],
+            onItemClick: ({ detail }) => {
+              if (detail.id === "logout") {
+                removeToken("admin");
+                navigate("/admin/login", { replace: true });
+              } else {
+                navigate("/admin/admins");
+              }
+            },
           },
         ]}
       />

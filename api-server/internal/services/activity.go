@@ -23,6 +23,16 @@ const (
 	SeveritySuccess Severity = "success"
 )
 
+// Admin team and support assignment events.
+const (
+	EventAdminAccountCreated   = "admin.account_created"
+	EventAdminAccountUpdated   = "admin.account_updated"
+	EventAdminAccountDeleted   = "admin.account_deleted"
+	EventAdminPasswordReset    = "admin.password_reset"
+	EventAdminPasswordChanged  = "admin.password_changed"
+	EventSupportTicketAssigned = "support.ticket_assigned"
+)
+
 // Event names are the stable contract between the recording call sites and the
 // web UI, which maps them to translated sentences. Renaming one silently turns
 // its feed rows into untranslated text, so they are enumerated here rather than

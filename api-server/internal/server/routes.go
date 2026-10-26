@@ -44,6 +44,18 @@ func (s *Server) registerRoutes() {
 
 	admin.Use(middleware.AdminJWTMiddleware(s.config.JWT.Secret, s.db))
 
+	adminAccounts := handlers.NewAdminAccountsHandler(s.db)
+	admin.Get("/me", adminAccounts.Me)
+	admin.Patch("/me", adminAccounts.UpdateMe)
+	admin.Post("/me/password", loginLimiter, adminAccounts.ChangeMyPassword(adminAuthHandler.IssueToken))
+	admin.Get("/admins/directory", adminAccounts.Directory)
+	owners := admin.Group("/admins", middleware.RequireAdminOwner())
+	owners.Get("", adminAccounts.List)
+	owners.Post("", adminAccounts.Create)
+	owners.Patch("/:id", adminAccounts.Update)
+	owners.Post("/:id/password", adminAccounts.ResetPassword)
+	owners.Delete("/:id", adminAccounts.Delete)
+
 	admin2FA := handlers.NewAdmin2FAHandler(s.db)
 	twoFA := admin.Group("/auth/2fa")
 	twoFA.Get("/setup", admin2FA.Setup)

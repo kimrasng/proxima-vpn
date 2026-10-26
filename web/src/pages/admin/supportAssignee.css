@@ -1,0 +1,49 @@
+.support-assignee-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.support-assignee-chip {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 14px;
+  border: 1px solid #c6cdd6;
+  border-radius: 999px;
+  background: #fff;
+  color: #414d5c;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.support-assignee-chip strong {
+  min-width: 22px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: #f1f3f5;
+  color: #16191f;
+  font-size: 12px;
+  line-height: 20px;
+  text-align: center;
+}
+
+.support-assignee-chip:hover,
+.support-assignee-chip:focus-visible {
+  border-color: #0b5fd6;
+  outline: none;
+}
+
+.support-assignee-chip--on {
+  border-color: #0b5fd6;
+  background: #0b5fd6;
+  color: #fff;
+}
+
+.support-assignee-chip--on strong {
+  background: rgba(255, 255, 255, 0.22);
+  color: #fff;
+}

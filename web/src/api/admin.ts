@@ -89,6 +89,9 @@ import type {
   NodeTagCount,
   RuleSetCatalogEntry,
   RuleSetContents,
+  AdminAccount,
+  AdminDirectoryEntry,
+  AdminRole,
 } from './types';
 
 function applyAdminClient() {
@@ -491,6 +494,11 @@ export function updateAnnouncement(id: string, req: UpdateAnnouncementRequest): 
   return put<Announcement>(`/api/v1/admin/announcements/${id}`, req);
 }
 
+export function previewAnnouncement(format: string, content: string): Promise<{ html: string }> {
+  applyAdminClient();
+  return post<{ html: string }>('/api/v1/admin/announcements/preview', { format, content });
+}
+
 export function deleteAnnouncement(id: string): Promise<void> {
   applyAdminClient();
   return del<void>(`/api/v1/admin/announcements/${id}`);
@@ -661,10 +669,13 @@ export function getSupportSummary(): Promise<AdminSupportSummary> {
   return get<AdminSupportSummary>('/api/v1/admin/support/summary');
 }
 
-export function listSupportTickets(params: { status?: SupportStatus | ''; q?: string; page?: number; limit?: number }): Promise<AdminSupportTicketList> {
+export type SupportAssigneeFilter = 'all' | 'mine' | 'unassigned';
+
+export function listSupportTickets(params: { status?: SupportStatus | ''; assignee?: SupportAssigneeFilter; q?: string; page?: number; limit?: number }): Promise<AdminSupportTicketList> {
   applyAdminClient();
   const query = new URLSearchParams();
   if (params.status) query.set('status', params.status);
+  if (params.assignee && params.assignee !== 'all') query.set('assignee', params.assignee);
   if (params.q?.trim()) query.set('q', params.q.trim());
   query.set('page', String(params.page ?? 1));
   query.set('limit', String(params.limit ?? 20));
@@ -681,7 +692,7 @@ export function replySupportTicket(id: string, body: string, notifyUser: boolean
   return post<SupportMessage>(`/api/v1/admin/support/tickets/${id}/messages`, { body, notify_user: notifyUser });
 }
 
-export function updateSupportTicket(id: string, req: { status?: SupportStatus; priority?: SupportPriority }): Promise<void> {
+export function updateSupportTicket(id: string, req: { status?: SupportStatus; priority?: SupportPriority; assigned_admin_id?: string }): Promise<void> {
   applyAdminClient();
   return patch<void>(`/api/v1/admin/support/tickets/${id}`, req);
 }
@@ -729,4 +740,49 @@ export function updateSupportFAQ(id: string, req: SupportFAQInput): Promise<void
 export function deleteSupportFAQ(id: string): Promise<void> {
   applyAdminClient();
   return del<void>(`/api/v1/admin/support/faqs/${id}`);
+}
+
+export function listAdmins(): Promise<{ admins: AdminAccount[] }> {
+  applyAdminClient();
+  return get<{ admins: AdminAccount[] }>('/api/v1/admin/admins');
+}
+
+export function listAdminDirectory(): Promise<{ admins: AdminDirectoryEntry[]; me: string }> {
+  applyAdminClient();
+  return get<{ admins: AdminDirectoryEntry[]; me: string }>('/api/v1/admin/admins/directory');
+}
+
+export function createAdmin(req: { email: string; name: string; role: AdminRole; password?: string }): Promise<{ admin: AdminAccount; temporary_password?: string }> {
+  applyAdminClient();
+  return post<{ admin: AdminAccount; temporary_password?: string }>('/api/v1/admin/admins', req);
+}
+
+export function updateAdmin(id: string, req: { name?: string; role?: AdminRole; is_active?: boolean }): Promise<{ admin: AdminAccount }> {
+  applyAdminClient();
+  return patch<{ admin: AdminAccount }>(`/api/v1/admin/admins/${id}`, req);
+}
+
+export function resetAdminPassword(id: string): Promise<{ temporary_password: string }> {
+  applyAdminClient();
+  return post<{ temporary_password: string }>(`/api/v1/admin/admins/${id}/password`, {});
+}
+
+export function deleteAdmin(id: string): Promise<void> {
+  applyAdminClient();
+  return del<void>(`/api/v1/admin/admins/${id}`);
+}
+
+export function getAdminMe(): Promise<{ admin: AdminAccount }> {
+  applyAdminClient();
+  return get<{ admin: AdminAccount }>('/api/v1/admin/me');
+}
+
+export function updateAdminMe(name: string): Promise<{ admin: AdminAccount }> {
+  applyAdminClient();
+  return patch<{ admin: AdminAccount }>('/api/v1/admin/me', { name });
+}
+
+export function changeAdminPassword(currentPassword: string, newPassword: string): Promise<{ token: string }> {
+  applyAdminClient();
+  return post<{ token: string }>('/api/v1/admin/me/password', { current_password: currentPassword, new_password: newPassword });
 }

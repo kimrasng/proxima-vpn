@@ -19,7 +19,7 @@ import {
 } from "@cloudscape-design/components";
 import * as adminApi from "../../api/admin";
 import { ApiError } from "../../api/client";
-import type { AdminSupportTicket, SupportMessage, SupportPriority, SupportStatus as Status } from "../../api/types";
+import type { AdminDirectoryEntry, AdminSupportTicket, SupportMessage, SupportPriority, SupportStatus as Status } from "../../api/types";
 import { usePublishBreadcrumbLeaf } from "../../hooks/useBreadcrumbLeaf";
 import { pickLocalized } from "../../utils/localizedText";
 import SupportThread from "../../components/support/SupportThread";
@@ -38,6 +38,11 @@ export default function SupportTicketDetail() {
   const [failed, setFailed] = useState(false);
   const [body, setBody] = useState("");
   const [notifyUser, setNotifyUser] = useState(false);
+  const [directory, setDirectory] = useState<{ admins: AdminDirectoryEntry[]; me: string }>({ admins: [], me: "" });
+
+  useEffect(() => {
+    adminApi.listAdminDirectory().then(setDirectory).catch(() => setDirectory({ admins: [], me: "" }));
+  }, []);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -106,6 +111,19 @@ export default function SupportTicketDetail() {
     { value: "answered", label: t("support.status.answered") },
     { value: "closed", label: t("support.status.closed") },
   ];
+  const assigneeName = (a: AdminDirectoryEntry) => a.name.trim() || a.email;
+  const assigneeOptions = [
+    { value: "", label: t("support.admin.unassigned") },
+    ...directory.admins.map((a) => ({
+      value: a.id,
+      label: a.id === directory.me ? `${assigneeName(a)} (${t("support.admin.me")})` : assigneeName(a),
+      description: a.name.trim() ? a.email : undefined,
+    })),
+  ];
+  if (ticket.assigned_admin_id && !directory.admins.some((a) => a.id === ticket.assigned_admin_id)) {
+    assigneeOptions.push({ value: ticket.assigned_admin_id, label: ticket.assigned_admin_name?.trim() || ticket.assigned_admin_email || "-", description: undefined });
+  }
+  const assignTo = (id: string) => void run(() => adminApi.updateSupportTicket(ticketId, { assigned_admin_id: id }), t("support.admin.assignError"));
   const priorityOptions: { value: SupportPriority; label: string }[] = [
     { value: "low", label: t("support.priority.low") },
     { value: "normal", label: t("support.priority.normal") },
@@ -132,12 +150,29 @@ export default function SupportTicketDetail() {
       <SpaceBetween size="l">
         {error && <Alert type="error" dismissible onDismiss={() => setError(null)}>{error}</Alert>}
         <Container header={<Header variant="h3">{t("support.admin.details")}</Header>}>
-          <ColumnLayout columns={3} variant="text-grid">
+          <ColumnLayout columns={4} variant="text-grid" minColumnWidth={170}>
             <div>
               <Box variant="awsui-key-label">{t("support.admin.user")}</Box>
               <Box>{ticket.user_name}</Box>
               <Box color="text-body-secondary">{ticket.user_email}</Box>
             </div>
+            <FormField
+              label={t("support.admin.assigneeCol")}
+              description={
+                directory.me && ticket.assigned_admin_id !== directory.me ? (
+                  <Button variant="inline-link" disabled={busy} onClick={() => assignTo(directory.me)}>{t("support.admin.assignMe")}</Button>
+                ) : undefined
+              }
+            >
+              <Select
+                selectedOption={assigneeOptions.find((option) => option.value === (ticket.assigned_admin_id ?? "")) ?? null}
+                options={assigneeOptions}
+                filteringType={assigneeOptions.length > 6 ? "auto" : "none"}
+                disabled={busy}
+                ariaLabel={t("support.admin.assigneeCol")}
+                onChange={({ detail }) => assignTo(detail.selectedOption.value ?? "")}
+              />
+            </FormField>
             <FormField label={t("support.list.status")}>
               <Select
                 selectedOption={statusOptions.find((option) => option.value === ticket.status) ?? null}

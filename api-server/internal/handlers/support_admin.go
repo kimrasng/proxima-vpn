@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/proximavpn/proxima-vpn/api-server/internal/mail"
+	"github.com/proximavpn/proxima-vpn/api-server/internal/services"
 )
 
 var supportSlugPattern = regexp.MustCompile(`^[a-z0-9-]{1,40}$`)
@@ -22,6 +23,10 @@ type adminSupportTicketOut struct {
 	UserID    string `json:"user_id"`
 	UserEmail string `json:"user_email"`
 	UserName  string `json:"user_name"`
+
+	AssignedAdminID    *string `json:"assigned_admin_id"`
+	AssignedAdminEmail *string `json:"assigned_admin_email"`
+	AssignedAdminName  *string `json:"assigned_admin_name"`
 }
 
 type adminReplyRequest struct {
@@ -63,6 +68,16 @@ func (h *SupportHandler) AdminListTickets(c *fiber.Ctx) error {
 		args = append(args, st)
 		where = append(where, "t.status = $"+strconv.Itoa(len(args)))
 	}
+	switch c.Query("assignee") {
+	case "", "all":
+	case "mine":
+		args = append(args, adminIDOf(c))
+		where = append(where, "t.assigned_admin_id = $"+strconv.Itoa(len(args)))
+	case "unassigned":
+		where = append(where, "t.assigned_admin_id IS NULL")
+	default:
+		return supportFail(c, fiber.StatusBadRequest, "invalid assignee filter")
+	}
 	if q := strings.TrimSpace(c.Query("q")); q != "" {
 		if !runeLenBetween(q, 1, 100) {
 			return supportFail(c, fiber.StatusBadRequest, "search text is too long")
@@ -80,8 +95,10 @@ func (h *SupportHandler) AdminListTickets(c *fiber.Ctx) error {
 	args = append(args, limit, (page-1)*limit)
 	rows, err := h.db.Query(ctx,
 		`SELECT t.id::text, COALESCE(t.category_id::text, ''), COALESCE(cat.names, '{}'::jsonb), t.subject, t.status, t.priority,
-		        t.admin_unread, t.created_at, t.updated_at, t.last_reply_at, u.id::text, u.email, u.name
+		        t.admin_unread, t.created_at, t.updated_at, t.last_reply_at, u.id::text, u.email, u.name,
+		        t.assigned_admin_id::text, aa.email, aa.name
 		 FROM support_tickets t JOIN users u ON u.id = t.user_id LEFT JOIN support_categories cat ON cat.id = t.category_id
+		 LEFT JOIN admins aa ON aa.id = t.assigned_admin_id
 		 WHERE `+whereSQL+` ORDER BY (t.status = 'open') DESC, t.updated_at DESC LIMIT $`+strconv.Itoa(len(args)-1)+` OFFSET $`+strconv.Itoa(len(args)), args...)
 	if err != nil {
 		return supportServerError(c, "admin list", err)
@@ -90,7 +107,7 @@ func (h *SupportHandler) AdminListTickets(c *fiber.Ctx) error {
 	out := make([]adminSupportTicketOut, 0)
 	for rows.Next() {
 		var t adminSupportTicketOut
-		if err := rows.Scan(&t.ID, &t.CategoryID, &t.CategoryNames, &t.Subject, &t.Status, &t.Priority, &t.Unread, &t.CreatedAt, &t.UpdatedAt, &t.LastReplyAt, &t.UserID, &t.UserEmail, &t.UserName); err != nil {
+		if err := rows.Scan(&t.ID, &t.CategoryID, &t.CategoryNames, &t.Subject, &t.Status, &t.Priority, &t.Unread, &t.CreatedAt, &t.UpdatedAt, &t.LastReplyAt, &t.UserID, &t.UserEmail, &t.UserName, &t.AssignedAdminID, &t.AssignedAdminEmail, &t.AssignedAdminName); err != nil {
 			return supportServerError(c, "admin scan", err)
 		}
 		out = append(out, t)
@@ -108,15 +125,17 @@ func (h *SupportHandler) AdminListTickets(c *fiber.Ctx) error {
 // @Security BearerAuth
 // @Router /admin/support/summary [get]
 func (h *SupportHandler) AdminSummary(c *fiber.Ctx) error {
-	var open, answered, closed, unread int
+	var open, answered, closed, unread, mine, unassigned int
 	err := h.db.QueryRow(c.UserContext(),
 		`SELECT count(*) FILTER (WHERE status = 'open'), count(*) FILTER (WHERE status = 'answered'),
-		        count(*) FILTER (WHERE status = 'closed'), count(*) FILTER (WHERE admin_unread AND status <> 'closed')
-		 FROM support_tickets`).Scan(&open, &answered, &closed, &unread)
+		        count(*) FILTER (WHERE status = 'closed'), count(*) FILTER (WHERE admin_unread AND status <> 'closed'),
+		        count(*) FILTER (WHERE assigned_admin_id = $1 AND status <> 'closed'),
+		        count(*) FILTER (WHERE assigned_admin_id IS NULL AND status <> 'closed')
+		 FROM support_tickets`, adminIDOf(c)).Scan(&open, &answered, &closed, &unread, &mine, &unassigned)
 	if err != nil {
 		return supportServerError(c, "summary", err)
 	}
-	return c.JSON(fiber.Map{"open": open, "answered": answered, "closed": closed, "unread": unread})
+	return c.JSON(fiber.Map{"open": open, "answered": answered, "closed": closed, "unread": unread, "mine": mine, "unassigned": unassigned})
 }
 
 // AdminGetTicket handles GET /api/v1/admin/support/tickets/:id.
@@ -134,10 +153,12 @@ func (h *SupportHandler) AdminGetTicket(c *fiber.Ctx) error {
 	var t adminSupportTicketOut
 	err := h.db.QueryRow(ctx,
 		`SELECT t.id::text, COALESCE(t.category_id::text, ''), COALESCE(cat.names, '{}'::jsonb), t.subject, t.status, t.priority,
-		        t.admin_unread, t.created_at, t.updated_at, t.last_reply_at, u.id::text, u.email, u.name
+		        t.admin_unread, t.created_at, t.updated_at, t.last_reply_at, u.id::text, u.email, u.name,
+		        t.assigned_admin_id::text, aa.email, aa.name
 		 FROM support_tickets t JOIN users u ON u.id = t.user_id LEFT JOIN support_categories cat ON cat.id = t.category_id
+		 LEFT JOIN admins aa ON aa.id = t.assigned_admin_id
 		 WHERE t.id = $1`, id,
-	).Scan(&t.ID, &t.CategoryID, &t.CategoryNames, &t.Subject, &t.Status, &t.Priority, &t.Unread, &t.CreatedAt, &t.UpdatedAt, &t.LastReplyAt, &t.UserID, &t.UserEmail, &t.UserName)
+	).Scan(&t.ID, &t.CategoryID, &t.CategoryNames, &t.Subject, &t.Status, &t.Priority, &t.Unread, &t.CreatedAt, &t.UpdatedAt, &t.LastReplyAt, &t.UserID, &t.UserEmail, &t.UserName, &t.AssignedAdminID, &t.AssignedAdminEmail, &t.AssignedAdminName)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return supportFail(c, fiber.StatusNotFound, "ticket not found")
 	}
@@ -248,6 +269,9 @@ func (h *SupportHandler) notifyReply(ticketID string) {
 type updateSupportTicketRequest struct {
 	Status   *string `json:"status"`
 	Priority *string `json:"priority"`
+	// AssignedAdminID assigns the ticket; an empty string unassigns it and an
+	// absent field leaves the assignee unchanged.
+	AssignedAdminID *string `json:"assigned_admin_id"`
 }
 
 // AdminUpdateTicket handles PATCH /api/v1/admin/support/tickets/:id.
@@ -266,8 +290,11 @@ func (h *SupportHandler) AdminUpdateTicket(c *fiber.Ctx) error {
 	if err := c.BodyParser(&req); err != nil {
 		return supportFail(c, fiber.StatusBadRequest, "invalid request body")
 	}
-	if req.Status == nil && req.Priority == nil {
+	if req.Status == nil && req.Priority == nil && req.AssignedAdminID == nil {
 		return supportFail(c, fiber.StatusBadRequest, "nothing to update")
+	}
+	if req.AssignedAdminID != nil && *req.AssignedAdminID != "" && !isUUID(*req.AssignedAdminID) {
+		return supportFail(c, fiber.StatusBadRequest, "invalid assignee")
 	}
 	if req.Status != nil && *req.Status != "open" && *req.Status != "answered" && *req.Status != "closed" {
 		return supportFail(c, fiber.StatusBadRequest, "invalid status")
@@ -275,18 +302,40 @@ func (h *SupportHandler) AdminUpdateTicket(c *fiber.Ctx) error {
 	if req.Priority != nil && *req.Priority != "low" && *req.Priority != "normal" && *req.Priority != "high" {
 		return supportFail(c, fiber.StatusBadRequest, "invalid priority")
 	}
-	tag, err := h.db.Exec(c.UserContext(),
+	ctx := c.UserContext()
+	if req.AssignedAdminID != nil && *req.AssignedAdminID != "" {
+		var active bool
+		err := h.db.QueryRow(ctx, `SELECT is_active FROM admins WHERE id = $1`, *req.AssignedAdminID).Scan(&active)
+		if errors.Is(err, pgx.ErrNoRows) || (err == nil && !active) {
+			return supportFail(c, fiber.StatusBadRequest, "assignee must be an active admin")
+		}
+		if err != nil {
+			return supportServerError(c, "load assignee", err)
+		}
+	}
+	tag, err := h.db.Exec(ctx,
 		`UPDATE support_tickets SET
 		   status = COALESCE($2, status),
 		   priority = COALESCE($3, priority),
 		   closed_at = CASE WHEN $2::text = 'closed' THEN COALESCE(closed_at, NOW()) WHEN $2::text IS NOT NULL THEN NULL ELSE closed_at END,
+		   assigned_admin_id = CASE WHEN $4::boolean THEN NULLIF($5, '')::uuid ELSE assigned_admin_id END,
 		   updated_at = NOW()
-		 WHERE id = $1`, id, req.Status, req.Priority)
+		 WHERE id = $1`, id, req.Status, req.Priority, req.AssignedAdminID != nil, derefOrEmpty(req.AssignedAdminID))
 	if err != nil {
 		return supportServerError(c, "update ticket", err)
 	}
 	if tag.RowsAffected() == 0 {
 		return supportFail(c, fiber.StatusNotFound, "ticket not found")
+	}
+	if req.AssignedAdminID != nil {
+		services.NewActivityService(h.db).Log(ctx, services.Record{
+			EventType:  services.EventSupportTicketAssigned,
+			Severity:   services.SeverityInfo,
+			ActorType:  "admin",
+			ActorID:    adminIDOf(c),
+			ActorLabel: adminEmail(c),
+			Detail:     map[string]any{"ticket_id": id, "assignee_id": *req.AssignedAdminID},
+		})
 	}
 	return c.JSON(fiber.Map{"message": "ticket updated"})
 }

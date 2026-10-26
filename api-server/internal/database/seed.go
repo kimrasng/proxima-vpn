@@ -40,7 +40,7 @@ func SeedAdmin(ctx context.Context, pool *pgxpool.Pool) error {
 	}
 
 	_, err = pool.Exec(ctx,
-		"INSERT INTO admins (email, password_hash) VALUES ($1, $2)",
+		"INSERT INTO admins (email, password_hash, role) VALUES ($1, $2, 'owner')",
 		email, hash,
 	)
 	if err != nil {

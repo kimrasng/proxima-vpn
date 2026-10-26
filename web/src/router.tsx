@@ -34,6 +34,7 @@ const NodeDetail = lazy(() => import("./pages/admin/NodeDetail"));
 const UUIDEvictions = lazy(() => import("./pages/admin/UUIDEvictions"));
 const Connections = lazy(() => import("./pages/admin/Connections"));
 const SubscriptionDomains = lazy(() => import("./pages/admin/SubscriptionDomains"));
+const AdminAccounts = lazy(() => import("./pages/admin/AdminAccounts"));
 
 const Login = lazy(() => import("./pages/auth/Login"));
 const AdminLogin = lazy(() => import("./pages/auth/AdminLogin"));
@@ -106,6 +107,7 @@ export const router = createBrowserRouter([
       { path: "/admin/guides", element: <AdminGuides /> },
       { path: "/admin/settings", element: <Settings /> },
       { path: "/admin/2fa", element: <TwoFactor /> },
+      { path: "/admin/admins", element: <AdminAccounts /> },
     ],
   },
   {

@@ -3,6 +3,7 @@ package middleware
 import (
 	"context"
 	"strings"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/golang-jwt/jwt/v5"
@@ -47,19 +48,51 @@ func AdminJWTMiddleware(secret string, db *pgxpool.Pool) fiber.Handler {
 			})
 		}
 
-		var exists bool
+		// Role, status and email are read fresh on every request, so demoting,
+		// disabling or renaming an admin takes effect immediately instead of
+		// when the token expires.
+		var (
+			email     string
+			role      string
+			isActive  bool
+			pwChanged time.Time
+		)
 		err = db.QueryRow(context.Background(),
-			"SELECT EXISTS(SELECT 1 FROM admins WHERE id = $1)", claims.AdminID,
-		).Scan(&exists)
-		if err != nil || !exists {
+			"SELECT email, role, is_active, password_changed_at FROM admins WHERE id = $1", claims.AdminID,
+		).Scan(&email, &role, &isActive, &pwChanged)
+		if err != nil {
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 				"error": "admin account not found",
 			})
 		}
+		if !isActive {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"error": "admin account is disabled",
+			})
+		}
+		if claims.PasswordChangedAt != pwChanged.UnixMicro() {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"error": "session ended after a password change",
+			})
+		}
 
 		c.Locals("admin_id", claims.AdminID)
-		c.Locals("email", claims.Email)
+		c.Locals("email", email)
+		c.Locals("admin_role", role)
 
+		return c.Next()
+	}
+}
+
+// RequireAdminOwner allows the request only for admins whose current role is
+// owner. It must run after AdminJWTMiddleware, which loads the role.
+func RequireAdminOwner() fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		if role, _ := c.Locals("admin_role").(string); role != "owner" {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+				"error": "only an owner can manage admin accounts",
+			})
+		}
 		return c.Next()
 	}
 }

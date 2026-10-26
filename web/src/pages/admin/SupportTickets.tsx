@@ -21,6 +21,7 @@ import type { AdminSupportSummary, AdminSupportTicket, SupportStatus as Status }
 import { formatRelativeTime } from "../../utils/relativeTime";
 import { pickLocalized } from "../../utils/localizedText";
 import SupportStatus from "../../components/support/SupportStatus";
+import "./supportAssignee.css";
 
 const PAGE_SIZE = 20;
 type Filter = Status | "";
@@ -30,6 +31,7 @@ export default function SupportTickets() {
   const navigate = useNavigate();
   const language = i18n.resolvedLanguage || i18n.language;
   const [filter, setFilter] = useState<Filter>("open");
+  const [assignee, setAssignee] = useState<adminApi.SupportAssigneeFilter>("all");
   const [search, setSearch] = useState("");
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
@@ -45,7 +47,7 @@ export default function SupportTickets() {
     setLoading(true);
     try {
       const [list, counts] = await Promise.all([
-        adminApi.listSupportTickets({ status: filter, q: query, page, limit: PAGE_SIZE }),
+        adminApi.listSupportTickets({ status: filter, assignee, q: query, page, limit: PAGE_SIZE }),
         adminApi.getSupportSummary(),
       ]);
       if (id !== requestId.current) return;
@@ -58,7 +60,7 @@ export default function SupportTickets() {
     } finally {
       if (id === requestId.current) setLoading(false);
     }
-  }, [filter, query, page]);
+  }, [filter, assignee, query, page]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -76,13 +78,27 @@ export default function SupportTickets() {
       <SpaceBetween size="l">
         {failed && <Flashbar items={[{ type: "error", content: t("support.admin.loadError"), dismissible: false }]} />}
         {summary && (
-          <ColumnLayout columns={4} variant="text-grid">
+          <ColumnLayout columns={4} variant="text-grid" minColumnWidth={140}>
             <div><Box variant="awsui-key-label">{t("support.status.open")}</Box><Box variant="awsui-value-large">{summary.open}</Box></div>
             <div><Box variant="awsui-key-label">{t("support.status.answered")}</Box><Box variant="awsui-value-large">{summary.answered}</Box></div>
             <div><Box variant="awsui-key-label">{t("support.status.closed")}</Box><Box variant="awsui-value-large">{summary.closed}</Box></div>
             <div><Box variant="awsui-key-label">{t("support.admin.unread")}</Box><Box variant="awsui-value-large">{summary.unread}</Box></div>
           </ColumnLayout>
         )}
+        <div className="support-assignee-bar" role="group" aria-label={t("support.admin.assigneeFilter")}>
+          {(["all", "mine", "unassigned"] as const).map((id) => (
+            <button
+              key={id}
+              type="button"
+              aria-pressed={assignee === id}
+              className={assignee === id ? "support-assignee-chip support-assignee-chip--on" : "support-assignee-chip"}
+              onClick={() => { setPage(1); setAssignee(id); }}
+            >
+              <span>{t(`support.admin.assignee.${id}`)}</span>
+              {summary && id !== "all" && <strong>{id === "mine" ? summary.mine : summary.unassigned}</strong>}
+            </button>
+          ))}
+        </div>
         <Table<AdminSupportTicket>
           variant="container"
           loading={loading}
@@ -138,6 +154,13 @@ export default function SupportTickets() {
             { id: "user", header: t("support.admin.user"), cell: (item) => item.user_email },
             { id: "category", header: t("support.list.category"), cell: (item) => pickLocalized(item.category_names, language) || "-" },
             { id: "status", header: t("support.list.status"), cell: (item) => <SupportStatus status={item.status} /> },
+            {
+              id: "assignee",
+              header: t("support.admin.assigneeCol"),
+              cell: (item) => item.assigned_admin_id
+                ? (item.assigned_admin_name?.trim() || item.assigned_admin_email)
+                : <Box color="text-status-inactive">{t("support.admin.unassigned")}</Box>,
+            },
             { id: "updated", header: t("support.admin.updated"), cell: (item) => formatRelativeTime(t, item.updated_at) },
           ]}
         />

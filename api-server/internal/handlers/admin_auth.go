@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"log"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -16,6 +17,10 @@ type AdminClaims struct {
 	AdminID string `json:"admin_id"`
 	Email   string `json:"email"`
 	Role    string `json:"role"`
+	// PasswordChangedAt is admins.password_changed_at (Unix microseconds) at
+	// issue time. The middleware rejects the token once the stored value moves,
+	// so changing or resetting a password ends every older session exactly.
+	PasswordChangedAt int64 `json:"pwc"`
 	jwt.RegisteredClaims
 }
 
@@ -80,14 +85,17 @@ func (h *AdminAuthHandler) Login(c *fiber.Ctx) error {
 		passwordHash string
 		totpSecret   string
 		totpEnabled  bool
+		role         string
+		isActive     bool
+		pwChanged    time.Time
 	)
 
 	err := h.db.QueryRow(
 		context.Background(),
-		`SELECT id, email, password_hash, totp_secret, totp_enabled
-		 FROM admins WHERE email = $1`,
+		`SELECT id, email, password_hash, COALESCE(totp_secret, ''), totp_enabled, role, is_active, password_changed_at
+		 FROM admins WHERE lower(email) = lower($1)`,
 		req.Email,
-	).Scan(&id, &email, &passwordHash, &totpSecret, &totpEnabled)
+	).Scan(&id, &email, &passwordHash, &totpSecret, &totpEnabled, &role, &isActive, &pwChanged)
 	if err != nil {
 		h.recordLogin(c, req.Email, false, services.LoginFailureUnknownEmail)
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
@@ -99,6 +107,13 @@ func (h *AdminAuthHandler) Login(c *fiber.Ctx) error {
 		h.recordLogin(c, email, false, services.LoginFailureBadPassword)
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"error": "invalid credentials",
+		})
+	}
+
+	if !isActive {
+		h.recordLogin(c, email, false, services.LoginFailureSuspended)
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+			"error": "admin account is disabled",
 		})
 	}
 
@@ -122,7 +137,9 @@ func (h *AdminAuthHandler) Login(c *fiber.Ctx) error {
 	claims := AdminClaims{
 		AdminID: id,
 		Email:   email,
-		Role:    "admin",
+		Role:    role,
+
+		PasswordChangedAt: pwChanged.UnixMicro(),
 		RegisteredClaims: jwt.RegisteredClaims{
 			IssuedAt:  jwt.NewNumericDate(now),
 			ExpiresAt: jwt.NewNumericDate(now.Add(expiry)),
@@ -135,6 +152,10 @@ func (h *AdminAuthHandler) Login(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to generate token",
 		})
+	}
+
+	if _, err := h.db.Exec(context.Background(), `UPDATE admins SET last_login_at = NOW() WHERE id = $1`, id); err != nil {
+		log.Printf("[admin-auth] record last login: %v", err)
 	}
 
 	h.activity.Log(context.Background(), services.Record{
@@ -162,4 +183,31 @@ func (h *AdminAuthHandler) recordLogin(c *fiber.Ctx, email string, success bool,
 		IP:        c.IP(),
 		UserAgent: c.Get(fiber.HeaderUserAgent),
 	})
+}
+
+// IssueToken signs a fresh admin JWT bound to the admin's current role and
+// password version. It is used after a password change so the session that
+// made the change stays signed in while every older token is rejected.
+func (h *AdminAuthHandler) IssueToken(c *fiber.Ctx, adminID string) (string, error) {
+	var (
+		email     string
+		role      string
+		pwChanged time.Time
+	)
+	ctx := c.UserContext()
+	if err := h.db.QueryRow(ctx, `SELECT email, role, password_changed_at FROM admins WHERE id = $1`, adminID).Scan(&email, &role, &pwChanged); err != nil {
+		return "", err
+	}
+	now := time.Now()
+	claims := AdminClaims{
+		AdminID:           adminID,
+		Email:             email,
+		Role:              role,
+		PasswordChangedAt: pwChanged.UnixMicro(),
+		RegisteredClaims: jwt.RegisteredClaims{
+			IssuedAt:  jwt.NewNumericDate(now),
+			ExpiresAt: jwt.NewNumericDate(now.Add(resolveSessionExpiry(ctx, h.db, h.jwtExpiry))),
+		},
+	}
+	return jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(h.jwtSecret))
 }

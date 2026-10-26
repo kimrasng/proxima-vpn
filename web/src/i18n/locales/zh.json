@@ -239,7 +239,8 @@
       "guides": "指南与文档",
       "support": "客服工单",
       "supportHelp": "工单帮助管理",
-      "routing": "路由规则"
+      "routing": "路由规则",
+      "admins": "管理员账户"
     },
     "dashboard": {
       "title": "仪表盘",
@@ -1116,7 +1117,8 @@
       "resetTickets": "发放流量重置券并查看发放记录。可以发给指定用户、正在使用某套餐的用户或所有用户。用户在仪表板使用重置券，将本月流量用量清零。",
       "support": "查看并回复用户提交的工单。回复后会向用户邮箱发送通知。",
       "supportHelp": "管理用户提交工单前看到的分类与常见问题，可分别填写韩语、英语和中文。",
-      "routing": "编辑 Clash Meta 订阅中的代理组、规则集和规则顺序。保存后在下次订阅更新时生效。"
+      "routing": "编辑 Clash Meta 订阅中的代理组、规则集和规则顺序。保存后在下次订阅更新时生效。",
+      "admins": "邀请管理员、管理角色与状态，并修改自己的姓名和密码。只有所有者可以管理其他管理员。"
     },
     "notifications": {
       "title": "通知"
@@ -2507,6 +2509,146 @@
         "providers": "规则集（{{count}}）",
         "rules": "规则（{{count}}）"
       }
+    },
+    "account": {
+      "menu": "我的账户",
+      "profile": "账户设置",
+      "team": "管理管理员团队",
+      "logout": "退出登录"
+    },
+    "admins": {
+      "title": "管理员账户",
+      "description": "添加管理员并划分权限，让多人共同运营。工单可以分配给管理员。",
+      "tab": {
+        "team": "管理员团队",
+        "profile": "我的账户"
+      },
+      "loading": "正在加载管理员...",
+      "loadError": "无法加载管理员信息。",
+      "empty": "没有管理员。",
+      "stat": {
+        "total": "管理员总数",
+        "owners": "所有者",
+        "active": "已启用",
+        "no2fa": "未启用 2FA"
+      },
+      "role": {
+        "owner": "所有者",
+        "admin": "管理员"
+      },
+      "roleHelp": {
+        "owner": "拥有管理员的全部功能，并可添加、编辑、删除管理员账户及重置其密码。至少需保留一名启用状态的所有者。",
+        "admin": "可使用节点、用户、支付、工单等全部运营功能，但不能管理其他管理员账户。"
+      },
+      "tableTitle": "管理员列表",
+      "tableHint": "更改角色和状态后，从该管理员的下一个请求起立即生效。",
+      "add": "添加管理员",
+      "col": {
+        "who": "管理员",
+        "role": "角色",
+        "status": "状态",
+        "tickets": "负责工单",
+        "lastLogin": "上次登录",
+        "actions": "操作"
+      },
+      "you": "我",
+      "active": "已启用",
+      "disabled": "已停用",
+      "twofaOn": "已启用 2FA",
+      "twofaOff": "未启用 2FA",
+      "never": "无",
+      "openTickets": "进行中 {{count}} 个",
+      "actionsFor": "{{name}} 的操作",
+      "action": {
+        "edit": "修改姓名和角色",
+        "reset": "重置密码",
+        "disable": "停用",
+        "enable": "重新启用",
+        "delete": "删除"
+      },
+      "lock": {
+        "self": "不能在这里停用或删除自己的账户。",
+        "lastOwner": "这是最后一名启用的所有者，无法更改。请先指定其他所有者。",
+        "useProfile": "自己的密码请在“我的账户”中修改。"
+      },
+      "createTitle": "添加管理员",
+      "editTitle": "编辑管理员",
+      "create": "添加并获取临时密码",
+      "save": "保存",
+      "field": {
+        "email": "邮箱",
+        "emailHint": "用作登录账号，之后无法更改。",
+        "name": "姓名",
+        "nameHint": "显示在工单负责人和活动记录中。",
+        "namePlaceholder": "例如：王运营",
+        "role": "角色"
+      },
+      "createNote": "添加后临时密码只显示一次。请通过安全渠道转交，并提醒对方首次登录后立即修改。",
+      "confirm": {
+        "reset": {
+          "title": "要重置密码吗？",
+          "body": "将生成新的临时密码，该管理员会在所有设备上立即退出登录。",
+          "cta": "重置"
+        },
+        "delete": {
+          "title": "要删除该管理员吗？",
+          "body": "账户将被永久删除并立即退出登录。其负责的 {{count}} 个工单将变为“未分配”。此操作无法撤销。",
+          "cta": "删除"
+        },
+        "disable": {
+          "title": "要停用该管理员吗？",
+          "body": "将立即退出登录且无法再次登录。账户和记录会保留，之后可以重新启用。",
+          "cta": "停用"
+        },
+        "enable": {
+          "title": "要重新启用该管理员吗？",
+          "body": "该管理员可以使用原密码再次登录。",
+          "cta": "启用"
+        }
+      },
+      "secret": {
+        "createdTitle": "已添加管理员",
+        "resetTitle": "已重置密码",
+        "once": "临时密码只在此时显示一次，关闭前请先复制。",
+        "password": "临时密码",
+        "copied": "已复制",
+        "copyFailed": "复制失败",
+        "next": "对方在管理员登录页用此邮箱和临时密码登录后，在“我的账户”中修改密码即可。",
+        "done": "已复制，关闭"
+      },
+      "error": {
+        "generic": "请求失败，请稍后重试。",
+        "email_taken": "已存在使用该邮箱的管理员。",
+        "invalid_email": "请输入有效的邮箱地址。",
+        "invalid_name": "姓名最多 60 个字符。",
+        "last_owner": "至少需保留一名启用的所有者。",
+        "self_demote": "不能取消自己的所有者角色。",
+        "self_disable": "不能停用自己的账户。",
+        "self_delete": "不能删除自己的账户。",
+        "wrong_password": "当前密码不正确。",
+        "weak_password": "密码至少需要 10 个字符。",
+        "same_password": "请使用与当前不同的密码。",
+        "use_profile": "自己的密码请在“我的账户”中修改。",
+        "not_found": "找不到该管理员，请刷新列表。"
+      },
+      "profile": {
+        "info": "我的信息",
+        "infoHint": "姓名会显示在工单负责人和活动记录中。",
+        "pwChanged": "密码修改",
+        "nameHint": "留空时显示邮箱 @ 前的部分。",
+        "nameSaved": "已保存姓名。",
+        "password": "修改密码",
+        "passwordHint": "确认当前密码后设置新密码。",
+        "current": "当前密码",
+        "new": "新密码",
+        "confirm": "确认新密码",
+        "rule": "至少 {{min}} 个字符",
+        "mismatch": "两次输入的新密码不一致。",
+        "signOutNote": "修改后，除当前浏览器外的所有设备都会退出登录。",
+        "change": "修改密码",
+        "passwordChanged": "密码已修改，其他所有会话均已退出。"
+      },
+      "notOwner": "只有所有者可以管理管理员团队。如需权限请联系所有者。"
     }
   },
   "user": {
@@ -3282,7 +3424,18 @@
       "cancel": "取消",
       "closedNotice": "该工单已关闭。如需回复，请先将状态改为“等待回复”。",
       "notifyUser": "回复后通过邮件通知用户",
-      "notifyUserHint": "勾选后将向 {{email}} 发送新回复提醒邮件；不勾选则只在工单中保存回复，不发送邮件。"
+      "notifyUserHint": "勾选后将向 {{email}} 发送新回复提醒邮件；不勾选则只在工单中保存回复，不发送邮件。",
+      "assigneeFilter": "负责人筛选",
+      "assignee": {
+        "all": "全部",
+        "mine": "我负责的",
+        "unassigned": "未分配"
+      },
+      "assigneeCol": "负责人",
+      "unassigned": "未分配",
+      "me": "我",
+      "assignMe": "由我负责",
+      "assignError": "无法更改负责人。"
     },
     "manage": {
       "title": "工单帮助管理",

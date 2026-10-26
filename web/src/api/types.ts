@@ -1320,6 +1320,30 @@ export interface AdminSupportTicket extends SupportTicket {
   user_id: string;
   user_email: string;
   user_name: string;
+  assigned_admin_id: string | null;
+  assigned_admin_email: string | null;
+  assigned_admin_name: string | null;
+}
+
+export type AdminRole = "owner" | "admin";
+
+export interface AdminAccount {
+  id: string;
+  email: string;
+  name: string;
+  role: AdminRole;
+  is_active: boolean;
+  totp_enabled: boolean;
+  last_login_at: string | null;
+  password_changed_at: string | null;
+  created_at: string;
+  open_tickets: number;
+}
+
+export interface AdminDirectoryEntry {
+  id: string;
+  email: string;
+  name: string;
 }
 
 export interface SupportMessage {
@@ -1353,6 +1377,8 @@ export interface AdminSupportSummary {
   answered: number;
   closed: number;
   unread: number;
+  mine: number;
+  unassigned: number;
 }
 
 export interface SupportCategoryInput {
