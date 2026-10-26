@@ -84,6 +84,11 @@ import type {
   SubscriptionDomainHealth,
   CreateSubscriptionDomainRequest,
   UpdateSubscriptionDomainRequest,
+  RoutingProfile,
+  RoutingProfileResponse,
+  NodeTagCount,
+  RuleSetCatalogEntry,
+  RuleSetContents,
 } from './types';
 
 function applyAdminClient() {
@@ -605,6 +610,50 @@ export function deleteSubscriptionDomain(id: string): Promise<void> {
 export function getSubscriptionDomainHealth(): Promise<SubscriptionDomainHealth[]> {
   applyAdminClient();
   return get<SubscriptionDomainHealth[]>('/api/v1/admin/subscription-domains/health');
+}
+
+export function getRoutingProfile(): Promise<RoutingProfileResponse> {
+  applyAdminClient();
+  return get<RoutingProfileResponse>('/api/v1/admin/routing-profile');
+}
+
+export function saveRoutingProfile(profile: RoutingProfile): Promise<RoutingProfileResponse> {
+  applyAdminClient();
+  return put<RoutingProfileResponse>('/api/v1/admin/routing-profile', profile);
+}
+
+export function resetRoutingProfile(): Promise<RoutingProfileResponse> {
+  applyAdminClient();
+  return del<RoutingProfileResponse>('/api/v1/admin/routing-profile');
+}
+
+export function previewRoutingProfile(profile: RoutingProfile): Promise<{ yaml: string }> {
+  applyAdminClient();
+  return post<{ yaml: string }>('/api/v1/admin/routing-profile/preview', profile);
+}
+
+export function listNodeTags(): Promise<NodeTagCount[]> {
+  applyAdminClient();
+  return get<NodeTagCount[]>('/api/v1/admin/node-tags');
+}
+
+export function getRuleSetCatalog(): Promise<RuleSetCatalogEntry[]> {
+  applyAdminClient();
+  return get<RuleSetCatalogEntry[]>('/api/v1/admin/rule-sets/catalog');
+}
+
+export function getRuleSetContents(url: string, format?: string): Promise<RuleSetContents> {
+  applyAdminClient();
+  const q = new URLSearchParams({ url });
+  if (format) q.set('format', format);
+  return get<RuleSetContents>(`/api/v1/admin/rule-sets/contents?${q.toString()}`);
+}
+
+export function decodeRuleSetFile(file: File): Promise<RuleSetContents> {
+  applyAdminClient();
+  const form = new FormData();
+  form.append('file', file);
+  return post<RuleSetContents>('/api/v1/admin/rule-sets/decode', form);
 }
 
 export function getSupportSummary(): Promise<AdminSupportSummary> {

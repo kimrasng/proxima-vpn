@@ -15,4 +15,8 @@ type NodeInfo struct {
 	WGPrivateKey     string
 	WGPeerPublicKey  string
 	WGAddress        string
+	// NodeID and Tags identify the exit node a proxy belongs to, so routing
+	// groups can take a specific node or every node carrying a tag.
+	NodeID string
+	Tags   []string
 }

@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/proximavpn/proxima-vpn/api-server/internal/services"
+	"github.com/proximavpn/proxima-vpn/api-server/internal/services/subscription"
 	"github.com/proximavpn/proxima-vpn/pkg/crypto"
 	"github.com/proximavpn/proxima-vpn/pkg/lang"
 	"github.com/proximavpn/proxima-vpn/pkg/nodeprov"
@@ -437,12 +438,13 @@ type nodeListItem struct {
 	OnlineDevices int `json:"online_devices"`
 	Capacity      int `json:"capacity"`
 
-	OSFamily           string `json:"os_family"`
-	Role               string `json:"role"`
-	PublishDirect      bool   `json:"publish_direct"`
-	MaxConcurrentConns int    `json:"max_concurrent_conns"`
-	FirewallPreset     string `json:"firewall_preset"`
-	FirewallPorts      string `json:"firewall_ports"`
+	OSFamily           string   `json:"os_family"`
+	Role               string   `json:"role"`
+	PublishDirect      bool     `json:"publish_direct"`
+	Tags               []string `json:"tags"`
+	MaxConcurrentConns int      `json:"max_concurrent_conns"`
+	FirewallPreset     string   `json:"firewall_preset"`
+	FirewallPorts      string   `json:"firewall_ports"`
 
 	// Per-language names keyed by language code, populated by GetNode only;
 	// the list endpoint omits them rather than joining for every row.
@@ -473,7 +475,7 @@ func (h *AdminNodeHandler) ListNodes(c *fiber.Ctx) error {
 			        last_seen, nodes.created_at, nodes.updated_at, last_ping_at, status_changed_at,
 		        xray_running, config_hash,
 		        shaping_ok, shaping_tiers, shaping_error, traffic_multiplier, shaping_mode,
-		        os_family, role, publish_direct, max_concurrent_conns, firewall_preset, firewall_ports,
+		        os_family, role, publish_direct, tags, max_concurrent_conns, firewall_preset, firewall_ports,
 		        ib.inbound_protocol, ib.inbound_port, ib.inbound_enabled`+
 			nodeEndpointSelection+`
 		 LEFT JOIN LATERAL (
@@ -502,7 +504,7 @@ func (h *AdminNodeHandler) ListNodes(c *fiber.Ctx) error {
 			&n.LastSeen, &n.CreatedAt, &n.UpdatedAt, &n.LastPingAt, &n.StatusChangedAt,
 			&n.XrayRunning, &n.ConfigHash,
 			&n.ShapingOK, &n.ShapingTiers, &n.ShapingError, &n.TrafficMultiplier, &n.ShapingMode,
-			&n.OSFamily, &n.Role, &n.PublishDirect, &n.MaxConcurrentConns, &n.FirewallPreset, &n.FirewallPorts,
+			&n.OSFamily, &n.Role, &n.PublishDirect, &n.Tags, &n.MaxConcurrentConns, &n.FirewallPreset, &n.FirewallPorts,
 			&n.InboundProtocol, &n.InboundPort, &n.InboundEnabled,
 		}
 		if err := rows.Scan(append(targets, n.scanTargets()...)...); err != nil {
@@ -608,7 +610,7 @@ func (h *AdminNodeHandler) GetNode(c *fiber.Ctx) error {
 			        last_seen, nodes.created_at, nodes.updated_at, last_ping_at, status_changed_at,
 		        xray_running, config_hash,
 		        shaping_ok, shaping_tiers, shaping_error, traffic_multiplier, shaping_mode,
-		        os_family, role, publish_direct, max_concurrent_conns, firewall_preset, firewall_ports`+
+		        os_family, role, publish_direct, tags, max_concurrent_conns, firewall_preset, firewall_ports`+
 			nodeEndpointSelection+` WHERE nodes.id = $1`,
 		id,
 	)
@@ -619,7 +621,7 @@ func (h *AdminNodeHandler) GetNode(c *fiber.Ctx) error {
 		&n.LastSeen, &n.CreatedAt, &n.UpdatedAt, &n.LastPingAt, &n.StatusChangedAt,
 		&n.XrayRunning, &n.ConfigHash,
 		&n.ShapingOK, &n.ShapingTiers, &n.ShapingError, &n.TrafficMultiplier, &n.ShapingMode,
-		&n.OSFamily, &n.Role, &n.PublishDirect, &n.MaxConcurrentConns, &n.FirewallPreset, &n.FirewallPorts,
+		&n.OSFamily, &n.Role, &n.PublishDirect, &n.Tags, &n.MaxConcurrentConns, &n.FirewallPreset, &n.FirewallPorts,
 	}
 	err := row.Scan(append(targets, n.scanTargets()...)...)
 	if err != nil {
@@ -953,6 +955,7 @@ type updateNodeRequest struct {
 	OSFamily           *string             `json:"os_family"`
 	Role               *string             `json:"role"`
 	PublishDirect      *bool               `json:"publish_direct"`
+	Tags               *[]string           `json:"tags"`
 	MaxConcurrentConns *int                `json:"max_concurrent_conns"`
 	FirewallPreset     *string             `json:"firewall_preset"`
 	CustomPorts        []nodeprov.PortSpec `json:"custom_ports"`
@@ -1145,6 +1148,17 @@ func (h *AdminNodeHandler) UpdateNode(c *fiber.Ctx) error {
 		args = append(args, *req.MaxConcurrentConns)
 		argIdx++
 	}
+	if req.Tags != nil {
+		tags, bad, ok := subscription.NormalizeNodeTags(*req.Tags)
+		if !ok {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": fmt.Sprintf("invalid tag %q: use up to 16 tags of 1-32 lowercase letters, digits, '.', '-' or '_'", bad),
+			})
+		}
+		setClauses = append(setClauses, fmt.Sprintf("tags = $%d", argIdx))
+		args = append(args, tags)
+		argIdx++
+	}
 	if req.PublishDirect != nil {
 		setClauses = append(setClauses, fmt.Sprintf("publish_direct = $%d", argIdx))
 		args = append(args, *req.PublishDirect)
@@ -1269,7 +1283,7 @@ func (h *AdminNodeHandler) UpdateNode(c *fiber.Ctx) error {
 	}
 
 	query := fmt.Sprintf(
-		"UPDATE nodes SET %s WHERE id = $%d RETURNING id, name, country, region, host(ip), port, public_port, status, xray_version, traffic_multiplier, os_family, max_concurrent_conns, firewall_preset, firewall_ports, created_at",
+		"UPDATE nodes SET %s WHERE id = $%d RETURNING id, name, country, region, host(ip), port, public_port, status, xray_version, traffic_multiplier, os_family, tags, max_concurrent_conns, firewall_preset, firewall_ports, created_at",
 		strings.Join(setClauses, ", "), argIdx,
 	)
 	args = append(args, id)
@@ -1288,6 +1302,7 @@ func (h *AdminNodeHandler) UpdateNode(c *fiber.Ctx) error {
 
 		TrafficMultiplier  float64   `json:"traffic_multiplier"`
 		OSFamily           string    `json:"os_family"`
+		Tags               []string  `json:"tags"`
 		MaxConcurrentConns int       `json:"max_concurrent_conns"`
 		FirewallPreset     string    `json:"firewall_preset"`
 		FirewallPorts      string    `json:"firewall_ports"`
@@ -1299,7 +1314,7 @@ func (h *AdminNodeHandler) UpdateNode(c *fiber.Ctx) error {
 	err = tx.QueryRow(ctx, query, args...).Scan(
 		&n.ID, &n.Name, &n.Country, &n.Region, &n.IP, &n.Port, &n.PublicPort,
 		&n.Status, &n.XrayVersion, &n.TrafficMultiplier,
-		&n.OSFamily, &n.MaxConcurrentConns, &n.FirewallPreset, &n.FirewallPorts,
+		&n.OSFamily, &n.Tags, &n.MaxConcurrentConns, &n.FirewallPreset, &n.FirewallPorts,
 		&n.CreatedAt,
 	)
 	if err != nil {

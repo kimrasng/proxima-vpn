@@ -17,6 +17,7 @@ const Activity = lazy(() => import("./pages/admin/Activity"));
 const Nodes = lazy(() => import("./pages/admin/Nodes"));
 const NodeGroups = lazy(() => import("./pages/admin/NodeGroups"));
 const NodeChains = lazy(() => import("./pages/admin/NodeChains"));
+const Routing = lazy(() => import("./pages/admin/Routing"));
 const Plans = lazy(() => import("./pages/admin/Plans"));
 const Promotions = lazy(() => import("./pages/admin/Promotions"));
 const AdminResetTickets = lazy(() => import("./pages/admin/ResetTickets"));
@@ -87,6 +88,7 @@ export const router = createBrowserRouter([
       { path: "/admin/nodes/:nodeId/inbounds", element: <NodeInbounds /> },
       { path: "/admin/node-groups", element: <NodeGroups /> },
       { path: "/admin/node-chains", element: <NodeChains /> },
+      { path: "/admin/routing", element: <Routing /> },
       { path: "/admin/plans", element: <Plans /> },
       { path: "/admin/users", element: <Users /> },
       { path: "/admin/users/:userId", element: <UserDetail /> },

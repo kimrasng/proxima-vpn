@@ -67,20 +67,31 @@ type clashDNS struct {
 }
 
 type proxyGroup struct {
-	Name     string   `yaml:"name"`
-	Type     string   `yaml:"type"`
-	Proxies  []string `yaml:"proxies"`
-	URL      string   `yaml:"url,omitempty"`
-	Interval int      `yaml:"interval,omitempty"`
+	Name      string   `yaml:"name"`
+	Type      string   `yaml:"type"`
+	Proxies   []string `yaml:"proxies"`
+	URL       string   `yaml:"url,omitempty"`
+	Interval  int      `yaml:"interval,omitempty"`
+	Tolerance int      `yaml:"tolerance,omitempty"`
+	Lazy      bool     `yaml:"lazy,omitempty"`
+	Hidden    bool     `yaml:"hidden,omitempty"`
 }
 
 // GenerateClash builds a full-featured Clash/verge config for the user's
 // allowed nodes. infoLabels are shown as selectable informational pseudo-nodes
 // (e.g. remaining traffic, days until expiry).
 func GenerateClash(nodes []NodeInfo, userUUID string, infoLabels []string) ([]byte, error) {
-	var proxies []any
-	var proxyNames []string
+	proxies, proxyNames, _, infoNames, err := clashProxies(nodes, userUUID, infoLabels)
+	if err != nil {
+		return nil, err
+	}
+	return generateLegacyLayout(proxies, proxyNames, infoNames)
+}
 
+// clashProxies serializes the TCP proxies Clash can use and prepends the
+// subscription-info pseudo-nodes. kept is aligned with proxyNames so callers
+// can read each proxy's node metadata.
+func clashProxies(nodes []NodeInfo, userUUID string, infoLabels []string) (proxies []any, proxyNames []string, kept []NodeInfo, infoNames []string, err error) {
 	for _, node := range nodes {
 		// Every node is served TCP-only: UDP-only protocols are not offered and
 		// the remaining proxies set udp: false (nodes also drop UDP egress).
@@ -93,15 +104,15 @@ func GenerateClash(nodes []NodeInfo, userUUID string, infoLabels []string) ([]by
 		}
 		proxies = append(proxies, proxy)
 		proxyNames = append(proxyNames, node.Name)
+		kept = append(kept, node)
 	}
 
 	if len(proxies) == 0 {
-		return nil, fmt.Errorf("no valid proxies generated")
+		return nil, nil, nil, nil, fmt.Errorf("no valid proxies generated")
 	}
 
 	// Informational pseudo-nodes are real (working) proxies cloned from the
 	// first node but renamed, so any Clash client accepts them.
-	var infoNames []string
 	var infoProxies []any
 	if template, ok := proxies[0].(map[string]any); ok {
 		for _, label := range infoLabels {
@@ -116,6 +127,10 @@ func GenerateClash(nodes []NodeInfo, userUUID string, infoLabels []string) ([]by
 	}
 	// Subscription info leads the list so clients show it first.
 	proxies = append(infoProxies, proxies...)
+	return proxies, proxyNames, kept, infoNames, nil
+}
+
+func generateLegacyLayout(proxies []any, proxyNames, infoNames []string) ([]byte, error) {
 
 	// "DIRECT" is a Clash built-in policy. It is offered in the manual node group
 	// and the fallback group so users can route a connection without any proxy

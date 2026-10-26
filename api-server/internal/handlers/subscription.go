@@ -73,6 +73,9 @@ type subscriptionNode struct {
 	HeartbeatFresh        bool
 	RealityReady          bool
 	DeviceBandwidthReady  bool
+	// Tags are the exit's; a relayed chain still leaves the internet from its
+	// exit, which is what routing groups care about.
+	Tags []string
 
 	// Chain fields. EntryHost/EntryPort are empty on a direct chain, which is
 	// reached at the exit's own address; on a relayed chain they are the address
@@ -173,7 +176,8 @@ func (h *SubscriptionHandler) getSubscriptionForDevice(c *fiber.Ctx, deviceID, f
 		        realityib.ports, COALESCE(n.reality_client_sni, ''), COALESCE(n.reality_sni_status, ''),
 		        COALESCE(n.config_hash, ''), COALESCE(n.xray_running, false),
 		        COALESCE(n.last_seen >= NOW() - INTERVAL '40 seconds', false),
-              COALESCE(n.shaping_ok,false) AND n.shaping_mode = 'device_global_v1'
+              COALESCE(n.shaping_ok,false) AND n.shaping_mode = 'device_global_v1',
+		        n.tags
 		 FROM node_chains c
 		 JOIN node_group_chains ngc ON ngc.chain_id = c.id
 		 JOIN node_groups ng ON ngc.node_group_id = ng.id
@@ -247,6 +251,7 @@ func (h *SubscriptionHandler) getSubscriptionForDevice(c *fiber.Ctx, deviceID, f
 			&node.EntryHost, &node.EntryPort, &node.ChainExitPort,
 			&node.RealityPorts, &node.RealitySNI, &node.RealityStatus,
 			&node.ConfigHash, &node.XrayRunning, &node.HeartbeatFresh, &node.DeviceBandwidthReady,
+			&node.Tags,
 		); err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 				"error": "failed to read nodes",
@@ -292,7 +297,17 @@ func (h *SubscriptionHandler) getSubscriptionForDevice(c *fiber.Ctx, deviceID, f
 			return noReadyServers(c)
 		}
 		infoLabels := buildPlanInfoLabels(user)
-		result, err := subscription.GenerateClash(nodeInfos, deviceUUID, infoLabels)
+		var result []byte
+		var err error
+		if format == formatClash {
+			result, err = subscription.GenerateClash(nodeInfos, deviceUUID, infoLabels)
+		} else {
+			profile, _, _, loadErr := loadRoutingProfile(ctx, h.db)
+			if loadErr != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to load routing profile"})
+			}
+			result, err = subscription.GenerateRoutedClash(nodeInfos, deviceUUID, infoLabels, profile)
+		}
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to generate clash config"})
 		}
@@ -588,10 +603,11 @@ func buildNodeInfoList(nodes []subscriptionNode, userUUID string, speedMbps int,
 				continue
 			}
 			if info, ok := relayedNodeInfo(node, deviceWGPrivateKey, deviceWGAddress); ok {
-				infos = append(infos, info)
+				infos = append(infos, withExitMetadata(info, node))
 			}
 			continue
 		}
+		first := len(infos)
 
 		if node.RealityReady {
 			ports := node.RealityPorts
@@ -622,6 +638,7 @@ func buildNodeInfoList(nodes []subscriptionNode, userUUID string, speedMbps int,
 		// Limited devices remain VLESS-only: other engines do not share this
 		// authenticated per-device egress interface.
 		if speedMbps > 0 {
+			stampExitMetadata(infos[first:], node)
 			continue
 		}
 
@@ -686,8 +703,21 @@ func buildNodeInfoList(nodes []subscriptionNode, userUUID string, speedMbps int,
 				})
 			}
 		}
+		stampExitMetadata(infos[first:], node)
 	}
 	return infos
+}
+
+func withExitMetadata(info subscription.NodeInfo, node subscriptionNode) subscription.NodeInfo {
+	info.NodeID = node.ID
+	info.Tags = node.Tags
+	return info
+}
+
+func stampExitMetadata(infos []subscription.NodeInfo, node subscriptionNode) {
+	for i := range infos {
+		infos[i] = withExitMetadata(infos[i], node)
+	}
 }
 
 // firstWireGuardNodeInfo returns a standalone wireguard NodeInfo for the

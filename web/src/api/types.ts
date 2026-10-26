@@ -75,6 +75,7 @@ export interface Node {
   os_family: string;
   role: NodeRole;
   publish_direct: boolean;
+  tags: string[];
   // 0 means no cap rather than "refuse everything".
   max_concurrent_conns: number;
   firewall_preset: string;
@@ -93,6 +94,168 @@ export interface Node {
 export type NodeOSFamily = 'debian' | 'rhel' | 'alpine';
 
 export type NodeRole = 'exit' | 'relay' | 'both';
+
+export type RoutingMember =
+  | { kind: 'group'; ref: string }
+  | { kind: 'builtin'; value: 'DIRECT' | 'REJECT' }
+  | { kind: 'tag'; tag: string }
+  | { kind: 'node'; node_id: string }
+  | { kind: 'all' };
+
+export interface NodeTagCount {
+  tag: string;
+  nodes: number;
+}
+
+export interface RuleSetCatalogEntry {
+  kind: 'geosite' | 'geoip';
+  name: string;
+  behavior: 'domain' | 'ipcidr';
+  size: number;
+  url: string;
+}
+
+export interface RuleSetContents {
+  behavior: string;
+  format: string;
+  count: number;
+  entries: string[];
+  truncated: boolean;
+}
+
+export interface ClashGeneralSettings {
+  mixed_port: number;
+  port: number;
+  socks_port: number;
+  allow_lan: boolean;
+  bind_address: string;
+  mode: 'rule' | 'global' | 'direct';
+  log_level: 'silent' | 'error' | 'warning' | 'info' | 'debug';
+  ipv6: boolean;
+  unified_delay: boolean;
+  tcp_concurrent: boolean;
+  find_process_mode: 'off' | 'strict' | 'always';
+  keep_alive_interval: number;
+  keep_alive_idle: number;
+  disable_keep_alive: boolean;
+  external_controller: string;
+  secret: string;
+  store_selected: boolean;
+  store_fake_ip: boolean;
+  geodata_mode: boolean;
+  geo_auto_update: boolean;
+  geo_update_interval: number;
+}
+
+export interface ClashDNSSettings {
+  enable: boolean;
+  listen: string;
+  ipv6: boolean;
+  prefer_h3: boolean;
+  use_hosts: boolean;
+  use_system_hosts: boolean;
+  cache_algorithm: '' | 'lru' | 'arc';
+  enhanced_mode: 'fake-ip' | 'redir-host' | 'normal';
+  fake_ip_range: string;
+  fake_ip_filter_mode: 'blacklist' | 'whitelist' | 'rule';
+  fake_ip_filter: string[] | null;
+  respect_rules: boolean;
+  default_nameserver: string[] | null;
+  nameserver: string[] | null;
+  fallback: string[] | null;
+  proxy_server_nameserver: string[] | null;
+  direct_nameserver: string[] | null;
+  direct_nameserver_follow_policy: boolean;
+  nameserver_policy: Record<string, string[]> | null;
+  fallback_filter: { geoip: boolean; geoip_code: string; ipcidr: string[] | null; domain: string[] | null };
+}
+
+export interface ClashSnifferSettings {
+  enable: boolean;
+  force_dns_mapping: boolean;
+  parse_pure_ip: boolean;
+  override_destination: boolean;
+  http_ports: string[] | null;
+  http_override_destination: boolean;
+  tls_ports: string[] | null;
+  quic_ports: string[] | null;
+  skip_domain: string[] | null;
+  force_domain: string[] | null;
+  skip_src_address: string[] | null;
+  skip_dst_address: string[] | null;
+}
+
+export interface ClashSettings {
+  general: ClashGeneralSettings;
+  dns: ClashDNSSettings;
+  sniffer: ClashSnifferSettings;
+  hosts: Record<string, string> | null;
+  extra_yaml: string;
+}
+
+export type RoutingGroupType = 'select' | 'url-test' | 'fallback';
+
+export interface RoutingGroup {
+  key: string;
+  name: string;
+  type: RoutingGroupType;
+  hidden: boolean;
+  url?: string;
+  interval?: number;
+  tolerance?: number;
+  members: RoutingMember[];
+}
+
+export interface RoutingProvider {
+  key: string;
+  type: 'http' | 'inline';
+  behavior: 'domain' | 'ipcidr' | 'classical';
+  format?: 'mrs' | 'yaml' | 'text';
+  url?: string;
+  interval?: number;
+  payload?: string[];
+}
+
+export type RoutingRuleType =
+  | 'RULE-SET'
+  | 'DOMAIN'
+  | 'DOMAIN-SUFFIX'
+  | 'DOMAIN-KEYWORD'
+  | 'IP-CIDR'
+  | 'IP-CIDR6'
+  | 'DST-PORT';
+
+export interface RoutingRule {
+  type: RoutingRuleType;
+  value: string;
+  target: string;
+  no_resolve?: boolean;
+}
+
+export interface RoutingProfile {
+  settings?: ClashSettings;
+  block_quic: boolean;
+  final: string;
+  groups: RoutingGroup[];
+  providers: RoutingProvider[];
+  rules: RoutingRule[];
+}
+
+export interface RoutingProfileResponse {
+  profile: RoutingProfile;
+  is_default: boolean;
+  updated_at: string | null;
+}
+
+export interface RoutingFieldError {
+  path: string;
+  message: string;
+}
+
+export interface RoutingValidationError {
+  error: string;
+  fields: RoutingFieldError[];
+}
 
 export type ChainTransport = 'tcp' | 'udp' | 'tcp_udp';
 
@@ -398,6 +561,7 @@ export interface UpdateNodeRequest {
   readonly reality_client_sni?: string;
   role?: NodeRole;
   publish_direct?: boolean;
+  tags?: string[];
   name?: string;
   country?: string;
   region?: string;
@@ -946,6 +1110,10 @@ export interface Announcement {
   id: string;
   title: string;
   content: string;
+  format?: string;
+  rendered_html?: string;
+  content_html?: string;
+  translations?: { language: string; title: string; content: string }[];
   image_url?: string | null;
   is_active: boolean;
   expires_at?: string | null;
@@ -955,6 +1123,8 @@ export interface Announcement {
 export interface CreateAnnouncementRequest {
   title: string;
   content: string;
+  format?: string;
+  translations?: { language: string; title: string; content: string }[];
   image_url?: string | null;
   expires_at?: string | null;
 }
@@ -962,6 +1132,8 @@ export interface CreateAnnouncementRequest {
 export interface UpdateAnnouncementRequest {
   title?: string;
   content?: string;
+  format?: string;
+  translations?: { language: string; title: string; content: string }[];
   image_url?: string | null;
   is_active?: boolean;
   expires_at?: string | null;

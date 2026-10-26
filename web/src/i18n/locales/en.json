@@ -238,7 +238,8 @@
       "resetTickets": "Reset tickets",
       "guides": "Guides & docs",
       "support": "Support tickets",
-      "supportHelp": "Support help"
+      "supportHelp": "Support help",
+      "routing": "Routing rules"
     },
     "dashboard": {
       "title": "Dashboard",
@@ -376,7 +377,10 @@
         "node.inbound_deleted": "deleted an inbound",
         "node.inbound_toggled": "enabled or disabled an inbound",
         "user.passkey_added": "added a passkey.",
-        "user.passkey_removed": "removed a passkey."
+        "user.passkey_removed": "removed a passkey.",
+        "plan.reset_ticket_granted": "A reset ticket was granted.",
+        "plan.reset_ticket_used": "A reset ticket was used to reset data usage.",
+        "plan.reset_ticket_revoked": "A reset ticket was revoked."
       },
       "shareOfTotal": "{{share}}% of total",
       "nodeSummaryCounts": "Healthy {{healthy}} · Warning {{warning}} · Offline {{offline}}",
@@ -636,6 +640,17 @@
           "en": "English",
           "zh": "Chinese"
         }
+      },
+      "tags": {
+        "label": "Tags",
+        "hint": "Tag a node so routing groups can include it by tag.",
+        "placeholder": "Type a tag and press Enter",
+        "add": "Add \"{{tag}}\"",
+        "remove": "Remove {{tag}}",
+        "invalid": "1-32 lowercase letters, digits, '.', '-' or '_'.",
+        "tooMany": "At most {{max}} tags.",
+        "usedBy": "{{count}} nodes",
+        "none": "No tags yet."
       }
     },
     "nodeDetail": {
@@ -1100,7 +1115,8 @@
       "subscriptionDomains": "Manage public subscription domains and review service-side DNS, TLS, and certificate health.",
       "resetTickets": "Grant data reset tickets and review past grants. Tickets can go to one user, everyone currently on a plan, or every account. Users spend a ticket on their dashboard to reset this month's data usage to zero.",
       "support": "Read and answer tickets from users. Replying sends the user an email notification.",
-      "supportHelp": "Manage the categories and frequently asked questions shown before a user opens a ticket. Each can be written in Korean, English and Chinese."
+      "supportHelp": "Manage the categories and frequently asked questions shown before a user opens a ticket. Each can be written in Korean, English and Chinese.",
+      "routing": "Edit the proxy groups, rule sets and rule order served in Clash Meta subscriptions. Changes apply on the next subscription refresh."
     },
     "notifications": {
       "title": "Notifications"
@@ -1926,6 +1942,570 @@
         "previewEmpty": "Start typing to see a preview here.",
         "markdownPlaceholder": "## 1. Install the app\n\n- Download the installer from the link below.\n\n[Download](https://example.com)",
         "htmlPlaceholder": "<h2>1. Install the app</h2>\n<p>Download the installer from the link below.</p>"
+      }
+    },
+    "routing": {
+      "title": "Routing rules",
+      "description": "Groups, rule sets and rules served in Clash Meta subscriptions. Rules are evaluated top to bottom.",
+      "defaultBadge": "Default",
+      "customBadge": "Customised",
+      "reset": "Reset to default",
+      "preview": "Preview YAML",
+      "save": "Save",
+      "apply": "Apply",
+      "copy": "Copy",
+      "on": "On",
+      "off": "Off",
+      "loadError": "Could not load the routing profile.",
+      "saveError": "Could not save.",
+      "previewError": "Could not build the preview.",
+      "resetError": "Could not reset.",
+      "validationError": "Check the input. These fields did not pass server validation.",
+      "saved": "Saved. Subscriptions use it from their next refresh.",
+      "resetDone": "Reverted to the default profile.",
+      "general": "General",
+      "updatedAt": "Last saved {{date}}",
+      "notCustomised": "The built-in default is in use.",
+      "blockQuic": "Block QUIC (UDP 443)",
+      "blockQuicHint": "Nodes carry TCP only, so blocking QUIC makes browsers fall back to TCP.",
+      "final": "Everything else (MATCH)",
+      "finalHint": "Group that traffic matching no rule goes to.",
+      "groups": "Proxy groups",
+      "groupsHint": "Groups users pick from in their app. Node filters fill members automatically.",
+      "addGroup": "Add group",
+      "editGroup": "Edit group",
+      "providers": "Rule sets",
+      "providersHint": "Domain or IP lists fetched from a URL (mrs etc.) or written inline.",
+      "addProvider": "Add rule set",
+      "editProvider": "Edit rule set",
+      "rules": "Rules",
+      "rulesHint": "The first matching rule from the top wins.",
+      "addRule": "Add rule",
+      "editRule": "Edit rule",
+      "name": "Name",
+      "key": "Key",
+      "type": "Type",
+      "members": "Members",
+      "hidden": "Hidden",
+      "hiddenHint": "Hide from the app list",
+      "source": "Source",
+      "match": "Match",
+      "target": "Target",
+      "value": "Value",
+      "behavior": "Behavior",
+      "format": "Format",
+      "entries": "{{count}} entries",
+      "moveUp": "Move up",
+      "moveDown": "Move down",
+      "quicRow": "QUIC block (automatic)",
+      "matchRow": "Final rule (automatic)",
+      "previewTitle": "Subscription YAML preview",
+      "previewHint": "Built from real node names, countries and network types. Addresses and credentials are placeholders.",
+      "resetTitle": "Reset to the default profile?",
+      "resetConfirm": "This deletes the saved custom rules and restores default routing. It cannot be undone.",
+      "inUseTitle": "In use, cannot delete",
+      "inUse": "It is referenced below. Change or remove those references first.",
+      "keyHint": "Lowercase letters, digits, _ or -, up to 32. Cannot change after saving.",
+      "nameHint": "Shown in apps. Commas and parentheses are not allowed.",
+      "healthUrl": "Health check URL",
+      "interval": "Check interval (s)",
+      "tolerance": "Switch tolerance (ms)",
+      "intervalSeconds": "Refresh interval (s)",
+      "membersHint": "Shown in this order. A node filter adds every matching node.",
+      "addMember": "Add member",
+      "memberKindLabel": "Member kind",
+      "pickGroup": "Pick a group",
+      "removeMember": "Remove {{name}}",
+      "payload": "Entries",
+      "payloadHint": "One per line, e.g. +.example.com",
+      "pickProvider": "Pick a rule set",
+      "noResolve": "no-resolve (do not resolve domains to IPs)",
+      "memberKind": {
+        "group": "Another group",
+        "builtin": "Built-in policy",
+        "tag": "Tag filter",
+        "node": "Specific node",
+        "all": "All nodes"
+      },
+      "groupType": {
+        "select": "Manual select",
+        "url-test": "Fastest node",
+        "fallback": "Failover"
+      },
+      "providerType": {
+        "http": "From URL",
+        "inline": "Inline"
+      },
+      "valueHint": {
+        "RULE-SET": "Pick one of the rule sets above.",
+        "DOMAIN": "Exact domain, e.g. www.example.com",
+        "DOMAIN-SUFFIX": "Domain and its subdomains, e.g. example.kr",
+        "DOMAIN-KEYWORD": "Word in the domain, e.g. naver",
+        "IP-CIDR": "IPv4 range, e.g. 1.2.3.0/24",
+        "IP-CIDR6": "IPv6 range, e.g. 2001:db8::/32",
+        "DST-PORT": "Destination port or range, e.g. 443 or 8000-8100"
+      },
+      "err": {
+        "key": "Use 1-32 lowercase letters, digits, _ or -.",
+        "keyTaken": "This key is already used.",
+        "nameLength": "Use 1-64 characters.",
+        "nameSpaces": "No leading or trailing spaces.",
+        "nameChars": "Commas, parentheses and line breaks are not allowed.",
+        "nameReserved": "Reserved by Clash.",
+        "nameTaken": "This name is already used.",
+        "members": "Add at least one member.",
+        "url": "Enter an address starting with https://.",
+        "mrs": "mrs supports only domain and ipcidr behaviors.",
+        "payload": "Enter 1-5000 entries.",
+        "valueLength": "Use 1-253 characters.",
+        "valueSpaces": "No leading or trailing spaces.",
+        "valueChars": "Commas and line breaks are not allowed.",
+        "provider": "Pick a rule set.",
+        "target": "Pick a target.",
+        "tag": "Invalid tag format.",
+        "node": "Pick a node."
+      },
+      "tagMember": "#{{tag}} ({{count}} nodes)",
+      "allNodes": "All nodes",
+      "allNodesHint": "All {{count}} current nodes are included.",
+      "missingNode": "(deleted node)",
+      "pickTag": "Enter a tag",
+      "pickNode": "Pick a node",
+      "noNodes": "No nodes.",
+      "tagMatches": "Matches: {{nodes}}",
+      "tagNoMatch": "No node carries this tag.",
+      "addTagMember": "Add tag",
+      "addNodeMember": "Add node",
+      "catalog": {
+        "title": "MetaCubeX rule sets",
+        "hint": "Geosite and geoip rule sets from MetaCubeX/meta-rules-dat.",
+        "open": "Import from MetaCubeX",
+        "geosite": "geosite (domains)",
+        "geoip": "geoip (IP ranges)",
+        "search": "Search by name",
+        "count": "{{shown}} / {{total}}",
+        "size": "Size",
+        "added": "Added",
+        "empty": "No results.",
+        "loadError": "Could not load the rule set catalog.",
+        "addSelected": "Add {{count}} selected",
+        "added_n": "Added {{count}} rule sets."
+      },
+      "viewContents": "View contents",
+      "viewer": {
+        "uploadTitle": "Open rule set file",
+        "open": "Open file",
+        "choose": "Choose file",
+        "drop": "Drop a file here",
+        "fewer": "Fewer",
+        "more": "More",
+        "summary": "{{count}} entries · {{format}}",
+        "truncated": "Showing the first {{shown}}.",
+        "search": "Search entries",
+        "matches": "{{count}} matches",
+        "firstN": "Showing the first {{n}}",
+        "loadError": "Could not load the rule set.",
+        "decodeError": "Could not decode the file.",
+        "uploadHint": "Supports .mrs, .yaml and .list files."
+      },
+      "settings": {
+        "title": "Clash settings",
+        "description": "Ports, DNS and sniffer options of the generated Clash Meta (mihomo) profile, applied to every user's subscription. The grey text under each field is the real YAML key.",
+        "tabs": {
+          "general": "General",
+          "dns": "DNS",
+          "sniffer": "Sniffer",
+          "advanced": "Advanced",
+          "basic": "Basics",
+          "network": "Network & app"
+        },
+        "docs": "Open mihomo docs",
+        "field": {
+          "general": {
+            "mixed_port": {
+              "label": "Mixed port",
+              "desc": "Accepts HTTP and SOCKS5 proxy traffic on one port. Point apps and browsers at this port; most clients need only this. 0 disables it."
+            },
+            "port": {
+              "label": "HTTP proxy port",
+              "desc": "HTTP-only proxy port. Usually unnecessary when the mixed port is set. 0 disables it."
+            },
+            "socks_port": {
+              "label": "SOCKS5 proxy port",
+              "desc": "SOCKS5-only proxy port. Usually unnecessary when the mixed port is set. 0 disables it."
+            },
+            "mode": {
+              "label": "Mode",
+              "desc": "rule: route by the rules below (recommended). global: send everything through the GLOBAL group. direct: connect everything directly without a proxy."
+            },
+            "log_level": {
+              "label": "Log level",
+              "desc": "How much the client logs. silent logs nothing; debug is the most verbose. Use warning normally and info/debug only when troubleshooting."
+            },
+            "find_process_mode": {
+              "label": "Process lookup",
+              "desc": "Finds which app opened a connection so PROCESS-NAME rules can match. off: disabled (best for battery). strict: only when process rules exist. always: every connection. Use off on mobile."
+            },
+            "allow_lan": {
+              "label": "Allow LAN",
+              "desc": "Lets other devices on the same Wi-Fi or router use this device's proxy ports. Turn it off on public networks."
+            },
+            "bind_address": {
+              "label": "Bind address",
+              "desc": "Which local address listens when LAN access is on. * means all addresses; enter one IP to listen on a single interface."
+            },
+            "ipv6": {
+              "label": "IPv6",
+              "desc": "Allows IPv6 connections. When off, IPv6 destinations are blocked and only IPv4 is used. Keep it off if nodes or networks have weak IPv6 support."
+            },
+            "unified_delay": {
+              "label": "Unified delay",
+              "desc": "Measures node latency without handshake overhead, so nodes with different protocols compare fairly and url-test groups pick more accurately."
+            },
+            "tcp_concurrent": {
+              "label": "TCP concurrent",
+              "desc": "When a domain resolves to several IPs, dials them all at once and keeps the fastest. Speeds up first connections."
+            },
+            "keep_alive_interval": {
+              "label": "Keep-alive interval (s)",
+              "desc": "How often a keep-alive probe is sent. Shorter detects dead connections faster but uses more battery. 0 uses the default (15s)."
+            },
+            "keep_alive_idle": {
+              "label": "Keep-alive idle (s)",
+              "desc": "Idle seconds before keep-alive probes start. 0 uses the default."
+            },
+            "disable_keep_alive": {
+              "label": "Disable keep-alive",
+              "desc": "Turns TCP keep-alive off completely. Saves battery on mobile, but dead connections are noticed later."
+            },
+            "external_controller": {
+              "label": "External controller",
+              "desc": "API address that dashboards (yacd, metacubexd) and apps use to control the client. 127.0.0.1 keeps it local to the device. Empty disables it."
+            },
+            "secret": {
+              "label": "Controller secret",
+              "desc": "Password required by the external controller API. Always set it if the controller listens beyond 127.0.0.1. Every user's profile gets the same value."
+            },
+            "store_selected": {
+              "label": "Remember selected nodes",
+              "desc": "Remembers the node a user picked in select groups, so the choice survives restarts."
+            },
+            "store_fake_ip": {
+              "label": "Persist fake-IP",
+              "desc": "Saves the domain-to-fake-IP table in fake-IP mode, so existing connections break less after a restart."
+            },
+            "geodata_mode": {
+              "label": "Geodata mode",
+              "desc": "Use .dat files for GEOIP/GEOSITE rules instead of mmdb. This profile uses rule sets (.mrs), so it can normally stay off."
+            },
+            "geo_auto_update": {
+              "label": "Auto-update geo data",
+              "desc": "Periodically re-downloads GeoIP/GeoSite data files. Only matters if you use GEOIP/GEOSITE rules directly."
+            },
+            "geo_update_interval": {
+              "label": "Geo update interval (hours)",
+              "desc": "How often geo data auto-updates, in hours. 0 uses the default (24h)."
+            }
+          },
+          "dns": {
+            "enable": {
+              "label": "Built-in DNS",
+              "desc": "Uses the client's built-in DNS server. Must stay on for rule-based routing and fake-IP to work properly. When off, the device's system DNS is used."
+            },
+            "listen": {
+              "label": "DNS listen",
+              "desc": "Address and port where the built-in DNS listens. TUN mode hijacks DNS to this address. Ports below 1024 (like 53) may need admin rights."
+            },
+            "enhanced_mode": {
+              "label": "Enhanced mode",
+              "desc": "fake-ip: returns a placeholder IP instantly, so connections start fast and the real lookup happens at the node with less DNS leakage (recommended). redir-host: resolves the real IP first; more compatible but slower and can leak. normal: plain DNS without enhancement."
+            },
+            "fake_ip_range": {
+              "label": "Fake-IP range",
+              "desc": "The range placeholder IPs are taken from in fake-IP mode. It must not overlap real networks. The default 198.18.0.1/16 is a reserved benchmark range and is safe."
+            },
+            "fake_ip_filter_mode": {
+              "label": "Fake-IP filter mode",
+              "desc": "How the fake-IP filter list is read. blacklist: listed domains get real IPs. whitelist: only listed domains get fake IPs. rule: entries are rules like RULE-SET,key,real-ip."
+            },
+            "cache_algorithm": {
+              "label": "Cache algorithm",
+              "desc": "How DNS answers are cached. lru evicts the least recently used; arc balances frequent and recent entries. Empty uses the client default."
+            },
+            "ipv6": {
+              "label": "Return IPv6 (AAAA)",
+              "desc": "Whether DNS also answers with IPv6 (AAAA) records. Turn it off if IPv6 is off in the General tab."
+            },
+            "respect_rules": {
+              "label": "DNS follows rules",
+              "desc": "DNS queries themselves are routed by the rules, so a lookup for an overseas domain goes out through the matching node and avoids local DNS blocking. Requires proxy server nameservers to be set."
+            },
+            "prefer_h3": {
+              "label": "Prefer HTTP/3 for DoH",
+              "desc": "Tries HTTP/3 (QUIC) first for DNS-over-HTTPS servers. Leave it off when UDP 443 is blocked (QUIC blocking on), since it would only add delay."
+            },
+            "use_hosts": {
+              "label": "Use hosts",
+              "desc": "Answers from the hosts list in the Advanced tab first."
+            },
+            "use_system_hosts": {
+              "label": "Use system hosts",
+              "desc": "Also answers from the device's system hosts file (/etc/hosts)."
+            },
+            "direct_nameserver_follow_policy": {
+              "label": "Direct NS follows policy",
+              "desc": "Domains routed DIRECT are also resolved through the nameserver policy below. When off, only the direct nameservers are used."
+            },
+            "default_nameserver": {
+              "label": "Bootstrap nameservers",
+              "desc": "DNS used to resolve the hostnames of DoH/DoT servers (e.g. dns.google). Must be plain IP addresses, one per line."
+            },
+            "nameserver": {
+              "label": "Nameservers",
+              "desc": "Main DNS servers for normal lookups. Supports https:// (DoH), tls:// (DoT), quic:// (DoQ) and plain IPs, one per line. Several servers are queried at once and the fastest answer wins."
+            },
+            "proxy_server_nameserver": {
+              "label": "Proxy server nameservers",
+              "desc": "DNS used only to resolve node (proxy server) hostnames. If this lookup is blocked the client cannot reach any node, so use DoH servers that are not blocked."
+            },
+            "direct_nameserver": {
+              "label": "Direct nameservers",
+              "desc": "DNS for domains that go DIRECT. 'system' uses the device's own DNS, which gives the nearest local servers."
+            },
+            "fallback": {
+              "label": "Fallback nameservers",
+              "desc": "Used instead of the main nameservers when an answer looks poisoned (see the fallback filter below). Usually overseas DoH servers. Can stay empty when respect-rules is on."
+            },
+            "fake_ip_filter": {
+              "label": "Fake-IP exclusions",
+              "desc": "Domains that get real IPs instead of fake ones: router pages, game consoles, time sync and other services that need the real address. In rule mode, write RULE-SET,key,real-ip lines and end with MATCH,fake-ip."
+            },
+            "nameserver_policy": {
+              "label": "Per-domain nameservers",
+              "desc": "Resolves chosen domains with chosen DNS servers. One 'pattern = server1, server2' per line, e.g. '+.naver.com = system' or 'rule-set:kr_custom = https://1.1.1.1/dns-query' for a whole rule set."
+            },
+            "ff_geoip": {
+              "label": "Judge by GeoIP",
+              "desc": "If an IP from the main nameservers is not in the country code below, treat it as poisoned and use the fallback answer."
+            },
+            "ff_geoip_code": {
+              "label": "Trusted country code",
+              "desc": "Country used by the GeoIP check. With KR, any non-Korean answer is re-checked with the fallback servers."
+            },
+            "ff_ipcidr": {
+              "label": "Poisoned IP ranges",
+              "desc": "Answers inside these ranges count as poisoned. One CIDR per line, e.g. 240.0.0.0/4."
+            },
+            "ff_domain": {
+              "label": "Always-fallback domains",
+              "desc": "These domains always skip the main nameservers and use the fallback servers. One per line, e.g. +.google.com."
+            }
+          },
+          "sniffer": {
+            "enable": {
+              "label": "Enable sniffer",
+              "desc": "Reads TLS/HTTP headers of IP-only connections to recover the real domain, so domain rules still apply when an app connects straight to an IP."
+            },
+            "force_dns_mapping": {
+              "label": "Sniff DNS-mapped",
+              "desc": "Also sniffs connections whose domain is already known from fake-IP or DNS records, to confirm the real domain."
+            },
+            "parse_pure_ip": {
+              "label": "Sniff pure IP",
+              "desc": "Sniffs connections that carry no domain information at all, so hard-coded IP connections can still match domain rules."
+            },
+            "override_destination": {
+              "label": "Override destination",
+              "desc": "Replaces the destination with the sniffed domain so the node resolves it itself. Off by default because some apps (pinned CDN IPs) can break."
+            },
+            "http_override_destination": {
+              "label": "HTTP override destination",
+              "desc": "Applies destination override to HTTP connections only, independent of the setting above."
+            },
+            "http_ports": {
+              "label": "HTTP ports",
+              "desc": "Ports where HTTP headers are read to find the domain. One per line; ranges like 8080-8880."
+            },
+            "tls_ports": {
+              "label": "TLS ports",
+              "desc": "Ports where the TLS SNI is read to find the domain. 443 and 8443 are usually enough."
+            },
+            "quic_ports": {
+              "label": "QUIC ports",
+              "desc": "Ports where QUIC (HTTP/3) is sniffed. Leave empty while QUIC blocking (UDP 443 reject) is on."
+            },
+            "skip_domain": {
+              "label": "Skip domains",
+              "desc": "Domains whose sniff results are ignored, for services that break when sniffed (e.g. Apple push). One per line; +. covers all subdomains."
+            },
+            "force_domain": {
+              "label": "Force domains",
+              "desc": "Domains that are always sniffed regardless of other conditions. One per line."
+            },
+            "skip_src_address": {
+              "label": "Skip source IPs",
+              "desc": "Connections from these source ranges are not sniffed. One CIDR per line."
+            },
+            "skip_dst_address": {
+              "label": "Skip destination IPs",
+              "desc": "Connections to these destination ranges are not sniffed. One CIDR per line."
+            }
+          },
+          "advanced": {
+            "hosts": {
+              "label": "Static hosts",
+              "desc": "Pins domains to fixed IPs. One 'domain = IP' per line, e.g. router.lan = 192.168.0.1."
+            },
+            "extra_yaml": {
+              "label": "Extra YAML",
+              "desc": "Any mihomo option not shown above (tun, ntp, experimental, ...) written as YAML. It is merged on top of the generated profile and wins on conflicts. proxies, proxy-groups, rules, rule-providers and proxy-providers are managed in their own tabs and cannot be set here."
+            }
+          }
+        },
+        "dnsDefault": "Client default",
+        "quicWarning": "QUIC blocking (UDP 443 reject) is on, so QUIC sniffing has no effect.",
+        "sections": {
+          "dnsCore": "Behaviour",
+          "dnsServers": "Nameservers",
+          "dnsPolicy": "Per-domain servers",
+          "dnsFallback": "Poisoning check (fallback filter)",
+          "snifferCore": "Behaviour",
+          "snifferLists": "Ports and exceptions"
+        },
+        "presetsTitle": "Quick setup",
+        "presetsHint": "Pick a bundle and the related options are filled in at once. Nothing applies until you save, so feel free to try one.",
+        "presetApply": "Apply",
+        "presetNote": "Proxy groups, rules, hosts and extra YAML are not changed. Press Save afterwards to publish to subscriptions.",
+        "preset": {
+          "recommended": {
+            "title": "Recommended",
+            "desc": "Stable settings that suit most users",
+            "detail": "Sets mixed port 7890, rule mode, fake-ip DNS over Cloudflare/Google DoH, sniffer on, TCP concurrency and unified delay on. Choose this for a first setup or when unsure."
+          },
+          "privacy": {
+            "title": "Privacy first",
+            "desc": "No external controller, encrypted DNS only",
+            "detail": "Recommended, plus the external controller and logs off, and every DNS query sent only over Quad9/Cloudflare encrypted DNS (DoH). The device's system DNS is not used."
+          },
+          "compatible": {
+            "title": "Compatibility first",
+            "desc": "When older apps or games fail to connect",
+            "detail": "Returns real IPs with redir-host instead of fake-ip, and turns the sniffer and TCP concurrency off. Try this when a particular app, game or corporate network breaks. It can be slightly slower."
+          },
+          "lowPower": {
+            "title": "Battery saver",
+            "desc": "Less background drain on mobile",
+            "detail": "Recommended, plus a 60-second keep-alive interval, concurrency and Geo auto-update off, and minimal logging. Dropped connections may be noticed a little later."
+          }
+        },
+        "group": {
+          "ports": "Connection",
+          "dnsBasic": "DNS",
+          "sniffBasic": "Domain detection (sniffer)",
+          "extraPorts": "Extra proxy ports",
+          "connection": "Connection performance",
+          "app": "App behavior",
+          "geo": "Geo data",
+          "dnsServers": "DNS servers",
+          "fakeIp": "Answer mode (fake-ip)",
+          "dnsPolicy": "Per-domain DNS servers",
+          "dnsBehavior": "DNS behavior",
+          "fallback": "Poisoning fallback",
+          "sniffPorts": "Ports to sniff",
+          "sniffBehavior": "Sniffing behavior",
+          "sniffExceptions": "Exceptions",
+          "hosts": "Static hosts",
+          "extra": "Extra YAML"
+        },
+        "groupHint": {
+          "ports": "The proxy port the app opens on the device and how traffic is sent. One mixed port and Rule mode are usually enough.",
+          "dnsBasic": "How domain names become IPs. Keeping it on makes rule-based routing accurate and prevents DNS leaks.",
+          "sniffBasic": "Recovers the real domain of connections that arrive as bare IPs so domain rules still apply.",
+          "extraPorts": "Not needed with the mixed port. Open these only if an app supports HTTP-only or SOCKS5-only proxies.",
+          "connection": "Affects connection speed and how fast drops are noticed. Keep the defaults if unsure.",
+          "app": "The client app's logging, memory features and dashboard access.",
+          "geo": "Only matters if you write GEOIP/GEOSITE rules yourself. This profile uses rule sets (.mrs), so usually leave it off.",
+          "dnsServers": "Used top to bottom. Pick from the suggestions or type an address and press Enter. Pasting several lines adds them all.",
+          "fakeIp": "fake-ip answers instantly with a placeholder IP, which is fast, but some apps need the real IP. Put those domains in the filter.",
+          "dnsPolicy": "Sends specific domains to a different DNS server, for example local services to the device DNS (system).",
+          "fallback": "DNS used when the main answer looks poisoned. Leave empty to disable; adding one reveals the filter options below.",
+          "sniffPorts": "Domains are read from connections to these ports. 443 (HTTPS) and 80 (HTTP) cover most traffic.",
+          "sniffExceptions": "Exclude domains and addresses that break when sniffed, or force sniffing for specific domains.",
+          "hosts": "Pins a domain to an IP. Enter the domain on the left and the IP on the right, then add.",
+          "extra": "mihomo options not on this screen (tun, ntp, …) as raw YAML. The buttons insert common blocks, and syntax is checked as you type."
+        },
+        "mode": {
+          "rule": "Rule (recommended)",
+          "global": "Global proxy",
+          "direct": "Direct"
+        },
+        "enhanced": {
+          "fake-ip": "fake-ip (fast)",
+          "redir-host": "Real IP",
+          "normal": "Normal"
+        },
+        "filterMode": {
+          "rule": "Rules",
+          "blacklist": "Exclude list",
+          "whitelist": "Only list"
+        },
+        "process": {
+          "off": "Off",
+          "strict": "When needed",
+          "always": "Always"
+        },
+        "log": {
+          "silent": "Off (silent)",
+          "error": "Errors (error)",
+          "warning": "Warnings (warning)",
+          "info": "Info (info)",
+          "debug": "Verbose (debug)"
+        },
+        "unit": {
+          "seconds": "s",
+          "hours": "h"
+        },
+        "portOff": "Empty = closed",
+        "add": "Add",
+        "addPlaceholder": "Type and press Enter",
+        "suggest": "Suggested:",
+        "removeItem": "Remove {{value}}",
+        "dnsSuggest": {
+          "cloudflare": "Cloudflare DoH",
+          "google": "Google DoH",
+          "quad9": "Quad9 DoH",
+          "adguard": "AdGuard DoH",
+          "system": "Device DNS (system)"
+        },
+        "invalid": {
+          "port": "'{{value}}' is not a valid port. Use 443 or a range like 8080-8880.",
+          "cidr": "'{{value}}' is not a valid address range. Use something like 192.168.0.0/16.",
+          "domain": "'{{value}}' is not a valid domain. Use example.com or +.example.com.",
+          "dns": "'{{value}}' is not a valid DNS address. Use 1.1.1.1, https://…/dns-query, tls://… or system.",
+          "any": "Empty values are not allowed."
+        },
+        "dnsOff": "DNS is off, so clients use the device DNS as-is. Domain rules become less accurate and DNS may leak.",
+        "dnsTurnOn": "Turn DNS on",
+        "snifferOff": "The sniffer is off, so domain rules do not apply to connections that arrive as bare IPs.",
+        "snifferTurnOn": "Turn sniffer on",
+        "quicBadge": "QUIC blocked",
+        "snippets": "Insert block:",
+        "snippet": {
+          "tun": "TUN mode",
+          "ntp": "NTP time sync",
+          "experimental": "Experimental",
+          "tcpKeepAlive": "Keep-alive"
+        },
+        "extraOk": "Valid · adds keys: {{keys}}",
+        "extraSyntax": "YAML error on line {{line}}: {{message}}",
+        "extraMapping": "The top level must be 'key: value' pairs, not a list or a single value.",
+        "extraReserved": "{{keys}} is managed by the routing editor and cannot be set here."
+      },
+      "tabs": {
+        "settings": "Clash settings",
+        "groups": "Proxy groups ({{count}})",
+        "providers": "Rule sets ({{count}})",
+        "rules": "Rules ({{count}})"
       }
     }
   },

@@ -42,6 +42,7 @@ import type {
 import { formatAbsoluteTime, formatRelativeTime } from "../../utils/relativeTime";
 import { formatPorts, parsePortInput, resolvePorts } from "../../utils/nodePorts";
 import { focusFirstInvalid, hasFieldErrors } from "../../utils/formValidation";
+import NodeTagEditor from "../../components/NodeTagEditor";
 import { HoverTooltip } from "../../components/HoverTooltip";
 import { NodeProvisionWizard } from "../../components/NodeProvisionWizard";
 import { NodeEndpointState } from "../../components/NodeEndpointState";
@@ -197,6 +198,7 @@ export default function Nodes() {
     osFamily: "",
     role: "exit" as NodeRole,
     publishDirect: true,
+    tags: [] as string[],
     maxConns: "0",
     firewallPreset: "standard",
     customPorts: "",
@@ -394,6 +396,7 @@ export default function Nodes() {
       osFamily: node.os_family ?? "",
       role: node.role,
       publishDirect: node.publish_direct,
+      tags: node.tags ?? [],
       maxConns: String(node.max_concurrent_conns ?? 0),
       firewallPreset: node.firewall_preset || "standard",
       customPorts: "",
@@ -425,6 +428,7 @@ export default function Nodes() {
         max_concurrent_conns: editMaxConns,
         role: editForm.role,
         publish_direct: editForm.publishDirect,
+        tags: editForm.tags,
         firewall_preset: preset,
         custom_ports: preset === "custom" ? editCustomPorts.specs : undefined,
         labels: editForm.labels,
@@ -741,9 +745,18 @@ export default function Nodes() {
                   item.country === "" && item.region === "" ? (
                     <Box color="text-status-inactive">—</Box>
                   ) : (
-                    `${countryFlag(item.country)} ${item.country || "—"}${
-                      item.region ? ` / ${item.region}` : ""
-                    }`.trim()
+                    <SpaceBetween direction="horizontal" size="xxs" alignItems="center">
+                      <span>
+                        {`${countryFlag(item.country)} ${item.country || "—"}${
+                          item.region ? ` / ${item.region}` : ""
+                        }`.trim()}
+                      </span>
+                      {(item.tags ?? []).map((tag) => (
+                        <Badge key={tag} color="blue">
+                          #{tag}
+                        </Badge>
+                      ))}
+                    </SpaceBetween>
                   ),
               },
               {
@@ -1063,6 +1076,16 @@ export default function Nodes() {
                   <Input
                     value={editForm.region}
                     onChange={({ detail }) => setEditForm((f) => ({ ...f, region: detail.value }))}
+                  />
+                </FormField>
+                <FormField
+                  label={t("admin.nodes.tags.label")}
+                  description={t("admin.nodes.tags.hint")}
+                  stretch
+                >
+                  <NodeTagEditor
+                    value={editForm.tags}
+                    onChange={(tags) => setEditForm((f) => ({ ...f, tags }))}
                   />
                 </FormField>
                 <FormField

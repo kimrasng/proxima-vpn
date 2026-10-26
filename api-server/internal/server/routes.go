@@ -207,6 +207,17 @@ func (s *Server) registerRoutes() {
 	subDomains.Put("/:id", adminSubDomainHandler.Update)
 	subDomains.Delete("/:id", adminSubDomainHandler.Delete)
 
+	adminRoutingHandler := handlers.NewAdminRoutingHandler(s.db)
+	routingProfile := admin.Group("/routing-profile")
+	routingProfile.Get("/", adminRoutingHandler.Get)
+	routingProfile.Put("/", adminRoutingHandler.Update)
+	routingProfile.Delete("/", adminRoutingHandler.Reset)
+	routingProfile.Post("/preview", adminRoutingHandler.Preview)
+	admin.Get("/node-tags", adminRoutingHandler.NodeTags)
+	admin.Get("/rule-sets/catalog", adminRoutingHandler.RuleSetCatalog)
+	admin.Get("/rule-sets/contents", adminRoutingHandler.RuleSetContents)
+	admin.Post("/rule-sets/decode", adminRoutingHandler.DecodeRuleSet)
+
 	if s.backupService != nil {
 		adminBackupHandler := handlers.NewAdminBackupHandler(s.backupService)
 		admin.Post("/backup/trigger", adminBackupHandler.TriggerBackup)
