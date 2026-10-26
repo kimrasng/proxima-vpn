@@ -1,0 +1,5 @@
+/* Korean/Chinese sentences break at phrase boundaries (see orderAudit.css). */
+.user-dashboard {
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}

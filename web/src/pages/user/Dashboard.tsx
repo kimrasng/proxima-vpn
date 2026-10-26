@@ -12,14 +12,15 @@ import {
 import type { Announcement } from "../../api/types";
 import * as userApi from "../../api/user";
 import DeviceQuickConnect from "../../components/DeviceQuickConnect";
-import ResetTickets from "../../components/ResetTickets";
 import { useUserResource } from "../../hooks/useUserResource";
+import "./dashboard.css";
 
 function formatBytes(bytes: number): string {
   if (bytes <= 0) return "0 B";
   const units = ["B", "KB", "MB", "GB", "TB"];
   const index = Math.min(units.length - 1, Math.max(0, Math.floor(Math.log(bytes) / Math.log(1024))));
-  return `${(bytes / 1024 ** index).toFixed(1)} ${units[index]}`;
+  const value = bytes / 1024 ** index;
+  return `${Number.isInteger(value) ? value : value.toFixed(1)} ${units[index]}`;
 }
 
 const STATUS_LABEL_KEYS: Record<string, string> = {
@@ -34,6 +35,8 @@ export default function Dashboard() {
   const summary = useUserResource(userApi.getSummary);
   const nodes = useUserResource(userApi.listAvailableNodes);
   const announcements = useUserResource(userApi.listAnnouncements);
+  const tickets = useUserResource(userApi.listResetTickets);
+  const ticketCount = tickets.data?.length;
   const [selectedAnnouncement, setSelectedAnnouncement] = useState<Announcement | null>(null);
   const [connectionRefresh, setConnectionRefresh] = useState(0);
   const data = summary.data;
@@ -67,6 +70,7 @@ export default function Dashboard() {
         </SpaceBetween>
       }>{t("user.dashboard.title")}</Header>
     }>
+      <div className="user-dashboard">
       <SpaceBetween size="l">
         {summary.loading ? <Container><Spinner size="large" /></Container> : summary.error ? (
           <Alert type="error" action={<Button onClick={summary.refresh}>{t("user.dashboard.retry")}</Button>}>
@@ -121,7 +125,9 @@ export default function Dashboard() {
             </Container>
           </>
         ) : data && (
-          <Container header={<Header variant="h2" description={t("user.dashboard.planSection")}>
+          <Container header={<Header variant="h2" actions={
+            <Button variant="link" onClick={() => navigate("/portal/plan")}>{t("user.dashboard.planDetails")}</Button>
+          }>
             {data.plan_name}
           </Header>}>
             <SpaceBetween size="m">
@@ -161,8 +167,19 @@ export default function Dashboard() {
                       {expires && <Box color="text-body-secondary">{dateFormat(expires)}</Box>}
                     </SpaceBetween>
                   </ColumnLayout>
-                  {trafficPercentage >= 80 && <Alert type="warning">{t(trafficPercentage >= 100
-                    ? "user.dashboard.trafficExhausted" : "user.dashboard.trafficWarning")}</Alert>}
+                  {canReset && trafficPercentage >= 80 && (
+                    <Alert
+                      type={trafficPercentage >= 100 ? "error" : "warning"}
+                      action={
+                        <Button onClick={() => navigate("/portal/plan")}>
+                          {(ticketCount ?? 0) > 0 ? t("user.dashboard.useTicket") : t("user.dashboard.seePlans")}
+                        </Button>
+                      }
+                    >
+                      {t(trafficPercentage >= 100 ? "user.dashboard.trafficExhausted" : "user.dashboard.trafficWarning")}
+                      {(ticketCount ?? 0) > 0 && <> {t("user.dashboard.ticketHint", { count: ticketCount })}</>}
+                    </Alert>
+                  )}
                   <SpaceBetween size="xs">
                       <Box variant="awsui-key-label">{t("user.dashboard.connections")}</Box>
                       <Box>{data.max_concurrent > 0
@@ -178,7 +195,6 @@ export default function Dashboard() {
           </Container>
         )}
 
-        {data && <ResetTickets canReset={canReset} onRedeemed={summary.refresh} />}
 
         <Grid gridDefinition={[{ colspan: { default: 12, s: 7 } }, { colspan: { default: 12, s: 5 } }]}>
           <DeviceQuickConnect summary={data} refreshKey={connectionRefresh} />
@@ -234,6 +250,7 @@ export default function Dashboard() {
           </SpaceBetween>
         </Grid>
       </SpaceBetween>
+      </div>
       <Modal visible={selectedAnnouncement !== null} closeAriaLabel={t("user.announcements.close")} onDismiss={() => setSelectedAnnouncement(null)}
         header={selectedAnnouncement?.title} footer={<Box float="right">
           <Button onClick={() => setSelectedAnnouncement(null)}>{t("user.announcements.close")}</Button>
