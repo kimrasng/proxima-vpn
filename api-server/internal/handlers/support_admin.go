@@ -251,6 +251,8 @@ func (h *SupportHandler) notifyReply(ticketID string) {
 		log.Printf("[support] reply notification skipped for ticket %s: mail is not configured", ticketID)
 		return
 	}
+	// Fiber route parameters reference a request buffer reused after the handler returns.
+	ticketID = strings.Clone(ticketID)
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()

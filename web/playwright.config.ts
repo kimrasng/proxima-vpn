@@ -37,6 +37,13 @@ export default defineConfig({
     {
       name: "admin",
       testMatch: /(?:admin|admin-subscription-domains)\.spec\.ts/,
+      testIgnore: /\/admin\.spec\.ts$/,
+      dependencies: ["setup"],
+      use: { ...devices["Desktop Chrome"], storageState: "e2e/.auth/admin.json" },
+    },
+    {
+      name: "admin-core",
+      testMatch: /\/admin\.spec\.ts$/,
       dependencies: ["setup"],
       use: { ...devices["Desktop Chrome"], storageState: "e2e/.auth/admin.json" },
     },
