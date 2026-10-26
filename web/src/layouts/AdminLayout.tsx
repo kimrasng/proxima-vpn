@@ -24,6 +24,22 @@ import type { AlertSeverity, DashboardAlerts } from "../api/types";
 
 const badgePollInterval = 60000;
 
+interface NavGroup {
+  id: string;
+  title: string;
+  links: { text: string; href: string }[];
+}
+
+// The nav link a path belongs to: the longest link href the path equals or sits
+// under, so a detail page such as /admin/users/:id still highlights "Users".
+function owningHref(hrefs: readonly string[], pathname: string): string {
+  let best = "";
+  for (const href of hrefs) {
+    if ((pathname === href || pathname.startsWith(href + "/")) && href.length > best.length) best = href;
+  }
+  return best || pathname;
+}
+
 const rootCrumb = { labelKey: "admin.nav.serviceName", href: "/admin/dashboard" } as const;
 
 // Deliberately an allowlist: deriving labels from path segments instead would
@@ -143,8 +159,12 @@ function AdminLayoutShell() {
   const { theme, toggle: toggleTheme } = useTheme();
   const breadcrumbLeaf = useBreadcrumbLeafValue();
   const [alerts, setAlerts] = useState<DashboardAlerts | null>(null);
+  const [openGroups, setOpenGroups] = useState<ReadonlySet<string>>(new Set());
+  const [foldedGroups, setFoldedGroups] = useState<ReadonlySet<string>>(new Set());
+  const [seenActiveGroup, setSeenActiveGroup] = useState<string | undefined>(undefined);
 
   const alertCount = alerts?.total ?? 0;
+
 
   useEffect(() => {
     const load = async () => {
@@ -159,64 +179,110 @@ function AdminLayoutShell() {
     return () => clearInterval(interval);
   }, []);
 
-  const navItems: SideNavigationProps.Item[] = [
+  const dashboardLink = { text: t("admin.nav.dashboard"), href: "/admin/dashboard" };
+  const alertsLink = { text: t("admin.nav.alerts"), href: "/admin/alerts" };
+
+  // Grouped by the job an operator is doing. Alerts sit outside the groups so
+  // their badge stays visible while every group is folded.
+  const navGroups: NavGroup[] = [
     {
-      type: "link",
-      text: t("admin.nav.dashboard"),
-      href: "/admin/dashboard",
-    },
-    {
-      // The two pages the dashboard panels drill into. Grouped with it rather
-      // than under a resource heading: they cut across nodes and users, so they
-      // belong to neither.
-      type: "section-group",
+      id: "monitoring",
       title: t("admin.nav.group.monitoring"),
-      items: [
-        {
-          type: "link",
-          text: t("admin.nav.alerts"),
-          href: "/admin/alerts",
-          info: alertCount > 0 ? <Badge color="red">{alertCount}</Badge> : undefined,
-        },
-        { type: "link", text: t("admin.nav.activity"), href: "/admin/activity" },
+      links: [
+        { text: t("admin.nav.activity"), href: "/admin/activity" },
+        { text: t("admin.nav.connections"), href: "/admin/connections" },
+        { text: t("admin.nav.uuidEvictions"), href: "/admin/uuid-evictions" },
       ],
     },
     {
-      type: "section-group",
+      id: "infrastructure",
       title: t("admin.nav.group.infrastructure"),
-      items: [
-        { type: "link", text: t("admin.nav.nodes"), href: "/admin/nodes" },
-        { type: "link", text: t("admin.nav.nodeGroups"), href: "/admin/node-groups" },
-        { type: "link", text: t("admin.nav.nodeChains"), href: "/admin/node-chains" },
+      links: [
+        { text: t("admin.nav.nodes"), href: "/admin/nodes" },
+        { text: t("admin.nav.nodeGroups"), href: "/admin/node-groups" },
+        { text: t("admin.nav.nodeChains"), href: "/admin/node-chains" },
+        { text: t("admin.nav.subscriptionDomains"), href: "/admin/subscription-domains" },
       ],
     },
     {
-      type: "section-group",
-      title: t("admin.nav.group.customers"),
-      items: [
-        { type: "link", text: t("admin.nav.users"), href: "/admin/users" },
-        { type: "link", text: t("admin.nav.connections"), href: "/admin/connections" },
-        { type: "link", text: t("admin.nav.uuidEvictions"), href: "/admin/uuid-evictions" },
-        { type: "link", text: t("admin.nav.subscriptionDomains"), href: "/admin/subscription-domains" },
-        { type: "link", text: t("admin.nav.plans"), href: "/admin/plans" },
-        { type: "link", text: t("admin.nav.orders"), href: "/admin/orders" },
-        { type: "link", text: t("admin.nav.promotions"), href: "/admin/promotions" },
-        { type: "link", text: t("admin.nav.resetTickets"), href: "/admin/reset-tickets" },
-        { type: "link", text: t("admin.nav.announcements"), href: "/admin/announcements" },
-        { type: "link", text: t("admin.nav.support"), href: "/admin/support" },
-        { type: "link", text: t("admin.nav.supportHelp"), href: "/admin/support/help" },
-        { type: "link", text: t("admin.nav.guides"), href: "/admin/guides" },
+      id: "sales",
+      title: t("admin.nav.group.sales"),
+      links: [
+        { text: t("admin.nav.users"), href: "/admin/users" },
+        { text: t("admin.nav.plans"), href: "/admin/plans" },
+        { text: t("admin.nav.orders"), href: "/admin/orders" },
+        { text: t("admin.nav.promotions"), href: "/admin/promotions" },
+        { text: t("admin.nav.resetTickets"), href: "/admin/reset-tickets" },
       ],
     },
     {
-      type: "section-group",
+      id: "support",
+      title: t("admin.nav.group.support"),
+      links: [
+        { text: t("admin.nav.support"), href: "/admin/support" },
+        { text: t("admin.nav.supportHelp"), href: "/admin/support/help" },
+        { text: t("admin.nav.announcements"), href: "/admin/announcements" },
+        { text: t("admin.nav.guides"), href: "/admin/guides" },
+      ],
+    },
+    {
+      id: "system",
       title: t("admin.nav.group.system"),
-      items: [
-        { type: "link", text: t("admin.nav.settings"), href: "/admin/settings" },
-        { type: "link", text: t("admin.nav.twoFactor"), href: "/admin/2fa" },
+      links: [
+        { text: t("admin.nav.settings"), href: "/admin/settings" },
+        { text: t("admin.nav.twoFactor"), href: "/admin/2fa" },
       ],
     },
   ];
+
+  const activeHref = owningHref(
+    [dashboardLink, alertsLink, ...navGroups.flatMap((group) => group.links)].map((link) => link.href),
+    location.pathname,
+  );
+  const activeGroupId = navGroups.find((group) => group.links.some((link) => link.href === activeHref))?.id;
+
+  // Arriving at a page re-opens its group even if the user folded it earlier.
+  if (activeGroupId !== seenActiveGroup) {
+    setSeenActiveGroup(activeGroupId);
+    if (activeGroupId && foldedGroups.has(activeGroupId)) {
+      setFoldedGroups((previous) => {
+        const next = new Set(previous);
+        next.delete(activeGroupId);
+        return next;
+      });
+    }
+  }
+
+  const navItems: SideNavigationProps.Item[] = [
+    { type: "link", text: dashboardLink.text, href: dashboardLink.href },
+    {
+      type: "link",
+      text: alertsLink.text,
+      href: alertsLink.href,
+      info: alertCount > 0 ? <Badge color="red">{alertCount}</Badge> : undefined,
+    },
+    { type: "divider" },
+    ...navGroups.map((group): SideNavigationProps.Section => ({
+      type: "section",
+      text: group.title,
+      defaultExpanded: (group.id === activeGroupId && !foldedGroups.has(group.id)) || openGroups.has(group.id),
+      items: group.links.map((link) => ({ type: "link", text: link.text, href: link.href })),
+    })),
+  ];
+
+  const trackGroupToggle: NonNullable<SideNavigationProps["onChange"]> = ({ detail }) => {
+    const first = detail.item.items[0];
+    const group = first?.type === "link" ? navGroups.find((candidate) => candidate.links[0]?.href === first.href) : undefined;
+    if (!group) return;
+    const toggle = (previous: ReadonlySet<string>, add: boolean) => {
+      const next = new Set(previous);
+      if (add) next.add(group.id);
+      else next.delete(group.id);
+      return next;
+    };
+    setOpenGroups((previous) => toggle(previous, detail.expanded));
+    setFoldedGroups((previous) => toggle(previous, !detail.expanded));
+  };
 
   const changeLanguage = (lng: string) => {
     void i18n.changeLanguage(lng);
@@ -357,8 +423,10 @@ function AdminLayoutShell() {
         }
         navigation={
           <SideNavigation
-            activeHref={location.pathname}
+            key={activeGroupId ?? "none"}
+            activeHref={activeHref}
             items={navItems}
+            onChange={trackGroupToggle}
             onFollow={(event) => {
               event.preventDefault();
               navigate(event.detail.href);

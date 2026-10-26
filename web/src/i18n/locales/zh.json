@@ -221,9 +221,10 @@
       "twoFactor": "双因素认证",
       "group": {
         "infrastructure": "基础设施",
-        "customers": "客户管理",
         "system": "系统",
-        "monitoring": "监控"
+        "monitoring": "监控",
+        "sales": "客户与销售",
+        "support": "客户支持"
       },
       "serviceName": "Proxima VPN",
       "connections": "连接情况",

@@ -221,9 +221,10 @@
       "twoFactor": "2FA Security",
       "group": {
         "infrastructure": "Infrastructure",
-        "customers": "Customers",
         "system": "System",
-        "monitoring": "Monitoring"
+        "monitoring": "Monitoring",
+        "sales": "Customers & sales",
+        "support": "Customer support"
       },
       "serviceName": "Proxima VPN",
       "connections": "Connections",
