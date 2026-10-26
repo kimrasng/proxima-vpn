@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/jackc/pgx/v5"
@@ -22,7 +23,12 @@ type promoLandingResponse struct {
 	DiscountDescription string  `json:"discount_description"`
 	PlanName            *string `json:"plan_name,omitempty"`
 	TrialDays           *int    `json:"trial_days,omitempty"`
-	IsValid             bool    `json:"is_valid"`
+	// Structured benefit so the page can phrase it in the visitor's language;
+	// discount_description stays for existing clients.
+	DiscountType  *string    `json:"discount_type,omitempty"`
+	DiscountValue *int64     `json:"discount_value,omitempty"`
+	ValidUntil    *time.Time `json:"valid_until,omitempty"`
+	IsValid       bool       `json:"is_valid"`
 }
 
 // Get exposes only public benefit information, never eligibility lists or partner commissions.
@@ -32,13 +38,15 @@ func (h *PromoLandingHandler) Get(c *fiber.Ctx) error {
 	var result promoLandingResponse
 	var discountType string
 	var value int64
-	err := h.db.QueryRow(c.UserContext(), `SELECT code,discount_type,discount_value,
+	var validUntil time.Time
+	err := h.db.QueryRow(c.UserContext(), `SELECT code,discount_type,discount_value,valid_until,
 		is_active AND NOW() >= valid_from AND NOW() < valid_until
 		AND (max_redemptions IS NULL OR redeemed_count < max_redemptions)
-		FROM promotion_codes WHERE code=$1`, code).Scan(&result.Code, &discountType, &value, &result.IsValid)
+		FROM promotion_codes WHERE code=$1`, code).Scan(&result.Code, &discountType, &value, &validUntil, &result.IsValid)
 	if err == nil {
 		result.Type = "coupon"
 		result.DiscountDescription = publicDiscountDescription(discountType, value)
+		result.DiscountType, result.DiscountValue, result.ValidUntil = &discountType, &value, &validUntil
 		return c.JSON(result)
 	}
 	if !errors.Is(err, pgx.ErrNoRows) {
@@ -62,6 +70,7 @@ func (h *PromoLandingHandler) Get(c *fiber.Ctx) error {
 	if err == nil {
 		result.Type = "affiliate"
 		result.DiscountDescription = publicDiscountDescription(discountType, value)
+		result.DiscountType, result.DiscountValue = &discountType, &value
 		return c.JSON(result)
 	}
 	if !errors.Is(err, pgx.ErrNoRows) {

@@ -36,6 +36,7 @@ import type {
 } from "../../api/types";
 import * as userApi from "../../api/user";
 import { ApiError } from "../../api/client";
+import { getPromoLanding } from "../../api/promotionKinds";
 import { planSavings, formatPriceCents } from "../../utils/planPricing";
 
 function formatBytes(bytes: number): string {
@@ -58,7 +59,10 @@ function isPromotionRejectReason(value: unknown): value is PromotionRejectReason
 		value === "not_first_purchase" ||
 		value === "user_not_allowed" ||
 		value === "overall_cap_reached" ||
-		value === "user_cap_reached"
+		value === "user_cap_reached" ||
+		value === "use_trial_redeem" ||
+		value === "card_required_unsupported" ||
+		value === "active_plan_exists"
 	);
 }
 
@@ -122,7 +126,7 @@ export default function PlanInfo() {
   // not a transient toast the user can miss before it fades.
   type CheckoutReturn =
     | { kind: "confirming" }
-    | { kind: "paid" | "extension"; planName: string; days: number; until: string }
+    | { kind: "paid" | "extension" | "trial"; planName: string; days: number; until: string }
     | { kind: "pending" | "cancelled" | "failed" };
   const [checkoutReturn, setCheckoutReturn] = useState<CheckoutReturn | null>(null);
   const returnGeneration = useRef(0);
@@ -265,6 +269,20 @@ export default function PlanInfo() {
     setApplying(true);
     setCheckoutError(null);
     try {
+      const landing = await getPromoLanding(code).catch(() => null);
+      if (landing?.type === "trial") {
+        try {
+          const trial = await userApi.redeemFreeTrial(code);
+          setCheckout(null);
+          setPromotionCode("");
+          setCheckoutReturn({ kind: "trial", planName: trial.plan_name, days: trial.trial_days, until: trial.plan_expires_at });
+        } catch (err) {
+          const reason = rejectionFromError(err);
+          setCheckoutError(reason ? t(`user.plan.promotion.rejected.${reason}`)
+            : err instanceof ApiError && err.status === 409 ? t("user.plan.promotion.trialPending") : t("user.plan.promotion.error"));
+        }
+        return;
+      }
       let order: OrderResponse;
       if (checkout.order) {
         try {
@@ -771,7 +789,8 @@ export default function PlanInfo() {
           visible={checkoutReturn !== null}
           onDismiss={checkoutReturn?.kind === "confirming" ? undefined : () => { ++returnGeneration.current; setCheckoutReturn(null); void loadData(); }}
           closeAriaLabel={t("user.announcements.close")}
-          header={checkoutReturn?.kind === "paid" ? t("user.plan.return.paidTitle")
+          header={checkoutReturn?.kind === "trial" ? t("user.plan.return.trialTitle")
+            : checkoutReturn?.kind === "paid" ? t("user.plan.return.paidTitle")
             : checkoutReturn?.kind === "extension" ? t("user.plan.return.extensionTitle")
             : checkoutReturn?.kind === "cancelled" ? t("user.plan.return.cancelledTitle")
             : checkoutReturn?.kind === "failed" ? t("user.plan.return.failedTitle")
@@ -790,10 +809,12 @@ export default function PlanInfo() {
                 <Box>{t("user.plan.return.confirming")}</Box>
               </SpaceBetween>
             </Box>
-          ) : checkoutReturn?.kind === "paid" || checkoutReturn?.kind === "extension" ? (
+          ) : checkoutReturn?.kind === "paid" || checkoutReturn?.kind === "extension" || checkoutReturn?.kind === "trial" ? (
             <SpaceBetween size="m">
               <StatusIndicator type="success">
-                {checkoutReturn.kind === "extension"
+                {checkoutReturn.kind === "trial"
+                  ? t("user.plan.return.trialBody", { plan: checkoutReturn.planName, days: checkoutReturn.days, until: new Date(checkoutReturn.until).toLocaleDateString(i18n.resolvedLanguage ?? i18n.language) })
+                  : checkoutReturn.kind === "extension"
                   ? t("user.plan.return.extensionBody", { days: checkoutReturn.days, until: checkoutReturn.until ? new Date(checkoutReturn.until).toLocaleDateString(i18n.resolvedLanguage ?? i18n.language) : "-" })
                   : t("user.plan.return.paidBody", { plan: checkoutReturn.planName, until: checkoutReturn.until ? new Date(checkoutReturn.until).toLocaleDateString(i18n.resolvedLanguage ?? i18n.language) : "-" })}
               </StatusIndicator>

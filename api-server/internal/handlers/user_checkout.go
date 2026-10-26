@@ -174,11 +174,12 @@ func (h *UserCheckoutHandler) Start(c *fiber.Ctx) error {
 	var expiresAt sql.NullTime
 	err := h.db.QueryRow(ctx,
 		`SELECT o.plan_id, p.name, u.email, o.duration_days, o.price_cents,
-		        o.discount_cents, COALESCE(pc.code, ''), o.expires_at
+		        o.discount_cents, COALESCE(pc.code, ap.code, ''), o.expires_at
 		 FROM plan_orders o
 		 JOIN plans p ON p.id = o.plan_id
 		 JOIN users u ON u.id = o.user_id
 		 LEFT JOIN promotion_codes pc ON pc.id = o.promotion_id
+		 LEFT JOIN affiliate_partners ap ON ap.id = o.affiliate_partner_id
 		 WHERE o.id = $1 AND o.user_id = $2 AND o.status = 'pending'`,
 		orderID, userID,
 	).Scan(&planID, &planName, &userEmail, &durationDays, &priceCents, &discountCents, &promoCode, &expiresAt)

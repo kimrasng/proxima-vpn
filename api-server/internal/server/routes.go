@@ -23,6 +23,7 @@ func (s *Server) registerRoutes() {
 	}
 
 	api := s.app.Group("/api/v1")
+	api.Get("/promo/:code", handlers.NewPromoLandingHandler(s.db).Get)
 
 	loginLimiter := limiter.New(limiter.Config{
 		Max:        10,
@@ -37,7 +38,6 @@ func (s *Server) registerRoutes() {
 		},
 	})
 
-	api.Get("/promo/:code", handlers.NewPromoLandingHandler(s.db).Get)
 	admin := api.Group("/admin")
 
 	adminAuthHandler := handlers.NewAdminAuthHandler(s.db, s.config.JWT.Secret, s.parseAdminExpiry())

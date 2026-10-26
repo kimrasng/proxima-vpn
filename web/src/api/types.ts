@@ -873,7 +873,10 @@ export type PromotionRejectReason =
   | 'not_first_purchase'
   | 'user_not_allowed'
   | 'overall_cap_reached'
-  | 'user_cap_reached';
+  | 'user_cap_reached'
+  | 'use_trial_redeem'
+  | 'card_required_unsupported'
+  | 'active_plan_exists';
 
 // The order is created either way; `promotion_rejected` only reports that the
 // code was ignored, so callers must still treat the response as a success.

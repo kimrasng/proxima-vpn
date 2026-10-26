@@ -83,6 +83,9 @@ export interface PromoLandingInfo {
   discount_description: string;
   plan_name?: string;
   trial_days?: number;
+  discount_type?: "percent" | "fixed";
+  discount_value?: number;
+  valid_until?: string;
   is_valid: boolean;
 }
 export function getPromoLanding(code: string) {

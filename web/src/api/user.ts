@@ -105,6 +105,18 @@ export function applyPromotionToOrder(orderId: string, code: string): Promise<Or
   });
 }
 
+export interface FreeTrialRedeemResult {
+  order_id: string;
+  plan_name: string;
+  trial_days: number;
+  plan_expires_at: string;
+}
+
+export function redeemFreeTrial(code: string): Promise<FreeTrialRedeemResult> {
+  applyUserClient();
+  return post<FreeTrialRedeemResult>('/api/v1/user/free-trials/redeem', { code });
+}
+
 export function listMyOrders(): Promise<OrderResponse[]> {
   applyUserClient();
   return get<OrderResponse[]>('/api/v1/user/orders');

@@ -308,9 +308,9 @@
       "guides": "Guides & docs",
       "support": "Support tickets",
       "supportHelp": "Support help",
-      "admins": "Admin accounts",
       "oauthApps": "OAuth apps",
-      "oauthDocs": "OAuth integration guide"
+      "oauthDocs": "OAuth integration guide",
+      "admins": "Admin accounts"
     },
     "dashboard": {
       "title": "Dashboard",
@@ -1256,9 +1256,9 @@
       "routing": "Edit the proxy groups, rule sets and rule order served in Clash Meta subscriptions. Changes apply on the next subscription refresh.",
       "support": "Read and answer tickets from users. Replying sends the user an email notification.",
       "supportHelp": "Manage the categories and frequently asked questions shown before a user opens a ticket. Each can be written in Korean, English and Chinese.",
-      "admins": "Invite admins, manage their roles and status, and change your own name and password. Only owners can manage other admins.",
       "oauthApps": "Register first- and third-party apps that sign in with Proxima accounts, and set each app's permissions and allowed callback URLs.",
-      "oauthDocs": "Explains the whole flow of creating an OAuth app and integrating sign-in, tokens and the resource API."
+      "oauthDocs": "Explains the whole flow of creating an OAuth app and integrating sign-in, tokens and the resource API.",
+      "admins": "Invite admins, manage their roles and status, and change your own name and password. Only owners can manage other admins."
     },
     "notifications": {
       "title": "Notifications"
@@ -2729,146 +2729,6 @@
         }
       }
     },
-    "account": {
-      "menu": "My account",
-      "profile": "Account settings",
-      "team": "Manage admin team",
-      "logout": "Sign out"
-    },
-    "admins": {
-      "title": "Admin accounts",
-      "description": "Add admins and split permissions so several people can run the service together. Support tickets can be assigned to admins.",
-      "tab": {
-        "team": "Admin team",
-        "profile": "My account"
-      },
-      "loading": "Loading admins...",
-      "loadError": "Could not load admin information.",
-      "empty": "No admins.",
-      "stat": {
-        "total": "Total admins",
-        "owners": "Owners",
-        "active": "Active",
-        "no2fa": "Without 2FA"
-      },
-      "role": {
-        "owner": "Owner",
-        "admin": "Admin"
-      },
-      "roleHelp": {
-        "owner": "Everything an admin can do, plus adding, editing and deleting admin accounts and resetting their passwords. At least one must always be active.",
-        "admin": "Full access to operations such as nodes, users, payments and support, but cannot manage other admin accounts."
-      },
-      "tableTitle": "Admins",
-      "tableHint": "Role and status changes apply from that admin's next request.",
-      "add": "Add admin",
-      "col": {
-        "who": "Admin",
-        "role": "Role",
-        "status": "Status",
-        "tickets": "Assigned tickets",
-        "lastLogin": "Last sign-in",
-        "actions": "Actions"
-      },
-      "you": "You",
-      "active": "Active",
-      "disabled": "Disabled",
-      "twofaOn": "2FA on",
-      "twofaOff": "2FA off",
-      "never": "Never",
-      "openTickets": "{{count}} open",
-      "actionsFor": "Actions for {{name}}",
-      "action": {
-        "edit": "Edit name and role",
-        "reset": "Reset password",
-        "disable": "Disable",
-        "enable": "Re-enable",
-        "delete": "Delete"
-      },
-      "lock": {
-        "self": "You cannot disable or delete your own account here.",
-        "lastOwner": "This is the last active owner. Make someone else an owner first.",
-        "useProfile": "Change your own password from the My account tab."
-      },
-      "createTitle": "Add admin",
-      "editTitle": "Edit admin",
-      "create": "Add and get a temporary password",
-      "save": "Save",
-      "field": {
-        "email": "Email",
-        "emailHint": "Used to sign in. It cannot be changed later.",
-        "name": "Name",
-        "nameHint": "Shown as the ticket assignee and in activity logs.",
-        "namePlaceholder": "e.g. Alex Kim",
-        "role": "Role"
-      },
-      "createNote": "A temporary password is shown once after adding. Share it through a safe channel and ask them to change it after their first sign-in.",
-      "confirm": {
-        "reset": {
-          "title": "Reset this password?",
-          "body": "A new temporary password is created and this admin is signed out on every device immediately.",
-          "cta": "Reset"
-        },
-        "delete": {
-          "title": "Delete this admin?",
-          "body": "The account is deleted permanently and signed out right away. Their {{count}} assigned tickets become unassigned. This cannot be undone.",
-          "cta": "Delete"
-        },
-        "disable": {
-          "title": "Disable this admin?",
-          "body": "They are signed out immediately and cannot sign in again. The account and its history stay, so you can re-enable it later.",
-          "cta": "Disable"
-        },
-        "enable": {
-          "title": "Re-enable this admin?",
-          "body": "This admin can sign in again with their existing password.",
-          "cta": "Enable"
-        }
-      },
-      "secret": {
-        "createdTitle": "Admin added",
-        "resetTitle": "Password reset",
-        "once": "The temporary password is shown only now. Copy it before closing.",
-        "password": "Temporary password",
-        "copied": "Copied",
-        "copyFailed": "Could not copy",
-        "next": "They sign in at the admin login page with this email and temporary password, then change it under My account.",
-        "done": "Copied, close"
-      },
-      "error": {
-        "generic": "The request failed. Try again in a moment.",
-        "email_taken": "An admin with this email already exists.",
-        "invalid_email": "Enter a valid email address.",
-        "invalid_name": "Names can be up to 60 characters.",
-        "last_owner": "At least one active owner must remain.",
-        "self_demote": "You cannot remove your own owner role.",
-        "self_disable": "You cannot disable your own account.",
-        "self_delete": "You cannot delete your own account.",
-        "wrong_password": "The current password is incorrect.",
-        "weak_password": "Passwords need at least 10 characters.",
-        "same_password": "Choose a different password from your current one.",
-        "use_profile": "Change your own password from the My account tab.",
-        "not_found": "Admin not found. Refresh the list."
-      },
-      "profile": {
-        "info": "My details",
-        "infoHint": "Your name is shown as the ticket assignee and in activity logs.",
-        "pwChanged": "Password changed",
-        "nameHint": "Leave empty to show the part of your email before @.",
-        "nameSaved": "Name saved.",
-        "password": "Change password",
-        "passwordHint": "Confirm your current password to set a new one.",
-        "current": "Current password",
-        "new": "New password",
-        "confirm": "Confirm new password",
-        "rule": "At least {{min}} characters",
-        "mismatch": "The new passwords do not match.",
-        "signOutNote": "Changing it signs you out on every other device except this browser.",
-        "change": "Change password",
-        "passwordChanged": "Password changed. Every other session has been signed out."
-      },
-      "notOwner": "Only owners can manage the admin team. Ask an owner if you need access."
-    },
     "oauthApps": {
       "title": "OAuth apps",
       "description": "Register apps (including your own) that sign in with Proxima accounts, and manage their scopes, callback URLs and client secrets.",
@@ -3166,26 +3026,196 @@
         "verifierHint": "Send this at token exchange. It disappears when you leave this page, so save it now.",
         "open": "Open in a new tab"
       }
+    },
+    "account": {
+      "menu": "My account",
+      "profile": "Account settings",
+      "team": "Manage admin team",
+      "logout": "Sign out"
+    },
+    "admins": {
+      "title": "Admin accounts",
+      "description": "Add admins and split permissions so several people can run the service together. Support tickets can be assigned to admins.",
+      "tab": {
+        "team": "Admin team",
+        "profile": "My account"
+      },
+      "loading": "Loading admins...",
+      "loadError": "Could not load admin information.",
+      "empty": "No admins.",
+      "stat": {
+        "total": "Total admins",
+        "owners": "Owners",
+        "active": "Active",
+        "no2fa": "Without 2FA"
+      },
+      "role": {
+        "owner": "Owner",
+        "admin": "Admin"
+      },
+      "roleHelp": {
+        "owner": "Everything an admin can do, plus adding, editing and deleting admin accounts and resetting their passwords. At least one must always be active.",
+        "admin": "Full access to operations such as nodes, users, payments and support, but cannot manage other admin accounts."
+      },
+      "tableTitle": "Admins",
+      "tableHint": "Role and status changes apply from that admin's next request.",
+      "add": "Add admin",
+      "col": {
+        "who": "Admin",
+        "role": "Role",
+        "status": "Status",
+        "tickets": "Assigned tickets",
+        "lastLogin": "Last sign-in",
+        "actions": "Actions"
+      },
+      "you": "You",
+      "active": "Active",
+      "disabled": "Disabled",
+      "twofaOn": "2FA on",
+      "twofaOff": "2FA off",
+      "never": "Never",
+      "openTickets": "{{count}} open",
+      "actionsFor": "Actions for {{name}}",
+      "action": {
+        "edit": "Edit name and role",
+        "reset": "Reset password",
+        "disable": "Disable",
+        "enable": "Re-enable",
+        "delete": "Delete"
+      },
+      "lock": {
+        "self": "You cannot disable or delete your own account here.",
+        "lastOwner": "This is the last active owner. Make someone else an owner first.",
+        "useProfile": "Change your own password from the My account tab."
+      },
+      "createTitle": "Add admin",
+      "editTitle": "Edit admin",
+      "create": "Add and get a temporary password",
+      "save": "Save",
+      "field": {
+        "email": "Email",
+        "emailHint": "Used to sign in. It cannot be changed later.",
+        "name": "Name",
+        "nameHint": "Shown as the ticket assignee and in activity logs.",
+        "namePlaceholder": "e.g. Alex Kim",
+        "role": "Role"
+      },
+      "createNote": "A temporary password is shown once after adding. Share it through a safe channel and ask them to change it after their first sign-in.",
+      "confirm": {
+        "reset": {
+          "title": "Reset this password?",
+          "body": "A new temporary password is created and this admin is signed out on every device immediately.",
+          "cta": "Reset"
+        },
+        "delete": {
+          "title": "Delete this admin?",
+          "body": "The account is deleted permanently and signed out right away. Their {{count}} assigned tickets become unassigned. This cannot be undone.",
+          "cta": "Delete"
+        },
+        "disable": {
+          "title": "Disable this admin?",
+          "body": "They are signed out immediately and cannot sign in again. The account and its history stay, so you can re-enable it later.",
+          "cta": "Disable"
+        },
+        "enable": {
+          "title": "Re-enable this admin?",
+          "body": "This admin can sign in again with their existing password.",
+          "cta": "Enable"
+        }
+      },
+      "secret": {
+        "createdTitle": "Admin added",
+        "resetTitle": "Password reset",
+        "once": "The temporary password is shown only now. Copy it before closing.",
+        "password": "Temporary password",
+        "copied": "Copied",
+        "copyFailed": "Could not copy",
+        "next": "They sign in at the admin login page with this email and temporary password, then change it under My account.",
+        "done": "Copied, close"
+      },
+      "error": {
+        "generic": "The request failed. Try again in a moment.",
+        "email_taken": "An admin with this email already exists.",
+        "invalid_email": "Enter a valid email address.",
+        "invalid_name": "Names can be up to 60 characters.",
+        "last_owner": "At least one active owner must remain.",
+        "self_demote": "You cannot remove your own owner role.",
+        "self_disable": "You cannot disable your own account.",
+        "self_delete": "You cannot delete your own account.",
+        "wrong_password": "The current password is incorrect.",
+        "weak_password": "Passwords need at least 10 characters.",
+        "same_password": "Choose a different password from your current one.",
+        "use_profile": "Change your own password from the My account tab.",
+        "not_found": "Admin not found. Refresh the list."
+      },
+      "profile": {
+        "info": "My details",
+        "infoHint": "Your name is shown as the ticket assignee and in activity logs.",
+        "pwChanged": "Password changed",
+        "nameHint": "Leave empty to show the part of your email before @.",
+        "nameSaved": "Name saved.",
+        "password": "Change password",
+        "passwordHint": "Confirm your current password to set a new one.",
+        "current": "Current password",
+        "new": "New password",
+        "confirm": "Confirm new password",
+        "rule": "At least {{min}} characters",
+        "mismatch": "The new passwords do not match.",
+        "signOutNote": "Changing it signs you out on every other device except this browser.",
+        "change": "Change password",
+        "passwordChanged": "Password changed. Every other session has been signed out."
+      },
+      "notOwner": "Only owners can manage the admin team. Ask an owner if you need access."
     }
   },
   "user": {
     "promo": {
-      "title": "Your next connection comes with a benefit.",
-      "subtitle": "Use your Proxima VPN promotion and choose the plan that fits you.",
       "trialBenefit": "{{days}}-day free trial",
-      "benefitHint": "Sign in to review the benefit and eligibility at checkout.",
-      "claim": "Log in and claim your benefit",
+      "benefitHint": "After you sign in, the code is entered on the checkout screen for you.",
       "login": "Go to login",
       "secure": "Encrypted connection",
       "devices": "Multiple devices",
       "support": "Support portal",
-      "footer": "Proxima VPN · Your connection, your way.",
       "loading": "Checking your promotion",
       "invalidTitle": "This promotion is not available",
       "invalid": "The code may be invalid, inactive, expired, or fully redeemed.",
       "errorTitle": "Could not check this promotion",
       "error": "Check your connection and try again.",
-      "retry": "Try again"
+      "retry": "Try again",
+      "percentBenefit": "{{value}}% off",
+      "fixedBenefit": "{{value}} off",
+      "kind": {
+        "coupon": "Discount coupon",
+        "trial": "Free trial",
+        "affiliate": "Partner offer"
+      },
+      "headline": {
+        "coupon": "Start now and pay less",
+        "trial": "Try it first, no strings attached",
+        "affiliate": "An offer just for invited guests"
+      },
+      "lead": {
+        "coupon": "This code is filled in for you at checkout. Reach Korean services quickly from anywhere.",
+        "trial": "Start right away without paying. Pick a plan later if you like it.",
+        "affiliate": "You came in through a partner link. The discount is applied to your first payment automatically."
+      },
+      "step1": "Sign in or create an account",
+      "step2": "Pick a plan and the discount is applied",
+      "step2Trial": "Your trial plan is granted instantly",
+      "step3": "Connect an app and start browsing",
+      "benefitLabel": "Your benefit",
+      "codeLabel": "Promo code",
+      "copyCode": "Copy code",
+      "copied": "Copied",
+      "planOnly": "{{plan}} plan",
+      "until": "Until {{date}} KST",
+      "claim": {
+        "coupon": "Get the discount",
+        "trial": "Start free trial",
+        "affiliate": "Claim the offer"
+      },
+      "seePlans": "See plans",
+      "benefitHintTrial": "Sign in and your trial plan is granted right away. No payment needed."
     },
     "nav": {
       "dashboard": "Dashboard",
@@ -3435,8 +3465,12 @@
           "not_first_purchase": "That promotion code is only valid on a first purchase.",
           "user_not_allowed": "That promotion code is not available to your account.",
           "overall_cap_reached": "That promotion code has reached its redemption limit.",
-          "user_cap_reached": "You have already used that promotion code the maximum number of times."
-        }
+          "user_cap_reached": "You have already used that promotion code the maximum number of times.",
+          "use_trial_redeem": "This is a free-trial code. It starts without payment.",
+          "card_required_unsupported": "Trial codes that need a saved card can't be used yet. Please contact support.",
+          "active_plan_exists": "You already have an active plan, so the free trial can't start. Free trials are only for accounts without a running plan."
+        },
+        "trialPending": "You have an order waiting for payment. Cancel it, then start the free trial."
       },
       "savePercent": "Save {{percent}}%",
       "checkoutModal": {
@@ -3535,7 +3569,9 @@
         "cancelledBody": "The order stays pending. You can continue paying whenever you're ready.",
         "failedBody": "A network problem kept us from verifying the payment. Please check back shortly.",
         "autoHint": "Your usage and the monthly reset date stay as they are.",
-        "ok": "OK"
+        "ok": "OK",
+        "trialTitle": "Your free trial has started",
+        "trialBody": "You can use the {{plan}} plan free for {{days}} days, until {{until}}."
       }
     },
     "account": {
