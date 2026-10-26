@@ -652,6 +652,7 @@ export interface OrderResponse {
   duration_days: number;
   price_cents: number;
   discount_cents?: number;
+  promotion_code?: string;
   status: OrderStatus;
   created_at: string;
   expires_at?: string;

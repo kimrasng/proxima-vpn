@@ -55,6 +55,7 @@ type orderResponse struct {
 	DurationDays  int        `json:"duration_days"`
 	PriceCents    int64      `json:"price_cents"`
 	DiscountCents int64      `json:"discount_cents,omitempty"`
+	PromotionCode string     `json:"promotion_code,omitempty"`
 	Status        string     `json:"status"`
 	CreatedAt     time.Time  `json:"created_at"`
 	ExpiresAt     *time.Time `json:"expires_at,omitempty"`
@@ -200,11 +201,11 @@ func (h *UserOrderHandler) Create(c *fiber.Ctx) error {
 	}
 
 	_, stripeCheckoutAvailable := h.providers.Get(payments.ProviderStripe)
-	// Base free orders use hosted Checkout when it is configured so Stripe
-	// records a zero-total session. Fully discounted orders retain the local
-	// idempotent settlement path. Without Stripe, free plans still fulfill
-	// through the app's authenticated settlement.
-	if resp.PriceCents == 0 && (!stripeCheckoutAvailable || req.PromotionCode != "") {
+	// Base free orders and fully discounted orders both go through Stripe
+	// when it is configured, so the checkout page shows the discount and
+	// Stripe records the session. Only when Stripe is absent does the local
+	// settlement path apply.
+	if resp.PriceCents == 0 && !stripeCheckoutAvailable {
 		if err := h.settleZeroCostOrder(ctx, resp.ID, userID); err != nil {
 			if errors.Is(err, errOrderNotPending) {
 				return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "order state or price changed; reload the order"})
@@ -308,6 +309,8 @@ func (h *UserOrderHandler) applyPromotion(ctx context.Context, resp *orderRespon
 	}
 	*resp = updated
 
+	resp.PromotionCode = code
+
 	h.activity.Log(ctx, services.Record{
 		EventType:  services.EventPromotionApplied,
 		Severity:   services.SeverityInfo,
@@ -358,10 +361,12 @@ func (h *UserOrderHandler) List(c *fiber.Ctx) error {
 	userID := c.Locals("user_id").(string)
 
 	rows, err := h.db.Query(context.Background(),
-		`SELECT o.id, o.plan_id, p.name, o.duration_days, o.price_cents, o.discount_cents, o.status,
+		`SELECT o.id, o.plan_id, p.name, o.duration_days, o.price_cents, o.discount_cents,
+		        COALESCE(pc.code, ''), o.status,
 		        o.created_at, o.expires_at, o.provider, o.paid_at, o.cancelled_at
 		 FROM plan_orders o
 		 JOIN plans p ON p.id = o.plan_id
+		 LEFT JOIN promotion_codes pc ON pc.id = o.promotion_id
 		 WHERE o.user_id = $1
 		 ORDER BY o.created_at DESC`,
 		userID,
@@ -374,7 +379,7 @@ func (h *UserOrderHandler) List(c *fiber.Ctx) error {
 	results := make([]orderResponse, 0)
 	for rows.Next() {
 		var r orderResponse
-		if err := rows.Scan(&r.ID, &r.PlanID, &r.PlanName, &r.DurationDays, &r.PriceCents, &r.DiscountCents, &r.Status, &r.CreatedAt, &r.ExpiresAt, &r.Provider, &r.PaidAt, &r.CancelledAt); err != nil {
+		if err := rows.Scan(&r.ID, &r.PlanID, &r.PlanName, &r.DurationDays, &r.PriceCents, &r.DiscountCents, &r.PromotionCode, &r.Status, &r.CreatedAt, &r.ExpiresAt, &r.Provider, &r.PaidAt, &r.CancelledAt); err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "internal server error"})
 		}
 		results = append(results, r)

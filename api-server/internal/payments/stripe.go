@@ -95,9 +95,34 @@ func (p *StripeProvider) StartCheckout(ctx context.Context, req CheckoutRequest)
 				Quantity: stripe.Int64(1),
 				// The Stripe product is a generic balance descriptor; never label the
 				// item as a VPN service on Stripe.
-				PriceData: p.priceData(req.PriceCents),
+				// When the order carries a promotion, the line item is the original
+				// (pre-discount) price and a coupon shows the discount separately.
+				PriceData: p.priceData(req.PriceCents + req.DiscountCents),
 			},
 		},
+	}
+
+	// When the order carries a promotion discount, create a one-time Stripe
+	// coupon so Stripe's checkout page shows the original price with a
+	// discount line rather than just the reduced total.
+	if req.DiscountCents > 0 {
+		couponName := "Promotion"
+		if req.PromotionCode != "" {
+			couponName = req.PromotionCode
+		}
+		coupon, err := p.client.V1Coupons.Create(ctx, &stripe.CouponCreateParams{
+			AmountOff:      stripe.Int64(req.DiscountCents),
+			Currency:       stripe.String(p.currency),
+			Duration:       stripe.String(string(stripe.CouponDurationOnce)),
+			MaxRedemptions: stripe.Int64(1),
+			Name:           stripe.String(couponName),
+		})
+		if err != nil {
+			return nil, fmt.Errorf("create promotion coupon: %w", err)
+		}
+		params.Discounts = []*stripe.CheckoutSessionCreateDiscountParams{
+			{Coupon: stripe.String(coupon.ID)},
+		}
 	}
 
 	session, err := p.client.V1CheckoutSessions.Create(ctx, params)

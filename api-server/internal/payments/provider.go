@@ -41,6 +41,11 @@ type CheckoutRequest struct {
 	// The order's own deadline. A hosted session's expiry is set to match it
 	// so the panel and the provider never disagree about when it lapsed.
 	ExpiresAt time.Time
+	// When the order carries a promotion discount, DiscountCents is the
+	// amount taken off and PromotionCode is the code the user typed. Stripe
+	// shows them as a real coupon line on the checkout page.
+	DiscountCents int64
+	PromotionCode string
 }
 
 // CheckoutHandoff is what starting a checkout hands back to the caller.

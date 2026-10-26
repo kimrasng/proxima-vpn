@@ -168,18 +168,20 @@ func (h *UserCheckoutHandler) Start(c *fiber.Ctx) error {
 	}
 
 	ctx := context.Background()
-	var planID, planName, userEmail string
+	var planID, planName, userEmail, promoCode string
 	var durationDays int
-	var priceCents int64
+	var priceCents, discountCents int64
 	var expiresAt sql.NullTime
 	err := h.db.QueryRow(ctx,
-		`SELECT o.plan_id, p.name, u.email, o.duration_days, o.price_cents, o.expires_at
+		`SELECT o.plan_id, p.name, u.email, o.duration_days, o.price_cents,
+		        o.discount_cents, COALESCE(pc.code, ''), o.expires_at
 		 FROM plan_orders o
 		 JOIN plans p ON p.id = o.plan_id
 		 JOIN users u ON u.id = o.user_id
+		 LEFT JOIN promotion_codes pc ON pc.id = o.promotion_id
 		 WHERE o.id = $1 AND o.user_id = $2 AND o.status = 'pending'`,
 		orderID, userID,
-	).Scan(&planID, &planName, &userEmail, &durationDays, &priceCents, &expiresAt)
+	).Scan(&planID, &planName, &userEmail, &durationDays, &priceCents, &discountCents, &promoCode, &expiresAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
@@ -190,12 +192,14 @@ func (h *UserCheckoutHandler) Start(c *fiber.Ctx) error {
 	}
 
 	req2 := payments.CheckoutRequest{
-		OrderID:      orderID,
-		UserID:       userID,
-		UserEmail:    userEmail,
-		PlanName:     planName,
-		DurationDays: durationDays,
-		PriceCents:   priceCents,
+		OrderID:       orderID,
+		UserID:        userID,
+		UserEmail:     userEmail,
+		PlanName:      planName,
+		DurationDays:  durationDays,
+		PriceCents:    priceCents,
+		DiscountCents: discountCents,
+		PromotionCode: promoCode,
 	}
 	if expiresAt.Valid {
 		req2.ExpiresAt = expiresAt.Time

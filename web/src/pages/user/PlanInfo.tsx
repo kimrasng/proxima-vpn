@@ -223,7 +223,7 @@ export default function PlanInfo() {
     setCheckout(target);
     setCheckoutError(null);
     setPromotionCode("");
-    setAppliedCode(target.discountCents > 0 ? "" : null);
+    setAppliedCode(target.discountCents > 0 ? (target.order?.promotion_code || "") : null);
     setProviderName((current) =>
       current && providers.some((provider) => provider.name === current)
         ? current
@@ -512,7 +512,10 @@ export default function PlanInfo() {
               </StatusIndicator>
               {(pendingOrder.discount_cents ?? 0) > 0 && (
                 <SpaceBetween direction="horizontal" size="xs" alignItems="center">
-                  <Box variant="awsui-key-label">{t("user.plan.promotion.discountApplied")}</Box>
+                  <Box variant="awsui-key-label">
+                    {t("user.plan.promotion.discountApplied")}
+                    {pendingOrder.promotion_code ? ` (${pendingOrder.promotion_code})` : ""}
+                  </Box>
                   <Box color="text-status-inactive">
                     <s>{formatPriceCents(pendingOrder.price_cents + (pendingOrder.discount_cents ?? 0))}</s>
                   </Box>
