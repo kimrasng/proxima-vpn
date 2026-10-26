@@ -362,11 +362,13 @@ func (h *UserOrderHandler) List(c *fiber.Ctx) error {
 
 	rows, err := h.db.Query(context.Background(),
 		`SELECT o.id, o.plan_id, p.name, o.duration_days, o.price_cents, o.discount_cents,
-		        COALESCE(pc.code, ''), o.status,
+		        COALESCE(pc.code, ap.code, ft.code, ''), o.status,
 		        o.created_at, o.expires_at, o.provider, o.paid_at, o.cancelled_at
 		 FROM plan_orders o
 		 JOIN plans p ON p.id = o.plan_id
 		 LEFT JOIN promotion_codes pc ON pc.id = o.promotion_id
+		 LEFT JOIN affiliate_partners ap ON ap.id = o.affiliate_partner_id
+		 LEFT JOIN free_trial_promotions ft ON ft.id = o.free_trial_id
 		 WHERE o.user_id = $1
 		 ORDER BY o.created_at DESC`,
 		userID,

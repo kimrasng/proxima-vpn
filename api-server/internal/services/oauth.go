@@ -515,12 +515,15 @@ func (s *OAuthService) ValidateAuthorize(ctx context.Context, p AuthorizeParams)
 // unpadded base64url encoding of a 32-byte SHA-256 digest is exactly 43
 // characters from [A-Za-z0-9_-] (RFC 7636 4.2). Placeholders and padded or
 // standard-base64 values are rejected before a code is ever issued.
+// validCodeChallenge reports whether s is a PKCE code_challenge: exactly 43
+// characters of the unpadded base64url alphabet (RFC 7636 section 4.2).
 func validCodeChallenge(s string) bool {
 	if len(s) != 43 {
 		return false
 	}
 	for _, r := range s {
-		if !(r >= 'A' && r <= 'Z' || r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || r == '-' || r == '_') {
+		isAlphaNum := r >= 'A' && r <= 'Z' || r >= 'a' && r <= 'z' || r >= '0' && r <= '9'
+		if !isAlphaNum && r != '-' && r != '_' {
 			return false
 		}
 	}
@@ -897,4 +900,110 @@ func (s *OAuthService) RevokeGrant(ctx context.Context, userID, clientID string)
 		return false, err
 	}
 	return true, tx.Commit(ctx)
+}
+
+// OAuthAppUser is one user who has authorized an app, as the admin sees it.
+type OAuthAppUser struct {
+	UserID       string     `json:"user_id"`
+	Email        string     `json:"email"`
+	Name         string     `json:"name"`
+	Scopes       []string   `json:"scopes"`
+	GrantedAt    time.Time  `json:"granted_at"`
+	LastUsedAt   *time.Time `json:"last_used_at"`
+	ActiveTokens int        `json:"active_tokens"`
+}
+
+// ListAppUsers returns every user who currently authorizes the app with the
+// given internal ID, most recently used first.
+func (s *OAuthService) ListAppUsers(ctx context.Context, appID string) ([]OAuthAppUser, error) {
+	var exists bool
+	if err := s.db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM oauth_clients WHERE id = $1)`, appID).Scan(&exists); err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, ErrOAuthClientNotFound
+	}
+	rows, err := s.db.Query(ctx,
+		`SELECT u.id::text, u.email, COALESCE(u.name, ''), g.scopes, g.created_at,
+		        (SELECT MAX(t.last_used_at) FROM oauth_tokens t WHERE t.user_id = g.user_id AND t.client_id = g.client_id),
+		        (SELECT COUNT(*) FROM oauth_tokens t WHERE t.user_id = g.user_id AND t.client_id = g.client_id
+		           AND t.revoked_at IS NULL AND (t.access_expires_at > NOW() OR t.refresh_expires_at > NOW()))
+		 FROM oauth_grants g JOIN users u ON u.id = g.user_id
+		 WHERE g.client_id = $1
+		 ORDER BY 6 DESC NULLS LAST, g.created_at DESC`, appID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []OAuthAppUser{}
+	for rows.Next() {
+		var v OAuthAppUser
+		if err := rows.Scan(&v.UserID, &v.Email, &v.Name, &v.Scopes, &v.GrantedAt, &v.LastUsedAt, &v.ActiveTokens); err != nil {
+			return nil, err
+		}
+		out = append(out, v)
+	}
+	return out, rows.Err()
+}
+
+// RevokeAppUsers withdraws consent for the app with the given internal ID and
+// ends its tokens and pending codes. With userID set only that user is
+// disconnected; empty userID disconnects everyone. The app row is locked first
+// and every (user, app) family lock is taken in user order, matching
+// RevokeGrant, so a concurrent refresh cannot mint a token this misses.
+func (s *OAuthService) RevokeAppUsers(ctx context.Context, appID, userID string) (int, error) {
+	tx, err := s.db.Begin(ctx)
+	if err != nil {
+		return 0, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	var locked string
+	err = tx.QueryRow(ctx, `SELECT id FROM oauth_clients WHERE id = $1 FOR UPDATE`, appID).Scan(&locked)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return 0, ErrOAuthClientNotFound
+	}
+	if err != nil {
+		return 0, err
+	}
+	rows, err := tx.Query(ctx,
+		`SELECT user_id::text FROM oauth_grants WHERE client_id = $1 AND ($2 = '' OR user_id::text = $2) ORDER BY user_id`,
+		appID, userID)
+	if err != nil {
+		return 0, err
+	}
+	var users []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			rows.Close()
+			return 0, err
+		}
+		users = append(users, id)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return 0, err
+	}
+	for _, id := range users {
+		if err := lockOAuthFamily(ctx, tx, id, appID); err != nil {
+			return 0, err
+		}
+	}
+	if len(users) == 0 {
+		return 0, tx.Commit(ctx)
+	}
+	if _, err := tx.Exec(ctx, `DELETE FROM oauth_grants WHERE client_id = $1 AND user_id::text = ANY($2)`, appID, users); err != nil {
+		return 0, err
+	}
+	if _, err := tx.Exec(ctx,
+		`UPDATE oauth_tokens SET revoked_at = NOW() WHERE client_id = $1 AND user_id::text = ANY($2) AND revoked_at IS NULL`,
+		appID, users); err != nil {
+		return 0, err
+	}
+	if _, err := tx.Exec(ctx,
+		`UPDATE oauth_authorization_codes SET used_at = NOW() WHERE client_id = $1 AND user_id::text = ANY($2) AND used_at IS NULL`,
+		appID, users); err != nil {
+		return 0, err
+	}
+	return len(users), tx.Commit(ctx)
 }
