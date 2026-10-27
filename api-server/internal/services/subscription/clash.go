@@ -294,8 +294,9 @@ func clashVLESSReality(node NodeInfo, uuid string) map[string]any {
 		"client-fingerprint": "chrome",
 		"servername":         node.ServerName,
 		"reality-opts": map[string]any{
-			"public-key": node.RealityPublicKey,
-			"short-id":   node.RealityShortID,
+			"public-key":             node.RealityPublicKey,
+			"short-id":               node.RealityShortID,
+			"support-x25519mlkem768": true,
 		},
 	}
 }

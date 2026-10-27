@@ -42,6 +42,11 @@ func TestGenerateClashValidProxies(t *testing.T) {
 		t.Fatalf("expected 2 proxies, got %d", len(parsed.Proxies))
 	}
 
+	reality := parsed.Proxies[0].(map[string]any)["reality-opts"].(map[string]any)
+	if reality["support-x25519mlkem768"] != true {
+		t.Errorf("REALITY proxies must enable X25519MLKEM768 for current Xray servers, got %v", reality)
+	}
+
 	str := string(out)
 	if !strings.Contains(str, "tokyo-1") || !strings.Contains(str, "osaka-1") {
 		t.Errorf("expected proxy names in output, got:\n%s", str)
