@@ -125,8 +125,8 @@ func setSubscriptionHeaders(c *fiber.Ctx, user subscriptionUser, s subscriptionS
 	c.Set("Profile-Update-Interval", fmt.Sprintf("%d", hours))
 	c.Set("Profile-Title", "base64:"+base64.StdEncoding.EncodeToString([]byte(s.profileTitle)))
 	// Unquoted token plus RFC 5987 filename*: Clash Verge Rev parses this header
-	// from its debug-escaped form, so a quoted filename shows up as \"Proxima.yaml\.
-	c.Set(fiber.HeaderContentDisposition, `attachment; filename=Proxima.yaml; filename*=UTF-8''Proxima.yaml`)
+	// from its debug-escaped form, so keep the display name unquoted.
+	c.Set(fiber.HeaderContentDisposition, `attachment; filename=Proxima; filename*=UTF-8''Proxima`)
 	if s.supportURL != "" {
 		c.Set("Support-Url", s.supportURL)
 		// Clash Verge Rev and compatible clients show a home-page shortcut.

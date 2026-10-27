@@ -144,7 +144,7 @@ func TestSetSubscriptionHeadersReflectsEachPlan(t *testing.T) {
 			if got := resp.Header.Get("Profile-Update-Interval"); got != plan.wantInterval {
 				t.Errorf("Profile-Update-Interval = %q, want %q", got, plan.wantInterval)
 			}
-			if got := resp.Header.Get("Content-Disposition"); got != `attachment; filename=Proxima.yaml; filename*=UTF-8''Proxima.yaml` {
+			if got := resp.Header.Get("Content-Disposition"); got != `attachment; filename=Proxima; filename*=UTF-8''Proxima` {
 				t.Errorf("Content-Disposition = %q", got)
 			}
 		})
@@ -176,7 +176,7 @@ func TestSetSubscriptionHeaders(t *testing.T) {
 	if decoded, err := base64.StdEncoding.DecodeString(title); err != nil || string(decoded) != "Proxima VPN" {
 		t.Errorf("Profile-Title = %q", h.Get("Profile-Title"))
 	}
-	if got := h.Get("Content-Disposition"); got != `attachment; filename=Proxima.yaml; filename*=UTF-8''Proxima.yaml` {
+	if got := h.Get("Content-Disposition"); got != `attachment; filename=Proxima; filename*=UTF-8''Proxima` {
 		t.Errorf("Content-Disposition = %q", got)
 	}
 	if got := h.Get("Support-Url"); got != "https://example.test/help" {
