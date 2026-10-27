@@ -165,7 +165,7 @@ func (h *SubscriptionHandler) getSubscriptionForDevice(c *fiber.Ctx, deviceID, f
 	}
 
 	rows, err := h.db.Query(ctx,
-		`SELECT n.id, COALESCE(NULLIF(nl.name, ''), NULLIF(c.name, ''), n.name), host(n.ip), n.port, n.public_port, n.status,
+		`SELECT n.id, COALESCE(NULLIF(nl.name, ''), CASE WHEN c.entry_node_id IS NULL AND c.relay_pool_id IS NULL THEN n.name END, NULLIF(c.name, ''), n.name), host(n.ip), n.port, n.public_port, n.status,
 		        n.reality_public_key, n.reality_short_id,
 		        n.tls_cert_file, n.tls_key_file,
 		        vmessib.port, trojanib.port, ssib.port, ssib.settings->>'password',
