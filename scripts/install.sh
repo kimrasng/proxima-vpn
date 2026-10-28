@@ -14,6 +14,11 @@ set -e
 #   --port     Service port (optional, defaults to 443)
 #   --ports    Firewall ports/ranges to open, e.g. "443,20001-22000"
 #              (optional, defaults to service port plus the speed-tier range)
+#   --public-port  External port the host forwards to --port (optional). Use it
+#              on VMs whose provider only exposes mapped ports; the panel then
+#              publishes this port instead of --port.
+#   --low-memory   Install packages one at a time (optional, auto-enabled when
+#              the host has under 512 MB of RAM)
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -34,6 +39,8 @@ COUNTRY=""
 REGION=""
 PORT="443"
 PORTS=""
+PUBLIC_PORT=""
+LOW_MEMORY=""
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -44,6 +51,8 @@ while [[ $# -gt 0 ]]; do
         --region)  REGION="$2"; shift 2 ;;
         --port)    PORT="$2"; shift 2 ;;
         --ports)   PORTS="$2"; shift 2 ;;
+        --public-port) PUBLIC_PORT="$2"; shift 2 ;;
+        --low-memory)  LOW_MEMORY="1"; shift ;;
         -h|--help)
             echo "Usage: bash install.sh --server <panel-url> --token <reg-token>"
             echo ""
@@ -55,6 +64,8 @@ while [[ $# -gt 0 ]]; do
             echo "  --region   Region/city (optional)"
             echo "  --port     Service port (default: 443)"
             echo "  --ports    Firewall ports to open (default: service port + 20001-22000)"
+            echo "  --public-port  External port the host forwards to --port"
+            echo "  --low-memory   Install packages one at a time (auto under 512 MB RAM)"
             exit 0
             ;;
         *)
@@ -106,6 +117,11 @@ for spec in "${PORT_SPECS[@]}"; do
     fi
 done
 
+if [[ -n "$PUBLIC_PORT" ]] && { [[ ! "$PUBLIC_PORT" =~ ^[0-9]+$ ]] || (( PUBLIC_PORT < 1 || PUBLIC_PORT > 65535 )); }; then
+    log_error "--public-port must be a port number between 1 and 65535"
+    exit 1
+fi
+
 # --- Check root privileges ---
 if [[ $EUID -ne 0 ]]; then
     log_error "This script must be run as root"
@@ -142,22 +158,53 @@ log_step "1/4" "Installing node-agent dependencies..."
 # All roles apply kernel policy with nft and sysctl. iproute2 provides `ip`
 # (and `tc` for exit speed limits); jq reads registration credentials and role.
 # Do not install VPN-only tools until the panel has confirmed an exit role.
+# Small VMs (a 128 MB container, for example) are killed by the kernel when apt
+# or dnf resolves many packages at once, which used to abort the install with
+# no hint of what failed. Under 512 MB, install one package per transaction.
+if [[ -z "$LOW_MEMORY" ]] && [[ -r /proc/meminfo ]]; then
+    MEM_KB=$(awk '/^MemTotal:/ {print $2}' /proc/meminfo)
+    if [[ -n "$MEM_KB" ]] && (( MEM_KB < 524288 )); then
+        LOW_MEMORY="1"
+    fi
+fi
+[[ -n "$LOW_MEMORY" ]] && log_info "Low-memory mode: installing packages one at a time"
+
+# pkg_install installs the given packages, one at a time in low-memory mode.
+# A failure names the package instead of hiding it.
+pkg_install() {
+    local pkg
+    if [[ -n "$LOW_MEMORY" ]]; then
+        for pkg in "$@"; do
+            if ! pkg_install_batch "$pkg"; then
+                log_error "Failed to install package '${pkg}' (low-memory mode); free memory or install it manually"
+                return 1
+            fi
+        done
+    else
+        pkg_install_batch "$@" || { log_error "Failed to install packages: $*"; return 1; }
+    fi
+}
+
 PACKAGE_MANAGER=""
 if command -v apt-get &>/dev/null; then
     PACKAGE_MANAGER="apt-get"
+    pkg_install_batch() { apt-get install -y -qq --no-install-recommends "$@" >/dev/null 2>&1; }
     apt-get update -qq >/dev/null 2>&1
-    apt-get install -y -qq curl ca-certificates jq systemd nftables iproute2 procps >/dev/null 2>&1
+    pkg_install curl ca-certificates jq systemd nftables iproute2 procps
 elif command -v yum &>/dev/null; then
     PACKAGE_MANAGER="yum"
-    yum install -y -q curl ca-certificates jq systemd nftables iproute procps-ng >/dev/null 2>&1
+    pkg_install_batch() { yum install -y -q "$@" >/dev/null 2>&1; }
+    pkg_install curl ca-certificates jq systemd nftables iproute procps-ng
 elif command -v dnf &>/dev/null; then
     PACKAGE_MANAGER="dnf"
-    dnf install -y -q curl ca-certificates jq systemd nftables iproute procps-ng >/dev/null 2>&1
+    pkg_install_batch() { dnf install -y -q "$@" >/dev/null 2>&1; }
+    pkg_install curl ca-certificates jq systemd nftables iproute procps-ng
 elif command -v apk &>/dev/null; then
     PACKAGE_MANAGER="apk"
+    pkg_install_batch() { apk add --no-cache -q "$@" >/dev/null 2>&1; }
     # Alpine runs OpenRC instead of systemd and ships busybox tools; coreutils
-    # provides the `sort -V` the Xray version floor below relies on.
-    apk add --no-cache -q curl ca-certificates jq openrc nftables iproute2 procps-ng coreutils >/dev/null 2>&1
+    # provides the sort -V the Xray version floor below relies on.
+    pkg_install curl ca-certificates jq openrc nftables iproute2 procps-ng coreutils
 else
     log_warn "Could not detect package manager. Ensure curl, CA certificates, jq, systemd or OpenRC, nftables, iproute2 (ip/tc), and procps (sysctl) are installed."
 fi
@@ -262,13 +309,11 @@ log_info "Node role: $ROLE"
 # --- Install VPN-only dependencies and Xray-core for exit-capable roles ---
 if [[ "$ROLE" != "relay" ]]; then
     log_step "4/4" "Installing Xray-core for $ROLE node..."
-    case "$PACKAGE_MANAGER" in
-        apt-get) apt-get install -y -qq unzip >/dev/null 2>&1 ;;
-        yum)     yum install -y -q unzip >/dev/null 2>&1 ;;
-        dnf)     dnf install -y -q unzip >/dev/null 2>&1 ;;
-        apk)     apk add --no-cache -q unzip >/dev/null 2>&1 ;;
-        *)       log_warn "Ensure unzip is installed for Xray-core installation." ;;
-    esac
+    if [[ -n "$PACKAGE_MANAGER" ]]; then
+        pkg_install unzip
+    else
+        log_warn "Ensure unzip is installed for Xray-core installation."
+    fi
     # The panel reads per-user online IPs through GetStatsOnlineIpList, which older
     # cores do not serve - on one of those the concurrency figures are simply absent
     # and nothing looks wrong. Overridable so a pinned deployment can choose its own

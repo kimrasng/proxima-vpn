@@ -99,12 +99,16 @@ type generateTokenResponse struct {
 // provisionNodeRequest carries the operator's provisioning choices. Every field
 // is optional so an empty body still yields a usable token.
 type provisionNodeRequest struct {
-	OSFamily           string              `json:"os_family"`
-	Role               string              `json:"role"`
-	Name               string              `json:"name"`
-	Country            string              `json:"country"`
-	Region             string              `json:"region"`
-	Port               int                 `json:"port"`
+	OSFamily string `json:"os_family"`
+	Role     string `json:"role"`
+	Name     string `json:"name"`
+	Country  string `json:"country"`
+	Region   string `json:"region"`
+	Port     int    `json:"port"`
+	// PublicPort is the external port the host forwards to Port, for VMs whose
+	// provider exposes only mapped ports. It also pins the speed-limited
+	// endpoint to Port, since the 20001-22000 tier range cannot be forwarded.
+	PublicPort         *int                `json:"public_port"`
 	TrafficMultiplier  *float64            `json:"traffic_multiplier"`
 	MaxConcurrentConns *int                `json:"max_concurrent_conns"`
 	FirewallPreset     string              `json:"firewall_preset"`
@@ -163,6 +167,14 @@ func (h *AdminNodeHandler) GenerateToken(c *fiber.Ctx) error {
 		port = nodeprov.DefaultServicePort
 	}
 
+	var tierPort *int
+	if req.PublicPort != nil {
+		if *req.PublicPort < 1 || *req.PublicPort > 65535 {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "public_port must be between 1 and 65535"})
+		}
+		tierPort = &port
+	}
+
 	specs, err := nodeprov.ResolvePorts(role, preset, port, req.CustomPorts)
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
@@ -205,12 +217,13 @@ func (h *AdminNodeHandler) GenerateToken(c *fiber.Ctx) error {
 		context.Background(),
 		`INSERT INTO nodes (name, reg_token, api_key, country, region, ip, port, status,
 		                    os_family, role, traffic_multiplier, max_concurrent_conns,
-		                    firewall_preset, firewall_ports)
+		                    firewall_preset, firewall_ports, public_port, tier_port)
 		 VALUES ($1, $2, 'pending', $3, $4, '0.0.0.0'::inet, $5, 'pending',
-		         $6, $7, $8, $9, $10, $11)
+		         $6, $7, $8, $9, $10, $11, $12, $13)
 		 RETURNING id::text`,
 		name, token, req.Country, req.Region, port,
 		string(osFamily), string(role), multiplier, maxConns, string(preset), ports,
+		req.PublicPort, tierPort,
 	).Scan(&nodeID)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -220,7 +233,7 @@ func (h *AdminNodeHandler) GenerateToken(c *fiber.Ctx) error {
 
 	return c.JSON(generateTokenResponse{
 		Token:          token,
-		InstallCommand: h.buildInstallCommand(osFamily, token, name, req.Country, req.Region, port, ports),
+		InstallCommand: h.buildInstallCommand(osFamily, token, name, req.Country, req.Region, port, ports, req.PublicPort),
 		NodeID:         nodeID,
 		FirewallPorts:  ports,
 	})
@@ -233,7 +246,7 @@ func (h *AdminNodeHandler) GenerateToken(c *fiber.Ctx) error {
 // Alpine ships neither bash nor process substitution (its login shell is
 // busybox ash), so there the script is downloaded to a file and run with a bash
 // installed first; every other family keeps the bash <(curl ...) form.
-func (h *AdminNodeHandler) buildInstallCommand(osFamily nodeprov.OSFamily, token, name, country, region string, port int, ports string) string {
+func (h *AdminNodeHandler) buildInstallCommand(osFamily nodeprov.OSFamily, token, name, country, region string, port int, ports string, publicPort *int) string {
 	var b strings.Builder
 	if osFamily == nodeprov.OSAlpine {
 		fmt.Fprintf(&b, "apk add --no-cache -q bash curl && curl -fsSL %s/scripts/install.sh -o /tmp/proxima-install.sh && bash /tmp/proxima-install.sh --server %s --token %s",
@@ -243,6 +256,9 @@ func (h *AdminNodeHandler) buildInstallCommand(osFamily nodeprov.OSFamily, token
 			h.panelURL, h.panelURL, token)
 	}
 	fmt.Fprintf(&b, " --port %d", port)
+	if publicPort != nil {
+		fmt.Fprintf(&b, " --public-port %d", *publicPort)
+	}
 	if ports != "" {
 		fmt.Fprintf(&b, " --ports %s", ports)
 	}
