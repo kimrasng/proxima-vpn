@@ -280,6 +280,13 @@ func clashWireGuard(node NodeInfo) map[string]any {
 	}
 }
 
+// quotedYAMLString forces a quoted scalar. A hex REALITY short ID such as
+// 85e12345 is otherwise written bare and read back as a float, which Mihomo
+// rejects with "invalid REALITY short ID".
+func quotedYAMLString(s string) *yaml.Node {
+	return &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: s, Style: yaml.DoubleQuotedStyle}
+}
+
 func clashVLESSReality(node NodeInfo, uuid string) map[string]any {
 	return map[string]any{
 		"name":               node.Name,
@@ -295,7 +302,7 @@ func clashVLESSReality(node NodeInfo, uuid string) map[string]any {
 		"servername":         node.ServerName,
 		"reality-opts": map[string]any{
 			"public-key":             node.RealityPublicKey,
-			"short-id":               node.RealityShortID,
+			"short-id":               quotedYAMLString(node.RealityShortID),
 			"support-x25519mlkem768": true,
 		},
 	}

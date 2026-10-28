@@ -53,6 +53,38 @@ func TestGenerateClashValidProxies(t *testing.T) {
 	}
 }
 
+// A hex short ID such as "85e12345" reads as a float under YAML 1.2, which
+// Mihomo rejects as "invalid REALITY short ID". The generated profile must
+// keep it a string.
+func TestGenerateClashKeepsNumericLookingShortIDString(t *testing.T) {
+	nodes := []NodeInfo{{
+		Name: "kt", IP: "203.0.113.10", Port: 443, Protocol: "vless_reality",
+		RealityPublicKey: "pubkey", RealityShortID: "85e12345", ServerName: "example.com",
+	}}
+
+	out, err := GenerateClash(nodes, "11111111-1111-1111-1111-111111111111", nil)
+	if err != nil {
+		t.Fatalf("GenerateClash returned error: %v", err)
+	}
+
+	var parsed struct {
+		Proxies []struct {
+			Reality struct {
+				ShortID yaml.Node `yaml:"short-id"`
+			} `yaml:"reality-opts"`
+		} `yaml:"proxies"`
+	}
+	if err := yaml.Unmarshal(out, &parsed); err != nil {
+		t.Fatalf("output is not valid YAML: %v", err)
+	}
+	// Mihomo reads the scalar's resolved type, so a plain 85e12345 is a float.
+	// Only an explicitly quoted scalar stays a string for every YAML reader.
+	node := parsed.Proxies[0].Reality.ShortID
+	if node.Value != "85e12345" || node.Style&(yaml.DoubleQuotedStyle|yaml.SingleQuotedStyle) == 0 {
+		t.Errorf("short-id must be a quoted string, got value %q style %v", node.Value, node.Style)
+	}
+}
+
 func TestGenerateClashInfoNodes(t *testing.T) {
 	nodes := []NodeInfo{
 		{
