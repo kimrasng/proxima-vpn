@@ -46,6 +46,17 @@ func VlessPort(nodePort, mbps int) int {
 	return PortBase + clamp(mbps)
 }
 
+// TierPort is the port a speed-limited client connects to. A node whose host
+// only exposes a few ports can pin that port with override, so the tier
+// listener and the published endpoint are the same number. Unlimited clients
+// (mbps <= 0) always use the node's main port and ignore the override.
+func TierPort(nodePort int, override *int, mbps int) int {
+	if mbps > 0 && override != nil {
+		return *override
+	}
+	return VlessPort(nodePort, mbps)
+}
+
 // Tag returns the inbound tag for the given speed limit.
 func Tag(mbps int) string {
 	if mbps <= 0 {

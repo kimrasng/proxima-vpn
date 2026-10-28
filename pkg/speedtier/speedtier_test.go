@@ -35,3 +35,16 @@ func TestTagAndParseRoundTrip(t *testing.T) {
 		t.Error("ParseLimitTag should return ok=false for unrelated tags")
 	}
 }
+
+func TestTierPortOverride(t *testing.T) {
+	if got := TierPort(443, nil, 100); got != PortBase+100 {
+		t.Errorf("no override should keep %d, got %d", PortBase+100, got)
+	}
+	override := 41538
+	if got := TierPort(443, &override, 100); got != 41538 {
+		t.Errorf("override should win for a limited plan, got %d", got)
+	}
+	if got := TierPort(443, &override, 0); got != 443 {
+		t.Errorf("unlimited plans must ignore the tier override, got %d", got)
+	}
+}

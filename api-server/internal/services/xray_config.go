@@ -291,10 +291,11 @@ func (s *XrayConfigService) generate(ctx context.Context, nodeID string) ([]byte
 	var tlsCertFile, tlsKeyFile *string
 	var ssPassword *string
 	var nodePort int
+	var tierPort *int
 	err := s.db.QueryRow(ctx,
-		`SELECT port, reality_private_key, reality_short_id, tls_cert_file, tls_key_file, ss_password FROM nodes WHERE id = $1`,
+		`SELECT port, tier_port, reality_private_key, reality_short_id, tls_cert_file, tls_key_file, ss_password FROM nodes WHERE id = $1`,
 		nodeID,
-	).Scan(&nodePort, &realityPrivateKey, &realityShortID, &tlsCertFile, &tlsKeyFile, &ssPassword)
+	).Scan(&nodePort, &tierPort, &realityPrivateKey, &realityShortID, &tlsCertFile, &tlsKeyFile, &ssPassword)
 	if err != nil {
 		return nil, nil, fmt.Errorf("fetch node details: %w", err)
 	}
@@ -446,7 +447,7 @@ func (s *XrayConfigService) generate(ctx context.Context, nodeID string) ([]byte
 	sort.Ints(tierMbps)
 	for _, mbps := range tierMbps {
 		tier := s.buildTierVlessInbound(
-			speedtier.VlessPort(nodePort, mbps),
+			speedtier.TierPort(nodePort, tierPort, mbps),
 			speedtier.Tag(mbps),
 			tierVless[mbps],
 			realityPrivateKey, realityShortID, tierDest, tierServerNames,

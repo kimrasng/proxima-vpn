@@ -2,6 +2,12 @@ package database
 
 var managedEndpointMigrations = []string{
 	`ALTER TABLE nodes ADD COLUMN IF NOT EXISTS public_port INT`,
+	`ALTER TABLE nodes ADD COLUMN IF NOT EXISTS tier_port INT`,
+	`DO $$ BEGIN
+		IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'nodes'::regclass AND conname = 'nodes_tier_port_valid') THEN
+			ALTER TABLE nodes ADD CONSTRAINT nodes_tier_port_valid CHECK (tier_port IS NULL OR tier_port BETWEEN 1 AND 65535);
+		END IF;
+	END $$`,
 	`DO $$ BEGIN
 		IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'nodes'::regclass AND conname = 'nodes_public_port_valid') THEN
 			ALTER TABLE nodes ADD CONSTRAINT nodes_public_port_valid CHECK (public_port IS NULL OR public_port BETWEEN 1 AND 65535);

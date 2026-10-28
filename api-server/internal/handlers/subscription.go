@@ -52,6 +52,7 @@ type subscriptionNode struct {
 	IP                    string
 	Port                  int
 	PublicPort            *int
+	TierPort              *int
 	Status                string
 	RealityPublicKey      string
 	RealityShortID        string
@@ -165,7 +166,7 @@ func (h *SubscriptionHandler) getSubscriptionForDevice(c *fiber.Ctx, deviceID, f
 	}
 
 	rows, err := h.db.Query(ctx,
-		`SELECT n.id, COALESCE(NULLIF(nl.name, ''), CASE WHEN c.entry_node_id IS NULL AND c.relay_pool_id IS NULL THEN n.name END, NULLIF(c.name, ''), n.name), host(n.ip), n.port, n.public_port, n.status,
+		`SELECT n.id, COALESCE(NULLIF(nl.name, ''), CASE WHEN c.entry_node_id IS NULL AND c.relay_pool_id IS NULL THEN n.name END, NULLIF(c.name, ''), n.name), host(n.ip), n.port, n.public_port, n.tier_port, n.status,
 		        n.reality_public_key, n.reality_short_id,
 		        n.tls_cert_file, n.tls_key_file,
 		        vmessib.port, trojanib.port, ssib.port, ssib.settings->>'password',
@@ -242,7 +243,7 @@ func (h *SubscriptionHandler) getSubscriptionForDevice(c *fiber.Ctx, deviceID, f
 	for rows.Next() {
 		var node subscriptionNode
 		if err := rows.Scan(
-			&node.ID, &node.Name, &node.IP, &node.Port, &node.PublicPort,
+			&node.ID, &node.Name, &node.IP, &node.Port, &node.PublicPort, &node.TierPort,
 			&node.Status, &node.RealityPublicKey, &node.RealityShortID,
 			&node.TLSCertFile, &node.TLSKeyFile,
 			&node.VmessPort, &node.TrojanPort, &node.SSPort, &node.SSPassword,
@@ -393,7 +394,7 @@ func (h *SubscriptionHandler) getSubscriptionForDevice(c *fiber.Ctx, deviceID, f
 			if node.RealityReady {
 				ports := node.RealityPorts
 				if speedMbps > 0 {
-					port := speedtier.VlessPort(node.Port, speedMbps)
+					port := speedtier.TierPort(node.Port, node.TierPort, speedMbps)
 					ports = nil
 					if slices.Contains(node.GeneratedRealityPorts, port) {
 						ports = []int{port}
@@ -612,7 +613,7 @@ func buildNodeInfoList(nodes []subscriptionNode, userUUID string, speedMbps int,
 		if node.RealityReady {
 			ports := node.RealityPorts
 			if speedMbps > 0 {
-				port := speedtier.VlessPort(node.Port, speedMbps)
+				port := speedtier.TierPort(node.Port, node.TierPort, speedMbps)
 				ports = nil
 				if slices.Contains(node.GeneratedRealityPorts, port) {
 					ports = []int{port}

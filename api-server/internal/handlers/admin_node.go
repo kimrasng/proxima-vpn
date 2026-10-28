@@ -947,10 +947,14 @@ func (h *AdminNodeHandler) UpdateXray(c *fiber.Ctx) error {
 }
 
 type updateNodeRequest struct {
-	Name               *string             `json:"name"`
-	Country            *string             `json:"country"`
-	Region             *string             `json:"region"`
-	PublicPort         *int                `json:"public_port"`
+	Name       *string `json:"name"`
+	Country    *string `json:"country"`
+	Region     *string `json:"region"`
+	PublicPort *int    `json:"public_port"`
+	// TierPort pins the listener and published port of speed-limited VLESS
+	// Reality endpoints for hosts that expose only a few external ports. Zero
+	// clears it, restoring the default PortBase+Mbps port.
+	TierPort           *int                `json:"tier_port"`
 	TrafficMultiplier  *float64            `json:"traffic_multiplier"`
 	OSFamily           *string             `json:"os_family"`
 	Role               *string             `json:"role"`
@@ -1117,6 +1121,18 @@ func (h *AdminNodeHandler) UpdateNode(c *fiber.Ctx) error {
 		setClauses = append(setClauses, fmt.Sprintf("public_port = $%d", argIdx))
 		args = append(args, *req.PublicPort)
 		argIdx++
+	}
+	if req.TierPort != nil {
+		if *req.TierPort < 0 || *req.TierPort > 65535 {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "tier_port must be between 1 and 65535, or 0 to clear it"})
+		}
+		if *req.TierPort == 0 {
+			setClauses = append(setClauses, "tier_port = NULL")
+		} else {
+			setClauses = append(setClauses, fmt.Sprintf("tier_port = $%d", argIdx))
+			args = append(args, *req.TierPort)
+			argIdx++
+		}
 	}
 	if req.TrafficMultiplier != nil {
 		if *req.TrafficMultiplier <= 0 || *req.TrafficMultiplier > maxTrafficMultiplier {
