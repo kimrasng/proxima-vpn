@@ -15,39 +15,45 @@ import (
 // Subscription output formats. The account URL picks one from the requesting
 // client, so users import a single URL into any app.
 const (
-	formatClashMeta  = "clash-meta"
-	formatClash      = "clash" // legacy Clash/Stash: no VLESS, Hysteria2 or SS-2022
-	formatSingbox    = "sing-box"
-	formatV2ray      = "v2ray" // base64 share links, the universal fallback
-	formatSurfboard  = "surfboard"
-	formatQuantumult = "quantumult"
-	formatWireGuard  = "wireguard"
-	formatHTML       = "html"
+	formatClashMeta      = "clash-meta"
+	formatProximaIOS     = "proxima-ios"
+	formatProximaAndroid = "proxima-android"
+	formatClash          = "clash" // legacy Clash/Stash: no VLESS, Hysteria2 or SS-2022
+	formatSingbox        = "sing-box"
+	formatV2ray          = "v2ray" // base64 share links, the universal fallback
+	formatSurfboard      = "surfboard"
+	formatQuantumult     = "quantumult"
+	formatWireGuard      = "wireguard"
+	formatHTML           = "html"
 )
 
 // pathClientTypes are the explicit overrides served at /sub/{token}/{client_type}
 // for apps whose User-Agent is not recognized.
 var pathClientTypes = map[string]string{
-	"clash-meta": formatClashMeta,
-	"clash":      formatClash,
-	"sing-box":   formatSingbox,
-	"v2ray":      formatV2ray,
-	"surfboard":  formatSurfboard,
-	"quantumult": formatQuantumult,
-	"wireguard":  formatWireGuard,
+	"proxima-ios":     formatProximaIOS,
+	"proxima-android": formatProximaAndroid,
+	"clash-meta":      formatClashMeta,
+	"clash":           formatClash,
+	"sing-box":        formatSingbox,
+	"v2ray":           formatV2ray,
+	"surfboard":       formatSurfboard,
+	"quantumult":      formatQuantumult,
+	"wireguard":       formatWireGuard,
 }
 
 // queryFormats keeps ?format= URLs saved before User-Agent detection working.
 // "clash" has always produced the Meta profile there, so it still does.
 var queryFormats = map[string]string{
-	"clash":      formatClashMeta,
-	"clash-meta": formatClashMeta,
-	"singbox":    formatSingbox,
-	"sing-box":   formatSingbox,
-	"v2ray":      formatV2ray,
-	"surfboard":  formatSurfboard,
-	"quantumult": formatQuantumult,
-	"wireguard":  formatWireGuard,
+	"proxima-ios":     formatProximaIOS,
+	"proxima-android": formatProximaAndroid,
+	"clash":           formatClashMeta,
+	"clash-meta":      formatClashMeta,
+	"singbox":         formatSingbox,
+	"sing-box":        formatSingbox,
+	"v2ray":           formatV2ray,
+	"surfboard":       formatSurfboard,
+	"quantumult":      formatQuantumult,
+	"wireguard":       formatWireGuard,
 }
 
 type userAgentRule struct {
@@ -59,6 +65,8 @@ type userAgentRule struct {
 // before the generic Clash pattern: only the Meta dialect carries VLESS, so a
 // Meta app served the legacy profile would lose most servers.
 var userAgentRules = []userAgentRule{
+	{regexp.MustCompile(`(?i)^proxima-ios/`), formatProximaIOS},
+	{regexp.MustCompile(`(?i)^proxima-android/`), formatProximaAndroid},
 	{regexp.MustCompile(`(?i)^(clash-verge|clash[-. ]?meta|clashx[-. ]?meta|flclash|mihomo|clash-nyanpasu|koala-?clash|clashmi)`), formatClashMeta},
 	{regexp.MustCompile(`(?i)^(clash|stash)`), formatClash},
 	{regexp.MustCompile(`(?i)^(sfa|sfi|sfm|sft|sing-?box|karing|hiddify)`), formatSingbox},

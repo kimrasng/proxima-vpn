@@ -179,6 +179,15 @@ var (
 // the profile can be stored and rendered. Values end up inside comma-separated
 // Clash rule strings, so separators are rejected rather than escaped.
 func ValidateRoutingProfile(p RoutingProfile) []FieldError {
+	return validateRoutingProfile(p, maxInlinePayload)
+}
+
+// Mobile conversion may expand a remote MRS set into a bounded inline payload.
+func validateMobileRoutingProfile(p RoutingProfile) []FieldError {
+	return validateRoutingProfile(p, 50000)
+}
+
+func validateRoutingProfile(p RoutingProfile, maxPayload int) []FieldError {
 	var errs []FieldError
 	add := func(path, format string, args ...any) {
 		errs = append(errs, FieldError{Path: path, Message: fmt.Sprintf(format, args...)})
@@ -298,8 +307,8 @@ func ValidateRoutingProfile(p RoutingProfile) []FieldError {
 				add(path+".format", "format must be mrs, yaml or text")
 			}
 		case "inline":
-			if len(pr.Payload) == 0 || len(pr.Payload) > maxInlinePayload {
-				add(path+".payload", "inline rule sets need 1-%d entries", maxInlinePayload)
+			if len(pr.Payload) == 0 || len(pr.Payload) > maxPayload {
+				add(path+".payload", "inline rule sets need 1-%d entries", maxPayload)
 			}
 			for j, entry := range pr.Payload {
 				if msg := payloadProblem(pr.Behavior, entry); msg != "" {

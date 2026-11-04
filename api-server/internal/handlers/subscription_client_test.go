@@ -16,6 +16,9 @@ func TestDetectClientFormat(t *testing.T) {
 	for _, tc := range []struct {
 		ua, accept, want string
 	}{
+		{"Proxima-iOS/1.2.3 (iOS 18.2)", "", formatProximaIOS},
+		{"Proxima-Android/1.2.3 (Android 15)", "", formatProximaAndroid},
+		{"Proxima-iOS-extra/1.2.3", "", formatV2ray},
 		// Meta-based Clash apps must win over the generic Clash rule.
 		{"clash-verge/v2.0.3", "", formatClashMeta},
 		{"Clash-Verge/v1.7.7", "", formatClashMeta},

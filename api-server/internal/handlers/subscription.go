@@ -6,9 +6,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"math"
+	"net"
 	"net/url"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -17,6 +20,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/proximavpn/proxima-vpn/api-server/internal/services"
+	"github.com/proximavpn/proxima-vpn/api-server/internal/services/ruleset"
 	"github.com/proximavpn/proxima-vpn/api-server/internal/services/subscription"
 	"github.com/proximavpn/proxima-vpn/pkg/crypto"
 	"github.com/proximavpn/proxima-vpn/pkg/speedtier"
@@ -25,13 +29,14 @@ import (
 type SubscriptionHandler struct {
 	db             *pgxpool.Pool
 	updateInterval int
+	resolveMobile  func(context.Context, subscription.RoutingProfile) (subscription.RoutingProfile, map[string][]string, error)
 }
 
 func NewSubscriptionHandler(db *pgxpool.Pool, updateInterval int) *SubscriptionHandler {
 	if updateInterval <= 0 {
 		updateInterval = 3600
 	}
-	return &SubscriptionHandler{db: db, updateInterval: updateInterval}
+	return &SubscriptionHandler{db: db, updateInterval: updateInterval, resolveMobile: ruleset.ResolveMobileProviders}
 }
 
 type subscriptionUser struct {
@@ -287,6 +292,50 @@ func (h *SubscriptionHandler) getSubscriptionForDevice(c *fiber.Ctx, deviceID, f
 	var contentType string
 
 	switch format {
+	case formatProximaIOS, formatProximaAndroid:
+		nodeInfos := buildNodeInfoList(nodes, deviceUUID, speedMbps, deviceWGPrivateKey, deviceWGAddress)
+		mobileNodes := make([]subscription.NodeInfo, 0, len(nodeInfos))
+		for _, node := range nodeInfos {
+			if (format == formatProximaAndroid && node.Protocol == "vless_reality") || (format == formatProximaIOS && subscription.TCPProtocol(node.Protocol)) {
+				mobileNodes = append(mobileNodes, node)
+			}
+		}
+		if len(mobileNodes) == 0 {
+			return noReadyServers(c)
+		}
+		profile, _, _, err := loadRoutingProfile(ctx, h.db)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to load routing profile"})
+		}
+		mobileCtx, cancel := context.WithTimeout(c.UserContext(), 25*time.Second)
+		defer cancel()
+		profile, providers, err := h.resolveMobile(mobileCtx, profile)
+		if err != nil {
+			log.Printf("mobile subscription rule provider: %v", err)
+			return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{"error": "mobile routing rules unavailable"})
+		}
+		if format == formatProximaIOS {
+			// The iOS importer cannot express UDP+443 without logical rules.
+			// Its profile intentionally omits this block; Android retains it.
+			profile.BlockQUIC = false
+			body, err = subscription.GenerateIOSClash(mobileNodes, deviceUUID, profile)
+			contentType = "text/yaml; charset=utf-8"
+		} else {
+			var metadata []byte
+			metadata, err = subscription.GenerateAndroidRouting(profile, providers, mobileNodes)
+			if err == nil {
+				links := make([]string, 0, len(mobileNodes)+1)
+				for _, node := range mobileNodes {
+					links = append(links, buildMobileVLESSLink(deviceUUID, node))
+				}
+				links = append(links, "# proxima-routing-rules:"+base64.StdEncoding.EncodeToString(metadata))
+				body = []byte(strings.Join(links, "\n"))
+			}
+			contentType = "text/plain; charset=utf-8"
+		}
+		if err != nil {
+			return c.Status(fiber.StatusUnprocessableEntity).JSON(fiber.Map{"error": "mobile routing profile unsupported", "detail": err.Error()})
+		}
 	case formatClashMeta, formatClash:
 		nodeInfos := buildNodeInfoList(nodes, deviceUUID, speedMbps, deviceWGPrivateKey, deviceWGAddress)
 		if format == formatClash {
@@ -804,6 +853,11 @@ func buildVLESSLink(uuid string, node subscriptionNode, port int, fragment strin
 		url.QueryEscape(node.RealityShortID),
 		url.PathEscape(fragment+" VLESS"),
 	)
+}
+
+func buildMobileVLESSLink(uuid string, node subscription.NodeInfo) string {
+	return fmt.Sprintf("vless://%s@%s?type=tcp&security=reality&sni=%s&fp=chrome&pbk=%s&sid=%s&flow=xtls-rprx-vision#%s",
+		uuid, net.JoinHostPort(node.IP, strconv.Itoa(node.Port)), url.QueryEscape(node.ServerName), url.QueryEscape(node.RealityPublicKey), url.QueryEscape(node.RealityShortID), url.PathEscape(node.Name))
 }
 
 func buildVMESSLink(uuid string, node subscriptionNode, port int, fragment string) string {
