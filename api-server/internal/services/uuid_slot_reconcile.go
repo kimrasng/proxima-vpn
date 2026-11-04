@@ -19,7 +19,7 @@ func ReconcileAccountUUIDSlots(ctx context.Context, db *pgxpool.Pool, rdb *redis
 	if db == nil || rdb == nil {
 		return nil, fmt.Errorf("UUID slot reconciliation unavailable")
 	}
-	rows, err := db.Query(ctx, `SELECT id::text,last_seen>NOW()-INTERVAL '20 seconds' FROM nodes WHERE role IN ('exit','both') AND status!='pending' ORDER BY id`)
+	rows, err := db.Query(ctx, `SELECT id::text,COALESCE(last_seen>NOW()-INTERVAL '20 seconds',false) FROM nodes WHERE role IN ('exit','both') AND status!='pending' ORDER BY id`)
 	if err != nil {
 		return nil, err
 	}

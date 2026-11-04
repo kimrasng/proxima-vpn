@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -11,6 +12,59 @@ import (
 	"github.com/proximavpn/proxima-vpn/api-server/internal/database"
 	"github.com/redis/go-redis/v9"
 )
+
+func TestUUIDSlotReconciliationIncompleteHeartbeatRetainsSlot(t *testing.T) {
+	dsn, addr := os.Getenv("TEST_DATABASE_URL"), os.Getenv("TEST_REDIS_ADDR")
+	if dsn == "" || addr == "" {
+		t.Skip("isolated TEST_DATABASE_URL and TEST_REDIS_ADDR required")
+	}
+	ctx := context.Background()
+	db, err := pgxpool.New(ctx, dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if err := database.Migrate(ctx, db); err != nil {
+		t.Fatal(err)
+	}
+	rdb := redis.NewClient(&redis.Options{Addr: addr})
+	defer func() { _ = rdb.Close() }()
+	user, device, node := uuid.NewString(), uuid.NewString(), uuid.NewString()
+	if _, err := db.Exec(ctx, `INSERT INTO nodes(id,name,ip,role,status,api_key,last_seen) VALUES($1,'slot-heartbeat-test','203.0.113.1','exit','online','key',NULL)`, node); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _, _ = db.Exec(ctx, `DELETE FROM nodes WHERE id=$1`, node) }()
+	key := AccountUUIDSlotKey(user)
+	defer rdb.Del(ctx, key, key+":reservations", key+":reserved_at", key+":sequence", key+":absence:"+device)
+	admitted, err := ReserveAccountUUIDSlot(ctx, rdb, user, device, 1)
+	if err != nil || !admitted {
+		t.Fatalf("reserve: %v %v", admitted, err)
+	}
+	for _, tc := range []struct {
+		name string
+		seen string
+	}{
+		{"never reported", "NULL"},
+		{"stale", "NOW()-INTERVAL '1 minute'"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := db.Exec(ctx, `UPDATE nodes SET last_seen=`+tc.seen+` WHERE id=$1`, node); err != nil {
+				t.Fatal(err)
+			}
+			released, err := ReconcileAccountUUIDSlots(ctx, db, rdb, user)
+			if err == nil || !strings.Contains(err.Error(), "incomplete Exit: "+node) {
+				t.Fatalf("expected incomplete Exit error for %s, got released=%v err=%v", node, released, err)
+			}
+			if len(released) != 0 {
+				t.Fatalf("unexpected released slots: %v", released)
+			}
+			member, err := rdb.SIsMember(ctx, key, device).Result()
+			if err != nil || !member {
+				t.Fatalf("reserved slot not retained: member=%v err=%v", member, err)
+			}
+		})
+	}
+}
 
 func TestUUIDSlotReconciliationPreAdmissionAndIdle(t *testing.T) {
 	dsn, addr := os.Getenv("TEST_DATABASE_URL"), os.Getenv("TEST_REDIS_ADDR")
