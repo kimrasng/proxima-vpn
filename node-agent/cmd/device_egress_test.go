@@ -19,6 +19,35 @@ import (
 
 const limitedDeviceConfig = `{"inbounds":[{"protocol":"vless","tag":"vless-in","settings":{"clients":[{"id":"uuid-a","email":"uuid-a@proxima"}]}}],"outbounds":[{"tag":"direct","protocol":"freedom"},{"tag":"device-egress-uuid-a","protocol":"socks","settings":{"servers":[{"address":"127.0.0.1","port":10086,"users":[{"user":"uuid-a","pass":"materialize-at-node"}]}]}}],"routing":{"rules":[{"type":"field","user":["uuid-a@proxima"],"outboundTag":"device-egress-uuid-a"}]}}`
 
+func TestDeviceEgressRateChangesAndRollback(t *testing.T) {
+	egress := newDeviceEgress(func([]devicebandwidth.Credential) error { return nil })
+	limiter := newLocalBandwidth()
+	egress.setRates = limiter.SetRates
+	config := func(rate int) []byte {
+		return []byte(strings.Replace(limitedDeviceConfig, `{"inbounds"`, fmt.Sprintf(`{"proxima_device_rates":{"uuid-a":%d},"inbounds"`, rate), 1))
+	}
+	for _, rate := range []int{0, 100, 25} {
+		runtime, err := egress.TransformConfig(config(rate))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if bytes.Contains(runtime, []byte("proxima_device_rates")) {
+			t.Fatal("metadata leaked to Xray")
+		}
+		if got := limiter.rates["uuid-a"]; got != rate {
+			t.Fatalf("rate = %d, want %d", got, rate)
+		}
+	}
+	for _, rate := range []int{0, 100} {
+		if err := egress.CanRestore(config(rate)); err == nil {
+			t.Fatalf("restored obsolete rate %d", rate)
+		}
+	}
+	if err := egress.CanRestore(config(25)); err != nil {
+		t.Fatalf("same-rate rollback: %v", err)
+	}
+}
+
 func TestDeviceEgressMaterializesOnlyRuntimeSecrets(t *testing.T) {
 	var credentials []devicebandwidth.Credential
 	egress := newDeviceEgress(func(c []devicebandwidth.Credential) error { credentials = c; return nil })

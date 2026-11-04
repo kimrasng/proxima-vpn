@@ -6,6 +6,8 @@ import (
 	"reflect"
 	"sort"
 	"testing"
+
+	"github.com/proximavpn/proxima-vpn/api-server/internal/database"
 )
 
 // Exercise the production GenerateConfig/GenerateDigest path when a migrated
@@ -170,6 +172,9 @@ func TestDeviceEgressGenerateConfigCompatibilityPortCollision(t *testing.T) {
 	for _, mode := range []string{"legacy", "explicit", "incompatible"} {
 		t.Run(mode, func(t *testing.T) {
 			pool, ctx := openEvictionPool(t)
+			if err := database.Migrate(ctx, pool); err != nil {
+				t.Fatal(err)
+			}
 			nodeID, deviceID := seedEvictionFixture(t, ctx, pool)
 			if _, err := pool.Exec(ctx,
 				`UPDATE plans SET speed_limit = 25 WHERE id =
@@ -213,6 +218,9 @@ func TestDeviceEgressGenerateConfigCompatibilityPortCollision(t *testing.T) {
 			if err := json.Unmarshal(config, &cfg); err != nil {
 				t.Fatal(err)
 			}
+			if rate, ok := cfg.DeviceRates[deviceID]; !ok || rate != 25 {
+				t.Fatalf("shared-port device rate = %d (present %v), want 25", rate, ok)
+			}
 			count := 0
 			for _, ib := range cfg.Inbounds {
 				if ib.Port == 20025 {
@@ -226,6 +234,33 @@ func TestDeviceEgressGenerateConfigCompatibilityPortCollision(t *testing.T) {
 				t.Fatalf("got %d listeners on compatibility port 20025, want one", count)
 			}
 			assertDeviceEgressDeclarations(t, cfg, []string{deviceID}, []string{tag})
+			if _, err := pool.Exec(ctx, `UPDATE nodes SET tier_port=20025 WHERE id=$1`, nodeID); err != nil {
+				t.Fatal(err)
+			}
+			before, err := NewXrayConfigService(pool).GenerateDigest(ctx, nodeID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := pool.Exec(ctx, `UPDATE plans SET speed_limit=50 WHERE id=(SELECT u.plan_id FROM users u JOIN devices d ON d.user_id=u.id WHERE d.xray_uuid=$1)`, deviceID); err != nil {
+				t.Fatal(err)
+			}
+			after, err := NewXrayConfigService(pool).GenerateDigest(ctx, nodeID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if before.Hash == after.Hash {
+				t.Fatal("speed change did not change config hash")
+			}
+			updated, err := NewXrayConfigService(pool).GenerateConfig(ctx, nodeID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := json.Unmarshal(updated, &cfg); err != nil {
+				t.Fatal(err)
+			}
+			if cfg.DeviceRates[deviceID] != 50 {
+				t.Fatalf("updated rate = %d, want 50", cfg.DeviceRates[deviceID])
+			}
 		})
 	}
 }

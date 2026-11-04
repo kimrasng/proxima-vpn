@@ -25,13 +25,14 @@ type deviceEgress struct {
 	setCredentials func([]devicebandwidth.Credential) error
 	// setRates receives per-device plan speeds for local enforcement; nil
 	// means rates are unknown and metered traffic must be denied.
-	setRates       func(map[string]int)
-	passwords      map[string]string
-	passwordTokens map[string]string
-	authorized     map[string]struct{}
-	managed        map[string]struct{}
-	ready          func() bool
-	count          int
+	setRates        func(map[string]int)
+	passwords       map[string]string
+	passwordTokens  map[string]string
+	authorized      map[string]struct{}
+	managed         map[string]struct{}
+	authorizedRates map[string]int
+	ready           func() bool
+	count           int
 }
 
 func newDeviceEgress(setCredentials func([]devicebandwidth.Credential) error) *deviceEgress {
@@ -306,6 +307,19 @@ func parseDeviceConfig(data []byte) (*deviceConfig, error) {
 			return nil, fmt.Errorf("device egress %q has no authenticated client", id)
 		}
 	}
+	if raw, present := cfg.root["proxima_device_rates"]; present {
+		var rates map[string]*int
+		if err := json.Unmarshal(raw, &rates); err != nil || rates == nil {
+			return nil, fmt.Errorf("invalid device rates")
+		}
+		for id := range cfg.rates {
+			rate, ok := rates[id]
+			if !ok || rate == nil || *rate < 0 {
+				return nil, fmt.Errorf("missing or invalid device rate for %q", id)
+			}
+			cfg.rates[id] = *rate
+		}
+	}
 	return cfg, nil
 }
 
@@ -423,6 +437,7 @@ func (e *deviceEgress) TransformConfig(canonical []byte) ([]byte, error) {
 		// a malformed generation arrives. The caller also stops old Xray.
 		e.authorized = nil
 		e.managed = nil
+		e.authorizedRates = nil
 		e.count = 0
 		e.applyRates(nil)
 		_ = e.setCredentials(nil)
@@ -431,6 +446,7 @@ func (e *deviceEgress) TransformConfig(canonical []byte) ([]byte, error) {
 	if len(cfg.devices) > 0 && e.ready != nil && !e.ready() {
 		e.authorized = nil
 		e.managed = nil
+		e.authorizedRates = nil
 		e.count = 0
 		e.applyRates(nil)
 		_ = e.setCredentials(nil)
@@ -440,6 +456,7 @@ func (e *deviceEgress) TransformConfig(canonical []byte) ([]byte, error) {
 	// have its speed limit, never a window of unknown (denied) or stale rate.
 	e.applyRates(cfg.rates)
 	e.authorized = cfg.identities
+	e.authorizedRates = cfg.rates
 	e.managed = make(map[string]struct{}, len(cfg.devices))
 	for id := range cfg.devices {
 		e.managed[id] = struct{}{}
@@ -497,9 +514,7 @@ func (e *deviceEgress) TransformConfig(canonical []byte) ([]byte, error) {
 		return nil, err
 	}
 	e.count = len(credentials)
-	if e.count == 0 {
-		return append([]byte(nil), canonical...), nil
-	}
+	delete(cfg.root, "proxima_device_rates")
 	cfg.root["outbounds"], _ = json.Marshal(cfg.outbounds)
 	return json.Marshal(cfg.root)
 }
@@ -517,6 +532,11 @@ func (e *deviceEgress) CanRestore(canonical []byte) error {
 	for identity := range cfg.identities {
 		if _, allowed := e.authorized[identity]; !allowed {
 			return fmt.Errorf("backup contains a revoked or changed client")
+		}
+	}
+	for id, rate := range cfg.rates {
+		if current, ok := e.authorizedRates[id]; !ok || current != rate {
+			return fmt.Errorf("backup contains obsolete device rate for %q", id)
 		}
 	}
 	for id := range cfg.devices {

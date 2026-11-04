@@ -148,13 +148,14 @@ type xrayLog struct {
 }
 
 type xrayConfig struct {
-	Log       xrayLog        `json:"log"`
-	Stats     struct{}       `json:"stats"`
-	API       xrayAPI        `json:"api"`
-	Policy    xrayPolicy     `json:"policy"`
-	Inbounds  []xrayInbound  `json:"inbounds"`
-	Outbounds []xrayOutbound `json:"outbounds"`
-	Routing   xrayRouting    `json:"routing"`
+	Log         xrayLog          `json:"log"`
+	Stats       struct{}         `json:"stats"`
+	API         xrayAPI          `json:"api"`
+	Policy      xrayPolicy       `json:"policy"`
+	Inbounds    []xrayInbound    `json:"inbounds"`
+	Outbounds   []xrayOutbound   `json:"outbounds"`
+	Routing     xrayRouting      `json:"routing"`
+	DeviceRates map[string]int64 `json:"proxima_device_rates,omitempty"`
 }
 
 type inboundRow struct {
@@ -350,6 +351,7 @@ func (s *XrayConfigService) generate(ctx context.Context, nodeID string) ([]byte
 	var vmessClients []xrayClient
 	var trojanClients []xrayTrojanClient
 	tierVless := map[int][]xrayClient{}
+	deviceRates := map[string]int64{}
 	policyLevels := map[string]xrayPolicyLevel{
 		"0": {StatsUserUplink: true, StatsUserDownlink: true, StatsUserOnline: true},
 	}
@@ -370,9 +372,11 @@ func (s *XrayConfigService) generate(ctx context.Context, nodeID string) ([]byte
 		}
 		vlessClients = append(vlessClients, client)
 		if speedLimit != nil && *speedLimit > 0 {
+			deviceRates[uuid] = *speedLimit
 			addCompatibilityTierClient(tierVless, *speedLimit, client)
 			continue
 		}
+		deviceRates[uuid] = 0
 
 		vmessClients = append(vmessClients, xrayClient{
 			ID:    uuid,
@@ -475,7 +479,8 @@ func (s *XrayConfigService) generate(ctx context.Context, nodeID string) ([]byte
 				StatsInboundDownlink: true,
 			},
 		},
-		Inbounds: inbounds,
+		Inbounds:    inbounds,
+		DeviceRates: deviceRates,
 	}
 
 	out, err := json.Marshal(cfg)

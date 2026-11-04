@@ -113,6 +113,7 @@ func IsDeviceRule(rule map[string]json.RawMessage) bool {
 // admitted, so they are applied live with that device rather than treated as
 // config structure; every other outbound and rule is left in place and order.
 func StripDeviceTopology(cfg map[string]json.RawMessage) error {
+	delete(cfg, "proxima_device_rates")
 	if raw, ok := cfg["outbounds"]; ok {
 		var outbounds []map[string]json.RawMessage
 		if err := json.Unmarshal(raw, &outbounds); err != nil {

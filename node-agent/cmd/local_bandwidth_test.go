@@ -1,10 +1,15 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"io"
+	"net"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/proximavpn/proxima-vpn/node-agent/internal/deviceegress"
 	"github.com/proximavpn/proxima-vpn/pkg/devicebandwidth"
 )
 
@@ -73,5 +78,130 @@ func TestDeviceConfigRatesFromLimitTier(t *testing.T) {
 	}
 	if cfg.rates["d1"] != 20 {
 		t.Fatalf("rate = %d, want 20 from limit tier", cfg.rates["d1"])
+	}
+}
+
+func TestDeviceConfigSharedPortUsesExplicitRate(t *testing.T) {
+	cfg, err := parseDeviceConfig([]byte(`{
+	  "proxima_device_rates":{"d1":25},
+	  "inbounds":[{"tag":"vless-reality","protocol":"vless","port":20025,"settings":{"clients":[{"id":"d1","email":"d1@proxima"}]}}],
+	  "outbounds":[{"tag":"device-egress-d1","protocol":"socks","settings":{"servers":[{"address":"127.0.0.1","port":10086,"users":[{"user":"d1","pass":"materialize-at-node"}]}]}}],
+	  "routing":{"rules":[{"type":"field","user":["d1@proxima"],"outboundTag":"device-egress-d1"}]}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.rates["d1"] != 25 {
+		t.Fatalf("shared-port rate = %d, want 25 Mbps", cfg.rates["d1"])
+	}
+}
+
+func TestSharedPortRateAppliedToRealSOCKSTraffic(t *testing.T) {
+	limiter := newLocalBandwidth()
+	limited := make(chan struct{}, 1)
+	permit := func(ctx context.Context, id string, direction devicebandwidth.Direction, size int) (devicebandwidth.PermitResponse, error) {
+		result, err := limiter.Permit(ctx, id, direction, size)
+		if err == nil && !result.Allowed && result.RetryAfterMS > 0 {
+			select {
+			case limited <- struct{}{}:
+			default:
+			}
+		}
+		return result, err
+	}
+	server := deviceegress.NewWithDialer(permit, func(context.Context, string, string) (net.Conn, error) {
+		a, b := net.Pipe()
+		go func() { defer b.Close(); _, _ = io.Copy(b, b) }()
+		return a, nil
+	})
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	if err := server.Start(ctx, "127.0.0.1:0"); err != nil {
+		t.Fatal(err)
+	}
+	defer server.Close()
+	egress := newDeviceEgress(server.SetCredentials)
+	egress.setRates = limiter.SetRates
+	canonical := strings.Replace(limitedDeviceConfig, `{"inbounds"`, `{"proxima_device_rates":{"uuid-a":1},"inbounds"`, 1)
+	if _, err := egress.TransformConfig([]byte(canonical)); err != nil {
+		t.Fatal(err)
+	}
+	password := egress.passwords["device-egress-uuid-a"]
+	conn, err := net.Dial("tcp", server.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	if err := conn.SetDeadline(time.Now().Add(5 * time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	exchange := func(request []byte, response []byte) {
+		t.Helper()
+		if _, err := conn.Write(request); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := io.ReadFull(conn, response); err != nil {
+			t.Fatal(err)
+		}
+	}
+	response := make([]byte, 2)
+	exchange([]byte{5, 1, 2}, response)
+	if !bytes.Equal(response, []byte{5, 2}) {
+		t.Fatalf("method = %v", response)
+	}
+	auth := append([]byte{1, byte(len("uuid-a"))}, []byte("uuid-a")...)
+	auth = append(auth, byte(len(password)))
+	auth = append(auth, []byte(password)...)
+	exchange(auth, response)
+	if !bytes.Equal(response, []byte{1, 0}) {
+		t.Fatalf("auth = %v", response)
+	}
+	connect := make([]byte, 10)
+	exchange([]byte{5, 1, 0, 1, 203, 0, 113, 1, 0, 80}, connect)
+	if connect[1] != 0 {
+		t.Fatalf("connect = %v", connect)
+	}
+	payload := make([]byte, 200000)
+	if _, err := conn.Write(payload); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-limited:
+	case <-time.After(3 * time.Second):
+		t.Fatal("real SOCKS traffic did not reach the configured rate limit")
+	}
+}
+
+func TestDeviceConfigExplicitRateOverridesCompatibilityTier(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		rates   string
+		want    int
+		invalid bool
+	}{
+		{"high speed", `{"d1":5000}`, 5000, false},
+		{"unlimited", `{"d1":0}`, 0, false},
+		{"missing", `{}`, 0, true},
+		{"null", `{"d1":null}`, 0, true},
+		{"negative", `{"d1":-1}`, 0, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			data := `{"proxima_device_rates":` + tc.rates + `,
+			  "inbounds":[{"tag":"vless-reality-limit-2000","protocol":"vless","settings":{"clients":[{"id":"d1","email":"d1@proxima"}]}}],
+			  "outbounds":[{"tag":"device-egress-d1","protocol":"socks","settings":{"servers":[{"address":"127.0.0.1","port":10086,"users":[{"user":"d1","pass":"materialize-at-node"}]}]}}],
+			  "routing":{"rules":[{"type":"field","user":["d1@proxima"],"outboundTag":"device-egress-d1"}]}}`
+			cfg, err := parseDeviceConfig([]byte(data))
+			if tc.invalid {
+				if err == nil {
+					t.Fatal("invalid device rate accepted")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if cfg.rates["d1"] != tc.want {
+				t.Fatalf("rate = %d, want %d", cfg.rates["d1"], tc.want)
+			}
+		})
 	}
 }
