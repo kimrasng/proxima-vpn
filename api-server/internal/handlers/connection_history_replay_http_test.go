@@ -4,9 +4,69 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
+	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/proximavpn/proxima-vpn/pkg/nodeprov"
 )
+
+func TestConnectionHistoryHTTPDetailEncodedEntityIDs(t *testing.T) {
+	for _, resource := range []string{"flows", "sessions"} {
+		t.Run(resource, func(t *testing.T) {
+			// Given: a real stored flow/session whose ID contains colons.
+			f := historyFixture(t)
+			f.enable()
+			event := f.event(1, "flow_end", 3, 123, 456)
+			id := *event.FlowID
+			if resource == "sessions" {
+				event.Kind = "tunnel_end"
+				event.FlowID, event.Destination = nil, nil
+				event.Bytes = nodeprov.HistoryBytes{Layer: "none"}
+				event.Lifecycle.Scope = "authenticated_transport"
+				event.Quality.Bytes, event.Quality.Destination = "unknown", "unknown"
+				id = *event.TunnelID
+			}
+			f.ingest(f.batch(event), 200)
+			prefix := "/api/v1/admin/connection-history/" + resource + "/"
+			path := prefix + f.node + "/" + string(*f.config.CollectionEpoch) + "/"
+			encoded := strings.ReplaceAll(id, ":", "%3A")
+			raw := f.request("GET", path+id, nil, "", 200)
+			f.request("GET", prefix+f.other+"/"+string(*f.config.CollectionEpoch)+"/"+encoded, nil, "", 404)
+			// When: the browser encodes the entity path segment.
+			detail := f.request("GET", path+encoded, nil, "", 200)
+			// Then: it resolves the identical row, decoding exactly once.
+			if !bytes.Equal(raw, detail) {
+				t.Fatalf("raw/encoded details differ: raw=%s encoded=%s", raw, detail)
+			}
+			f.request("GET", path+strings.ReplaceAll(encoded, "%", "%25"), nil, "", 404)
+			for _, malformed := range []string{"%", "%GG"} {
+				// Fiber's test transport dumps RequestURI verbatim;
+				// NewRequest would reject an invalid escape in its input URL.
+				req := httptest.NewRequest("GET", path+"unused", nil)
+				req.RequestURI = path + malformed
+				req.Header.Set("Authorization", "Bearer "+f.token)
+				t.Logf("HTTP REQUEST GET %s admin=true", req.RequestURI)
+				resp, err := f.app.Test(req, 15000)
+				if err != nil {
+					t.Fatal(err)
+				}
+				body, err := io.ReadAll(resp.Body)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := resp.Body.Close(); err != nil {
+					t.Fatal(err)
+				}
+				t.Logf("HTTP RESPONSE status=%d body=%s", resp.StatusCode, body)
+				if resp.StatusCode != 400 {
+					t.Fatalf("malformed entity escape status=%d want=400 body=%s", resp.StatusCode, body)
+				}
+			}
+		})
+	}
+}
 
 func TestConnectionHistoryHTTPReplayConflictReverseAndQuota(t *testing.T) {
 	// Given: issued identity and ON epoch, with unrelated quota rows.

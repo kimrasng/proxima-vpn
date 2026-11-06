@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"net/url"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -165,7 +166,11 @@ func (h *ConnectionHistoryHandler) detail(c *fiber.Ctx, flows bool) error {
 	if err := historyAdmin(c); err != nil {
 		return err
 	}
-	row, err := h.service.Detail(c.UserContext(), flows, c.Params("node_id"), c.Params("collection_epoch"), c.Params("entity_id"))
+	entity, err := url.PathUnescape(c.Params("entity_id"))
+	if err != nil {
+		return fiber.ErrBadRequest
+	}
+	row, err := h.service.Detail(c.UserContext(), flows, c.Params("node_id"), c.Params("collection_epoch"), entity)
 	return historyResponse(c, row, err)
 }
 func (h *ConnectionHistoryHandler) Flow(c *fiber.Ctx) error    { return h.detail(c, true) }
