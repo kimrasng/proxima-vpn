@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "upstream": {
+    "repository": "https://github.com/HyNetworks/hysteria.git",
+    "commit": "ca8fbd874fd6ca82413948de6dc5924405e103e1",
+    "tag": "app/v2.13.0"
+  },
+  "go": "1.26.8",
+  "toolchain_linux_arm64_zip_sha256": "02b36b6787b3ac767668f630e2998df45a3b1f9ffee08d1bf3ef6487cd658d99",
+  "patches": [
+    {
+      "path": "patches/0001-precise-history.patch",
+      "sha256": "a70c9eadcd27fc406b30b740fba22a1000360f3704714e237e6f78caf15bec23"
+    }
+  ],
+  "overlay_manifest": "sources.sha256",
+  "shared_source_manifest_sha256": "43c66f6a832078c72f5c982cfe4d4a59f488e1df2eb187d1c799077328ec5298",
+  "shared_module": "github.com/proximavpn/proxima-vpn/pkg",
+  "runtime_build": "hysteria2-ca8fbd874fd6-history-v1",
+  "build_flags": [
+    "-trimpath",
+    "-buildvcs=false"
+  ],
+  "targets": [
+    "linux/amd64",
+    "linux/arm64"
+  ]
+}

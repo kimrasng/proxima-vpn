@@ -1,0 +1,473 @@
+diff --git a/app/cmd/server.go b/app/cmd/server.go
+index 064804e..712d2ee 100644
+--- a/app/cmd/server.go
++++ b/app/cmd/server.go
+@@ -1723,6 +1723,13 @@ func runServer(v *viper.Viper) {
+ 	}
+ 	defer mimicInst.Close()
+ 
++	historyServer, err := startHistory(context.Background(), hyConfig)
++	if err != nil {
++		logger.Fatal("failed to initialize connection history", zap.Error(err))
++	}
++	if historyServer != nil {
++		defer historyServer.Close()
++	}
+ 	s, err := server.NewServer(hyConfig)
+ 	if err != nil {
+ 		logger.Fatal("failed to initialize server", zap.Error(err))
+diff --git a/app/go.mod b/app/go.mod
+index 49e548c..386f07c 100644
+--- a/app/go.mod
++++ b/app/go.mod
+@@ -2,6 +2,10 @@ module github.com/apernet/hysteria/app/v2
+ 
+ go 1.26.0
+ 
++require github.com/proximavpn/proxima-vpn/pkg v0.0.0
++
++replace github.com/proximavpn/proxima-vpn/pkg => ../../shared
++
+ require (
+ 	github.com/apernet/go-tproxy v0.0.0-20230809025308-8f4723fd742f
+ 	github.com/apernet/hysteria/core/v2 v2.0.0-00010101000000-000000000000
+diff --git a/core/go.mod b/core/go.mod
+index 676cd0d..35be2bb 100644
+--- a/core/go.mod
++++ b/core/go.mod
+@@ -2,6 +2,10 @@ module github.com/apernet/hysteria/core/v2
+ 
+ go 1.26.0
+ 
++require github.com/proximavpn/proxima-vpn/pkg v0.0.0
++
++replace github.com/proximavpn/proxima-vpn/pkg => ../../shared
++
+ require (
+ 	github.com/apernet/quic-go v0.63.1-0.20261004180939-a10df75c260c
+ 	github.com/stretchr/testify v1.12.1
+diff --git a/core/server/config.go b/core/server/config.go
+index 1cf8bd3..c2688bb 100644
+--- a/core/server/config.go
++++ b/core/server/config.go
+@@ -14,6 +14,7 @@ import (
+ 	"github.com/apernet/hysteria/core/v2/internal/pmtud"
+ 	"github.com/apernet/hysteria/core/v2/internal/utils"
+ 	"github.com/apernet/quic-go"
++	"github.com/proximavpn/proxima-vpn/pkg/connectionhistory"
+ )
+ 
+ const (
+@@ -41,6 +42,8 @@ type Config struct {
+ 	EventLogger           EventLogger
+ 	TrafficLogger         TrafficLogger
+ 	MasqHandler           http.Handler
++	History               *connectionhistory.Observer
++	HistoryInboundTag     string
+ }
+ 
+ // fill fills the fields that are not set by the user with default values when possible,
+diff --git a/core/server/server.go b/core/server/server.go
+index c3fb6d7..0d20c69 100644
+--- a/core/server/server.go
++++ b/core/server/server.go
+@@ -13,6 +13,7 @@ import (
+ 	"github.com/apernet/quic-go"
+ 	"github.com/apernet/quic-go/http3"
+ 	"github.com/apernet/quic-go/quicvarint"
++	"github.com/proximavpn/proxima-vpn/pkg/connectionhistory"
+ 
+ 	"github.com/apernet/hysteria/core/v2/internal/congestion"
+ 	"github.com/apernet/hysteria/core/v2/internal/protocol"
+@@ -98,9 +99,12 @@ func NewServer(config *Config) (Server, error) {
+ }
+ 
+ type serverImpl struct {
+-	config   *Config
+-	tr       *quic.Transport
+-	listener *quic.Listener
++	config      *Config
++	tr          *quic.Transport
++	listener    *quic.Listener
++	clientMutex sync.Mutex
++	clientWG    sync.WaitGroup
++	closing     bool
+ }
+ 
+ func (s *serverImpl) Serve() error {
+@@ -109,12 +113,27 @@ func (s *serverImpl) Serve() error {
+ 		if err != nil {
+ 			return err
+ 		}
+-		go s.handleClient(conn)
++		s.clientMutex.Lock()
++		if s.closing {
++			s.clientMutex.Unlock()
++			_ = conn.CloseWithError(closeErrCodeOK, "")
++			continue
++		}
++		s.clientWG.Add(1)
++		s.clientMutex.Unlock()
++		go func() {
++			defer s.clientWG.Done()
++			s.handleClient(conn)
++		}()
+ 	}
+ }
+ 
+ func (s *serverImpl) Close() error {
++	s.clientMutex.Lock()
++	s.closing = true
++	s.clientMutex.Unlock()
+ 	err := errors.Join(s.listener.Close(), s.tr.Close(), s.config.Conn.Close())
++	s.clientWG.Wait()
+ 	if s.config.Cleanup != nil {
+ 		err = errors.Join(err, s.config.Cleanup.Close())
+ 	}
+@@ -128,8 +147,17 @@ func (s *serverImpl) handleClient(conn *quic.Conn) {
+ 		StreamDispatcher: handler.ProxyStreamHijacker,
+ 	}
+ 	err := h3s.ServeQUICConn(conn)
++	_ = conn.CloseWithError(closeErrCodeOK, "")
++	handler.authMutex.Lock()
++	handler.closing = true
++	authenticated := handler.authenticated
++	handler.authMutex.Unlock()
++	handler.children.Wait()
++	if handler.historyTunnel != nil {
++		historyError(handler.historyTunnel.Close(historyEnd(err, "transport_close")))
++	}
+ 	// If the client is authenticated, we need to log the disconnect event
+-	if handler.authenticated {
++	if authenticated {
+ 		if tl := s.config.TrafficLogger; tl != nil {
+ 			tl.LogOnlineState(handler.authID, false)
+ 		}
+@@ -148,6 +176,9 @@ type h3sHandler struct {
+ 	authMutex     sync.Mutex
+ 	authID        string
+ 	connID        uint32 // a random id for dump streams
++	closing       bool
++	children      sync.WaitGroup
++	historyTunnel *connectionhistory.Tunnel
+ 
+ 	udpSM *udpSessionManager // Only set after authentication
+ }
+@@ -164,6 +195,9 @@ func (h *h3sHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+ 	if r.Method == http.MethodPost && r.Host == protocol.URLHost && r.URL.Path == protocol.URLPath {
+ 		h.authMutex.Lock()
+ 		defer h.authMutex.Unlock()
++		if h.closing {
++			return
++		}
+ 		if h.authenticated {
+ 			// Already authenticated
+ 			protocol.AuthResponseToHeader(w.Header(), protocol.AuthResponse{
+@@ -181,6 +215,14 @@ func (h *h3sHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+ 			// Set authenticated flag
+ 			h.authenticated = true
+ 			h.authID = id
++			if h.config.History != nil {
++				var historyErr error
++				h.historyTunnel, historyErr = h.config.History.NewTunnel(connectionhistory.TunnelInfo{
++					Protocol: "hysteria2", InboundTag: h.config.HistoryInboundTag,
++					LabelKind: "hysteria_auth_id", Label: id, Peer: historyPeer(h.conn.RemoteAddr().String()),
++				})
++				historyError(historyErr)
++			}
+ 			if h.config.IgnoreClientBandwidth {
+ 				// Ignore client bandwidth and use the configured congestion controller.
+ 				congestion.UseConfigured(h.conn, h.config.CongestionConfig.Type, h.config.CongestionConfig.BBRProfile)
+@@ -217,14 +259,15 @@ func (h *h3sHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+ 			// We use sync.Once to make sure that only one goroutine is started,
+ 			// as ServeHTTP may be called by multiple goroutines simultaneously
+ 			if !h.config.DisableUDP {
++				h.children.Add(1)
+ 				go func() {
++					defer h.children.Done()
+ 					sm := newUDPSessionManager(
+-						&udpIOImpl{h.conn, id, h.config.TrafficLogger, h.config.RequestHook, h.config.Outbound},
++						&udpIOImpl{h.conn, id, h.config.TrafficLogger, h.config.RequestHook, h.config.Outbound, h.config.History, h.historyTunnel},
+ 						&udpEventLoggerImpl{h.conn, id, h.config.EventLogger},
+ 						h.config.UDPIdleTimeout,
+ 					)
+-					h.udpSM = sm
+-					go sm.Run()
++					sm.Run()
+ 				}()
+ 			}
+ 		} else {
+@@ -238,7 +281,9 @@ func (h *h3sHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+ }
+ 
+ func (h *h3sHandler) ProxyStreamHijacker(ft http3.FrameType, stream *quic.Stream, err error) (bool, error) {
+-	if err != nil || !h.authenticated {
++	h.authMutex.Lock()
++	defer h.authMutex.Unlock()
++	if err != nil || !h.authenticated || h.closing {
+ 		return false, nil
+ 	}
+ 
+@@ -251,7 +296,11 @@ func (h *h3sHandler) ProxyStreamHijacker(ft http3.FrameType, stream *quic.Stream
+ 		}
+ 		// Wraps the stream with QStream, which handles Close() properly
+ 		qStream := &utils.QStream{Stream: stream}
+-		go h.handleTCPRequest(qStream)
++		h.children.Add(1)
++		go func() {
++			defer h.children.Done()
++			h.handleTCPRequest(qStream)
++		}()
+ 		return true, nil
+ 	default:
+ 		return false, nil
+@@ -282,6 +331,14 @@ func (h *h3sHandler) handleTCPRequest(stream *utils.QStream) {
+ 		return
+ 	}
+ 	streamStats.ReqAddr.Store(reqAddr)
++	originalAddr := reqAddr
++	flow := historyFlow(h.config.History, h.historyTunnel, reqAddr, "tcp", false)
++	endReason := "io_error"
++	defer func() {
++		if flow != nil {
++			historyError(flow.Close(historyEnd(err, endReason)))
++		}
++	}()
+ 	// Call the hook if set
+ 	var putback []byte
+ 	var hooked bool
+@@ -299,6 +356,9 @@ func (h *h3sHandler) handleTCPRequest(stream *utils.QStream) {
+ 				return
+ 			}
+ 			streamStats.setHookedReqAddr(reqAddr)
++			if flow != nil && reqAddr != originalAddr {
++				historyError(flow.SetDestination(historyEffectiveHost(reqAddr), nil))
++			}
+ 		}
+ 	}
+ 	// Log the event
+@@ -309,6 +369,7 @@ func (h *h3sHandler) handleTCPRequest(stream *utils.QStream) {
+ 	streamStats.State.Store(StreamStateConnecting)
+ 	tConn, err := h.config.Outbound.TCP(reqAddr)
+ 	if err != nil {
++		endReason = "dial_error"
+ 		if !hooked {
+ 			_ = protocol.WriteTCPResponse(stream, false, err.Error())
+ 		}
+@@ -325,16 +386,26 @@ func (h *h3sHandler) handleTCPRequest(stream *utils.QStream) {
+ 	streamStats.State.Store(StreamStateEstablished)
+ 	// Put back the data if the hook requested
+ 	if len(putback) > 0 {
++		if flow != nil {
++			historyError(flow.Observe(uint64(len(putback)), 0))
++		}
+ 		n, _ := tConn.Write(putback)
+ 		streamStats.Tx.Add(uint64(n))
+ 	}
+ 	// Start proxying
+-	if trafficLogger != nil {
++	if flow != nil {
++		err = copyTwoWayHistory(h.authID, stream, tConn, trafficLogger, streamStats, flow, func() {
++			_ = tConn.Close()
++			_ = stream.Close()
++			_ = stream.SetWriteDeadline(time.Now())
++		})
++	} else if trafficLogger != nil {
+ 		err = copyTwoWayEx(h.authID, stream, tConn, trafficLogger, streamStats)
+ 	} else {
+ 		// Use the fast path if no traffic logger is set
+ 		err = copyTwoWay(stream, tConn)
+ 	}
++	endReason = "eof"
+ 	if h.config.EventLogger != nil {
+ 		h.config.EventLogger.TCPError(h.conn.RemoteAddr(), h.authID, reqAddr, err)
+ 	}
+@@ -363,6 +434,8 @@ type udpIOImpl struct {
+ 	TrafficLogger TrafficLogger
+ 	RequestHook   RequestHook
+ 	Outbound      Outbound
++	History       *connectionhistory.Observer
++	Tunnel        *connectionhistory.Tunnel
+ }
+ 
+ func (io *udpIOImpl) ReceiveMessage() (*protocol.UDPMessage, error) {
+diff --git a/core/server/udp.go b/core/server/udp.go
+index a0bbedf..bd7d05a 100644
+--- a/core/server/udp.go
++++ b/core/server/udp.go
+@@ -47,7 +47,11 @@ type udpSessionEntry struct {
+ 	connLock sync.Mutex
+ 	closed   bool
+ 
+-	aclCache map[string]error
++	aclCache    map[string]error
++	active      sync.WaitGroup
++	finished    chan struct{}
++	onQuiescent func()
++	history     *udpHistory
+ }
+ 
+ func newUDPSessionEntry(
+@@ -63,6 +67,10 @@ func newUDPSessionEntry(
+ 
+ 		DialFunc: dialFunc,
+ 		ExitFunc: exitFunc,
++		finished: make(chan struct{}),
++	}
++	if observed, ok := io.(*udpIOImpl); ok && observed.History != nil && observed.Tunnel != nil {
++		e.history = newUDPHistory(observed.History, observed.Tunnel)
+ 	}
+ 
+ 	return e
+@@ -71,6 +79,14 @@ func newUDPSessionEntry(
+ // CloseWithErr closes the session and calls ExitFunc with the given error.
+ // A nil error indicates the session is cleaned up due to timeout.
+ func (e *udpSessionEntry) CloseWithErr(err error) {
++	reason := "io_error"
++	if err == nil {
++		reason = "idle_timeout"
++	}
++	e.closeWithReason(err, reason)
++}
++
++func (e *udpSessionEntry) closeWithReason(err error, reason string) {
+ 	// We need this lock to ensure not to create conn after session exit
+ 	e.connLock.Lock()
+ 
+@@ -87,6 +103,17 @@ func (e *udpSessionEntry) CloseWithErr(err error) {
+ 	e.connLock.Unlock()
+ 
+ 	e.ExitFunc(err)
++	// Never wait here: this can be called by receiveLoop or Feed itself.
++	go func() {
++		e.active.Wait()
++		if e.history != nil {
++			e.history.close(reason)
++		}
++		if e.onQuiescent != nil {
++			e.onQuiescent()
++		}
++		close(e.finished)
++	}()
+ }
+ 
+ // Feed feeds a UDP message to the session.
+@@ -96,11 +123,22 @@ func (e *udpSessionEntry) CloseWithErr(err error) {
+ // Until the connection is established, messages are held back instead, and are
+ // written together once the hook is done with them.
+ func (e *udpSessionEntry) Feed(msg *protocol.UDPMessage) (int, error) {
++	e.connLock.Lock()
++	if e.closed {
++		e.connLock.Unlock()
++		return 0, errors.New("session is closed")
++	}
++	e.active.Add(1)
++	e.connLock.Unlock()
++	defer e.active.Done()
+ 	e.Last.Set(time.Now())
+ 	dfMsg := e.D.Feed(msg)
+ 	if dfMsg == nil {
+ 		return 0, nil
+ 	}
++	if e.history != nil {
++		e.history.upload(dfMsg.Addr, len(dfMsg.Data))
++	}
+ 	if e.conn != nil {
+ 		return e.write(dfMsg)
+ 	}
+@@ -144,6 +182,9 @@ func (e *udpSessionEntry) write(dfMsg *protocol.UDPMessage) (int, error) {
+ 	addr := dfMsg.Addr
+ 	if e.OverrideAddr != "" {
+ 		addr = e.OverrideAddr
++		if e.history != nil {
++			e.history.effective(dfMsg.Addr, addr)
++		}
+ 	} else if err := e.checkAddr(addr); err != nil {
+ 		return 0, err
+ 	}
+@@ -200,7 +241,11 @@ func (e *udpSessionEntry) initConn(firstAddr, addr string) error {
+ 		e.OverrideAddr = addr
+ 		e.OriginalAddr = firstAddr
+ 	}
+-	go e.receiveLoop()
++	e.active.Add(1)
++	go func() {
++		defer e.active.Done()
++		e.receiveLoop()
++	}()
+ 
+ 	e.connLock.Unlock()
+ 	return nil
+@@ -215,6 +260,9 @@ func (e *udpSessionEntry) receiveLoop() {
+ 	msgBuf := make([]byte, protocol.MaxUDPSize)
+ 	for {
+ 		udpN, rAddr, err := e.conn.ReadFrom(udpBuf)
++		if e.history != nil && udpN > 0 {
++			e.history.download(rAddr, udpN)
++		}
+ 		if err != nil {
+ 			e.CloseWithErr(err)
+ 			return
+@@ -276,8 +324,9 @@ type udpSessionManager struct {
+ 	eventLogger udpEventLogger
+ 	idleTimeout time.Duration
+ 
+-	mutex sync.RWMutex
+-	m     map[uint32]*udpSessionEntry
++	mutex   sync.RWMutex
++	m       map[uint32]*udpSessionEntry
++	entries sync.WaitGroup
+ }
+ 
+ func newUDPSessionManager(io udpIO, eventLogger udpEventLogger, idleTimeout time.Duration) *udpSessionManager {
+@@ -293,9 +342,17 @@ func newUDPSessionManager(io udpIO, eventLogger udpEventLogger, idleTimeout time
+ // Exit and returns error when the underlying io returns error (e.g. closed).
+ func (m *udpSessionManager) Run() error {
+ 	stopCh := make(chan struct{})
+-	go m.idleCleanupLoop(stopCh)
+-	defer close(stopCh)
+-	defer m.cleanup(false)
++	idleDone := make(chan struct{})
++	go func() {
++		defer close(idleDone)
++		m.idleCleanupLoop(stopCh)
++	}()
++	defer func() {
++		close(stopCh)
++		<-idleDone
++		m.cleanup(false)
++		m.entries.Wait()
++	}()
+ 
+ 	for {
+ 		msg, err := m.io.ReceiveMessage()
+@@ -334,7 +391,11 @@ func (m *udpSessionManager) cleanup(idleOnly bool) {
+ 	for _, entry := range timeoutEntry {
+ 		// This eventually calls entry.ExitFunc,
+ 		// where the m.mutex will be locked again to remove the entry from the map.
+-		entry.CloseWithErr(nil)
++		if idleOnly {
++			entry.CloseWithErr(nil)
++		} else {
++			entry.closeWithReason(nil, "transport_close")
++		}
+ 	}
+ }
+ 
+@@ -357,11 +418,15 @@ func (m *udpSessionManager) feed(msg *protocol.UDPMessage) {
+ 
+ 			// Remove the session from the map
+ 			m.mutex.Lock()
+-			delete(m.m, entry.ID)
++			if m.m[entry.ID] == entry {
++				delete(m.m, entry.ID)
++			}
+ 			m.mutex.Unlock()
+ 		}
+ 
+ 		entry = newUDPSessionEntry(msg.SessionID, m.io, dialFunc, exitFunc)
++		m.entries.Add(1)
++		entry.onQuiescent = m.entries.Done
+ 
+ 		// Insert the session into the map
+ 		m.mutex.Lock()
