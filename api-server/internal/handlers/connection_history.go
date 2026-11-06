@@ -13,11 +13,12 @@ import (
 )
 
 type ConnectionHistoryHandler struct {
-	service *services.ConnectionHistoryService
+	service  *services.ConnectionHistoryService
+	activity *services.ActivityService
 }
 
-func NewConnectionHistoryHandler(service *services.ConnectionHistoryService) *ConnectionHistoryHandler {
-	return &ConnectionHistoryHandler{service: service}
+func NewConnectionHistoryHandler(service *services.ConnectionHistoryService, activity *services.ActivityService) *ConnectionHistoryHandler {
+	return &ConnectionHistoryHandler{service: service, activity: activity}
 }
 
 // RegisterRoutes accepts already-authenticated groups, matching the existing
@@ -116,6 +117,14 @@ func (h *ConnectionHistoryHandler) BulkControl(c *fiber.Ctx) error {
 	result := map[string]any{}
 	for id, cfg := range configs {
 		result[id] = fiber.Map{"enabled": cfg.Enabled, "revision": cfg.Revision, "collection_epoch": cfg.CollectionEpoch}
+		if err == nil {
+			h.activity.Log(c.UserContext(), services.Record{
+				EventType: "node.connection_logging_updated", Severity: services.SeveritySuccess,
+				ActorType: "admin", ActorID: adminIDOf(c), ActorLabel: adminEmail(c),
+				TargetType: "node", TargetID: id,
+				Detail: map[string]any{"enabled": cfg.Enabled, "revision": cfg.Revision, "collection_epoch": cfg.CollectionEpoch},
+			})
+		}
 	}
 	return historyResponse(c, result, err)
 }
@@ -158,6 +167,13 @@ func (h *ConnectionHistoryHandler) query(c *fiber.Ctx, flows bool) error {
 		return err
 	}
 	page, err := h.service.Query(c.UserContext(), flows, q)
+	if err == nil {
+		resource := "sessions"
+		if flows {
+			resource = "flows"
+		}
+		h.auditRead(c, "list", resource, q)
+	}
 	return historyResponse(c, page, err)
 }
 func (h *ConnectionHistoryHandler) Sessions(c *fiber.Ctx) error { return h.query(c, false) }
@@ -171,6 +187,15 @@ func (h *ConnectionHistoryHandler) detail(c *fiber.Ctx, flows bool) error {
 		return fiber.ErrBadRequest
 	}
 	row, err := h.service.Detail(c.UserContext(), flows, c.Params("node_id"), c.Params("collection_epoch"), entity)
+	if err == nil {
+		resource := "sessions"
+		if flows {
+			resource = "flows"
+		}
+		h.auditRead(c, "detail", resource, services.ConnectionHistoryQuery{
+			NodeID: c.Params("node_id"), Epoch: c.Params("collection_epoch"), EntityID: entity,
+		})
+	}
 	return historyResponse(c, row, err)
 }
 func (h *ConnectionHistoryHandler) Flow(c *fiber.Ctx) error    { return h.detail(c, true) }
@@ -184,5 +209,60 @@ func (h *ConnectionHistoryHandler) Aggregate(c *fiber.Ctx) error {
 		return err
 	}
 	totals, err := h.service.Aggregate(c.UserContext(), q)
+	if err == nil {
+		h.auditRead(c, "aggregate", "aggregate", q)
+	}
 	return historyResponse(c, totals, err)
+}
+
+func (h *ConnectionHistoryHandler) auditRead(c *fiber.Ctx, operation, resource string, q services.ConnectionHistoryQuery) {
+	// Only successful, validated scope enters the audit. Never copy the request
+	// query, cursor, destination values, private manifests, or returned events.
+	filters := map[string]any{
+		"destination_match": "none",
+		"tunnel_filtered":   q.TunnelID != "",
+		"entity_filtered":   q.EntityID != "",
+	}
+	for key, value := range map[string]string{
+		"node_id": q.NodeID, "user_id": q.UserID, "collection_epoch": q.Epoch,
+		"protocol": q.Protocol, "status": q.Status,
+	} {
+		if value != "" {
+			filters[key] = value
+		}
+	}
+	if q.From != nil {
+		filters["from"] = q.From.UTC().Format(time.RFC3339Nano)
+	}
+	if q.To != nil {
+		filters["to"] = q.To.UTC().Format(time.RFC3339Nano)
+	}
+	if q.Destination != "" {
+		filters["destination_match"] = "exact"
+	} else if q.DestinationPrefix != "" {
+		filters["destination_match"] = "prefix"
+	}
+	// A detail ID resolved to an ingested entity. Free-form list filters did not.
+	if operation == "detail" {
+		filters["entity_id"] = q.EntityID
+	}
+	detail := map[string]any{"operation": operation, "resource": resource, "filters": filters}
+	if operation == "list" {
+		limit := q.Limit
+		if limit == 0 {
+			limit = 50
+		}
+		detail["limit"], detail["cursor_present"] = limit, q.Cursor != ""
+	}
+	targetType, targetID := "connection_history", resource
+	if q.NodeID != "" {
+		targetType, targetID = "node", q.NodeID
+	} else if q.UserID != "" {
+		targetType, targetID = "user", q.UserID
+	}
+	h.activity.Log(c.UserContext(), services.Record{
+		EventType: "connection_history.read", Severity: services.SeverityInfo,
+		ActorType: "admin", ActorID: adminIDOf(c), ActorLabel: adminEmail(c),
+		TargetType: targetType, TargetID: targetID, Detail: detail,
+	})
 }

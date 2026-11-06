@@ -51,7 +51,7 @@ func (s *Server) registerRoutes() {
 	api.Post("/nodes/register", nodeAgentHandler.Register)
 	nodeAgent := api.Group("/nodes/:id", middleware.NodeAPIKeyMiddleware(s.db))
 	nodeAgent.Get("/connection-history/config", nodeAgentHandler.SyncConnectionHistoryBindings)
-	historyHandler := handlers.NewConnectionHistoryHandler(services.NewConnectionHistoryService(s.db))
+	historyHandler := handlers.NewConnectionHistoryHandler(services.NewConnectionHistoryService(s.db), services.NewActivityService(s.db))
 	historyHandler.RegisterRoutes(nodeAgent, admin)
 
 	admin2FA := handlers.NewAdmin2FAHandler(s.db)

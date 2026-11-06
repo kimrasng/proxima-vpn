@@ -121,7 +121,7 @@ func historyFixtureWithProtocol(t *testing.T, protocol string) *historyHTTPFixtu
 		t.Fatal(err)
 	}
 	f.app = fiber.New(fiber.Config{BodyLimit: 2 << 20})
-	h := handlers.NewConnectionHistoryHandler(f.svc)
+	h := handlers.NewConnectionHistoryHandler(f.svc, services.NewActivityService(pool))
 	node := f.app.Group("/api/v1/nodes/:id", middleware.NodeAPIKeyMiddleware(pool))
 	adm := f.app.Group("/api/v1/admin", middleware.AdminJWTMiddleware("history-test-secret", pool))
 	h.RegisterRoutes(node, adm)
