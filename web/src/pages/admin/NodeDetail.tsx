@@ -18,6 +18,7 @@ import {
   SpaceBetween,
   Spinner,
   StatusIndicator,
+  Tabs,
 } from "@cloudscape-design/components";
 import {
   LineChart,
@@ -37,6 +38,7 @@ import { formatAbsoluteTime, formatRelativeTime } from "../../utils/relativeTime
 import { formatBytes } from "../../utils/format";
 import { useManualRefresh } from "../../hooks/useManualRefresh";
 import { ConnectionLoggingPanel } from "./ConnectionLoggingPanel";
+import { ConnectionHistoryPanel } from "./ConnectionHistoryPanel";
 
 // Matches the node agents' 10s heartbeat, so a change on a node reaches
 // the screen within roughly one beat plus one poll.
@@ -132,6 +134,11 @@ function ValueTile({ label, value }: { label: string; value: string }) {
 
 export default function NodeDetail() {
   const { nodeId } = useParams<{ nodeId: string }>();
+  return <NodeDetailPage key={nodeId ?? ""} />;
+}
+
+function NodeDetailPage() {
+  const { nodeId } = useParams<{ nodeId: string }>();
   const navigate = useNavigate();
   const { t } = useTranslation();
   const [node, setNode] = useState<Node | null>(null);
@@ -140,6 +147,7 @@ export default function NodeDetail() {
   const [error, setError] = useState<string | null>(null);
   const [selectedHours, setSelectedHours] = useState(24);
   const [resourceMetric, setResourceMetric] = useState<ResourceMetric>("cpu");
+  const [activeTab, setActiveTab] = useState("overview");
 
   usePublishBreadcrumbLeaf(node?.name);
 
@@ -291,7 +299,15 @@ export default function NodeDetail() {
         </Header>
       }
     >
-      <SpaceBetween size="l">
+      <Tabs
+        activeTabId={activeTab}
+        onChange={({ detail }) => setActiveTab(detail.activeTabId)}
+        ariaLabel={t("admin.nodeDetail.title")}
+        tabs={[
+          {
+            id: "overview",
+            label: t("admin.nodeDetail.overview"),
+            content: <SpaceBetween size="l">
         <ConnectionLoggingPanel key={node.id} nodes={[node]} />
         {error && (
           <Flashbar items={[{ type: "error", content: error, dismissible: true, onDismiss: () => setError(null) }]} />
@@ -581,7 +597,15 @@ export default function NodeDetail() {
             )}
           </Container>
         </ColumnLayout>
-      </SpaceBetween>
+            </SpaceBetween>,
+          },
+          {
+            id: "connection-history",
+            label: t("connectionHistory.history"),
+            content: <ConnectionHistoryPanel nodeId={node.id} />,
+          },
+        ]}
+      />
     </ContentLayout>
   );
 }
