@@ -1,0 +1,43 @@
+{
+  "upstream": "https://github.com/XTLS/Xray-core",
+  "commit": "a4a3dff5b20c2faae567b742c172c7b95e75c083",
+  "tag": "v26.10.31",
+  "source_sha256": "7dba1dd055bdc854a2c5311610872c9bf6315ddb0a741fb8c2206212cec51b53",
+  "go": "1.27.3",
+  "build": "xray-a4a3dff5-history-v1",
+  "flags": [
+    "-trimpath",
+    "-buildvcs=false"
+  ],
+  "patches": [
+    {
+      "file": "patches/0001-history-hooks.patch",
+      "sha256": "8cc6e6459a2f77b36b13cf1303487f0e330d2f3ac41d685ea61dd5a24d3a7a60"
+    },
+    {
+      "file": "patches/0002-mux-retained-observation.patch",
+      "sha256": "779ade28ecab043769e46ac2dc45fea3e72ce50dbb82ee39eaafa5d7bdfbf0eb"
+    },
+    {
+      "file": "patches/0003-xudp-owner-detach.patch",
+      "sha256": "9b0f7538be367bc552436fee3e5eecaad40b3f1f667c1741ba8cda30e7589c7e"
+    },
+    {
+      "file": "patches/0004-ss2022-authenticated-association.patch",
+      "sha256": "98d497097099323ebefbb40f1889327cdcb29bcca430ae551039a11d4a9a34e4"
+    },
+    {
+      "file": "patches/0005-capability-probe.patch",
+      "sha256": "ccfd4f9b2887a0795b109394a3f2390a9bbbe53ce524eedcd16942e03ed5ef55"
+    },
+    {
+      "file": "patches/0006-proven-destination-metadata.patch",
+      "sha256": "5ca693670ba9fce322d73418f080f8971ae0131b9211f79c8a06627384840e87"
+    }
+  ],
+  "shared_source_digest": "43ceb55323f0838b63774faba79663ba7f20a1c6ba52d5c083dad93e5eda1290",
+  "shared_source_digest_algorithm": "sha256 of JSON array of sorted [relative path, sha256], files in shared.sha256",
+  "status": "development-not-release-qualified",
+  "overlay_source_digest": "6e8ac2969545619d8097ae75053943fab568ab401a719e2890de8e1a661a29a6",
+  "overlay_source_digest_algorithm": "sha256 of JSON array of sorted [relative path, sha256], files in overlay.sha256"
+}

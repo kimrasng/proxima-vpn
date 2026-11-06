@@ -1,0 +1,116 @@
+--- a/proxy/freedom/freedom.go
++++ b/proxy/freedom/freedom.go
+@@ -453,7 +453,7 @@
+ 	}
+ 
+ 	if newCtx != nil {
++		ctx = history.Preserve(ctx, newCtx)
+-		ctx = newCtx
+ 	}
+ 
+ 	if err := history.Run(ctx, requestDone, task.OnSuccess(responseDone, task.Close(output))); err != nil {
+--- a/proxy/socks/client.go
++++ b/proxy/socks/client.go
+@@ -164,7 +164,7 @@
+ 	}
+ 
+ 	if newCtx != nil {
++		ctx = history.Preserve(ctx, newCtx)
+-		ctx = newCtx
+ 	}
+ 
+ 	responseDonePost := task.OnSuccess(responseFunc, task.Close(link.Writer))
+--- a/common/mux/server.go
++++ b/common/mux/server.go
+@@ -1,6 +1,7 @@
+ package mux
+ 
+ import (
++	"github.com/xtls/xray-core/common/history"
+ 	"context"
+ 	"io"
+ 	"time"
+@@ -108,6 +109,16 @@
+ 	return worker, nil
+ }
+ 
++func startHandle(ctx context.Context, s *Session, output buf.Writer) {
++	s.historyDone = make(chan struct{})
++	done := history.TrackLink(&transport.Link{Reader:s.input, Writer:s.output})
++	go func() {
++		defer close(s.historyDone)
++		defer done()
++		handle(ctx,s,output)
++	}()
++}
++
+ func handle(ctx context.Context, s *Session, output buf.Writer) {
+ 	writer := NewResponseWriter(s.ID, output, s.transferType)
+ 	if err := buf.Copy(s.input, writer); err != nil {
+@@ -214,6 +225,9 @@
+ 			x.Status = Initializing
+ 			XUDPManager.Unlock()
+ 			x.Mux.Close(false) // detach from previous Mux
++			<-x.Mux.historyDone
++			history.Reattach(ctx, x.Mux.output)
++			history.PipeReader(x.Mux.input).Recover()
+ 			b := buf.New()
+ 			b.Write(mb[0].Bytes())
+ 			b.UDP = mb[0].UDP
+@@ -257,7 +271,7 @@
+ 			x.Mux.Close(false)
+ 			return errors.New("failed to add new session")
+ 		}
++		startHandle(ctx, x.Mux, w.link.Writer)
+-		go handle(ctx, x.Mux, w.link.Writer)
+ 		return nil
+ 	}
+ 
+@@ -282,7 +296,7 @@
+ 		s.Close(false)
+ 		return errors.New("failed to add new session")
+ 	}
++	startHandle(ctx, s, w.link.Writer)
+-	go handle(ctx, s, w.link.Writer)
+ 	if !meta.Option.Has(OptionData) {
+ 		return nil
+ 	}
+--- a/common/mux/session.go
++++ b/common/mux/session.go
+@@ -1,6 +1,7 @@
+ package mux
+ 
+ import (
++	"github.com/xtls/xray-core/common/history"
+ 	"context"
+ 	"io"
+ 	"runtime"
+@@ -13,7 +14,6 @@
+ 	"github.com/xtls/xray-core/common/net"
+ 	"github.com/xtls/xray-core/common/protocol"
+ 	"github.com/xtls/xray-core/common/signal/done"
+-	"github.com/xtls/xray-core/transport/pipe"
+ )
+ 
+ type SessionManager struct {
+@@ -165,6 +165,7 @@
+ 	closed       bool
+ 	done         *done.Instance
+ 	XUDP         *XUDP
++	historyDone chan struct{}
+ }
+ 
+ // Close closes all resources associated with this session.
+@@ -187,10 +188,10 @@
+ 	} else {
+ 		// Stop existing handle(), then trigger writer.Close().
+ 		// Note that s.output may be dispatcher.SizeStatWriter.
++		history.PipeReader(s.input).ReturnAnError(io.EOF)
+-		s.input.(*pipe.Reader).ReturnAnError(io.EOF)
+ 		runtime.Gosched()
+ 		// If the error set by ReturnAnError still exists, clear it.
++		// Recovery follows the previous response callback join on reattachment.
+-		s.input.(*pipe.Reader).Recover()
+ 		XUDPManager.Lock()
+ 		if s.XUDP.Status == Active {
+ 			s.XUDP.Expire = time.Now().Add(time.Minute)

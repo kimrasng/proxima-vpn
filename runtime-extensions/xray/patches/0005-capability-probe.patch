@@ -1,0 +1,26 @@
+--- a/main/main.go
++++ b/main/main.go
+@@ -1,7 +1,9 @@
+ package main
+ 
+ import (
++	"github.com/xtls/xray-core/common/history"
+ 	"flag"
++	"fmt"
+ 	"os"
+ 
+ 	"github.com/xtls/xray-core/main/commands/base"
+@@ -9,6 +11,13 @@
+ )
+ 
+ func main() {
++	if len(os.Args) == 2 && os.Args[1] == "history-capabilities" {
++		if err := history.Capabilities(os.Stdout); err != nil {
++			fmt.Fprintln(os.Stderr, err)
++			os.Exit(1)
++		}
++		return
++	}
+ 	os.Args = getArgsV4Compatible()
+ 
+ 	base.RootCommand.Long = "Xray is a platform for building proxies."

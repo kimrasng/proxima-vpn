@@ -1,0 +1,20 @@
+--- a/app/dispatcher/default.go
++++ b/app/dispatcher/default.go
+@@ -442,6 +442,7 @@
+ func (d *DefaultDispatcher) routedDispatch(ctx context.Context, link *transport.Link, destination net.Destination) {
+ 	outbounds := session.OutboundsFromContext(ctx)
+ 	ob := outbounds[len(outbounds)-1]
++	history.Effective(ctx, ob.Target)
+ 
+ 	var handler outbound.Handler
+ 
+--- a/proxy/freedom/freedom.go
++++ b/proxy/freedom/freedom.go
+@@ -376,6 +376,7 @@
+ 		}
+ 	}
+ 	defer conn.Close()
++	if !h.usesDialerProxy { history.DirectPeer(ctx, net.DestinationFromAddr(conn.RemoteAddr())) }
+ 	errors.LogInfo(ctx, "connection opened to ", destination, ", local endpoint ", conn.LocalAddr(), ", remote endpoint ", conn.RemoteAddr())
+ 
+ 	var newCtx context.Context

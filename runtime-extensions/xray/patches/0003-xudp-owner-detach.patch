@@ -1,0 +1,154 @@
+--- a/common/mux/server.go
++++ b/common/mux/server.go
+@@ -112,10 +112,16 @@
+ func startHandle(ctx context.Context, s *Session, output buf.Writer) {
+ 	s.historyDone = make(chan struct{})
+ 	done := history.TrackLink(&transport.Link{Reader:s.input, Writer:s.output})
++	if s.XUDP != nil {
++		XUDPManager.Lock()
++		s.XUDP.Status = Active
++		XUDPManager.Unlock()
++	}
+ 	go func() {
+ 		defer close(s.historyDone)
+ 		defer done()
+ 		handle(ctx,s,output)
++		s.historyWriters.Wait()
+ 	}()
+ }
+ 
+@@ -208,11 +214,15 @@
+ 		if err != nil {
+ 			return err
+ 		}
++		key := XUDPKey{GlobalID:meta.GlobalID}
++		if inbound := session.InboundFromContext(ctx); inbound != nil {
++			key.User, key.Tag = inbound.User, inbound.Tag
++		}
+ 		XUDPManager.Lock()
++		x := XUDPManager.Map[key]
+-		x := XUDPManager.Map[meta.GlobalID]
+ 		if x == nil {
++			x = &XUDP{GlobalID: meta.GlobalID, Key:key}
++			XUDPManager.Map[key] = x
+-			x = &XUDP{GlobalID: meta.GlobalID}
+-			XUDPManager.Map[meta.GlobalID] = x
+ 			XUDPManager.Unlock()
+ 		} else {
+ 			if x.Status == Initializing { // nearly impossible
+@@ -246,11 +256,12 @@
+ 			link, err := w.dispatcher.Dispatch(ctx, meta.Target)
+ 			if err != nil {
+ 				XUDPManager.Lock()
++				delete(XUDPManager.Map, x.Key)
+-				delete(XUDPManager.Map, x.GlobalID)
+ 				XUDPManager.Unlock()
+ 				err = errors.New("XUDP new ", meta.GlobalID).Base(errors.New("failed to dispatch request to ", meta.Target).Base(err))
+ 				return err // it will break the whole Mux connection
+ 			}
++			history.Retain(link)
+ 			link.Writer.WriteMultiBuffer(mb) // it's meaningless to test a new pipe
+ 			x.Mux = &Session{
+ 				input:  link.Reader,
+@@ -266,8 +277,11 @@
+ 			transferType: protocol.TransferTypePacket,
+ 			XUDP:         x,
+ 		}
+-		x.Status = Active
+ 		if !w.sessionManager.Add(x.Mux) {
++			XUDPManager.Lock()
++			delete(XUDPManager.Map, x.Key)
++			XUDPManager.Unlock()
++			x.Interrupt()
+ 			x.Mux.Close(false)
+ 			return errors.New("failed to add new session")
+ 		}
+@@ -302,7 +316,7 @@
+ 	}
+ 
+ 	rr := s.NewReader(reader, &meta.Target)
++	err = buf.Copy(rr, s)
+-	err = buf.Copy(rr, s.output)
+ 
+ 	if err != nil && buf.IsWriteError(err) {
+ 		s.Close(false)
+@@ -326,7 +340,7 @@
+ 	}
+ 
+ 	rr := s.NewReader(reader, &meta.Target)
++	err := buf.Copy(rr, s)
+-	err := buf.Copy(rr, s.output)
+ 
+ 	if err != nil && buf.IsWriteError(err) {
+ 		errors.LogInfoInner(context.Background(), err, "failed to write to downstream writer. closing session ", s.ID)
+--- a/common/mux/session.go
++++ b/common/mux/session.go
+@@ -166,6 +166,7 @@
+ 	done         *done.Instance
+ 	XUDP         *XUDP
+ 	historyDone chan struct{}
++	historyWriters sync.WaitGroup
+ }
+ 
+ // Close closes all resources associated with this session.
+@@ -204,6 +205,22 @@
+ 	return nil
+ }
+ 
++// WriteMultiBuffer admits an operation under the session lock, then releases
++// it before I/O. Close prevents new admissions; the response owner joins the
++// accepted writes before detaching observation segments.
++func (s *Session) WriteMultiBuffer(mb buf.MultiBuffer) error {
++	s.parent.RLock()
++	if s.closed {
++		s.parent.RUnlock()
++		buf.ReleaseMulti(mb)
++		return io.ErrClosedPipe
++	}
++	s.historyWriters.Add(1)
++	s.parent.RUnlock()
++	defer s.historyWriters.Done()
++	return s.output.WriteMultiBuffer(mb)
++}
++
+ // NewReader creates a buf.Reader based on the transfer type of this Session.
+ func (s *Session) NewReader(reader *buf.BufferedReader, dest *net.Destination) buf.Reader {
+ 	if s.transferType == protocol.TransferTypeStream {
+@@ -218,7 +235,14 @@
+ 	Expiring     = 2
+ )
+ 
++type XUDPKey struct {
++	GlobalID [8]byte
++	User *protocol.MemoryUser
++	Tag string
++}
++
+ type XUDP struct {
++	Key XUDPKey
+ 	GlobalID [8]byte
+ 	Status   uint64
+ 	Expire   time.Time
+@@ -232,11 +256,11 @@
+ 
+ var XUDPManager struct {
+ 	sync.Mutex
++	Map map[XUDPKey]*XUDP
+-	Map map[[8]byte]*XUDP
+ }
+ 
+ func init() {
++	XUDPManager.Map = make(map[XUDPKey]*XUDP)
+-	XUDPManager.Map = make(map[[8]byte]*XUDP)
+ 	go func() {
+ 		for {
+ 			time.Sleep(time.Minute)
+@@ -246,7 +270,7 @@
+ 				if x.Status == Expiring && now.After(x.Expire) {
+ 					x.Interrupt()
+ 					delete(XUDPManager.Map, id)
++					errors.LogDebug(context.Background(), "XUDP del ", id.GlobalID)
+-					errors.LogDebug(context.Background(), "XUDP del ", id)
+ 				}
+ 			}
+ 			XUDPManager.Unlock()

@@ -1,0 +1,126 @@
+--- a/proxy/shadowsocks_2022/inbound.go
++++ b/proxy/shadowsocks_2022/inbound.go
+@@ -176,7 +176,7 @@
+ 				sessionItem.UpdateConn(conn)
+ 			} else {
+ 				var err error
++				link, err = sessionItem.EnsureLink(history.SharedContext(ctx), conn, decoded.Destination, dispatcher, i.policyManager, func(dest net.Destination, payload []byte) ([]byte, error) {
+-				link, err = sessionItem.EnsureLink(ctx, conn, decoded.Destination, dispatcher, i.policyManager, func(dest net.Destination, payload []byte) ([]byte, error) {
+ 					return i.udpCodec.EncodeServerPacket(decoded.SessionID, dest, payload)
+ 				})
+ 				if err != nil {
+@@ -187,7 +187,7 @@
+ 			payloadBuf := buf.New()
+ 			payloadBuf.Write(decoded.Payload)
+ 			payloadBuf.UDP = &decoded.Destination
++			_ = sessionItem.WritePayload(buf.MultiBuffer{payloadBuf})
+-			_ = link.Writer.WriteMultiBuffer(buf.MultiBuffer{payloadBuf})
+ 		}
+ 	}
+ }
+--- a/proxy/shadowsocks_2022/inbound_multi.go
++++ b/proxy/shadowsocks_2022/inbound_multi.go
+@@ -354,7 +354,7 @@
+ 			pBuf := buf.New()
+ 			pBuf.Write(decoded.Payload)
+ 			pBuf.UDP = &decoded.Destination
++			_ = sessionItem.WritePayload(buf.MultiBuffer{pBuf})
+-			_ = link.Writer.WriteMultiBuffer(buf.MultiBuffer{pBuf})
+ 		}
+ 	}
+ }
+--- a/proxy/shadowsocks_2022/shadowsocks_2022.go
++++ b/proxy/shadowsocks_2022/shadowsocks_2022.go
+@@ -3,6 +3,7 @@
+ import (
+ 	"github.com/xtls/xray-core/common/history"
+ 	"context"
++	"io"
+ 
+ 	"github.com/xtls/xray-core/common"
+ 	"github.com/xtls/xray-core/common/buf"
+@@ -37,6 +38,10 @@
+ }
+ 
+ func (s *ServerUDPSession) Close() {
++	s.Lock()
++	if s.historyClosed { s.Unlock(); return }
++	s.historyClosed = true
++	s.Unlock()
+ 	if s.timer != nil {
+ 		s.timer.SetTimeout(0)
+ 	}
+@@ -46,6 +51,20 @@
+ 	}
+ }
+ 
++func (s *ServerUDPSession) WritePayload(mb buf.MultiBuffer) error {
++	s.Lock()
++	if s.historyClosed {
++		s.Unlock()
++		buf.ReleaseMulti(mb)
++		return io.ErrClosedPipe
++	}
++	s.historyWrites.Add(1)
++	link := s.link.Load()
++	s.Unlock()
++	defer s.historyWrites.Done()
++	return link.Writer.WriteMultiBuffer(mb)
++}
++
+ func (s *ServerUDPSession) EnsureLink(
+ 	ctx context.Context,
+ 	conn stat.Connection,
+@@ -67,9 +86,15 @@
+ 	sessCtx, cancel := context.WithCancel(ctx)
+ 	inbound := session.InboundFromContext(sessCtx)
+ 	if inbound != nil && s.User != nil {
++		copyInbound := *inbound
++		copyInbound.User = s.User
++		sessCtx = session.ContextWithInbound(sessCtx, &copyInbound)
++	}
++	var historyOwner *history.Owner
++	if responseEncoder != nil {
++		sessCtx, historyOwner = history.Attach(sessCtx)
++		history.Authenticate(sessCtx, "shadowsocks2022", history.IsShared(ctx), true)
+-		inbound.User = s.User
+ 	}
+-	history.Authenticate(sessCtx, "shadowsocks2022", s.User == nil || s.User.Email == "", true)
+ 	var email string
+ 	var level uint32
+ 	if s.User != nil {
+@@ -85,6 +110,7 @@
+ 
+ 	link, err := dispatcher.Dispatch(sessCtx, dest)
+ 	if err != nil {
++		if historyOwner != nil { historyOwner.Close() }
+ 		cancel()
+ 		return nil, err
+ 	}
+@@ -99,7 +125,14 @@
+ 	}, sessionPolicy.Timeouts.ConnectionIdle)
+ 	s.link.Store(link)
+ 
++	done := history.TrackLink(link)
++	go func() {
++		if historyOwner != nil { defer historyOwner.Close() }
++		defer done()
++		handleUDPResponse(s, link, dest, responseEncoder)
++		s.Close()
++		s.historyWrites.Wait()
++	}()
+-	go handleUDPResponse(s, link, dest, responseEncoder)
+ 	return link, nil
+ }
+ 
+--- a/proxy/shadowsocks_2022/replay.go
++++ b/proxy/shadowsocks_2022/replay.go
+@@ -95,6 +95,8 @@
+ 	link        atomic.Pointer[transport.Link]
+ 	timer       *signal.ActivityTimer
+ 	currentConn atomic.Value // stores stat.Connection
++	historyClosed bool
++	historyWrites sync.WaitGroup
+ }
+ 
+ func (s *ServerUDPSession) CheckPacketID(packetID uint64) bool {

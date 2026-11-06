@@ -1,0 +1,370 @@
+--- a/main/run.go
++++ b/main/run.go
+@@ -1,6 +1,8 @@
+ package main
+ 
+ import (
++	"context"
++	"github.com/xtls/xray-core/common/history"
+ 	"fmt"
+ 	"log"
+ 	"os"
+@@ -92,6 +94,13 @@
+ 		os.Exit(0)
+ 	}
+ 
++	historyServer, err := history.Start(context.Background())
++	if err != nil {
++		fmt.Println("Failed to start history:", err)
++		os.Exit(23)
++	}
++	if historyServer != nil { defer historyServer.Close() }
++
+ 	if err := server.Start(); err != nil {
+ 		fmt.Println("Failed to start:", err)
+ 		os.Exit(-1)
+--- a/app/proxyman/inbound/worker.go
++++ b/app/proxyman/inbound/worker.go
+@@ -1,6 +1,7 @@
+ package inbound
+ 
+ import (
++	"github.com/xtls/xray-core/common/history"
+ 	"context"
+ 	"sync"
+ 	"sync/atomic"
+@@ -120,6 +121,8 @@
+ 	content.SniffingRequest = w.sniffingRequest
+ 	ctx = session.ContextWithContent(ctx, content)
+ 
++	ctx, historyOwner := history.Attach(ctx)
++	defer historyOwner.Close()
+ 	if err := w.proxy.Process(ctx, net.Network_TCP, conn, w.dispatcher); err != nil {
+ 		errors.LogInfoInner(ctx, err, "connection ends")
+ 	}
+@@ -358,6 +361,8 @@
+ 			content := new(session.Content)
+ 			content.SniffingRequest = w.sniffingRequest
+ 			ctx = session.ContextWithContent(ctx, content)
++			ctx, historyOwner := history.Attach(ctx)
++			defer historyOwner.Close()
+ 			if err := w.proxy.Process(ctx, net.Network_UDP, conn, w.dispatcher); err != nil {
+ 				errors.LogInfoInner(ctx, err, "connection ends")
+ 			}
+@@ -505,6 +510,8 @@
+ 	content.SniffingRequest = w.sniffingRequest
+ 	ctx = session.ContextWithContent(ctx, content)
+ 
++	ctx, historyOwner := history.Attach(ctx)
++	defer historyOwner.Close()
+ 	if err := w.proxy.Process(ctx, net.Network_UNIX, conn, w.dispatcher); err != nil {
+ 		errors.LogInfoInner(ctx, err, "connection ends")
+ 	}
+--- a/app/dispatcher/default.go
++++ b/app/dispatcher/default.go
+@@ -1,6 +1,7 @@
+ package dispatcher
+ 
+ import (
++	"github.com/xtls/xray-core/common/history"
+ 	"context"
+ 	"strings"
+ 	"sync"
+@@ -284,10 +285,15 @@
+ 
+ 	sniffingRequest := content.SniffingRequest
+ 	inbound, outbound := d.getLink(ctx)
++	ctx, observation := history.WrapDispatch(ctx, destination, inbound)
+ 	if !sniffingRequest.Enabled {
++		go func() {
++			defer observation.Routed()
++			d.routedDispatch(ctx, outbound, destination)
++		}()
+-		go d.routedDispatch(ctx, outbound, destination)
+ 	} else {
+ 		go func() {
++			defer observation.Routed()
+ 			cReader := &cachedReader{
+ 				reader: outbound.Reader.(*pipe.Reader),
+ 			}
+@@ -338,6 +344,8 @@
+ 		content = new(session.Content)
+ 		ctx = session.ContextWithContent(ctx, content)
+ 	}
++	ctx, observation := history.WrapLink(ctx, destination, outbound)
++	defer observation.Routed()
+ 	outbound = WrapLink(ctx, d.policy, d.stats, outbound)
+ 	sniffingRequest := content.SniffingRequest
+ 	if !sniffingRequest.Enabled {
+--- a/proxy/vless/inbound/inbound.go
++++ b/proxy/vless/inbound/inbound.go
+@@ -1,6 +1,7 @@
+ package inbound
+ 
+ import (
++	"github.com/xtls/xray-core/common/history"
+ 	"bytes"
+ 	"context"
+ 	gotls "crypto/tls"
+@@ -533,6 +534,7 @@
+ 	}
+ 	inbound.Name = "vless"
+ 	inbound.User = request.User
++	history.Authenticate(ctx, "vless", false, false)
+ 	inbound.VlessRoute = net.PortFromBytes(userSentID[6:8])
+ 
+ 	account := request.User.Account.(*vless.MemoryAccount)
+@@ -551,6 +553,7 @@
+ 	case vless.XRV:
+ 		if account.Flow == requestAddons.Flow {
+ 			inbound.CanSpliceCopy = 2
++			if history.Capable(ctx) { inbound.CanSpliceCopy = 3 }
+ 			switch request.Command {
+ 			case protocol.RequestCommandUDP:
+ 				return errors.New(requestAddons.Flow + " doesn't support UDP")
+--- a/proxy/vmess/inbound/inbound.go
++++ b/proxy/vmess/inbound/inbound.go
+@@ -1,6 +1,7 @@
+ package inbound
+ 
+ import (
++	"github.com/xtls/xray-core/common/history"
+ 	"context"
+ 	"io"
+ 	"strings"
+@@ -272,6 +273,7 @@
+ 	inbound.Name = "vmess"
+ 	inbound.CanSpliceCopy = 3
+ 	inbound.User = request.User
++	history.Authenticate(ctx, "vmess", false, false)
+ 
+ 	sessionPolicy = h.policyManager.ForLevel(request.User.Level)
+ 
+@@ -310,7 +312,7 @@
+ 	}
+ 
+ 	requestDonePost := task.OnSuccess(requestDone, task.Close(link.Writer))
++	if err := history.RunLink(ctx, link, requestDonePost, responseDone); err != nil {
+-	if err := task.Run(ctx, requestDonePost, responseDone); err != nil {
+ 		common.Interrupt(link.Reader)
+ 		common.Interrupt(link.Writer)
+ 		return errors.New("connection ends").Base(err)
+--- a/proxy/trojan/server.go
++++ b/proxy/trojan/server.go
+@@ -1,6 +1,7 @@
+ package trojan
+ 
+ import (
++	"github.com/xtls/xray-core/common/history"
+ 	"context"
+ 	"io"
+ 	"strconv"
+@@ -226,6 +227,7 @@
+ 	inbound.Name = "trojan"
+ 	inbound.CanSpliceCopy = 3
+ 	inbound.User = user
++	history.Authenticate(ctx, "trojan", false, false)
+ 	sessionPolicy = s.policyManager.ForLevel(user.Level)
+ 
+ 	if destination.Network == net.Network_UDP { // handle udp request
+@@ -352,7 +354,7 @@
+ 	}
+ 
+ 	requestDonePost := task.OnSuccess(requestDone, task.Close(link.Writer))
++	if err := history.RunLink(ctx, link, requestDonePost, responseDone); err != nil {
+-	if err := task.Run(ctx, requestDonePost, responseDone); err != nil {
+ 		common.Must(common.Interrupt(link.Reader))
+ 		common.Must(common.Interrupt(link.Writer))
+ 		return errors.New("connection ends").Base(err)
+--- a/proxy/shadowsocks/server.go
++++ b/proxy/shadowsocks/server.go
+@@ -1,6 +1,7 @@
+ package shadowsocks
+ 
+ import (
++	"github.com/xtls/xray-core/common/history"
+ 	"context"
+ 	"time"
+ 
+@@ -169,6 +170,7 @@
+ 				continue
+ 			}
+ 
++			history.Authenticate(ctx, "shadowsocks", true, true)
+ 			destination := request.Destination()
+ 
+ 			currentPacketCtx := ctx
+@@ -221,6 +223,7 @@
+ 		panic("no inbound metadata")
+ 	}
+ 	inbound.User = request.User
++	history.Authenticate(ctx, "shadowsocks", true, false)
+ 
+ 	dest := request.Destination()
+ 	ctx = log.ContextWithAccessMessage(ctx, &log.AccessMessage{
+@@ -283,7 +286,7 @@
+ 	}
+ 
+ 	requestDoneAndCloseWriter := task.OnSuccess(requestDone, task.Close(link.Writer))
++	if err := history.RunLink(ctx, link, requestDoneAndCloseWriter, responseDone); err != nil {
+-	if err := task.Run(ctx, requestDoneAndCloseWriter, responseDone); err != nil {
+ 		common.Interrupt(link.Reader)
+ 		common.Interrupt(link.Writer)
+ 		return errors.New("connection ends").Base(err)
+--- a/proxy/shadowsocks_2022/inbound.go
++++ b/proxy/shadowsocks_2022/inbound.go
+@@ -1,6 +1,7 @@
+ package shadowsocks_2022
+ 
+ import (
++	"github.com/xtls/xray-core/common/history"
+ 	"context"
+ 	"time"
+ 
+@@ -117,6 +118,7 @@
+ 		return err
+ 	}
+ 
++	history.Authenticate(ctx, "shadowsocks2022", true, false)
+ 	dest := reqHeader.Destination
+ 
+ 	writer := NewServerStreamWriter(conn, i.method, i.psk, saltSlice)
+--- a/proxy/shadowsocks_2022/inbound_multi.go
++++ b/proxy/shadowsocks_2022/inbound_multi.go
+@@ -1,6 +1,7 @@
+ package shadowsocks_2022
+ 
+ import (
++	"github.com/xtls/xray-core/common/history"
+ 	"context"
+ 	"crypto/cipher"
+ 	"encoding/binary"
+@@ -246,6 +247,7 @@
+ 	// Dispatch Connection to Xray routing with matched User
+ 	inbound := session.InboundFromContext(ctx)
+ 	inbound.User = user
++	history.Authenticate(ctx, "shadowsocks2022", false, false)
+ 
+ 	ctx = log.ContextWithAccessMessage(ctx, &log.AccessMessage{
+ 		From:   conn.RemoteAddr(),
+--- a/proxy/shadowsocks_2022/shadowsocks_2022.go
++++ b/proxy/shadowsocks_2022/shadowsocks_2022.go
+@@ -1,6 +1,7 @@
+ package shadowsocks_2022
+ 
+ import (
++	"github.com/xtls/xray-core/common/history"
+ 	"context"
+ 
+ 	"github.com/xtls/xray-core/common"
+@@ -68,6 +69,7 @@
+ 	if inbound != nil && s.User != nil {
+ 		inbound.User = s.User
+ 	}
++	history.Authenticate(sessCtx, "shadowsocks2022", s.User == nil || s.User.Email == "", true)
+ 	var email string
+ 	var level uint32
+ 	if s.User != nil {
+--- a/proxy/shadowsocks_2022/stream.go
++++ b/proxy/shadowsocks_2022/stream.go
+@@ -1,6 +1,7 @@
+ package shadowsocks_2022
+ 
+ import (
++	"github.com/xtls/xray-core/common/history"
+ 	"context"
+ 	"crypto/cipher"
+ 	"crypto/rand"
+@@ -647,7 +648,7 @@
+ 	}
+ 
+ 	requestDoneAndCloseWriter := task.OnSuccess(requestDone, task.Close(link.Writer))
++	if err := history.RunLink(ctx, link, requestDoneAndCloseWriter, responseDone); err != nil {
+-	if err := task.Run(ctx, requestDoneAndCloseWriter, responseDone); err != nil {
+ 		common.Interrupt(link.Reader)
+ 		common.Interrupt(link.Writer)
+ 		return errors.New("connection ends").Base(err)
+--- a/proxy/proxy.go
++++ b/proxy/proxy.go
+@@ -6,6 +6,7 @@
+ package proxy
+ 
+ import (
++	"github.com/xtls/xray-core/common/history"
+ 	"bytes"
+ 	"context"
+ 	"crypto/rand"
+@@ -276,7 +277,7 @@
+ 			// if w.isUplink && inbound.CanSpliceCopy == 2 { // TODO: enable uplink splice
+ 			// 	inbound.CanSpliceCopy = 1
+ 			// }
++			if !history.Capable(w.ctx) && !w.isUplink && w.ob != nil && w.ob.CanSpliceCopy == 2 { // ob need to be passed in due to context can have more than one ob
+-			if !w.isUplink && w.ob != nil && w.ob.CanSpliceCopy == 2 { // ob need to be passed in due to context can have more than one ob
+ 				w.ob.CanSpliceCopy = 1
+ 			}
+ 		}
+@@ -337,7 +338,7 @@
+ 
+ 	if *switchToDirectCopy {
+ 		if inbound := session.InboundFromContext(w.ctx); inbound != nil {
++			if !history.Capable(w.ctx) && !w.isUplink && inbound.CanSpliceCopy == 2 {
+-			if !w.isUplink && inbound.CanSpliceCopy == 2 {
+ 				spliceReadyInbound = inbound
+ 			}
+ 			// if w.isUplink && w.ob != nil && w.ob.CanSpliceCopy == 2 { // TODO: enable uplink splice
+@@ -400,7 +401,7 @@
+ 	if err := w.Writer.WriteMultiBuffer(mb); err != nil {
+ 		return err
+ 	}
++	if !history.Capable(w.ctx) && spliceReadyInbound != nil && spliceReadyInbound.CanSpliceCopy == 2 {
+-	if spliceReadyInbound != nil && spliceReadyInbound.CanSpliceCopy == 2 {
+ 		// Enable splice only after this write has completed to avoid racing
+ 		// concurrent direct writes to the same TCP connection.
+ 		spliceReadyInbound.CanSpliceCopy = 1
+@@ -737,7 +738,7 @@
+ 	readerConn, readCounter, _ := UnwrapRawConn(readerConn)
+ 	writerConn, _, writeCounter := UnwrapRawConn(writerConn)
+ 	reader := buf.NewReader(readerConn)
++	if history.Capable(ctx) || (runtime.GOOS != "linux" && runtime.GOOS != "android") {
+-	if runtime.GOOS != "linux" && runtime.GOOS != "android" {
+ 		return readV(ctx, reader, writer, timer, readCounter)
+ 	}
+ 	tc, ok := writerConn.(*net.TCPConn)
+--- a/proxy/freedom/freedom.go
++++ b/proxy/freedom/freedom.go
+@@ -1,6 +1,7 @@
+ package freedom
+ 
+ import (
++	"github.com/xtls/xray-core/common/history"
+ 	"context"
+ 	"crypto/rand"
+ 	"io"
+@@ -455,7 +456,7 @@
+ 		ctx = newCtx
+ 	}
+ 
++	if err := history.Run(ctx, requestDone, task.OnSuccess(responseDone, task.Close(output))); err != nil {
+-	if err := task.Run(ctx, requestDone, task.OnSuccess(responseDone, task.Close(output))); err != nil {
+ 		return errors.New("connection ends").Base(err)
+ 	}
+ 
+--- a/proxy/socks/client.go
++++ b/proxy/socks/client.go
+@@ -1,6 +1,7 @@
+ package socks
+ 
+ import (
++	"github.com/xtls/xray-core/common/history"
+ 	"context"
+ 	"time"
+ 
+@@ -167,7 +168,7 @@
+ 	}
+ 
+ 	responseDonePost := task.OnSuccess(responseFunc, task.Close(link.Writer))
++	if err := history.Run(ctx, requestFunc, responseDonePost); err != nil {
+-	if err := task.Run(ctx, requestFunc, responseDonePost); err != nil {
+ 		return errors.New("connection ends").Base(err)
+ 	}
+ 
