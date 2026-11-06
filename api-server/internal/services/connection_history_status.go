@@ -175,6 +175,15 @@ func (s *ConnectionHistoryService) ReadControl(ctx context.Context, node string)
 	if err = json.Unmarshal(raw, &status); err != nil {
 		return nil, err
 	}
+	// A delayed healthy heartbeat describes the applied policy, not whether the
+	// current command has settled. Keep diagnostics and offline authoritative.
+	if state == "off" || state == "collecting" {
+		epochMatches := (epoch == nil && status.CollectionEpoch == nil) ||
+			(epoch != nil && status.CollectionEpoch != nil && *epoch == string(*status.CollectionEpoch))
+		if rev != appliedRev || enabled != applied || !epochMatches {
+			state = "pending"
+		}
+	}
 	// Producer records contain no auth labels or binding manifests.
 	return map[string]any{"node_id": node, "node_name": name, "enabled": enabled, "desired_revision": rev, "applied_revision": appliedRev, "applied_enabled": applied, "collection_epoch": epoch, "applied_collection_epoch": status.CollectionEpoch, "state": state, "status_at": statusAt, "last_config_fetch_at": fetchAt, "applied_at": appliedAt, "producers": status.Producers, "shared_identity": shared, "queue_bytes": status.QueueBytes, "dropped_events": status.DroppedEvents, "error_code": status.ErrorCode}, nil
 }
