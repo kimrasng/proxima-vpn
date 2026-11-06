@@ -52,6 +52,7 @@ import { describeClient } from "../../utils/userAgent";
 import { formatAbsoluteTime, formatTime } from "../../utils/relativeTime";
 import UserPlanGrantPanel from "./UserPlanGrantPanel";
 import UserResetTicketsPanel from "./UserResetTicketsPanel";
+import { ConnectionHistoryPanel } from "./ConnectionHistoryPanel";
 
 const REFRESH_INTERVAL = 30000;
 const LOGIN_HISTORY_LIMIT = 50;
@@ -415,6 +416,11 @@ function UserDetailPage() {
               id: "plan",
               label: t("admin.userDetail.tabs.plan"),
               content: <UserPlanGrantPanel user={user} plans={plans} onGranted={() => { void fetchAll(); markUpdated(); }} />,
+            },
+            {
+              id: "connection-history",
+              label: t("connectionHistory.history"),
+              content: <ConnectionHistoryPanel userId={user.id} />,
             },
             {
               id: "traffic",

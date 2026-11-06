@@ -127,6 +127,8 @@ function MetricValue({
   );
 }
 
+import { ConnectionLoggingPanel } from "./ConnectionLoggingPanel";
+
 export default function Dashboard() {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -266,6 +268,7 @@ export default function Dashboard() {
       }
     >
       <SpaceBetween size="l">
+        <ConnectionLoggingPanel nodes={nodes} />
         <Container>
           <ColumnLayout columns={4} variant="text-grid" minColumnWidth={180}>
             <KeyValuePairs

@@ -1,5 +1,10 @@
 import { get, post, put, patch, del, setClientTokenType } from './client';
 import type {
+  ConnectionHistoryPage,
+  ConnectionHistoryQuery,
+  ConnectionHistoryRow,
+  ConnectionHistoryTotal,
+  ConnectionLoggingControl,
   Node,
   NodeChain,
   CreateNodeChainRequest,
@@ -77,6 +82,40 @@ import type {
 
 function applyAdminClient() {
   setClientTokenType('admin');
+}
+
+export function getConnectionLogging(nodeId: string): Promise<ConnectionLoggingControl> {
+  applyAdminClient();
+  return get<ConnectionLoggingControl>(`/api/v1/admin/nodes/${encodeURIComponent(nodeId)}/connection-logging`);
+}
+
+export function setConnectionLogging(nodes: readonly { readonly id: string; readonly expected_revision: string }[], enabled: boolean): Promise<Record<string, { enabled: boolean; revision: string; collection_epoch: string | null }>> {
+  applyAdminClient();
+  return post('/api/v1/admin/nodes/connection-logging', { nodes, enabled });
+}
+
+function historyParams(query: ConnectionHistoryQuery): string {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(query)) {
+    if (value !== undefined && value !== '') params.set(key, String(value));
+  }
+  return params.toString();
+}
+
+export function getConnectionHistory(kind: 'sessions' | 'flows', query: ConnectionHistoryQuery): Promise<ConnectionHistoryPage> {
+  applyAdminClient();
+  return get(`/api/v1/admin/connection-history/${kind}?${historyParams(query)}`);
+}
+
+export function getConnectionHistoryDetail(kind: 'sessions' | 'flows', row: ConnectionHistoryRow): Promise<ConnectionHistoryRow> {
+  applyAdminClient();
+  const entity = kind === 'flows' ? row.event.flow_id : row.event.tunnel_id;
+  return get(`/api/v1/admin/connection-history/${kind}/${encodeURIComponent(row.node_id)}/${encodeURIComponent(row.event.collection_epoch)}/${encodeURIComponent(entity ?? '')}`);
+}
+
+export function getConnectionHistoryAggregate(query: ConnectionHistoryQuery): Promise<ConnectionHistoryTotal[]> {
+  applyAdminClient();
+  return get(`/api/v1/admin/connection-history/aggregate?${historyParams(query)}`);
 }
 
 export function adminLogin(req: LoginRequest): Promise<LoginResponse> {

@@ -1,0 +1,56 @@
+// Literal keys let locale validation verify every API enum member.
+export const historyLabels = {
+  states: {
+    off: { labelKey: 'connectionHistory.states.off' },
+    pending: { labelKey: 'connectionHistory.states.pending' },
+    collecting: { labelKey: 'connectionHistory.states.collecting' },
+    degraded: { labelKey: 'connectionHistory.states.degraded' },
+    unsupported: { labelKey: 'connectionHistory.states.unsupported' },
+    error: { labelKey: 'connectionHistory.states.error' },
+    offline: { labelKey: 'connectionHistory.states.offline' },
+    observing: { labelKey: 'connectionHistory.states.observing' },
+    ended: { labelKey: 'connectionHistory.states.ended' },
+    interrupted: { labelKey: 'connectionHistory.states.interrupted' },
+  },
+  scopes: {
+    authenticated_transport: { labelKey: 'connectionHistory.scopes.authenticated_transport' },
+    proxy_flow: { labelKey: 'connectionHistory.scopes.proxy_flow' },
+    activity_window: { labelKey: 'connectionHistory.scopes.activity_window' },
+    collection: { labelKey: 'connectionHistory.scopes.collection' },
+  },
+  layers: {
+    proxy_payload_observed: { labelKey: 'connectionHistory.layers.proxy_payload_observed' },
+    inner_ip_observed: { labelKey: 'connectionHistory.layers.inner_ip_observed' },
+    none: { labelKey: 'connectionHistory.layers.none' },
+  },
+  quality: {
+    exact: { labelKey: 'connectionHistory.quality.exact' },
+    observed: { labelKey: 'connectionHistory.quality.observed' },
+    unknown: { labelKey: 'connectionHistory.quality.unknown' },
+    complete: { labelKey: 'connectionHistory.quality.complete' },
+    partial: { labelKey: 'connectionHistory.quality.partial' },
+  },
+  qualityFields: {
+    identity: { labelKey: 'connectionHistory.qualityFields.identity' },
+    parent: { labelKey: 'connectionHistory.qualityFields.parent' },
+    destination: { labelKey: 'connectionHistory.qualityFields.destination' },
+    bytes: { labelKey: 'connectionHistory.qualityFields.bytes' },
+    start: { labelKey: 'connectionHistory.qualityFields.start' },
+    end: { labelKey: 'connectionHistory.qualityFields.end' },
+    completeness: { labelKey: 'connectionHistory.qualityFields.completeness' },
+  },
+  ends: {
+    local_owner_closed: { labelKey: 'connectionHistory.ends.local_owner_closed' },
+    activity_expired: { labelKey: 'connectionHistory.ends.activity_expired' },
+    observation_segment_closed: { labelKey: 'connectionHistory.ends.observation_segment_closed' },
+  },
+  fields: {
+    flows: { labelKey: 'connectionHistory.flows' },
+    sessions: { labelKey: 'connectionHistory.sessions' },
+    node_id: { labelKey: 'connectionHistory.node_id' },
+    user_id: { labelKey: 'connectionHistory.user_id' },
+    destination: { labelKey: 'connectionHistory.destination' },
+    from: { labelKey: 'connectionHistory.from' },
+    to: { labelKey: 'connectionHistory.to' },
+  },
+} as const;

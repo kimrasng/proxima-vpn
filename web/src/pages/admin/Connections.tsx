@@ -21,12 +21,14 @@ import {
   StatusIndicator,
   Table,
   TextFilter,
+  Tabs,
 } from "@cloudscape-design/components";
 import { useCollection } from "@cloudscape-design/collection-hooks";
 import { getOnlineUsers, terminateSession } from "../../api/admin";
 import type { OnlineUser } from "../../api/types";
 import { formatRelativeTime } from "../../utils/relativeTime";
 import { useManualRefresh } from "../../hooks/useManualRefresh";
+import { ConnectionHistoryPanel } from "./ConnectionHistoryPanel";
 
 // Matches the node agents' 10s heartbeat, so a change on a node reaches
 // the screen within roughly one beat plus one poll.
@@ -41,6 +43,14 @@ function formatBytes(bytes: number): string {
 }
 
 export default function Connections() {
+  const { t } = useTranslation();
+  return <Tabs tabs={[
+    { id: "live", label: t("connectionHistory.live"), content: <LiveConnections /> },
+    { id: "history", label: t("connectionHistory.history"), content: <ContentLayout header={<Header variant="h1">{t("connectionHistory.history")}</Header>}><ConnectionHistoryPanel /></ContentLayout> },
+  ]} />;
+}
+
+function LiveConnections() {
   const { t } = useTranslation();
   const navigate = useNavigate();
 

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { after, before, beforeEach, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'vite';
+import { createServer as createHttpServer } from 'node:http';
 
 let server;
 let client;
@@ -16,7 +17,7 @@ before(async () => {
     configFile: false,
     root: fileURLToPath(new URL('..', import.meta.url)),
     appType: 'custom',
-    server: { middlewareMode: true },
+    server: { middlewareMode: true, hmr: { server: createHttpServer() } },
     optimizeDeps: { noDiscovery: true },
   });
   client = await server.ssrLoadModule('/src/api/client.ts');

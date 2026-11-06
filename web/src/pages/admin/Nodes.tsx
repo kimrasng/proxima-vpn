@@ -48,6 +48,7 @@ import { NodeEndpointState } from "../../components/NodeEndpointState";
 import { NodeSNIEditor } from "../../components/NodeSNIEditor";
 import { LocalizedTextEditor } from "../../components/LocalizedTextEditor";
 import { useManualRefresh } from "../../hooks/useManualRefresh";
+import { ConnectionLoggingPanel } from "./ConnectionLoggingPanel";
 import "./nodesTable.css";
 
 // Matches the node agents' 10s heartbeat, so a change on a node reaches
@@ -548,6 +549,7 @@ export default function Nodes() {
           </ColumnLayout>
         </Container>
 
+        <ConnectionLoggingPanel nodes={nodes} />
         <Tabs
           activeTabId={nodeView}
           onChange={({ detail }) => {

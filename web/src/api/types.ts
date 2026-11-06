@@ -1,3 +1,129 @@
+// History integers remain decimal strings across the HTTP boundary.
+export type ConnectionHistoryLayer = 'proxy_payload_observed' | 'inner_ip_observed' | 'none';
+export type ConnectionHistoryQuality = 'exact' | 'observed' | 'unknown';
+export interface ConnectionLoggingControl {
+  readonly node_id: string;
+  readonly node_name: string;
+  readonly enabled: boolean;
+  readonly desired_revision: string;
+  readonly applied_revision: string;
+  readonly applied_enabled: boolean;
+  readonly collection_epoch: string | null;
+  readonly applied_collection_epoch: string | null;
+  readonly state: 'off' | 'pending' | 'collecting' | 'degraded' | 'unsupported' | 'error' | 'offline';
+  readonly status_at: string | null;
+  readonly last_config_fetch_at: string | null;
+  readonly applied_at: string | null;
+  readonly shared_identity: boolean;
+  readonly queue_bytes: string;
+  readonly dropped_events: string;
+  readonly error_code: string | null;
+  readonly producers: readonly {
+    readonly producer_id: string;
+    readonly observer_boot_id: string | null;
+    readonly runtime_build: string;
+    readonly capabilities: readonly string[] | null;
+    readonly applied_revision: string;
+    readonly last_durable_sequence: string;
+    readonly error_code: string | null;
+  }[] | null;
+}
+export interface ConnectionHistoryEvent {
+  readonly schema_version: 1;
+  readonly event_id: string;
+  readonly observer_boot_id: string;
+  readonly producer_id: string;
+  readonly sequence: string;
+  readonly runtime: string;
+  readonly runtime_build: string;
+  readonly config_revision: string;
+  readonly collection_epoch: string;
+  readonly event_time: string;
+  readonly monotonic_ns: string;
+  readonly kind: string;
+  readonly tunnel_id: string | null;
+  readonly flow_id: string | null;
+  readonly protocol: string | null;
+  readonly inbound_tag: string | null;
+  readonly auth: { readonly kind: 'device' | 'shared' | 'unknown'; readonly credential_ref: string | null; readonly binding_revision: string | null };
+  readonly peer: { readonly ip: string; readonly port: number } | null;
+  readonly destination: {
+    readonly requested_host: string | null;
+    readonly requested_port: number | null;
+    readonly transport: 'tcp' | 'udp';
+    readonly effective_host: string | null;
+    readonly observed_ip: string | null;
+    readonly observed_port: number | null;
+  } | null;
+  readonly bytes: { readonly layer: ConnectionHistoryLayer; readonly upload: string | null; readonly download: string | null; readonly final: boolean };
+  readonly lifecycle: {
+    readonly scope: 'authenticated_transport' | 'proxy_flow' | 'activity_window' | 'collection';
+    readonly started_at: string | null;
+    readonly last_observed_at: string | null;
+    readonly ended_at: string | null;
+    readonly partial_start: boolean;
+    readonly end_reason: string | null;
+    readonly end_semantics: 'local_owner_closed' | 'activity_expired' | 'observation_segment_closed' | null;
+  };
+  readonly quality: {
+    readonly identity: ConnectionHistoryQuality;
+    readonly parent: ConnectionHistoryQuality;
+    readonly destination: ConnectionHistoryQuality;
+    readonly bytes: ConnectionHistoryQuality;
+    readonly start: ConnectionHistoryQuality;
+    readonly end: ConnectionHistoryQuality;
+    readonly completeness: 'complete' | 'partial' | 'unknown';
+  };
+  readonly gap: {
+    readonly producer_id: string;
+    readonly observer_boot_id: string;
+    readonly first_sequence: string | null;
+    readonly last_sequence: string | null;
+    readonly from_time: string | null;
+    readonly to_time: string | null;
+    readonly lost_events: string | null;
+    readonly reason: string;
+  } | null;
+}
+export interface ConnectionHistoryTotal {
+  readonly layer: ConnectionHistoryLayer;
+  readonly upload: string;
+  readonly download: string;
+  readonly complete_intervals: number;
+  readonly partial_intervals: number;
+  readonly boundary_policy: string;
+}
+export interface ConnectionHistoryRow {
+  readonly node_id: string;
+  readonly node_name: string;
+  readonly user_id: string | null;
+  readonly device_id: string | null;
+  readonly user_snapshot: string | null;
+  readonly device_snapshot: string | null;
+  readonly first_observed_at: string;
+  readonly observation_status: 'observing' | 'ended' | 'interrupted';
+  readonly event: ConnectionHistoryEvent;
+  readonly gap_coverage: readonly ConnectionHistoryEvent[] | null;
+  readonly child_totals?: readonly ConnectionHistoryTotal[];
+}
+export interface ConnectionHistoryPage {
+  readonly items: ConnectionHistoryRow[];
+  readonly next_cursor: string | null;
+}
+export interface ConnectionHistoryQuery {
+  readonly node_id?: string;
+  readonly user_id?: string;
+  readonly tunnel_id?: string;
+  readonly collection_epoch?: string;
+  readonly destination?: string;
+  readonly protocol?: string;
+  readonly status?: string;
+  readonly from?: string;
+  readonly to?: string;
+  readonly cursor?: string;
+  readonly limit?: number;
+}
+
 // Auth
 export interface LoginRequest {
   email: string;

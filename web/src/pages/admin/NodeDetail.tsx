@@ -36,6 +36,7 @@ import { usePublishBreadcrumbLeaf } from "../../hooks/useBreadcrumbLeaf";
 import { formatAbsoluteTime, formatRelativeTime } from "../../utils/relativeTime";
 import { formatBytes } from "../../utils/format";
 import { useManualRefresh } from "../../hooks/useManualRefresh";
+import { ConnectionLoggingPanel } from "./ConnectionLoggingPanel";
 
 // Matches the node agents' 10s heartbeat, so a change on a node reaches
 // the screen within roughly one beat plus one poll.
@@ -291,6 +292,7 @@ export default function NodeDetail() {
       }
     >
       <SpaceBetween size="l">
+        <ConnectionLoggingPanel key={node.id} nodes={[node]} />
         {error && (
           <Flashbar items={[{ type: "error", content: error, dismissible: true, onDismiss: () => setError(null) }]} />
         )}
