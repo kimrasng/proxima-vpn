@@ -22,7 +22,9 @@ func (o *outbox) recoverRecords() error {
 		path := filepath.Join(o.dir, "records", entry.Name())
 		if strings.HasSuffix(entry.Name(), ".tmp") {
 			for id, cp := range o.disk.Sources {
-				o.noteLoss(id, cp, "disk_error")
+				if err := o.noteLoss(id, cp, "disk_error"); err != nil {
+					return err
+				}
 			}
 			if err := o.saveState(); err != nil {
 				return err
@@ -46,7 +48,9 @@ func (o *outbox) recoverRecords() error {
 				return fmt.Errorf("corrupt committed history record %s: %w", entry.Name(), decodeErr)
 			}
 			for id, cp := range o.disk.Sources {
-				o.noteLoss(id, cp, "disk_error")
+				if err := o.noteLoss(id, cp, "disk_error"); err != nil {
+					return err
+				}
 			}
 			if err := o.saveState(); err != nil {
 				return err
@@ -66,6 +70,11 @@ func (o *outbox) recoverRecords() error {
 			continue
 		}
 		o.bytes += recordCharge(int64(len(b)))
+		cp := o.disk.Sources[e.ProducerID]
+		if cp.Interval == nil && cp.Hello.ObserverBootID == e.ObserverBootID && cp.Through == e.Sequence {
+			cp.Interval = eventInterval(e)
+			o.disk.Sources[e.ProducerID] = cp
+		}
 		if n >= o.disk.Next {
 			o.advance(e)
 			o.disk.Next = n + 1
@@ -106,6 +115,7 @@ func (o *outbox) advance(e nodeprov.HistoryEvent) {
 		cp.GapCode = e.Gap.Reason
 	}
 	cp.Through, cp.Time, cp.Epoch = e.Sequence, &e.EventTime, &e.CollectionEpoch
+	cp.Interval = eventInterval(e)
 	cp.Hello.ConfigRevision = e.ConfigRevision
 	o.disk.Sources[e.ProducerID] = cp
 }
@@ -159,26 +169,13 @@ func (o *outbox) accept(e nodeprov.HistoryEvent) error {
 		if errors.Is(err, ErrOutboxFull) {
 			reason = "outbox_full"
 		}
-		cp.Epoch = &e.CollectionEpoch
-		cp.Hello.ConfigRevision = e.ConfigRevision
-		o.noteLoss(e.ProducerID, cp, reason)
-		return errors.Join(err, o.saveState())
+		if cp.Epoch == nil || *cp.Epoch != e.CollectionEpoch {
+			cp.Time = nil
+		}
+		cp.Interval = eventInterval(e)
+		return errors.Join(err, o.noteLoss(e.ProducerID, cp, reason), o.saveState())
 	}
 	return nil
-}
-
-func (o *outbox) noteLoss(id string, cp checkpoint, reason string) {
-	if cp.Epoch == nil {
-		return
-	}
-	if _, exists := o.disk.Losses[id]; exists {
-		return // Coalesce an unknown interval from its earliest durable observation.
-	}
-	o.disk.Losses[id] = lossState{
-		Gap: nodeprov.HistoryGap{ProducerID: id, ObserverBootID: cp.Hello.ObserverBootID,
-			FromTime: cp.Time, Reason: reason},
-		Epoch: *cp.Epoch, Revision: cp.Hello.ConfigRevision,
-	}
 }
 
 func (o *outbox) flushLosses() error {
@@ -190,7 +187,9 @@ func (o *outbox) flushLosses() error {
 	for _, id := range keys {
 		loss := o.disk.Losses[id]
 		now := nodeprov.HistoryTimestamp(o.clock())
-		loss.Gap.ToTime = &now
+		if loss.Gap.ToTime == nil {
+			loss.Gap.ToTime = &now
+		}
 		seq := o.disk.AgentSeq + 1
 		e := nodeprov.HistoryEvent{
 			SchemaVersion: 1, ObserverBootID: o.disk.AgentBoot, Sequence: seq,
@@ -221,20 +220,28 @@ func (o *outbox) hello(h nodeprov.HistoryHello) (nodeprov.HistoryU64, error) {
 		return 0, fmt.Errorf("too many history producers")
 	}
 	cp := old
-	if exists && o.unclean && old.Epoch == nil && h.CollectionEpoch != nil {
+	if exists && o.unclean && old.Epoch == nil && h.Enabled && h.CollectionEpoch != nil {
 		lost := old
 		lost.Epoch, lost.Hello.ConfigRevision = h.CollectionEpoch, h.ConfigRevision
-		o.noteLoss(h.ProducerID, lost, "producer_lost")
+		lost.Interval = &collectionInterval{Epoch: *h.CollectionEpoch, Revision: h.ConfigRevision}
+		if err := o.noteLoss(h.ProducerID, lost, "producer_lost"); err != nil {
+			return 0, err
+		}
 	}
 	if cp.Hello.ObserverBootID != h.ObserverBootID {
 		if exists {
-			o.noteLoss(h.ProducerID, old, "observer_restart")
+			if err := o.noteLoss(h.ProducerID, old, "observer_restart"); err != nil {
+				return 0, err
+			}
 		}
 		cp = checkpoint{}
 	}
 	cp.Hello = h
 	if cp.Epoch == nil {
 		cp.Epoch = h.CollectionEpoch
+	}
+	if h.Enabled && h.CollectionEpoch != nil && (cp.Interval == nil || cp.Interval.Epoch != *h.CollectionEpoch) {
+		cp.Interval = &collectionInterval{Epoch: *h.CollectionEpoch, Revision: h.ConfigRevision}
 	}
 	o.disk.Sources[h.ProducerID] = cp
 	if err := o.saveState(); err != nil {

@@ -34,6 +34,7 @@ type checkpoint struct {
 	Applied   *nodeprov.HistoryApplied
 	AppliedAt *nodeprov.HistoryTime
 	GapCode   string
+	Interval  *collectionInterval
 }
 
 type lossState struct {
@@ -94,7 +95,10 @@ func openOutbox(dir string, clock func() time.Time) (*outbox, error) {
 	o.unclean = o.disk.Active
 	if o.unclean {
 		for id, cp := range o.disk.Sources {
-			o.noteLoss(id, cp, "producer_lost")
+			if err := o.noteLoss(id, cp, "producer_lost"); err != nil {
+				f.Close()
+				return nil, err
+			}
 		}
 	}
 	o.disk.Active = true

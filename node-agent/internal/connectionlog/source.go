@@ -85,10 +85,19 @@ func (m *Manager) collect(ctx context.Context, w *producerWorker) error {
 	}()
 	defer func() { cancel(); conn.Close(); <-done }()
 	var sent *nodeprov.HistoryApply
+	var policyEpoch *nodeprov.HistoryUUID
+	initialOFF := !hello.Enabled && hello.CollectionEpoch == nil && hello.LastSequence == 0
 	var waiting bool
 	apply := func() error {
 		next := m.desiredApply()
+		var epoch *nodeprov.HistoryUUID
 		if next != nil {
+			epoch = next.CollectionEpoch
+			// A producer that has never collected has no interval to close.
+			// Keep the server's historical epoch for policy reporting only.
+			if initialOFF && !next.Enabled {
+				next.CollectionEpoch = nil
+			}
 			runtime := strings.SplitN(w.source.ID(), ":", 2)[0]
 			if typed, ok := w.source.(interface{ HistoryRuntime() string }); ok {
 				runtime = typed.HistoryRuntime()
@@ -108,6 +117,7 @@ func (m *Manager) collect(ctx context.Context, w *producerWorker) error {
 			return err
 		}
 		sent, waiting = next, true
+		policyEpoch = epoch
 		return nil
 	}
 	if err := apply(); err != nil {
@@ -164,8 +174,11 @@ func (m *Manager) collect(ctx context.Context, w *producerWorker) error {
 					v.Enabled != sent.Enabled || !reflect.DeepEqual(v.CollectionEpoch, sent.CollectionEpoch) {
 					return fmt.Errorf("unsolicited history applied barrier")
 				}
-				if err := m.persistApplied(hello.ProducerID, v); err != nil {
+				if err := m.persistApplied(hello.ProducerID, v, policyEpoch); err != nil {
 					return err
+				}
+				if v.Enabled {
+					initialOFF = false
 				}
 				m.workerError(w, nil)
 				waiting = false
@@ -184,11 +197,10 @@ func (m *Manager) collect(ctx context.Context, w *producerWorker) error {
 func (m *Manager) sourceDecodeError(id string, err error) error {
 	m.out.mu.Lock()
 	defer m.out.mu.Unlock()
-	m.out.noteLoss(id, m.out.disk.Sources[id], "decode_error")
-	return errors.Join(err, m.out.saveState())
+	return errors.Join(err, m.out.noteLoss(id, m.out.disk.Sources[id], "decode_error"), m.out.saveState())
 }
 
-func (m *Manager) persistApplied(id string, a nodeprov.HistoryApplied) error {
+func (m *Manager) persistApplied(id string, a nodeprov.HistoryApplied, policyEpoch *nodeprov.HistoryUUID) error {
 	m.out.mu.Lock()
 	defer m.out.mu.Unlock()
 	cp := m.out.disk.Sources[id]
@@ -196,7 +208,9 @@ func (m *Manager) persistApplied(id string, a nodeprov.HistoryApplied) error {
 		return fmt.Errorf("history applied barrier is not durable")
 	}
 	prior := cp
-	cp.Applied = &a
+	policy := a
+	policy.CollectionEpoch = policyEpoch
+	cp.Applied = &policy
 	now := nodeprov.HistoryTimestamp(m.clock())
 	cp.AppliedAt = &now
 	if !a.Enabled {
