@@ -59,12 +59,13 @@ type Hysteria2Bandwidth struct {
 
 // Hysteria2Manager manages the Hysteria2 process lifecycle.
 type Hysteria2Manager struct {
-	cmd        *exec.Cmd
-	configPath string
-	binaryPath string
-	mu         sync.Mutex
-	running    bool
-	done       chan struct{}
+	cmd           *exec.Cmd
+	configPath    string
+	binaryPath    string
+	historySocket string
+	mu            sync.Mutex
+	running       bool
+	done          chan struct{}
 }
 
 // NewHysteria2Manager creates a new Hysteria2 process manager.
@@ -95,6 +96,9 @@ func (m *Hysteria2Manager) Start() error {
 	}
 
 	m.cmd = exec.Command(m.binaryPath, "server", "--config", m.configPath)
+	if m.historySocket != "" {
+		m.cmd.Env = append(os.Environ(), "PROXIMA_HISTORY_SOCKET="+m.historySocket)
+	}
 	m.cmd.Stdout = newPrefixWriter("hysteria2")
 	m.cmd.Stderr = newPrefixWriter("hysteria2")
 
@@ -160,6 +164,13 @@ func (m *Hysteria2Manager) IsRunning() bool {
 	return m.running
 }
 
+// SetHistorySocket is set before Start and remains independent of VPN config.
+func (m *Hysteria2Manager) SetHistorySocket(path string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.historySocket = path
+}
+
 // UpdateConfig writes the given config to disk and restarts the process.
 func (m *Hysteria2Manager) UpdateConfig(cfg Hysteria2Config) error {
 	data, err := json.MarshalIndent(cfg, "", "  ")
@@ -183,8 +194,11 @@ func (m *Hysteria2Manager) writeConfig(data []byte) error {
 		return fmt.Errorf("create config dir: %w", err)
 	}
 
-	if err := os.WriteFile(m.configPath, data, 0o644); err != nil {
+	if err := os.WriteFile(m.configPath, data, 0o600); err != nil {
 		return fmt.Errorf("write hysteria2 config: %w", err)
+	}
+	if err := os.Chmod(m.configPath, 0o600); err != nil {
+		return fmt.Errorf("protect hysteria2 config: %w", err)
 	}
 
 	return nil
@@ -194,6 +208,11 @@ func (m *Hysteria2Manager) waitForExit() {
 	err := m.cmd.Wait()
 
 	m.mu.Lock()
+	if info, statErr := os.Lstat(m.historySocket); statErr == nil && info.Mode()&os.ModeSocket != 0 {
+		if removeErr := os.Remove(m.historySocket); removeErr != nil && !os.IsNotExist(removeErr) {
+			log.Printf("remove exited Hysteria history socket: %v", removeErr)
+		}
+	}
 	m.running = false
 	m.cmd = nil
 	m.mu.Unlock()

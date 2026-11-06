@@ -7,7 +7,7 @@ func GenerateSingbox(nodes []NodeInfo, userUUID string) ([]byte, error) {
 	var nodeTags []string
 
 	for _, node := range nodes {
-		if !TCPProtocol(node.Protocol) {
+		if !TCPProtocol(node.Protocol) && node.Protocol != "hysteria2" {
 			continue
 		}
 		ob := singboxOutbound(node, userUUID)
@@ -153,7 +153,7 @@ func singboxHysteria2(node NodeInfo, userUUID string) map[string]interface{} {
 		"tag":         node.Name,
 		"server":      node.IP,
 		"server_port": node.Port,
-		"password":    userUUID,
+		"password":    userUUID + ":" + userUUID,
 		"tls": map[string]interface{}{
 			"enabled": true,
 		},

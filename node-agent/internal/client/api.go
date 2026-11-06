@@ -102,9 +102,10 @@ type HeartbeatPayload struct {
 	// Bytes each relay route forwarded since the previous heartbeat, read
 	// from the Entry's nftables counters. Omitted when nothing moved and by
 	// older agents.
-	RouteTraffic []nodeprov.RouteTraffic   `json:"route_traffic,omitempty"`
-	RelayFlows   *nodeprov.RelayFlowReport `json:"relay_flows,omitempty"`
-	TunnelReport *nodeprov.TunnelReport    `json:"tunnel_report,omitempty"`
+	RouteTraffic      []nodeprov.RouteTraffic   `json:"route_traffic,omitempty"`
+	RelayFlows        *nodeprov.RelayFlowReport `json:"relay_flows,omitempty"`
+	TunnelReport      *nodeprov.TunnelReport    `json:"tunnel_report,omitempty"`
+	ConnectionLogging json.RawMessage           `json:"connection_logging,omitempty"`
 }
 
 type NodeStatus struct {
@@ -120,6 +121,7 @@ type NodeStatus struct {
 	RouteTraffic      []nodeprov.RouteTraffic
 	RelayFlows        *nodeprov.RelayFlowReport
 	TunnelReport      *nodeprov.TunnelReport
+	ConnectionLogging json.RawMessage
 }
 
 // Register registers this node with the main server.
@@ -285,6 +287,7 @@ func (c *APIClient) SendHeartbeatWithClosures(ctx context.Context, cpu, memory, 
 		RouteTraffic:      status.RouteTraffic,
 		RelayFlows:        status.RelayFlows,
 		TunnelReport:      status.TunnelReport,
+		ConnectionLogging: status.ConnectionLogging,
 	}
 
 	body, err := json.Marshal(payload)

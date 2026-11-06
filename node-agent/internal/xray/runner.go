@@ -4,17 +4,24 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/proximavpn/proxima-vpn/pkg/nodeprov"
 )
 
 const (
@@ -41,14 +48,15 @@ const (
 // mu. The exited channel lets IsRunning report liveness without reaping the
 // child itself - a single owner goroutine per process calls cmd.Wait().
 type XrayRunner struct {
-	mu          sync.Mutex
-	cmd         *exec.Cmd
-	exited      chan struct{} // closed by the reaper when cmd terminates
-	waitErr     error         // exit error observed by the reaper
-	configPath  string
-	grpcAddr    string
-	binaryPath  string
-	accessIndex *AccessIndex
+	mu            sync.Mutex
+	cmd           *exec.Cmd
+	exited        chan struct{} // closed by the reaper when cmd terminates
+	waitErr       error         // exit error observed by the reaper
+	configPath    string
+	grpcAddr      string
+	binaryPath    string
+	historySocket string
+	accessIndex   *AccessIndex
 
 	// Config writes and restores share the same canonical-to-runtime transform.
 	// canonicalConfig never contains node-local SOCKS passwords.
@@ -95,6 +103,9 @@ func (r *XrayRunner) Start() error {
 	}
 
 	cmd := exec.Command(r.binaryPath, "-config", r.configPath)
+	if r.historySocket != "" {
+		cmd.Env = append(os.Environ(), "PROXIMA_HISTORY_SOCKET="+r.historySocket)
+	}
 	// Bound output-copy shutdown if a descendant retains the log pipe after
 	// Xray exits; otherwise the single reaper could wait indefinitely.
 	cmd.WaitDelay = time.Second
@@ -125,6 +136,11 @@ func (r *XrayRunner) Start() error {
 		r.mu.Lock()
 		if r.exited == exited {
 			r.waitErr = err
+			if info, statErr := os.Lstat(r.historySocket); statErr == nil && info.Mode()&os.ModeSocket != 0 {
+				if removeErr := os.Remove(r.historySocket); removeErr != nil && !os.IsNotExist(removeErr) {
+					log.Printf("remove exited Xray history socket: %v", removeErr)
+				}
+			}
 		}
 		r.mu.Unlock()
 		close(exited)
@@ -230,6 +246,14 @@ func (r *XrayRunner) SetConfigTransform(transform func([]byte) ([]byte, error)) 
 	r.configMu.Lock()
 	defer r.configMu.Unlock()
 	r.configTransform = transform
+}
+
+// SetHistorySocket provisions the exporter before the initial runtime launch.
+// Policy changes use the exporter control socket, never the config/restart path.
+func (r *XrayRunner) SetHistorySocket(path string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.historySocket = path
 }
 
 // SetConfigRestoreGuard prevents rollback from re-admitting revoked users or
@@ -416,6 +440,16 @@ var xrayReleaseAssets = map[string]string{
 // previous implementation stopped Xray *before* downloading, so every slow or
 // failed download was a service outage of that duration.
 func (r *XrayRunner) StageBinary(ctx context.Context, targetVersion string) (string, error) {
+	r.mu.Lock()
+	historyRequired := r.historySocket != ""
+	r.mu.Unlock()
+	if historyRequired {
+		manifest := os.Getenv("PROXIMA_RUNTIME_MANIFEST")
+		if manifest == "" {
+			manifest = "/etc/node-agent/runtime-manifest.json"
+		}
+		return StageHistoryRuntime(ctx, manifest, "xray", r.binaryPath, targetVersion)
+	}
 	asset, ok := xrayReleaseAssets[runtime.GOOS+"/"+runtime.GOARCH]
 	if !ok {
 		return "", fmt.Errorf("no xray release asset known for %s/%s", runtime.GOOS, runtime.GOARCH)
@@ -501,6 +535,112 @@ func (r *XrayRunner) StageBinary(ctx context.Context, targetVersion string) (str
 
 	staged = true
 	return tmpPath, nil
+}
+
+// StageHistoryRuntime consumes a locally provisioned manifest produced from the
+// runtime owners' actual build/checksum outputs. Missing or mismatched artifacts
+// fail closed; there is no stock-binary fallback for history-capable nodes.
+func StageHistoryRuntime(ctx context.Context, manifestPath, name, destination, target string) (string, error) {
+	var manifest struct {
+		SchemaVersion int `json:"schema_version"`
+		Artifacts     []struct {
+			Runtime string `json:"runtime"`
+			Commit  string `json:"commit"`
+			Version string `json:"version"`
+			Build   string `json:"build"`
+			OS      string `json:"os"`
+			Arch    string `json:"arch"`
+			Path    string `json:"path"`
+			SHA256  string `json:"sha256"`
+		} `json:"artifacts"`
+	}
+	data, err := os.ReadFile(manifestPath)
+	if err != nil {
+		return "", fmt.Errorf("read approved runtime manifest: %w", err)
+	}
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&manifest); err != nil || manifest.SchemaVersion != 1 {
+		return "", fmt.Errorf("invalid runtime manifest")
+	}
+	commit, build := "", ""
+	required := []string{"auth_transport", "hot_toggle", "tcp_flow", "udp_destination"}
+	switch name {
+	case "xray":
+		commit, build = "a4a3dff5b20c2faae567b742c172c7b95e75c083", "xray-a4a3dff5-history-v1"
+		required = append(required, "mux", "xudp")
+	case "hysteria2":
+		commit, build = "ca8fbd874fd6ca82413948de6dc5924405e103e1", "hysteria2-ca8fbd874fd6-history-v1"
+	default:
+		return "", fmt.Errorf("unknown history runtime")
+	}
+	for _, artifact := range manifest.Artifacts {
+		if artifact.Runtime != name || artifact.OS != runtime.GOOS || artifact.Arch != runtime.GOARCH {
+			continue
+		}
+		if artifact.Commit != commit || artifact.Build != build || (target != "" && target != artifact.Version && target != build) {
+			return "", fmt.Errorf("runtime target is not the approved pinned build")
+		}
+		source := artifact.Path
+		if !filepath.IsAbs(source) {
+			source = filepath.Join(filepath.Dir(manifestPath), source)
+		}
+		binary, err := os.ReadFile(source)
+		if err != nil {
+			return "", fmt.Errorf("read runtime artifact: %w", err)
+		}
+		sum := sha256.Sum256(binary)
+		if hex.EncodeToString(sum[:]) != artifact.SHA256 {
+			return "", fmt.Errorf("runtime artifact checksum mismatch")
+		}
+		f, err := os.CreateTemp(filepath.Dir(destination), name+"-history-*")
+		if err != nil {
+			return "", err
+		}
+		path := f.Name()
+		staged := false
+		defer func() {
+			if !staged {
+				os.Remove(path)
+			}
+		}()
+		if _, err := f.Write(binary); err != nil {
+			f.Close()
+			return "", err
+		}
+		if err := f.Sync(); err != nil {
+			f.Close()
+			return "", err
+		}
+		if err := f.Close(); err != nil {
+			return "", err
+		}
+		if err := os.Chmod(path, 0o755); err != nil {
+			return "", err
+		}
+		probeCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		out, err := exec.CommandContext(probeCtx, path, "history-capabilities").Output()
+		cancel()
+		if err != nil {
+			return "", fmt.Errorf("runtime capability probe: %w", err)
+		}
+		frame, err := nodeprov.DecodeHistoryControl(out)
+		if err != nil {
+			return "", fmt.Errorf("runtime capability response: %w", err)
+		}
+		hello, ok := frame.(nodeprov.HistoryHello)
+		if !ok || hello.RuntimeBuild != build || hello.ProducerID != name {
+			return "", fmt.Errorf("runtime capability build mismatch")
+		}
+		for _, capability := range required {
+			if !slices.Contains(hello.Capabilities, capability) {
+				return "", fmt.Errorf("runtime missing required capability %s", capability)
+			}
+		}
+		staged = true
+		return path, nil
+	}
+	return "", fmt.Errorf("no approved %s artifact for %s/%s", name, runtime.GOOS, runtime.GOARCH)
 }
 
 // CommitBinary atomically moves a binary staged by StageBinary into place,

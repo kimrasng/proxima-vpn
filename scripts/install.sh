@@ -34,6 +34,7 @@ COUNTRY=""
 REGION=""
 PORT="443"
 PORTS=""
+RUNTIME_MANIFEST="${PROXIMA_RUNTIME_MANIFEST:-/etc/node-agent/runtime-manifest.json}"
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -44,6 +45,7 @@ while [[ $# -gt 0 ]]; do
         --region)  REGION="$2"; shift 2 ;;
         --port)    PORT="$2"; shift 2 ;;
         --ports)   PORTS="$2"; shift 2 ;;
+        --runtime-manifest) RUNTIME_MANIFEST="$2"; shift 2 ;;
         -h|--help)
             echo "Usage: bash install.sh --server <panel-url> --token <reg-token>"
             echo ""
@@ -55,6 +57,7 @@ while [[ $# -gt 0 ]]; do
             echo "  --region   Region/city (optional)"
             echo "  --port     Service port (default: 443)"
             echo "  --ports    Firewall ports to open (default: service port + 20001-22000)"
+            echo "  --runtime-manifest Local pinned runtime artifact manifest (required for exits)"
             exit 0
             ;;
         *)
@@ -261,58 +264,22 @@ log_info "Node role: $ROLE"
 
 # --- Install VPN-only dependencies and Xray-core for exit-capable roles ---
 if [[ "$ROLE" != "relay" ]]; then
-    log_step "4/4" "Installing Xray-core for $ROLE node..."
-    case "$PACKAGE_MANAGER" in
-        apt-get) apt-get install -y -qq unzip >/dev/null 2>&1 ;;
-        yum)     yum install -y -q unzip >/dev/null 2>&1 ;;
-        dnf)     dnf install -y -q unzip >/dev/null 2>&1 ;;
-        apk)     apk add --no-cache -q unzip >/dev/null 2>&1 ;;
-        *)       log_warn "Ensure unzip is installed for Xray-core installation." ;;
-    esac
-    # The panel reads per-user online IPs through GetStatsOnlineIpList, which older
-    # cores do not serve - on one of those the concurrency figures are simply absent
-    # and nothing looks wrong. Overridable so a pinned deployment can choose its own
-    # version, but never silently below the floor.
-    XRAY_MIN_VERSION="v25.1.1"
-    XRAY_VERSION="${XRAY_VERSION:-}"
-    if [[ -z "$XRAY_VERSION" ]]; then
-        XRAY_VERSION=$(curl -fsSL "https://api.github.com/repos/XTLS/Xray-core/releases/latest" | jq -r .tag_name)
-    fi
-    if [[ -z "$XRAY_VERSION" || "$XRAY_VERSION" == "null" ]]; then
-        log_error "Failed to fetch latest Xray-core version"
+    log_step "4/4" "Installing verified history runtimes for $ROLE node..."
+    if [[ ! -f "$RUNTIME_MANIFEST" ]]; then
+        log_error "Provision a local runtime manifest with --runtime-manifest."
+        log_error "Build pinned artifacts with runtime-extensions/{xray,hysteria2}/build.sh and scripts/history-runtime-manifest.sh."
+        log_error "Stock runtime fallback is disabled; the existing runtimes are untouched."
         exit 1
     fi
-
-    # Compares dot-separated numbers, so 26.3.27 ranks above 26.3.9 where a string
-    # comparison would not.
-    version_below() {
-        [[ "$(printf '%s\n%s\n' "${1#v}" "${2#v}" | sort -V | head -1)" == "${1#v}" && "${1#v}" != "${2#v}" ]]
-    }
-    if version_below "$XRAY_VERSION" "$XRAY_MIN_VERSION"; then
-        log_error "Xray-core $XRAY_VERSION is older than the required $XRAY_MIN_VERSION"
-        log_error "Per-user connection counting needs the GetStatsOnlineIpList stats RPC."
-        exit 1
-    fi
-    log_info "Xray-core $XRAY_VERSION satisfies the $XRAY_MIN_VERSION minimum"
-
-    XRAY_FILENAME="Xray-linux-64"
-    if [[ "$ARCH" == "arm64" ]]; then
-        XRAY_FILENAME="Xray-linux-arm64-v8a"
-    fi
-
-    XRAY_URL="https://github.com/XTLS/Xray-core/releases/download/${XRAY_VERSION}/${XRAY_FILENAME}.zip"
-    TMPDIR=$(mktemp -d)
-    trap 'rm -rf "$TMPDIR"' EXIT
-
-    if ! curl -fsSL -o "${TMPDIR}/xray.zip" "$XRAY_URL"; then
-        log_error "Failed to download Xray-core from $XRAY_URL"
-        exit 1
-    fi
-
-    unzip -q "${TMPDIR}/xray.zip" -d "${TMPDIR}/xray"
-    cp "${TMPDIR}/xray/xray" /usr/local/bin/xray
-    chmod +x /usr/local/bin/xray
-    log_info "Xray-core ${XRAY_VERSION} installed"
+    MANIFEST_BASE=$(cd "$(dirname "$RUNTIME_MANIFEST")" && pwd)
+    INSTALL_TMP=$(mktemp -d)
+    trap 'rm -rf "$INSTALL_TMP"' EXIT
+    jq --arg base "$MANIFEST_BASE" '.artifacts |= map(.path |= if startswith("/") then . else $base + "/" + . end)' \
+        "$RUNTIME_MANIFEST" > "$INSTALL_TMP/runtime-manifest.json"
+    /usr/local/bin/node-agent install-runtime --runtime xray --manifest "$INSTALL_TMP/runtime-manifest.json"
+    /usr/local/bin/node-agent install-runtime --runtime hysteria2 --manifest "$INSTALL_TMP/runtime-manifest.json"
+    install -m 0600 "$INSTALL_TMP/runtime-manifest.json" /etc/node-agent/runtime-manifest.json
+    log_info "Pinned Xray and Hysteria history runtimes installed"
 else
     log_step "4/4" "Relay-only node: skipping VPN software installation"
     # Fresh-install provisioning only: leave any existing VPN software untouched.

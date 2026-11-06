@@ -40,7 +40,8 @@ func main() {
 		log.Fatalf("failed to load config: %v", err)
 	}
 
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	db, err := database.NewPostgresPool(ctx, cfg.Database)
 	if err != nil {
@@ -72,6 +73,23 @@ func main() {
 
 	retention := scheduler.NewRetentionScheduler(db)
 	go retention.Start(ctx)
+	historyRetention := scheduler.NewConnectionHistoryRetention(db)
+	historyDone := make(chan struct{})
+	go func() {
+		defer close(historyDone)
+		ticker := time.NewTicker(6 * time.Hour)
+		defer ticker.Stop()
+		for {
+			if err := historyRetention.RunOnce(ctx, time.Now()); err != nil && ctx.Err() == nil {
+				log.Printf("[ConnectionHistory] retention: %v", err)
+			}
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+			}
+		}
+	}()
 
 	concurrency := scheduler.NewConcurrencyScheduler(db, rdb)
 	go concurrency.Start(ctx)
@@ -133,6 +151,8 @@ func main() {
 	if err := srv.Start(); err != nil {
 		log.Fatalf("server error: %v", err)
 	}
+	cancel()
+	<-historyDone
 
 	trafficReset.Stop()
 	expiryCheck.Stop()

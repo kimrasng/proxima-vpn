@@ -1,13 +1,50 @@
 package process
 
 import (
+	"context"
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
 )
+
+// AppliedPeers reads the kernel result, including after a partially failed
+// reconciliation. Desired API peers are not proof of what the interface uses.
+func (m *WireGuardManager) AppliedPeers(ctx context.Context) (int, []WireGuardPeer, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	iface, err := net.InterfaceByName(m.interfaceName)
+	if err != nil {
+		return 0, nil, fmt.Errorf("find WireGuard interface: %w", err)
+	}
+	output, err := exec.CommandContext(ctx, "wg", "show", m.interfaceName, "allowed-ips").Output()
+	if err != nil {
+		return 0, nil, fmt.Errorf("read applied WireGuard peers: %w", err)
+	}
+	peers := []WireGuardPeer{}
+	for _, line := range strings.Split(strings.TrimSpace(string(output)), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) == 0 {
+			continue
+		}
+		if len(fields) < 2 {
+			return 0, nil, fmt.Errorf("WireGuard peer has no applied map entry")
+		}
+		var prefixes []string
+		for _, field := range fields[1:] {
+			for _, prefix := range strings.Split(field, ",") {
+				if prefix != "" && prefix != "(none)" {
+					prefixes = append(prefixes, prefix)
+				}
+			}
+		}
+		peers = append(peers, WireGuardPeer{PublicKey: fields[0], AllowedIPs: strings.Join(prefixes, ",")})
+	}
+	return iface.Index, peers, nil
+}
 
 // WireGuardConfig represents the full configuration for a WireGuard interface.
 type WireGuardConfig struct {

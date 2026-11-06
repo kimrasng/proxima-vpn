@@ -44,6 +44,16 @@ func (s *Server) registerRoutes() {
 
 	admin.Use(middleware.AdminJWTMiddleware(s.config.JWT.Secret, s.db))
 
+	nodeAgentHandler := handlers.NewNodeAgentHandler(s.db, s.redis, services.ManagedEntryDNSIntentConfig{
+		Enabled: s.config.ManagedEntryDNS.Active(), ZoneID: s.config.ManagedEntryDNS.ZoneID,
+		BaseDomain: s.config.ManagedEntryDNS.BaseDomain,
+	})
+	api.Post("/nodes/register", nodeAgentHandler.Register)
+	nodeAgent := api.Group("/nodes/:id", middleware.NodeAPIKeyMiddleware(s.db))
+	nodeAgent.Get("/connection-history/config", nodeAgentHandler.SyncConnectionHistoryBindings)
+	historyHandler := handlers.NewConnectionHistoryHandler(services.NewConnectionHistoryService(s.db))
+	historyHandler.RegisterRoutes(nodeAgent, admin)
+
 	admin2FA := handlers.NewAdmin2FAHandler(s.db)
 	twoFA := admin.Group("/auth/2fa")
 	twoFA.Get("/setup", admin2FA.Setup)
@@ -185,14 +195,6 @@ func (s *Server) registerRoutes() {
 		admin.Get("/backup/download", adminBackupHandler.DownloadBackup)
 	}
 
-	nodeAgentHandler := handlers.NewNodeAgentHandler(s.db, s.redis, services.ManagedEntryDNSIntentConfig{
-		Enabled: s.config.ManagedEntryDNS.Active(), ZoneID: s.config.ManagedEntryDNS.ZoneID,
-		BaseDomain: s.config.ManagedEntryDNS.BaseDomain,
-	})
-	api.Post("/nodes/register", nodeAgentHandler.Register)
-
-	nodeAgent := api.Group("/nodes/:id")
-	nodeAgent.Use(middleware.NodeAPIKeyMiddleware(s.db))
 	nodeAgent.Delete("/", nodeAgentHandler.Unregister)
 	nodeAgent.Get("/config", nodeAgentHandler.Config)
 	nodeAgent.Get("/config/digest", nodeAgentHandler.ConfigDigest)

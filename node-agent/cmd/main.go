@@ -45,6 +45,7 @@ func main() {
 	rootCmd.AddCommand(unregisterCmd())
 	rootCmd.AddCommand(runCmd())
 	rootCmd.AddCommand(versionCmd())
+	rootCmd.AddCommand(installHistoryRuntimeCmd())
 
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
@@ -202,6 +203,13 @@ func runCmd() *cobra.Command {
 			}
 
 			runner := xray.NewXrayRunner("", "")
+			history := newConnectionHistory(ctx, apiClient, configPath)
+			runner.SetHistorySocket(history.socket("xray"))
+			defer func() {
+				if err := history.Close(); err != nil {
+					log.Printf("connection history shutdown: %v", err)
+				}
+			}()
 
 			// Over-limit client connections are closed with the kernel's
 			// SOCK_DESTROY. Say plainly at startup if this host cannot do that,
@@ -306,10 +314,14 @@ func runCmd() *cobra.Command {
 
 			go activeUUIDReportLoop(ctx, apiClient, egressServer)
 			go revokedUUIDPollLoop(ctx, apiClient.GetRevokedDevices, apiClient.AcknowledgeRevocation, egressServer)
-			go heartbeatLoop(ctx, apiClient, runner, xrayVersion, state, policyManager)
+			go heartbeatLoop(ctx, apiClient, runner, xrayVersion, state, policyManager, history)
 			go superviseLoop(ctx, runner, state)
 			go configPollLoop(ctx, apiClient, runner, statsClient, state)
-			go inboundsPollLoop(ctx, apiClient)
+			inboundsDone := make(chan struct{})
+			go func() {
+				defer close(inboundsDone)
+				inboundsPollLoop(ctx, apiClient, history)
+			}()
 			go policyPollLoop(ctx, role, apiClient, policyManager)
 			go updateCheckLoop(ctx, updater.NewUpdater(version, "", cfg.ServerURL, cfg.NodeID, cfg.APIKey))
 			go xrayUpdateLoop(ctx, apiClient, runner, xrayVersion, state)
@@ -321,6 +333,7 @@ func runCmd() *cobra.Command {
 
 			log.Println("shutting down...")
 			cancel()
+			<-inboundsDone
 			return nil
 		},
 	}
@@ -602,7 +615,7 @@ func (s *nodeState) UsersSnapshot() map[userKey]xray.VLESSUser {
 func runRelay(ctx context.Context, cfg *config.AgentConfig, apiClient *client.APIClient, policyManager *relay.Manager) error {
 	log.Println("node role is relay: forwarding only, tunnel services not started")
 
-	go heartbeatLoop(ctx, apiClient, nil, nil, nil, policyManager)
+	go heartbeatLoop(ctx, apiClient, nil, nil, nil, policyManager, nil)
 	go policyPollLoop(ctx, nodeprov.RoleRelay, apiClient, policyManager)
 	go updateCheckLoop(ctx, updater.NewUpdater(version, "", cfg.ServerURL, cfg.NodeID, cfg.APIKey))
 
@@ -693,7 +706,7 @@ const heartbeatInterval = 10 * time.Second
 // heartbeatLoop reports this node's health. runner and state are nil on a relay,
 // which runs no Xray and shapes nothing: there is no process to report on, so the
 // status it sends says so rather than inventing a reading.
-func heartbeatLoop(ctx context.Context, apiClient *client.APIClient, runner *xray.XrayRunner, xrayVersion *versionHolder, state *nodeState, policy *relay.Manager) {
+func heartbeatLoop(ctx context.Context, apiClient *client.APIClient, runner *xray.XrayRunner, xrayVersion *versionHolder, state *nodeState, policy *relay.Manager, history *connectionHistory) {
 	ticker := time.NewTicker(heartbeatInterval)
 	defer ticker.Stop()
 	ledger := newClosureLedger()
@@ -705,6 +718,11 @@ func heartbeatLoop(ctx context.Context, apiClient *client.APIClient, runner *xra
 		case <-ticker.C:
 			m := stats.CollectSysMetrics()
 			status := client.NodeStatus{ShapingOK: true}
+			if history != nil {
+				status.ConnectionLogging = history.status()
+			} else {
+				status.ConnectionLogging = json.RawMessage(`{"desired_revision":"0","applied_revision":"0","collection_epoch":null,"enabled":false,"state":"unsupported","applied_at":null,"last_config_fetch_at":null,"queue_bytes":"0","dropped_events":"0","error_code":"entry_only","producers":[]}`)
+			}
 			if state != nil {
 				configHash, shapingOK, shapingCount, shapingErr, shapingMode := state.ShapingStatus()
 				status.ConfigHash = configHash
@@ -1259,7 +1277,7 @@ func applyShaping(config []byte, state *nodeState) {
 // operator edits a chain or a pool, which is the same human timescale.
 const relayRulePollInterval = 30 * time.Second
 
-func inboundsPollLoop(ctx context.Context, apiClient *client.APIClient) {
+func inboundsPollLoop(ctx context.Context, apiClient *client.APIClient, history *connectionHistory) {
 	var hy2Manager *process.Hysteria2Manager
 	var wgManager *process.WireGuardManager
 	wgPeers := map[string]process.WireGuardPeer{}
@@ -1268,11 +1286,14 @@ func inboundsPollLoop(ctx context.Context, apiClient *client.APIClient) {
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
 
-	applyInbounds(ctx, apiClient, &hy2Manager, &wgManager, &wgPeers, &hy2Users)
+	applyInbounds(ctx, apiClient, &hy2Manager, &wgManager, &wgPeers, &hy2Users, history)
 
 	for {
 		select {
 		case <-ctx.Done():
+			if err := history.Close(); err != nil {
+				log.Printf("connection history shutdown: %v", err)
+			}
 			if hy2Manager != nil {
 				_ = hy2Manager.Stop()
 			}
@@ -1281,12 +1302,12 @@ func inboundsPollLoop(ctx context.Context, apiClient *client.APIClient) {
 			}
 			return
 		case <-ticker.C:
-			applyInbounds(ctx, apiClient, &hy2Manager, &wgManager, &wgPeers, &hy2Users)
+			applyInbounds(ctx, apiClient, &hy2Manager, &wgManager, &wgPeers, &hy2Users, history)
 		}
 	}
 }
 
-func applyInbounds(ctx context.Context, apiClient *client.APIClient, hy2 **process.Hysteria2Manager, wg **process.WireGuardManager, wgPeers *map[string]process.WireGuardPeer, hy2Users *[]string) {
+func applyInbounds(ctx context.Context, apiClient *client.APIClient, hy2 **process.Hysteria2Manager, wg **process.WireGuardManager, wgPeers *map[string]process.WireGuardPeer, hy2Users *[]string, history *connectionHistory) {
 	inbounds, err := apiClient.GetInbounds(ctx)
 	if err != nil {
 		log.Printf("inbounds poll: %v", err)
@@ -1315,6 +1336,7 @@ func applyInbounds(ctx context.Context, apiClient *client.APIClient, hy2 **proce
 	if wantHy2 {
 		if *hy2 == nil {
 			*hy2 = process.NewHysteria2Manager("", "")
+			(*hy2).SetHistorySocket(history.socket("hysteria2"))
 		}
 
 		users, err := apiClient.GetHysteria2Users(ctx)
@@ -1334,6 +1356,7 @@ func applyInbounds(ctx context.Context, apiClient *client.APIClient, hy2 **proce
 				log.Printf("hysteria2 update config: %v", err)
 			} else {
 				*hy2Users = users
+				history.setHysteriaShared(cfg.Auth != nil && cfg.Auth.Type == "password")
 				if !(*hy2).IsRunning() {
 					if err := (*hy2).Start(); err != nil {
 						log.Printf("hysteria2 start: %v", err)
@@ -1351,6 +1374,7 @@ func applyInbounds(ctx context.Context, apiClient *client.APIClient, hy2 **proce
 		} else {
 			log.Println("hysteria2 stopped (no enabled inbound)")
 			*hy2Users = nil
+			history.setHysteriaShared(false)
 		}
 	}
 
@@ -1359,6 +1383,10 @@ func applyInbounds(ctx context.Context, apiClient *client.APIClient, hy2 **proce
 			*wg = process.NewWireGuardManager("wg0", wgPort, "")
 		}
 		if !(*wg).IsRunning() {
+			if err := history.freezeWireGuard(ctx); err != nil {
+				log.Printf("wireguard history freeze: %v", err)
+				return
+			}
 			cfg := buildWireGuardConfig(wgPort, inbounds)
 			if err := (*wg).GenerateConfig(cfg); err != nil {
 				log.Printf("wireguard generate config: %v", err)
@@ -1373,15 +1401,22 @@ func applyInbounds(ctx context.Context, apiClient *client.APIClient, hy2 **proce
 			}
 		}
 		if (*wg).IsRunning() {
-			syncWireGuardPeers(ctx, apiClient, *wg, wgPeers)
+			syncWireGuardPeers(ctx, apiClient, *wg, wgPeers, history)
 		}
 	} else if *wg != nil && (*wg).IsRunning() {
+		if err := history.freezeWireGuard(ctx); err != nil {
+			log.Printf("wireguard history freeze: %v", err)
+			return
+		}
 		if err := (*wg).Stop(); err != nil {
 			log.Printf("wireguard stop: %v", err)
 		} else {
 			log.Println("wireguard stopped (no enabled inbound)")
 			*wgPeers = map[string]process.WireGuardPeer{}
 		}
+	}
+	if err := history.sync(inbounds); err != nil {
+		log.Printf("connection history suppliers: %v", err)
 	}
 }
 
@@ -1391,7 +1426,7 @@ func applyInbounds(ctx context.Context, apiClient *client.APIClient, hy2 **proce
 // wireguard.go) only for what changed. This runs every inboundsPollLoop tick
 // (30s) so suspensions/expiries/new devices reach the interface without a
 // full wg-quick restart.
-func syncWireGuardPeers(ctx context.Context, apiClient *client.APIClient, wg *process.WireGuardManager, applied *map[string]process.WireGuardPeer) {
+func syncWireGuardPeers(ctx context.Context, apiClient *client.APIClient, wg *process.WireGuardManager, applied *map[string]process.WireGuardPeer, history *connectionHistory) {
 	peers, err := apiClient.GetWireGuardPeers(ctx)
 	if err != nil {
 		log.Printf("wireguard peers poll: %v", err)
@@ -1405,6 +1440,25 @@ func syncWireGuardPeers(ctx context.Context, apiClient *client.APIClient, wg *pr
 		}
 		want[p.PublicKey] = process.WireGuardPeer{PublicKey: p.PublicKey, AllowedIPs: p.AllowedIPs}
 	}
+
+	changed := len(want) != len(*applied)
+	for key, peer := range want {
+		if prior, ok := (*applied)[key]; !ok || prior != peer {
+			changed = true
+		}
+	}
+	if changed {
+		if err := history.freezeWireGuard(ctx); err != nil {
+			log.Printf("wireguard history freeze: %v", err)
+			return
+		}
+	}
+	// Read the real applied map even on partial mutation failure.
+	defer func() {
+		if err := history.publishWireGuard(ctx, wg); err != nil {
+			log.Printf("wireguard history applied map: %v", err)
+		}
+	}()
 
 	for pubkey := range *applied {
 		if _, ok := want[pubkey]; ok {
@@ -1440,7 +1494,7 @@ func syncWireGuardPeers(ctx context.Context, apiClient *client.APIClient, wg *pr
 // password (auth type "userpass"), so suspending or deleting a device
 // revokes its Hysteria2 access on the next sync, the same as every other
 // protocol. See subscription/singbox.go:singboxHysteria2, which already
-// expects `password: userUUID` on the client side. Falls back to a single
+// expects `password: userUUID:userUUID` on the client side. Falls back to a single
 // node-wide password from inbound settings (legacy behavior) only if no
 // devices are currently eligible.
 func buildHysteria2Config(port int, inbounds []client.InboundConfig, users []string) process.Hysteria2Config {

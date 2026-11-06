@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"log"
@@ -338,6 +340,143 @@ func (h *NodeAgentHandler) ConfigDigest(c *fiber.Ctx) error {
 	return c.JSON(digest)
 }
 
+// SyncConnectionHistoryBindings runs only on the authenticated private history
+// config route. Labels come from actual generated clients, not suffix parsing.
+// Credential generations are hashed; neither secrets nor manifests are logged.
+func (h *NodeAgentHandler) SyncConnectionHistoryBindings(c *fiber.Ctx) error {
+	nodeID, err := historyNode(c)
+	if err != nil {
+		return err
+	}
+	ctx := c.UserContext()
+	service := services.NewConnectionHistoryService(h.db)
+	cfg, err := service.Config(ctx, nodeID)
+	if err != nil {
+		return historyResponse(c, nil, err)
+	}
+	desired, err := h.connectionHistoryBindings(ctx, nodeID)
+	if err != nil {
+		return historyResponse(c, nil, err)
+	}
+	if _, err := service.ReconcileBindings(ctx, nodeID, cfg.Revision, desired); err != nil {
+		return historyResponse(c, nil, err)
+	}
+	return c.Next()
+}
+
+func (h *NodeAgentHandler) connectionHistoryBindings(ctx context.Context, nodeID string) ([]services.ConnectionHistoryBindingSpec, error) {
+	var role nodeprov.Role
+	if err := h.db.QueryRow(ctx, `SELECT role FROM nodes WHERE id=$1`, nodeID).Scan(&role); err != nil {
+		return nil, err
+	}
+	if !role.Exits() {
+		return []services.ConnectionHistoryBindingSpec{}, nil
+	}
+	type device struct {
+		id, user, name, email, uuid, publicKey string
+		eligible                               bool
+	}
+	rows, err := h.db.Query(ctx, `SELECT d.id::text,d.user_id::text,d.name,u.email,d.xray_uuid,
+ COALESCE(d.wg_public_key,''),
+ EXISTS(SELECT 1 FROM plans p JOIN node_group_nodes ngn ON ngn.node_group_id=p.node_group_id
+ WHERE p.id=u.plan_id AND ngn.node_id=$1 AND u.is_active AND u.status='active'
+ AND (u.plan_expires_at IS NULL OR u.plan_expires_at>NOW())
+ AND (p.traffic_limit IS NULL OR u.traffic_used<p.traffic_limit)
+ AND (p.speed_limit IS NULL OR p.speed_limit<=0))
+ FROM devices d JOIN users u ON u.id=d.user_id`, nodeID)
+	if err != nil {
+		return nil, err
+	}
+	devices := map[string]device{}
+	for rows.Next() {
+		var d device
+		if err := rows.Scan(&d.id, &d.user, &d.name, &d.email, &d.uuid, &d.publicKey, &d.eligible); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		devices[d.uuid] = d
+	}
+	err = rows.Err()
+	rows.Close()
+	if err != nil {
+		return nil, err
+	}
+	desired := []services.ConnectionHistoryBindingSpec{}
+	add := func(runtime, tag, kind, label, generation string, d *device) {
+		b := services.ConnectionHistoryBindingSpec{Binding: nodeprov.HistoryBinding{
+			Runtime: runtime, InboundTag: tag, LabelKind: kind, Label: label, Kind: "shared",
+		}}
+		digest := sha256.Sum256([]byte(generation))
+		b.Generation = hex.EncodeToString(digest[:])
+		if d != nil {
+			b.Binding.Kind = "device"
+			b.Owner = services.ConnectionHistoryBindingOwner{
+				UserID: &d.user, DeviceID: &d.id, UserSnapshot: &d.email, DeviceSnapshot: &d.name,
+			}
+		}
+		desired = append(desired, b)
+	}
+	raw, err := h.xrayConfigSvc.GenerateConfig(ctx, nodeID)
+	if err != nil {
+		return nil, err
+	}
+	var generated struct {
+		Inbounds []struct {
+			Tag      string `json:"tag"`
+			Protocol string `json:"protocol"`
+			Settings struct {
+				Method   string `json:"method"`
+				Password string `json:"password"`
+				Clients  []struct {
+					ID       string `json:"id"`
+					Password string `json:"password"`
+					Email    string `json:"email"`
+				} `json:"clients"`
+			} `json:"settings"`
+		} `json:"inbounds"`
+	}
+	if err := json.Unmarshal(raw, &generated); err != nil {
+		return nil, err
+	}
+	for _, ib := range generated.Inbounds {
+		switch ib.Protocol {
+		case "vless", "vmess", "trojan":
+			for _, user := range ib.Settings.Clients {
+				credential := user.ID
+				if ib.Protocol == "trojan" {
+					credential = user.Password
+				}
+				if d, ok := devices[credential]; ok && user.Email != "" {
+					add("xray", ib.Tag, "xray_email", user.Email, credential, &d)
+				}
+			}
+		case "shadowsocks":
+			add("xray", ib.Tag, "shared_inbound", ib.Tag, ib.Settings.Method+"\x00"+ib.Settings.Password, nil)
+		}
+	}
+	var hysteria, wireguard bool
+	err = h.db.QueryRow(ctx, `SELECT
+ EXISTS(SELECT 1 FROM inbounds WHERE node_id=$1 AND enabled AND protocol='hysteria2'),
+ EXISTS(SELECT 1 FROM inbounds WHERE node_id=$1 AND enabled AND protocol='wireguard')`, nodeID).Scan(&hysteria, &wireguard)
+	if err != nil {
+		return nil, err
+	}
+	for _, d := range devices {
+		if !d.eligible {
+			continue
+		}
+		if hysteria {
+			add("hysteria2", "hysteria2", "hysteria_auth_id", d.uuid, d.uuid, &d)
+		}
+		if wireguard && d.publicKey != "" {
+			add("wireguard", "wg0", "wg_public_key", d.publicKey, d.publicKey, &d)
+		}
+	}
+	// The legacy node-wide Hysteria password has no proven per-device owner.
+	// Without an authenticated public label it deliberately remains unknown.
+	return desired, nil
+}
+
 type heartbeatRequest struct {
 	CPUUsage    float64 `json:"cpu_usage"`
 	MemoryUsage float64 `json:"memory_usage"`
@@ -360,9 +499,10 @@ type heartbeatRequest struct {
 	PolicyFingerprint string `json:"policy_fingerprint"`
 	PolicyError       string `json:"policy_error"`
 	// Per-route forwarded bytes since the previous heartbeat (Entries only).
-	RouteTraffic []nodeprov.RouteTraffic   `json:"route_traffic"`
-	RelayFlows   *nodeprov.RelayFlowReport `json:"relay_flows"`
-	TunnelReport *nodeprov.TunnelReport    `json:"tunnel_report"`
+	RouteTraffic      []nodeprov.RouteTraffic   `json:"route_traffic"`
+	RelayFlows        *nodeprov.RelayFlowReport `json:"relay_flows"`
+	TunnelReport      *nodeprov.TunnelReport    `json:"tunnel_report"`
+	ConnectionLogging json.RawMessage           `json:"connection_logging"`
 }
 
 func (h *NodeAgentHandler) Heartbeat(c *fiber.Ctx) error {
@@ -373,6 +513,16 @@ func (h *NodeAgentHandler) Heartbeat(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "invalid request body",
 		})
+	}
+
+	if len(req.ConnectionLogging) > 0 && string(req.ConnectionLogging) != "null" {
+		status, err := services.DecodeConnectionHistoryStatus(req.ConnectionLogging)
+		if err == nil {
+			err = services.NewConnectionHistoryService(h.db).RecordStatus(c.UserContext(), nodeID, status)
+		}
+		if err != nil {
+			return historyResponse(c, nil, err)
+		}
 	}
 
 	_, err := h.db.Exec(
@@ -546,7 +696,7 @@ func (h *NodeAgentHandler) GetWireGuardPeers(c *fiber.Ctx) error {
 // authenticate against this node's Hysteria2 server. Each uuid is used as
 // both username and password (see buildHysteria2Config in node-agent/cmd/
 // main.go), matching subscription/singbox.go:singboxHysteria2's existing
-// `password: userUUID` expectation. Eligibility mirrors GetWireGuardPeers and
+// `password: userUUID:userUUID` expectation. Eligibility mirrors GetWireGuardPeers and
 // XrayConfigService.GenerateConfig so Hysteria2 access is revoked on the same
 // conditions as every other protocol.
 func (h *NodeAgentHandler) GetHysteria2Users(c *fiber.Ctx) error {
