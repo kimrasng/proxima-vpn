@@ -99,6 +99,18 @@ original start is not known. Disable, producer loss, process crash, queue loss,
 and missing terminal evidence must not be read as exact VPN termination.
 Inspect the detail's quality, gaps, end reason, and final-byte status.
 
+`collection_stopped` means a matching supplier barrier closed that observation
+interval. It is distinct from both an actively observed owner and a proven
+connection end. Unknown VPN end times remain empty and nonterminal byte samples
+remain nonfinal. Actual terminal records keep their observed end evidence.
+NodeDetail's history tab fixes both list and aggregate requests to that node;
+UserDetail fixes the account while permitting a node filter.
+
+Successful collection-setting commands and history reads use the existing
+administrator activity log. Records identify the actor, target and allowlisted
+filter scope; raw destinations, credentials and returned event payloads are
+not duplicated into audit metadata.
+
 ## Queue health and retention
 
 Agent history state lives below the agent configuration directory in
