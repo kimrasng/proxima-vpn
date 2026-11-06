@@ -62,6 +62,20 @@ func (o *Observer) Apply(a nodeprov.HistoryApply) (nodeprov.HistoryApplied, erro
 	}
 	prior := o.revision
 	wasEnabled := o.enabled
+	if wasEnabled && !a.Enabled {
+		// These nonterminal samples belong to the active interval, not the
+		// disabling revision installed for the boundary and applied response.
+		for _, f := range o.sortedFlowsLocked() {
+			if err := f.emitLocked("flow_update", nil); err != nil {
+				return nodeprov.HistoryApplied{}, err
+			}
+		}
+		for _, t := range o.sortedTunnelsLocked() {
+			if err := t.emitLocked("tunnel_update", nil); err != nil {
+				return nodeprov.HistoryApplied{}, err
+			}
+		}
+	}
 	o.revision, o.bindings = a.ConfigRevision, bindings
 	o.epoch = copyPtr(a.CollectionEpoch)
 	if a.Enabled && !wasEnabled {
@@ -83,22 +97,16 @@ func (o *Observer) Apply(a nodeprov.HistoryApply) (nodeprov.HistoryApplied, erro
 			}
 		}
 	} else if wasEnabled && !a.Enabled {
-		for _, f := range o.sortedFlowsLocked() {
-			if err := f.emitLocked("flow_update", nil); err != nil {
-				return nodeprov.HistoryApplied{}, err
-			}
-		}
-		for _, t := range o.sortedTunnelsLocked() {
-			if err := t.emitLocked("tunnel_update", nil); err != nil {
-				return nodeprov.HistoryApplied{}, err
-			}
-		}
 		if err := o.boundaryLocked("disabled", prior); err != nil {
 			return nodeprov.HistoryApplied{}, err
 		}
 		o.enabled = false
 		for _, f := range o.flows {
 			f.upload, f.download = 0, 0
+		}
+		for s := range o.scopes {
+			s.partial = true
+			s.resetLocked()
 		}
 	} else if wasEnabled {
 		if err := o.boundaryLocked("reconfigured", prior); err != nil {

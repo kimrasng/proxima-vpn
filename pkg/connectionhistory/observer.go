@@ -43,6 +43,7 @@ type Observer struct {
 	flowCounter   uint64
 	tunnels       map[uint64]*Tunnel
 	flows         map[uint64]*Flow
+	scopes        map[*CollectionScope]struct{}
 	enabled       bool
 	revision      nodeprov.HistoryU64
 	epoch         *nodeprov.HistoryUUID
@@ -71,6 +72,7 @@ func NewObserver(options Options) (*Observer, error) {
 	o := &Observer{
 		options: options, boot: boot, start: options.Clock(),
 		tunnels: make(map[uint64]*Tunnel), flows: make(map[uint64]*Flow),
+		scopes:     make(map[*CollectionScope]struct{}),
 		usedEpochs: make(map[nodeprov.HistoryUUID]struct{}),
 		bindings:   make(map[bindingKey]nodeprov.HistoryAuth),
 		capacity:   ReplayCapacity, wake: make(chan struct{}, 1),

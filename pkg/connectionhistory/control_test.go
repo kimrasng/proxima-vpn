@@ -52,6 +52,35 @@ func TestApplyRevisionEpochAndBindingRules(t *testing.T) {
 	expectControlError(t, err, "binding_invalid")
 }
 
+func TestDisableSnapshotsRetainActiveRevisionAndIdempotentBarrier(t *testing.T) {
+	o := testObserver(t)
+	applyTest(t, o, 7, true, epochOne)
+	_, f := owners(t, o)
+	check(t, f.Observe(19, 7))
+	active := applyTest(t, o, 8, true, epochOne)
+	off := applyTest(t, o, 9, false, epochOne)
+	all := events(t, o, active.BarrierSequence)
+	if len(all) != 3 || all[0].Kind != "flow_update" || all[1].Kind != "tunnel_update" ||
+		all[2].Kind != "collection_boundary" {
+		t.Fatal("disable event ordering")
+	}
+	for _, e := range all[:2] {
+		if e.ConfigRevision != 8 || e.CollectionEpoch != epochOne || e.Bytes.Final || e.Lifecycle.EndedAt != nil {
+			t.Fatal("pre-disable sample stamped with an inactive revision")
+		}
+	}
+	if *all[0].Bytes.Upload != 19 || *all[0].Bytes.Download != 7 ||
+		all[2].ConfigRevision != 9 || all[2].Boundary.PriorRevision != 8 ||
+		all[2].Boundary.Action != "disabled" || all[2].Sequence != off.BarrierSequence ||
+		off.ConfigRevision != 9 || off.Enabled {
+		t.Fatal("disable sample or boundary/applied revision")
+	}
+	again := applyTest(t, o, 9, false, epochOne)
+	if again.BarrierSequence != off.BarrierSequence || len(events(t, o, off.BarrierSequence)) != 0 {
+		t.Fatal("idempotent disable emitted duplicate samples")
+	}
+}
+
 func TestCredentialBindingPinnedAndNeverExportsLabels(t *testing.T) {
 	o := testObserver(t)
 	_, held := owners(t, o)

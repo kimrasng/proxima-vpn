@@ -22,6 +22,7 @@ type FlowInfo struct {
 
 type Flow struct {
 	observer     *Observer
+	collection   *CollectionScope
 	counter      uint64
 	id           string
 	info         FlowInfo
@@ -76,12 +77,16 @@ func (o *Observer) newFlowLocked(info FlowInfo, previous *Flow) (*Flow, error) {
 		return nil, err
 	}
 	if previous != nil {
+		f.collection = previous.collection
 		if err := previous.closeLocked(End{Reason: "parent_changed", Semantics: "observation_segment_closed"}); err != nil {
 			return nil, err
 		}
 	}
 	o.flowCounter++
 	o.flows[f.counter] = f
+	if f.collection != nil {
+		f.collection.flows[f.counter] = f
+	}
 	if info.Tunnel != nil {
 		info.Tunnel.children++
 	}
@@ -104,12 +109,16 @@ func (f *Flow) Reparent(tunnel *Tunnel) (*Flow, error) {
 	o := f.observer
 	o.mu.Lock()
 	defer o.mu.Unlock()
+	return f.reparentLocked(tunnel)
+}
+
+func (f *Flow) reparentLocked(tunnel *Tunnel) (*Flow, error) {
 	if f.closed {
 		return nil, ErrClosed
 	}
 	info := f.info
 	info.Tunnel = tunnel
-	return o.newFlowLocked(info, f)
+	return f.observer.newFlowLocked(info, f)
 }
 func (f *Flow) beginEpochLocked(partial bool) {
 	partial = partial || f.info.PartialStart
@@ -159,6 +168,11 @@ func (f *Flow) Observe(upload, download uint64) error {
 	o := f.observer
 	o.mu.Lock()
 	defer o.mu.Unlock()
+	return f.observeLocked(upload, download)
+}
+
+func (f *Flow) observeLocked(upload, download uint64) error {
+	o := f.observer
 	if f.closed {
 		return ErrClosed
 	}
@@ -195,6 +209,10 @@ func (f *Flow) SetDestination(effectiveHost *string, observed *nodeprov.HistoryP
 	o := f.observer
 	o.mu.Lock()
 	defer o.mu.Unlock()
+	return f.setDestinationLocked(effectiveHost, observed)
+}
+
+func (f *Flow) setDestinationLocked(effectiveHost *string, observed *nodeprov.HistoryPeer) error {
 	if f.closed {
 		return ErrClosed
 	}
@@ -234,12 +252,21 @@ func (f *Flow) closeLocked(end End) error {
 			return err
 		}
 	}
+	f.retireLocked()
+	return nil
+}
+
+// Retirement only releases tracking. Disable must not invent a terminal event.
+func (f *Flow) retireLocked() {
+	o := f.observer
 	f.closed = true
 	delete(o.flows, f.counter)
+	if f.collection != nil {
+		delete(f.collection.flows, f.counter)
+	}
 	if f.info.Tunnel != nil {
 		f.info.Tunnel.children--
 	}
 	// Drop destination metadata as soon as the real owner closes, also OFF.
 	f.info.Destination = nodeprov.HistoryDestination{}
-	return nil
 }
