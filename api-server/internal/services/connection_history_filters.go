@@ -43,11 +43,11 @@ func historyQueryPredicate(q ConnectionHistoryQuery) (string, []any, error) {
 	}
 	if q.Status != "" {
 		switch q.Status {
-		case "observing", "ended", "interrupted":
+		case "observing", "ended", "interrupted", "collection_stopped":
 		default:
 			return "", nil, historyError(400, "invalid_status")
 		}
-		add(" AND p.observation_status=$", q.Status)
+		add(" AND ("+historyObservationStatus+")=$", q.Status)
 	}
 	if len(q.Destination) > 1024 || len(q.DestinationPrefix) > 1024 || (q.Destination != "" && q.DestinationPrefix != "") {
 		return "", nil, historyError(400, "invalid_destination")

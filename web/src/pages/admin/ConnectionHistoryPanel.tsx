@@ -8,7 +8,7 @@ import { historyLabels } from './ConnectionHistoryLabels';
 
 const emptyPage: ConnectionHistoryPage = { items: [], next_cursor: null };
 
-export function ConnectionHistoryPanel({ userId }: { readonly userId?: string }) {
+export function ConnectionHistoryPanel({ userId, nodeId }: { readonly userId?: string; readonly nodeId?: string }) {
   const { t } = useTranslation();
   const [kind, setKind] = useState<'sessions' | 'flows'>('flows');
   const [draft, setDraft] = useState<{ node_id: string; user_id: string; destination: string; protocol: string; state: '' | ConnectionHistoryRow['observation_status']; from: string; to: string }>({ node_id: '', user_id: '', destination: '', protocol: '', state: '', from: '', to: '' });
@@ -30,7 +30,7 @@ export function ConnectionHistoryPanel({ userId }: { readonly userId?: string })
     setPage(emptyPage);
     setTotals([]);
     try {
-      const filters = { ...query, user_id: userId || query.user_id };
+      const filters = { ...query, user_id: userId || query.user_id, node_id: nodeId ?? query.node_id };
       const [result, aggregate] = await Promise.all([
         getConnectionHistory(kind, { ...filters, cursor, limit: 25 }),
         getConnectionHistoryAggregate(filters),
@@ -44,7 +44,7 @@ export function ConnectionHistoryPanel({ userId }: { readonly userId?: string })
     } finally {
       if (id === request.current) setLoading(false);
     }
-  }, [query, userId, cursor, kind, t]);
+  }, [query, userId, nodeId, cursor, kind, t]);
   const invalidate = useCallback(() => { request.current++; detailRequest.current++; }, []);
   useEffect(() => {
     void load();
@@ -100,14 +100,14 @@ export function ConnectionHistoryPanel({ userId }: { readonly userId?: string })
           <FormField label={t('connectionHistory.view')}>
             <Select selectedOption={{ value: kind, label: t(historyLabels.fields[kind].labelKey) }} options={(['flows', 'sessions'] as const).map(value => ({ value, label: t(historyLabels.fields[value].labelKey) }))} onChange={({ detail }) => { closeDetail(); setKind(detail.selectedOption.value === 'sessions' ? 'sessions' : 'flows'); setCursors([]); }} />
           </FormField>
-          {(['node_id', 'user_id', 'destination'] as const).filter(key => key !== 'user_id' || !userId).map(key => <FormField key={key} label={t(historyLabels.fields[key].labelKey)} description={key === 'destination' ? t('connectionHistory.destinationHint') : undefined}>
+          {(['node_id', 'user_id', 'destination'] as const).filter(key => (key !== 'user_id' || !userId) && (key !== 'node_id' || nodeId === undefined)).map(key => <FormField key={key} label={t(historyLabels.fields[key].labelKey)} description={key === 'destination' ? t('connectionHistory.destinationHint') : undefined}>
             <Input value={draft[key]} onChange={({ detail }) => setDraft(d => ({ ...d, [key]: detail.value }))} />
           </FormField>)}
           <FormField label={t('connectionHistory.protocol')}>
             <Select selectedOption={{ value: draft.protocol, label: draft.protocol || t('connectionHistory.all') }} options={['', 'vless', 'vmess', 'trojan', 'shadowsocks', 'shadowsocks2022', 'hysteria2', 'wireguard'].map(value => ({ value, label: value || t('connectionHistory.all') }))} onChange={({ detail }) => setDraft(d => ({ ...d, protocol: detail.selectedOption.value ?? '' }))} />
           </FormField>
           <FormField label={t('connectionHistory.state')}>
-            <Select selectedOption={{ value: draft.state, label: draft.state ? t(historyLabels.states[draft.state].labelKey) : t('connectionHistory.all') }} options={(['', 'observing', 'ended', 'interrupted'] as const).map(value => ({ value, label: value ? t(historyLabels.states[value].labelKey) : t('connectionHistory.all') }))} onChange={({ detail }) => { const value = detail.selectedOption.value; if (value === '' || value === 'observing' || value === 'ended' || value === 'interrupted') setDraft(d => ({ ...d, state: value })); }} />
+            <Select selectedOption={{ value: draft.state, label: draft.state ? t(historyLabels.states[draft.state].labelKey) : t('connectionHistory.all') }} options={(['', 'observing', 'ended', 'interrupted', 'collection_stopped'] as const).map(value => ({ value, label: value ? t(historyLabels.states[value].labelKey) : t('connectionHistory.all') }))} onChange={({ detail }) => { const value = detail.selectedOption.value; if (value === '' || value === 'observing' || value === 'ended' || value === 'interrupted' || value === 'collection_stopped') setDraft(d => ({ ...d, state: value })); }} />
           </FormField>
           {(['from', 'to'] as const).map(key => <FormField key={key} label={t(historyLabels.fields[key].labelKey)} description={t('connectionHistory.dateFormat')}>
             <Input value={draft[key]} placeholder="2026-11-06T12:00:00+09:00" onChange={({ detail }) => setDraft(d => ({ ...d, [key]: detail.value }))} />
@@ -135,7 +135,7 @@ export function ConnectionHistoryPanel({ userId }: { readonly userId?: string })
         { id: 'node', header: t('connectionHistory.node'), cell: row => row.node_name || row.node_id },
         { id: 'protocol', header: t('connectionHistory.protocol'), cell: row => row.event.protocol ?? unknown },
         { id: 'state', header: t('connectionHistory.state'), cell: row => <SpaceBetween size="xxs">
-          <StatusIndicator type={row.observation_status === 'interrupted' || row.event.quality.completeness !== 'complete' ? 'warning' : 'info'}>{t(historyLabels.states[row.observation_status].labelKey)}</StatusIndicator>
+          <StatusIndicator type={row.observation_status === 'interrupted' || row.observation_status === 'collection_stopped' || row.event.quality.completeness !== 'complete' ? 'warning' : 'info'}>{t(historyLabels.states[row.observation_status].labelKey)}</StatusIndicator>
           <Box variant="small">{t(historyLabels.scopes[row.event.lifecycle.scope].labelKey)} · {t(historyLabels.quality[row.event.quality.completeness].labelKey)}</Box>
         </SpaceBetween> },
         { id: 'start', header: t('connectionHistory.start'), cell: row => time(row.event.lifecycle.started_at), minWidth: 180 },
@@ -154,12 +154,14 @@ export function ConnectionHistoryPanel({ userId }: { readonly userId?: string })
     <Modal visible={!!selected} onDismiss={closeDetail} size="large" header={t('connectionHistory.detail')} footer={<Box float="right"><Button onClick={closeDetail}>{t('common.close')}</Button></Box>}>
       {selected && event && <SpaceBetween size="m">
         {detailLoading && <StatusIndicator type="loading">{t('common.loading')}</StatusIndicator>}
+        {selected.observation_status === 'collection_stopped' && <Alert type="info">{t('connectionHistory.collectionStoppedHint')}</Alert>}
         {(event.lifecycle.partial_start || event.quality.completeness !== 'complete' || (selected.gap_coverage?.length ?? 0) > 0) && <Alert type="warning">{t('connectionHistory.partialHint')}</Alert>}
         <KeyValuePairs columns={2} items={[
           { label: t('connectionHistory.account'), value: account(selected) },
           { label: t('connectionHistory.device'), value: selected.device_snapshot ?? selected.device_id ?? unknown },
           { label: t('connectionHistory.node'), value: selected.node_name || selected.node_id },
           { label: t('connectionHistory.protocol'), value: event.protocol ?? unknown },
+          { label: t('connectionHistory.state'), value: t(historyLabels.states[selected.observation_status].labelKey) },
           { label: t('connectionHistory.scope'), value: t(historyLabels.scopes[event.lifecycle.scope].labelKey) },
           { label: t('connectionHistory.firstObserved'), value: time(selected.first_observed_at) },
           { label: t('connectionHistory.start'), value: `${time(event.lifecycle.started_at)} · ${t(historyLabels.quality[event.quality.start].labelKey)}` },

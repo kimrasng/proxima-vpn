@@ -70,7 +70,16 @@ func (s *ConnectionHistoryService) Detail(ctx context.Context, flows bool, node,
 }
 
 const historyQueryJoin = ` LEFT JOIN connection_log_controls c ON c.node_origin=p.node_origin
- LEFT JOIN connection_log_bindings b ON b.node_origin=p.node_origin AND b.credential_ref::text=p.payload->'auth'->>'credential_ref' `
+ LEFT JOIN connection_log_bindings b ON b.node_origin=p.node_origin AND b.credential_ref::text=p.payload->'auth'->>'credential_ref'
+ LEFT JOIN connection_log_epochs e ON e.node_origin=p.node_origin AND e.epoch=p.epoch `
+
+// A retained producer barrier closes collection, not the VPN owner. Deriving
+// this at read time handles either delivery order and already stored epochs.
+// Use the same expression for lists, detail and aggregate status filters.
+const historyObservationStatus = `CASE
+ WHEN p.ended_at IS NOT NULL THEN 'ended'
+ WHEN (e.barriers->(p.producer_id || '/' || p.boot_id::text || '/disabled')->>'sequence')::numeric > p.sequence THEN 'collection_stopped'
+ ELSE p.observation_status END`
 
 func (s *ConnectionHistoryService) Query(ctx context.Context, flows bool, q ConnectionHistoryQuery) (ConnectionHistoryPage, error) {
 	page := ConnectionHistoryPage{Items: []ConnectionHistoryRow{}}
@@ -103,7 +112,7 @@ func (s *ConnectionHistoryService) Query(ctx context.Context, flows bool, q Conn
 	}
 	args = append(args, q.Limit+1)
 	rows, err := s.db.Query(ctx, `SELECT p.node_origin::text,coalesce(c.node_snapshot,''),b.user_id::text,b.device_id::text,b.user_snapshot,b.device_snapshot,
- p.first_observed_at,p.observation_status,p.payload,p.epoch::text,p.entity_id
+ p.first_observed_at,`+historyObservationStatus+`,p.payload,p.epoch::text,p.entity_id
  FROM `+table+` p `+historyQueryJoin+where+` ORDER BY p.first_observed_at DESC,p.node_origin DESC,p.epoch DESC,p.entity_id DESC LIMIT $`+strconv.Itoa(len(args)), args...)
 	if err != nil {
 		return page, err
@@ -120,6 +129,12 @@ func (s *ConnectionHistoryService) Query(ctx context.Context, flows bool, q Conn
 		if err = json.Unmarshal(raw, &row.Event); err != nil {
 			rows.Close()
 			return page, err
+		}
+		if row.ObservationStatus == "collection_stopped" {
+			row.Event.Bytes.Final = false
+			if row.Event.Quality.Completeness == "complete" {
+				row.Event.Quality.Completeness = "partial"
+			}
 		}
 		page.Items = append(page.Items, row)
 		cursors = append(cursors, historyCursor{row.FirstObservedAt, row.NodeID, epoch, entity})
@@ -147,7 +162,7 @@ func (s *ConnectionHistoryService) Query(ctx context.Context, flows bool, q Conn
 		if len(row.GapCoverage) > 0 {
 			row.Event.Quality.Completeness = "unknown"
 			row.Event.Bytes.Final = false
-			if row.Event.Lifecycle.EndedAt == nil {
+			if row.Event.Lifecycle.EndedAt == nil && row.ObservationStatus != "collection_stopped" {
 				row.ObservationStatus = "interrupted"
 			}
 		}

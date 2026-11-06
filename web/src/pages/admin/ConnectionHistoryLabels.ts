@@ -9,6 +9,7 @@ export const historyLabels = {
     error: { labelKey: 'connectionHistory.states.error' },
     offline: { labelKey: 'connectionHistory.states.offline' },
     observing: { labelKey: 'connectionHistory.states.observing' },
+    collection_stopped: { labelKey: 'connectionHistory.states.collection_stopped' },
     ended: { labelKey: 'connectionHistory.states.ended' },
     interrupted: { labelKey: 'connectionHistory.states.interrupted' },
   },

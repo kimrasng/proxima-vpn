@@ -143,7 +143,7 @@ func TestConnectionHistoryHTTPExporterDisableAndReenable(t *testing.T) {
 				t.Fatalf("old epoch rows=%+v", oldPage)
 			}
 			old := oldPage.Items[0]
-			if old.ObservationStatus != "observing" || old.Event.Lifecycle.EndedAt != nil || old.Event.Bytes.Final ||
+			if old.ObservationStatus != "collection_stopped" || old.Event.Lifecycle.EndedAt != nil || old.Event.Bytes.Final ||
 				*old.Event.Bytes.Upload != 29 || *old.Event.Bytes.Download != 31 ||
 				old.Event.Auth.CredentialRef == nil || *old.Event.Auth.CredentialRef != f.binding.CredentialRef {
 				t.Fatalf("old nonterminal projection=%+v", old)

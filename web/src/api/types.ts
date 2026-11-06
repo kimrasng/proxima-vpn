@@ -101,7 +101,7 @@ export interface ConnectionHistoryRow {
   readonly user_snapshot: string | null;
   readonly device_snapshot: string | null;
   readonly first_observed_at: string;
-  readonly observation_status: 'observing' | 'ended' | 'interrupted';
+  readonly observation_status: 'observing' | 'ended' | 'interrupted' | 'collection_stopped';
   readonly event: ConnectionHistoryEvent;
   readonly gap_coverage: readonly ConnectionHistoryEvent[] | null;
   readonly child_totals?: readonly ConnectionHistoryTotal[];
