@@ -44,6 +44,7 @@ type Owner struct {
 	mu       sync.Mutex
 	tunnel   *ch.Tunnel
 	protocol string
+	activity bool
 	closed   bool
 	children int
 	tasks    int
@@ -120,6 +121,7 @@ func Authenticate(ctx context.Context, protocol string, shared, activity bool) {
 	report(err)
 	o.tunnel = t
 	o.protocol = protocol
+	o.activity = activity
 }
 
 // Close follows actual transport close and waits for registered copy callbacks.
@@ -133,7 +135,11 @@ func (o *Owner) Close() {
 
 func (o *Owner) finishLocked() {
 	if o.closed && o.children == 0 && o.tasks == 0 && o.tunnel != nil {
-		report(o.tunnel.Close(ch.End{Reason: "transport_close", Semantics: "local_owner_closed"}))
+		semantics := "local_owner_closed"
+		if o.activity {
+			semantics = "observation_segment_closed"
+		}
+		report(o.tunnel.Close(ch.End{Reason: "transport_close", Semantics: semantics}))
 		o.tunnel = nil
 	}
 }

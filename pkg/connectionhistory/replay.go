@@ -17,7 +17,7 @@ type record struct {
 // retention for a single bounded, exact contiguous loss accumulator. The gap is
 // always the first retained frame; a later overflow includes its original range.
 // No forwarding callback waits for the consumer or disk.
-func (o *Observer) enqueueLocked(r record) error {
+func (o *Observer) enqueueLocked(r record, lossRevision nodeprov.HistoryU64) error {
 	if o.queueBytes+len(r.data) <= o.capacity {
 		o.frames = append(o.frames, r)
 		o.queueBytes += len(r.data)
@@ -45,6 +45,7 @@ func (o *Observer) enqueueLocked(r record) error {
 	}
 	o.sequence++
 	gap := o.baseLocked("collection_gap")
+	gap.ConfigRevision = lossRevision
 	gap.Sequence, gap.EventID = o.sequence, string(o.boot)+":"+o.sequence.String()
 	gap.Gap, gap.Quality.Completeness = o.loss, "unknown"
 	data, err := nodeprov.EncodeHistoryEvent(gap)

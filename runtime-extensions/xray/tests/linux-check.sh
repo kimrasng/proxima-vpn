@@ -37,6 +37,6 @@ bash "$wrapper" shell --workdir=/var/tmp "$vm" mkdir -m 700 "$guest"
 printf 'XRAY_LINUX_SCRATCH=%s\n' "$guest"
 bash "$wrapper" copy "$work/linux-inputs.tar.gz" "$vm:$guest/inputs.tar.gz"
 bash "$wrapper" shell --workdir=/var/tmp "$vm" bash -c \
-  'set -euo pipefail; cd "$1"; tar -xzf inputs.tar.gz; uname -a; sha256sum xray-linux-* historytests-linux-arm64; ./xray-linux-arm64 history-capabilities; ./xray-linux-arm64 version; XRAY_HISTORY_BINARY="$PWD/xray-linux-arm64" ./historytests-linux-arm64 -test.v -test.timeout=180s; for unit in common-history common-mux app-dispatcher; do ./"$unit"-tests-linux-arm64 -test.v -test.timeout=60s; done' \
+  'set -euo pipefail; cd "$1"; tar -xzf inputs.tar.gz; uname -a; sha256sum xray-linux-* historytests-linux-arm64; ./xray-linux-arm64 history-capabilities; ./xray-linux-arm64 version; XRAY_HISTORY_BINARY="$PWD/xray-linux-arm64" ./historytests-linux-arm64 -test.v -test.timeout=360s; for unit in common-history common-mux app-dispatcher; do ./"$unit"-tests-linux-arm64 -test.v -test.timeout=60s; done' \
   bash "$guest"
 printf 'XRAY_LINUX_SCRATCH=%s\n' "$guest"

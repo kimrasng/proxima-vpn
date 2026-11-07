@@ -144,8 +144,21 @@ func (o *Observer) emitLocked(e nodeprov.HistoryEvent) error {
 	if err != nil {
 		return err
 	}
-	if err := o.enqueueLocked(record{sequence: e.Sequence, data: data, time: e.EventTime}); err != nil {
+	lossRevision := e.ConfigRevision
+	stopping := e.Boundary != nil && e.Boundary.Action == "disabled"
+	if stopping {
+		// Loss still belongs to the active interval. The disabling revision
+		// admits only the stop boundary, never a replacement gap.
+		lossRevision = e.Boundary.PriorRevision
+	}
+	if err := o.enqueueLocked(record{sequence: e.Sequence, data: data, time: e.EventTime}, lossRevision); err != nil {
 		return err
+	}
+	if stopping && o.sequence != e.Sequence {
+		// Overflow covered the attempted boundary with loss. Retain a new
+		// boundary after that gap so applied OFF names an actual stop record.
+		e.EventTime, e.MonotonicNS = o.nowLocked()
+		return o.emitLocked(e)
 	}
 	select {
 	case o.wake <- struct{}{}:

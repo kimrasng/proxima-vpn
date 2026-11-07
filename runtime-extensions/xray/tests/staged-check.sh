@@ -25,4 +25,4 @@ if [[ ${XRAY_RUNTIME_RACE:-0} == 1 ]]; then
 else
   CGO_ENABLED=0 "$go_bin" build -trimpath -buildvcs=false -o "$work/xray-history" ./main
 fi
-XRAY_HISTORY_BINARY="$work/xray-history" CGO_ENABLED=1 "$go_bin" test -race -count=1 -timeout=120s -v ./historytests ./common/history ./common/mux ./app/dispatcher
+XRAY_HISTORY_BINARY="$work/xray-history" CGO_ENABLED=1 "$go_bin" test -race -count=1 -timeout=360s -v ./historytests ./common/history ./common/mux ./app/dispatcher

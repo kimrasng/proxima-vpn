@@ -28,12 +28,16 @@ type runtimeFixture struct {
 }
 
 func startRuntime(t *testing.T, config string, socket string) *runtimeFixture {
+	return startRuntimeFor(t, config, socket, 60*time.Second)
+}
+
+func startRuntimeFor(t *testing.T, config string, socket string, lifetime time.Duration) *runtimeFixture {
 	t.Helper()
 	binary := os.Getenv("XRAY_HISTORY_BINARY")
 	if binary == "" {
 		t.Fatal("XRAY_HISTORY_BINARY must name the patched executable")
 	}
-	ctx, cancel := context.WithTimeout(context.WithoutCancel(t.Context()), 60*time.Second)
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(t.Context()), lifetime)
 	t.Cleanup(cancel)
 	cmd := exec.CommandContext(ctx, binary, "run", "-config", "stdin:")
 	cmd.Stdin = strings.NewReader(config)
