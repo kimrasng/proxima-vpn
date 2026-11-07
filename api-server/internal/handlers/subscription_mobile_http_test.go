@@ -87,6 +87,64 @@ func TestMobileDefaultSubscriptionExternalProviders(t *testing.T) {
 	}
 }
 
+func TestAndroidSubscriptionProjectsProcessRulesAndPreservesQUIC(t *testing.T) {
+	pool := chainTestDB(t)
+	f := newSubscriptionHTTPFixture(t, pool)
+	profile := subscription.RoutingProfile{
+		Final:  "auto",
+		Groups: []subscription.RoutingGroup{{Key: "auto", Name: "PROXY", Type: "url-test", Members: []subscription.RoutingMember{{Kind: subscription.MemberAll}}}},
+		Providers: []subscription.RoutingProvider{
+			{Key: "process", Type: "inline", Behavior: "classical", Payload: []string{"PROCESS-NAME,game.exe"}},
+			{Key: "quic", Type: "inline", Behavior: "classical", Payload: []string{"AND,((DOMAIN-SUFFIX,example.com),(NETWORK,UDP),(DST-PORT,443))"}},
+		},
+		Rules: []subscription.RoutingRule{{Type: "RULE-SET", Value: "process", Target: "auto"}, {Type: "RULE-SET", Value: "quic", Target: "REJECT"}},
+	}
+	data, err := json.Marshal(profile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(t.Context(), `INSERT INTO clash_routing_profile(id,document) VALUES(1,$1) ON CONFLICT(id) DO UPDATE SET document=EXCLUDED.document`, data); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _, _ = pool.Exec(context.Background(), `DELETE FROM clash_routing_profile WHERE id=1`) })
+	app := fiber.New()
+	app.Get("/sub/:sub_token", NewSubscriptionHandler(pool, 3600).GetAccountSubscription)
+	req := httptest.NewRequest("GET", f.path[:strings.LastIndex(f.path, "/")], nil)
+	req.Header.Set("User-Agent", "Proxima-Android/1.0.0")
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != 200 {
+		t.Fatalf("status %d: %s", resp.StatusCode, body)
+	}
+	lines := strings.Split(string(body), "\n")
+	metadata, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(lines[len(lines)-1], "# proxima-routing-rules:"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var doc struct {
+		Rules []struct {
+			Target  string   `json:"target"`
+			Domain  []string `json:"domain"`
+			Network string   `json:"network"`
+			Port    string   `json:"port"`
+			Match   bool     `json:"match"`
+		} `json:"rules"`
+	}
+	if err := json.Unmarshal(metadata, &doc); err != nil {
+		t.Fatal(err)
+	}
+	if len(doc.Rules) != 2 || doc.Rules[0].Target != "block" || len(doc.Rules[0].Domain) != 1 || doc.Rules[0].Domain[0] != "domain:example.com" || doc.Rules[0].Network != "udp" || doc.Rules[0].Port != "443" || !doc.Rules[1].Match {
+		t.Fatalf("unexpected routing rules: %+v", doc.Rules)
+	}
+}
+
 func TestMobileSubscriptionHTTP(t *testing.T) {
 	pool := chainTestDB(t)
 	f := newSubscriptionHTTPFixture(t, pool)
@@ -109,6 +167,7 @@ func TestMobileSubscriptionHTTP(t *testing.T) {
 	handler.resolveMobile = func(_ context.Context, p subscription.RoutingProfile) (subscription.RoutingProfile, map[string][]string, error) {
 		return p, map[string][]string{"private": {"+.example.com"}}, nil
 	}
+	handler.resolveAndroid = handler.resolveMobile
 	app := fiber.New()
 	app.Get("/sub/:sub_token", handler.GetAccountSubscription)
 	path := f.path[:strings.LastIndex(f.path, "/")]
@@ -170,7 +229,7 @@ func TestMobileSubscriptionHTTP(t *testing.T) {
 			}
 		})
 	}
-	handler.resolveMobile = func(context.Context, subscription.RoutingProfile) (subscription.RoutingProfile, map[string][]string, error) {
+	handler.resolveAndroid = func(context.Context, subscription.RoutingProfile) (subscription.RoutingProfile, map[string][]string, error) {
 		return subscription.RoutingProfile{}, nil, errors.New("provider failed")
 	}
 	req := httptest.NewRequest("GET", path, nil)

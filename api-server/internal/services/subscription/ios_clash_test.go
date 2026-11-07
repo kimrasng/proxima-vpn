@@ -82,6 +82,32 @@ func TestIOSClashPreservesRoutingAndCompatibleProxies(t *testing.T) {
 	}
 }
 
+func TestIOSClashUsesSamePublicPortsAsClashMeta(t *testing.T) {
+	nodes := routingNodes()
+	nodes[0].Port = 17635
+	nodes[1].Port = 64845
+	profile := iosRoutingProfile()
+	ios := renderIOS(t, nodes, profile)
+	clash := renderRouted(t, nodes, profile)
+	ports := func(doc map[string]any) map[string]int {
+		result := make(map[string]int)
+		for _, raw := range doc["proxies"].([]any) {
+			proxy := raw.(map[string]any)
+			result[proxy["name"].(string)] = proxy["port"].(int)
+		}
+		return result
+	}
+	iosPorts, clashPorts := ports(ios), ports(clash)
+	for _, name := range []string{"KR Home 1", "KR IDC 1", "JP Tokyo 1"} {
+		if iosPorts[name] != clashPorts[name] {
+			t.Errorf("%s: iOS port %d, Clash port %d", name, iosPorts[name], clashPorts[name])
+		}
+	}
+	if iosPorts["KR Home 1"] != 17635 || iosPorts["KR IDC 1"] != 64845 {
+		t.Fatalf("iOS did not preserve public ports: %v", iosPorts)
+	}
+}
+
 func TestIOSClashKeepsProviderContentsAndOrder(t *testing.T) {
 	profile := iosRoutingProfile()
 	out, err := GenerateIOSClash(routingNodes(), "test-user", profile)

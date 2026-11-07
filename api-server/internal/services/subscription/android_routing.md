@@ -46,9 +46,15 @@ may split adjacent predicates. Exceeding a limit returns `AndroidRoutingError` w
   The final rule has `match: true`.
 - Private providers are treated exactly like other providers: supply concrete
   private domain/CIDR entries. No private list is guessed or hardcoded.
-  Unexpanded geoip/geosite references, wildcard/leading-dot domains, logical
-  rules and other unsupported matches fail the whole
+  Flat AND conditions with distinct domain, IP, network and port dimensions
+  become one conjunctive rule. Repeated dimensions, nested logical rules,
+  unexpanded geoip/geosite references, wildcard/leading-dot domains and other unsupported matches fail the whole
   generation. They never become empty-condition rules or silent omissions.
+
+The Android subscription resolver removes PROCESS-NAME entries because the
+version-1 Android routing contract cannot represent process matching. Providers
+emptied by this removal and their RULE-SET references are also removed; other
+providers and rules remain in order. The iOS resolver is unaffected.
 
 ## Policy assumptions and limits
 

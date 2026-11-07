@@ -31,7 +31,10 @@ func androidProviderRules(behavior string, payload []string, inheritedTarget str
 				kind = "IP-CIDR6"
 			}
 		case "classical":
-			parts := strings.SplitN(entry, ",", 5)
+			parts, err := androidRuleParts(entry)
+			if err != nil {
+				return nil, fmt.Errorf("payload[%d]: %w", i, err)
+			}
 			if len(parts) < 2 || len(parts) > 4 {
 				return nil, androidRoutingProblem(fmt.Sprintf("payload[%d]", i), "classical entries must be TYPE,value[,target][,no-resolve]")
 			}
@@ -70,10 +73,10 @@ func androidProviderRules(behavior string, payload []string, inheritedTarget str
 			previous := &rules[len(rules)-1]
 			samePolicy := previous.Target == rule.Target && previous.Policy == rule.Policy && slices.Equal(previous.Candidates, rule.Candidates)
 			switch {
-			case samePolicy && len(previous.Domain) > 0 && len(rule.Domain) > 0:
+			case samePolicy && len(previous.Domain) > 0 && len(rule.Domain) > 0 && len(previous.IP) == 0 && len(rule.IP) == 0 && previous.Network == "" && rule.Network == "" && previous.Port == "" && rule.Port == "":
 				previous.Domain = append(previous.Domain, rule.Domain...)
 				continue
-			case samePolicy && len(previous.IP) > 0 && len(rule.IP) > 0:
+			case samePolicy && len(previous.IP) > 0 && len(rule.IP) > 0 && len(previous.Domain) == 0 && len(rule.Domain) == 0 && previous.Network == "" && rule.Network == "" && previous.Port == "" && rule.Port == "":
 				previous.IP = append(previous.IP, rule.IP...)
 				continue
 			}
@@ -85,6 +88,9 @@ func androidProviderRules(behavior string, payload []string, inheritedTarget str
 
 func androidRuleMatch(kind, value string) (androidRoutingRule, error) {
 	var rule androidRoutingRule
+	if kind == "AND" {
+		return androidAndMatch(value)
+	}
 	if value == "" || strings.ContainsAny(value, "\r\n\t ,") {
 		return rule, androidRoutingProblem("value", "empty value or separators in match")
 	}
@@ -110,8 +116,98 @@ func androidRuleMatch(kind, value string) (androidRoutingRule, error) {
 			return rule, androidRoutingProblem("port", "expected a port or inclusive range in 1-65535")
 		}
 		rule.Port = value
+	case "NETWORK":
+		switch strings.ToLower(value) {
+		case "tcp", "udp":
+			rule.Network = strings.ToLower(value)
+		default:
+			return rule, androidRoutingProblem("network", "expected TCP or UDP")
+		}
 	default:
 		return rule, androidRoutingProblem("type", "unsupported rule type "+kind)
+	}
+	return rule, nil
+}
+
+// Split only at the current expression level, keeping AND operands intact.
+func androidRuleParts(value string) ([]string, error) {
+	var parts []string
+	depth, start := 0, 0
+	for i, char := range value {
+		switch char {
+		case '(':
+			depth++
+		case ')':
+			depth--
+			if depth < 0 {
+				return nil, androidRoutingProblem("value", "unbalanced parentheses")
+			}
+		case ',':
+			if depth == 0 {
+				parts = append(parts, strings.TrimSpace(value[start:i]))
+				start = i + 1
+			}
+		}
+	}
+	if depth != 0 {
+		return nil, androidRoutingProblem("value", "unbalanced parentheses")
+	}
+	return append(parts, strings.TrimSpace(value[start:])), nil
+}
+
+func androidAndMatch(value string) (androidRoutingRule, error) {
+	var rule androidRoutingRule
+	if !strings.HasPrefix(value, "(") || !strings.HasSuffix(value, ")") {
+		return rule, androidRoutingProblem("AND", "expected parenthesized conditions")
+	}
+	operands, err := androidRuleParts(value[1 : len(value)-1])
+	if err != nil {
+		return rule, err
+	}
+	if len(operands) < 2 {
+		return rule, androidRoutingProblem("AND", "expected at least two conditions")
+	}
+	for _, operand := range operands {
+		if !strings.HasPrefix(operand, "(") || !strings.HasSuffix(operand, ")") {
+			return rule, androidRoutingProblem("AND", "expected parenthesized condition")
+		}
+		parts, err := androidRuleParts(operand[1 : len(operand)-1])
+		if err != nil {
+			return rule, err
+		}
+		if len(parts) != 2 || parts[0] == "AND" {
+			return rule, androidRoutingProblem("AND", "expected a simple TYPE,value condition")
+		}
+		match, err := androidRuleMatch(parts[0], parts[1])
+		if err != nil {
+			return rule, err
+		}
+		// Arrays are OR within a dimension, so repeated dimensions cannot
+		// represent a conjunction faithfully in the Android wire contract.
+		if len(match.Domain) > 0 {
+			if len(rule.Domain) > 0 {
+				return rule, androidRoutingProblem("AND", "repeated domain conditions")
+			}
+			rule.Domain = match.Domain
+		}
+		if len(match.IP) > 0 {
+			if len(rule.IP) > 0 {
+				return rule, androidRoutingProblem("AND", "repeated IP conditions")
+			}
+			rule.IP = match.IP
+		}
+		if match.Network != "" {
+			if rule.Network != "" {
+				return rule, androidRoutingProblem("AND", "repeated network conditions")
+			}
+			rule.Network = match.Network
+		}
+		if match.Port != "" {
+			if rule.Port != "" {
+				return rule, androidRoutingProblem("AND", "repeated port conditions")
+			}
+			rule.Port = match.Port
+		}
 	}
 	return rule, nil
 }

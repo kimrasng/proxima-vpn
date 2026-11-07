@@ -55,6 +55,8 @@ var canonicalMobileMRS = regexp.MustCompile(`^https://cdn\.jsdelivr\.net/gh/Meta
 // canonical MetaCubeX MRS URLs become their text .list twins. Other MRS files
 // are decoded into inline providers. Every provider is resolved for Android,
 // including inline providers. Provider, rule and payload order are preserved.
+// iOS omits validated UDP-443 AND entries, which cannot match its TCP traffic,
+// and providers emptied by that omission with their RULE-SET references.
 // The input is not mutated. Any incomplete or unsupported payload fails the
 // entire operation; callers must not render a partial result on error.
 func ResolveMobileProviders(ctx context.Context, profile subscription.RoutingProfile) (subscription.RoutingProfile, map[string][]string, error) {
@@ -62,20 +64,27 @@ func ResolveMobileProviders(ctx context.Context, profile subscription.RoutingPro
 }
 
 func resolveMobileProviders(ctx context.Context, profile subscription.RoutingProfile, fetch func(context.Context, string, string) (Contents, error)) (subscription.RoutingProfile, map[string][]string, error) {
+	return resolveMobileProfile(ctx, profile, fetch, false)
+}
+
+func resolveMobileProfile(ctx context.Context, profile subscription.RoutingProfile, fetch func(context.Context, string, string) (Contents, error), android bool) (subscription.RoutingProfile, map[string][]string, error) {
 	out := profile
-	out.Providers = slices.Clone(profile.Providers)
+	out.Providers = make([]subscription.RoutingProvider, 0, len(profile.Providers))
 	payloads := make(map[string][]string, len(profile.Providers))
+	removed := make(map[string]bool)
+	seen := make(map[string]bool, len(profile.Providers))
 	bytes, entries := 0, 0
-	for i, provider := range profile.Providers {
+	for _, provider := range profile.Providers {
 		if err := ctx.Err(); err != nil {
 			return subscription.RoutingProfile{}, nil, err
 		}
 		fail := func(err error) (subscription.RoutingProfile, map[string][]string, error) {
 			return subscription.RoutingProfile{}, nil, fmt.Errorf("mobile provider %q: %w", provider.Key, err)
 		}
-		if _, exists := payloads[provider.Key]; exists || provider.Key == "" {
+		if seen[provider.Key] || provider.Key == "" {
 			return fail(fmt.Errorf("empty or duplicate key"))
 		}
+		seen[provider.Key] = true
 		if provider.Behavior != "domain" && provider.Behavior != "ipcidr" && provider.Behavior != "classical" {
 			return fail(fmt.Errorf("unsupported behavior %q", provider.Behavior))
 		}
@@ -128,21 +137,63 @@ func resolveMobileProviders(ctx context.Context, profile subscription.RoutingPro
 		if len(payload) == 0 {
 			return fail(fmt.Errorf("empty payload"))
 		}
+		filtered := make([]string, 0, len(payload))
 		for j, entry := range payload {
-			if err := mobileEntryProblem(provider.Behavior, entry); err != nil {
+			problem := mobileEntryProblem
+			if android {
+				problem = androidEntryProblem
+			}
+			omit := !android && provider.Behavior == "classical" && iosUDP443Entry(entry)
+			if err := problem(provider.Behavior, entry); err != nil && !omit {
 				return fail(fmt.Errorf("entry %d: %w", j+1, err))
 			}
 			bytes += len(entry)
+			if !omit {
+				filtered = append(filtered, entry)
+			}
 		}
 		entries += len(payload)
 		if bytes > maxMobilePayloadBytes || entries > maxMobilePayloadEntries {
 			return fail(fmt.Errorf("resolved payload exceeds %d bytes or %d entries", maxMobilePayloadBytes, maxMobilePayloadEntries))
 		}
+		if len(filtered) != len(payload) {
+			// A remote source still contains the omitted logical rules. Freeze
+			// its validated projection inline rather than send that URL to iOS.
+			provider.Type, provider.Format, provider.URL, provider.Interval = "inline", "", "", 0
+			provider.Payload = filtered
+		}
 		provider.Payload = slices.Clone(provider.Payload)
-		out.Providers[i] = provider
-		payloads[provider.Key] = slices.Clone(payload)
+		payloads[provider.Key] = filtered
+		if len(filtered) == 0 {
+			removed[provider.Key] = true
+			continue
+		}
+		out.Providers = append(out.Providers, provider)
+	}
+	if android {
+		return projectAndroidProviders(out, payloads)
+	}
+	if len(removed) > 0 {
+		for key := range removed {
+			delete(payloads, key)
+		}
+		out.Rules = make([]subscription.RoutingRule, 0, len(profile.Rules))
+		for _, rule := range profile.Rules {
+			if rule.Type != "RULE-SET" || !removed[rule.Value] {
+				out.Rules = append(out.Rules, rule)
+			}
+		}
 	}
 	return out, payloads, nil
+}
+
+func iosUDP443Entry(entry string) bool {
+	if !strings.HasPrefix(entry, "AND,((") || androidEntryProblem("classical", entry) != nil {
+		return false
+	}
+	end := strings.Index(entry, "))")
+	conditions := strings.Split(entry[len("AND,(("):end], "),(")
+	return slices.Contains(conditions, "NETWORK,UDP") && slices.Contains(conditions, "DST-PORT,443")
 }
 
 // Accept only rule forms representable by both mobile generators.

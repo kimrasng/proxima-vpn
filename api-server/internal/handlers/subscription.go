@@ -30,13 +30,14 @@ type SubscriptionHandler struct {
 	db             *pgxpool.Pool
 	updateInterval int
 	resolveMobile  func(context.Context, subscription.RoutingProfile) (subscription.RoutingProfile, map[string][]string, error)
+	resolveAndroid func(context.Context, subscription.RoutingProfile) (subscription.RoutingProfile, map[string][]string, error)
 }
 
 func NewSubscriptionHandler(db *pgxpool.Pool, updateInterval int) *SubscriptionHandler {
 	if updateInterval <= 0 {
 		updateInterval = 3600
 	}
-	return &SubscriptionHandler{db: db, updateInterval: updateInterval, resolveMobile: ruleset.ResolveMobileProviders}
+	return &SubscriptionHandler{db: db, updateInterval: updateInterval, resolveMobile: ruleset.ResolveMobileProviders, resolveAndroid: ruleset.ResolveAndroidProviders}
 }
 
 type subscriptionUser struct {
@@ -309,7 +310,11 @@ func (h *SubscriptionHandler) getSubscriptionForDevice(c *fiber.Ctx, deviceID, f
 		}
 		mobileCtx, cancel := context.WithTimeout(c.UserContext(), 25*time.Second)
 		defer cancel()
-		profile, providers, err := h.resolveMobile(mobileCtx, profile)
+		resolver := h.resolveMobile
+		if format == formatProximaAndroid {
+			resolver = h.resolveAndroid
+		}
+		profile, providers, err := resolver(mobileCtx, profile)
 		if err != nil {
 			log.Printf("mobile subscription rule provider: %v", err)
 			return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{"error": "mobile routing rules unavailable"})
