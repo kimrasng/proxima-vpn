@@ -162,7 +162,8 @@ log_step "1/4" "Installing node-agent dependencies..."
 # or dnf resolves many packages at once, which used to abort the install with
 # no hint of what failed. Under 512 MB, install one package per transaction.
 if [[ -z "$LOW_MEMORY" ]] && [[ -r /proc/meminfo ]]; then
-    MEM_KB=$(awk '/^MemTotal:/ {print $2}' /proc/meminfo)
+    # awk is absent on some minimal images; detection is best-effort.
+    MEM_KB=$(awk '/^MemTotal:/ {print $2}' /proc/meminfo 2>/dev/null || true)
     if [[ -n "$MEM_KB" ]] && (( MEM_KB < 524288 )); then
         LOW_MEMORY="1"
     fi

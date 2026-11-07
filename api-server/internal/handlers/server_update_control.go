@@ -236,7 +236,7 @@ func (h *ServerUpdateControlHandler) exchange(req *http.Request, releaseID strin
 	if err != nil {
 		return 503, failure
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	data, err := io.ReadAll(io.LimitReader(resp.Body, serverUpdateMaxOutput+1))
 	if err != nil || len(data) > serverUpdateMaxOutput {
 		return 502, failure

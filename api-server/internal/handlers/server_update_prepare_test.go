@@ -118,7 +118,7 @@ func TestServerUpdatePrepareUnixContract(t *testing.T) {
 					t.Errorf("unsafe host request: %s %s %s", r.Method, r.URL, data)
 				}
 				w.WriteHeader(tc.host)
-				io.WriteString(w, tc.response)
+				_, _ = io.WriteString(w, tc.response)
 			}))
 			h := serverUpdateTestHandler(t, a)
 			var records []services.Record
@@ -179,7 +179,7 @@ func TestServerUpdateSignedCandidateAndExactApplyHash(t *testing.T) {
 		{"private metadata", "/prepare", strings.Replace(prepared, `"sequence":2`, `"sequence":2,"policy":{}`, 1), 502},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			t.Setenv("PROXIMA_UPDATER_SOCKET", serverUpdateTestSocket(t, func(w http.ResponseWriter, r *http.Request) { io.WriteString(w, tc.response) }))
+			t.Setenv("PROXIMA_UPDATER_SOCKET", serverUpdateTestSocket(t, func(w http.ResponseWriter, r *http.Request) { _, _ = io.WriteString(w, tc.response) }))
 			status, result := serverUpdateTestRequest(t, serverUpdateTestHandler(t, a), "GET", tc.path, "", a.id, "owner", nil)
 			if status != tc.want {
 				t.Fatalf("%d %v", status, result)
@@ -208,11 +208,11 @@ func TestServerUpdateSignedCandidateAndExactApplyHash(t *testing.T) {
 				w.WriteHeader(tc.host)
 				switch tc.host {
 				case 202:
-					io.WriteString(w, serverUpdateTestState("release-one", "accepted"))
+					_, _ = io.WriteString(w, serverUpdateTestState("release-one", "accepted"))
 				case 403:
-					io.WriteString(w, `{"error":"not_approved"}`)
+					_, _ = io.WriteString(w, `{"error":"not_approved"}`)
 				case 409:
-					io.WriteString(w, `{"error":"blocked"}`)
+					_, _ = io.WriteString(w, `{"error":"blocked"}`)
 				}
 			}))
 			payload := strings.Replace(input, `"release_id":`, `"payload_sha256":"`+tc.value+`","release_id":`, 1)
@@ -239,17 +239,17 @@ func TestServerUpdatePreparationDoesNotSerializeOrReplayRequests(t *testing.T) {
 				close(started)
 				<-finish
 				w.WriteHeader(202)
-				io.WriteString(w, `{"status":"preparing","tag":"v1.2.3"}`)
+				_, _ = io.WriteString(w, `{"status":"preparing","tag":"v1.2.3"}`)
 				return
 			}
 			w.WriteHeader(409)
-			io.WriteString(w, `{"error":"blocked"}`)
+			_, _ = io.WriteString(w, `{"error":"blocked"}`)
 		case "POST /v1/apply":
 			applies.Add(1)
 			w.WriteHeader(409)
-			io.WriteString(w, `{"error":"blocked"}`)
+			_, _ = io.WriteString(w, `{"error":"blocked"}`)
 		case "GET /v1/prepare":
-			io.WriteString(w, `{"status":"preparing","tag":"v1.2.3"}`)
+			_, _ = io.WriteString(w, `{"status":"preparing","tag":"v1.2.3"}`)
 		default:
 			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
 		}

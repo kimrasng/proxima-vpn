@@ -212,7 +212,8 @@ func mobileEntryProblem(behavior, entry string) error {
 				return fmt.Errorf("invalid domain %q", entry)
 			}
 			for _, c := range label {
-				if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-' || c == '_') {
+				valid := (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-' || c == '_'
+				if !valid {
 					return fmt.Errorf("unsupported domain %q", entry)
 				}
 			}

@@ -50,7 +50,7 @@ func billingPortalRequest(t *testing.T, h *UserTrialSubscriptionHandler, userID 
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	var body map[string]string
 	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
 		t.Fatal(err)

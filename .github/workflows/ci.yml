@@ -5,6 +5,12 @@ on:
   push:
     branches: [main]
 
+# The tag-push release run and a merge push both build everything; cancel the
+# older run instead of paying for both.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   backend:
     runs-on: ubuntu-latest
@@ -152,6 +158,21 @@ jobs:
           echo "all API calls are versioned"
       - name: Build
         run: cd web && npm run build
+
+  # release-publisher and server-updater are separate Go modules outside
+  # go.work, so the backend job's builds never touch them. They gate live
+  # server updates, so their tests gate CI the same way.
+  tools:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: '1.25'
+      - name: Test release-publisher
+        run: cd tools/release-publisher && GOWORK=off go test -race ./...
+      - name: Test server-updater
+        run: cd tools/server-updater && GOWORK=off go test -race ./...
 
   # The installer runs as root on operators' servers, so it is exercised two ways:
   # stubbed unit tests for every package manager and failure path, and once

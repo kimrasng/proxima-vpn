@@ -110,7 +110,7 @@ func TestSharedPortRateAppliedToRealSOCKSTraffic(t *testing.T) {
 	}
 	server := deviceegress.NewWithDialer(permit, func(context.Context, string, string) (net.Conn, error) {
 		a, b := net.Pipe()
-		go func() { defer b.Close(); _, _ = io.Copy(b, b) }()
+		go func() { defer func() { _ = b.Close() }(); _, _ = io.Copy(b, b) }()
 		return a, nil
 	})
 	ctx, cancel := context.WithCancel(context.Background())
@@ -118,7 +118,7 @@ func TestSharedPortRateAppliedToRealSOCKSTraffic(t *testing.T) {
 	if err := server.Start(ctx, "127.0.0.1:0"); err != nil {
 		t.Fatal(err)
 	}
-	defer server.Close()
+	defer func() { _ = server.Close() }()
 	egress := newDeviceEgress(server.SetCredentials)
 	egress.setRates = limiter.SetRates
 	canonical := strings.Replace(limitedDeviceConfig, `{"inbounds"`, `{"proxima_device_rates":{"uuid-a":1},"inbounds"`, 1)
@@ -130,7 +130,7 @@ func TestSharedPortRateAppliedToRealSOCKSTraffic(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	if err := conn.SetDeadline(time.Now().Add(5 * time.Second)); err != nil {
 		t.Fatal(err)
 	}

@@ -43,7 +43,7 @@ func TestServerReleaseRouteRequiresAuthentication(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 			if resp.StatusCode != fiber.StatusUnauthorized {
 				t.Fatalf("status = %d, want 401", resp.StatusCode)
 			}
@@ -94,7 +94,7 @@ func TestReadinessFailsWithoutDependencies(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != fiber.StatusServiceUnavailable {
 		t.Fatalf("status = %d, want 503", resp.StatusCode)
 	}

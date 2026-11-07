@@ -86,7 +86,7 @@ func (h *ServerReleaseHandler) Latest(c *fiber.Ctx) error {
 		}
 		return c.Status(status).JSON(fiber.Map{"error": "release_unavailable"})
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode == http.StatusNotFound {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "release_not_found"})
 	}

@@ -112,7 +112,7 @@ func serverUpdateTestRequest(t *testing.T, h *ServerUpdateControlHandler, method
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.Header.Get("Cache-Control") != "no-store" {
 		t.Error("response is cacheable")
 	}
@@ -140,9 +140,9 @@ func TestServerUpdateControlUnixProtocol(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		switch r.Method + " " + r.URL.Path {
 		case "GET /v1/status":
-			io.WriteString(w, `{"version":1,"consumed":[],"operation":null}`)
+			_, _ = io.WriteString(w, `{"version":1,"consumed":[],"operation":null}`)
 		case "GET /v1/preflight":
-			io.WriteString(w, `{"ok":false,"reason":"not_approved"}`)
+			_, _ = io.WriteString(w, `{"ok":false,"reason":"not_approved"}`)
 		case "POST /v1/apply":
 			data, err := io.ReadAll(r.Body)
 			if err != nil {
@@ -152,7 +152,7 @@ func TestServerUpdateControlUnixProtocol(t *testing.T) {
 				t.Errorf("unsafe host payload: %q", data)
 			}
 			w.WriteHeader(202)
-			io.WriteString(w, serverUpdateTestState("release-one", "manual_recovery"))
+			_, _ = io.WriteString(w, serverUpdateTestState("release-one", "manual_recovery"))
 		default:
 			t.Errorf("unexpected operation: %s %s", r.Method, r.URL.Path)
 			w.WriteHeader(404)
@@ -344,7 +344,7 @@ func TestServerUpdateControlHostFailuresNeverSucceed(t *testing.T) {
 				calls.Add(1)
 				w.Header().Set("Location", "http://updater/v1/apply")
 				w.WriteHeader(tc.hostStatus)
-				io.WriteString(w, tc.body)
+				_, _ = io.WriteString(w, tc.body)
 			}))
 			method, body := "GET", ""
 			if tc.path == "/apply" {

@@ -25,7 +25,7 @@ class InstallerTest(unittest.TestCase):
             tools.mkdir()
             # No inherited PATH: a missing stub must fail instead of executing a
             # host package manager, firewall, service manager, or network client.
-            for command in ("python3", "jq", "mkdir", "chmod", "cp", "cat", "grep", "sort", "head", "rm"):
+            for command in ("python3", "jq", "mkdir", "chmod", "cp", "cat", "grep", "sort", "head", "rm", "awk"):
                 real = shutil.which(command)
                 self.assertIsNotNone(real, "Test prerequisite not found: " + command)
                 (tools / command).symlink_to(real)

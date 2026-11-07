@@ -153,7 +153,7 @@ func (w *ServerReleaseWatch) openStorage() error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	data, err := io.ReadAll(io.LimitReader(f, 4097))
 	if err != nil {
 		return err
@@ -262,7 +262,7 @@ func (w *ServerReleaseWatch) save(cfg ServerReleaseWatchConfig) error {
 	if err != nil {
 		return err
 	}
-	defer w.root.Remove(name)
+	defer func() { _ = w.root.Remove(name) }()
 	_, writeErr := f.Write(data)
 	syncErr := f.Sync()
 	if err := errors.Join(writeErr, syncErr, f.Close()); err != nil {
@@ -361,7 +361,7 @@ func (w *ServerReleaseWatch) fetch(ctx context.Context, cfg ServerReleaseWatchCo
 	if err != nil {
 		return nil, "release_unavailable"
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode == http.StatusNotFound {
 		return nil, "release_not_found"
 	}

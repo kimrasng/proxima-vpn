@@ -91,9 +91,10 @@ func TestAndroidRoutingSelectPreservesFirstLiveBranch(t *testing.T) {
 			doc := decodeAndroidRouting(t, p, nil, androidTestNodes())
 
 			want := androidRoutingRule{Target: "proxy", Policy: "auto", Candidates: []string{"KR home", "JP Tokyo"}, Match: true}
-			if target == "DIRECT" {
+			switch target {
+			case "DIRECT":
 				want = androidRoutingRule{Target: "direct", Match: true}
-			} else if target == "REJECT" {
+			case "REJECT":
 				want = androidRoutingRule{Target: "block", Match: true}
 			}
 			if !reflect.DeepEqual(doc.Rules, []androidRoutingRule{want}) {
@@ -152,16 +153,16 @@ func TestAndroidRoutingDefaultProfileKeepsKoreanAndOverseasPolicies(t *testing.T
 		t.Fatalf("got %d rules, want QUIC + eight providers + final", len(doc.Rules))
 	}
 	for i, rule := range doc.Rules {
-		switch {
-		case i == 0:
+		switch i {
+		case 0:
 			if rule.Target != "block" || rule.Network != "udp" || rule.Port != "443" {
 				t.Fatalf("QUIC rule = %+v", rule)
 			}
-		case i == 1 || i == 2:
+		case 1, 2:
 			if rule.Target != "direct" || rule.Policy != "" {
 				t.Fatalf("private rule = %+v", rule)
 			}
-		case i == 3 || i == 9:
+		case 3, 9:
 			// Ads are opt-in; their default branch is overseas, not REJECT.
 			if rule.Target != "proxy" || rule.Policy != "jp_auto" || !reflect.DeepEqual(rule.Candidates, []string{"JP Tokyo"}) {
 				t.Fatalf("overseas/ads rule = %+v", rule)

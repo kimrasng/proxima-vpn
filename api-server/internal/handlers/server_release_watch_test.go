@@ -49,7 +49,7 @@ func releaseWatchRequest(t *testing.T, w *ServerReleaseWatch, method, role, body
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	var state ServerReleaseWatchState
 	if resp.StatusCode == 200 {
 		if resp.Header.Get("Cache-Control") != "no-store" {
@@ -85,7 +85,7 @@ func TestReleaseWatchOwnerPersistence(t *testing.T) {
 		t.Fatalf("permissions: %v %v", info, err)
 	}
 	if other, err := NewServerReleaseWatch(dir, nil); err == nil {
-		other.Close()
+		_ = other.Close()
 		t.Fatal("second writer accepted")
 	}
 	if err := w.Close(); err != nil {
@@ -95,7 +95,7 @@ func TestReleaseWatchOwnerPersistence(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer reopened.Close()
+	defer func() { _ = reopened.Close() }()
 	status, state = releaseWatchRequest(t, reopened, "GET", "owner", "")
 	if status != 200 || state.Config.Owner != "proxima" || state.Config.Repo != "server" || !state.Config.Enabled {
 		t.Fatalf("restart lost selection: %+v", state)
@@ -130,7 +130,7 @@ func TestReleaseWatchRejectsUnsafeStorage(t *testing.T) {
 				t.Fatal(err)
 			}
 			if w, err := NewServerReleaseWatch(dir, nil); err == nil {
-				w.Close()
+				_ = w.Close()
 				t.Fatal("unsafe storage accepted")
 			}
 		})
@@ -196,7 +196,7 @@ func primeReleaseWatchHTTP(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 }
 
 func TestReleaseWatchAutomaticIntervalAndCancellation(t *testing.T) {
@@ -350,7 +350,7 @@ func TestReleaseWatchRejectsUpstreamAndRedirects(t *testing.T) {
 				requests.Add(1)
 				rw.Header().Set("Location", "https://evil.test/private")
 				rw.WriteHeader(status)
-				io.WriteString(rw, "secret upstream response")
+				_, _ = io.WriteString(rw, "secret upstream response")
 			}))
 			w, _ := newReleaseWatchTest(t, client)
 			release, code := w.fetch(context.Background(), ServerReleaseWatchConfig{Owner: "proxima", Repo: "server"})

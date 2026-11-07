@@ -60,7 +60,7 @@ func (h *ServerUpdateControlHandler) preparationResponse(req *http.Request, stat
 		if err != nil {
 			return 502, failure
 		}
-		defer body.Close()
+		defer func() { _ = body.Close() }()
 		if json.NewDecoder(body).Decode(&input) != nil || result.Status != "preparing" || result.Tag != input.Tag {
 			return 502, failure
 		}

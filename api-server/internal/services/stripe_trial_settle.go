@@ -25,7 +25,8 @@ func settleTrialOrderTx(ctx context.Context, tx pgx.Tx, orderID string, trialEnd
 	}
 	// Renewal orders are inserted paid inside this same transaction, avoiding
 	// the customer's unrelated one-pending-order checkout constraint.
-	if status != "pending" && !(status == "expired" && trialEnd != nil && provider == "free_trial") &&
+	freeTrialPending := status == "expired" && trialEnd != nil && provider == "free_trial"
+	if status != "pending" && !freeTrialPending &&
 		(status != "paid" || provider != "stripe_subscription" || granted != nil) {
 		return fmt.Errorf("trial order is not pending")
 	}
