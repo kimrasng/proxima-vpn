@@ -2,17 +2,66 @@ name: Release
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing release tag whose recorded image digests to sign; the tag-push workflow run for it must have completed'
+        required: true
+        type: string
+      build_run_id:
+        description: 'Successful first-attempt tag-push Release run ID; tag must point to the selected main commit'
+        required: true
+        type: string
+      from_api:
+        description: 'Currently deployed API reference the updater host runs: <repository>@sha256:<64 hex>'
+        required: true
+        type: string
+      from_web:
+        description: 'Currently deployed web reference the updater host runs: <repository>@sha256:<64 hex>'
+        required: true
+        type: string
+      sequence:
+        description: 'Monotonic release sequence, strictly above every previously published envelope (see tools/release-publisher/README.md)'
+        required: true
+        type: string
+      channel:
+        description: 'Release channel; must equal the verifier policy channel provisioned on every host'
+        required: true
+        type: string
+        default: 'stable'
+      validity_hours:
+        description: 'Envelope validity window in hours (1..168)'
+        required: true
+        type: string
+        default: '72'
+      rollback_compatible:
+        description: 'Mark the signed transition rollback compatible (review the DB migration first)'
+        required: false
+        type: boolean
+        default: false
+      release_id:
+        description: 'Optional explicit release ID ([a-z][a-z0-9_-]{0,63}); default is derived from tag and sequence'
+        required: false
+        type: string
+
+permissions:
+  contents: read
 
 jobs:
   node-agent:
+    # Tag-push build path only: a manual sign-manifest run must not rebuild
+    # and re-push images. docker and release are skipped through needs.
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     strategy:
       matrix:
         goos: [linux]
         goarch: [amd64, arm64]
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-go@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version: '1.25'
           cache-dependency-path: |
@@ -24,11 +73,12 @@ jobs:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
           CGO_ENABLED: 0
+          AGENT_VERSION: ${{ github.ref_name }}
         run: |
           cd node-agent
-          go build -trimpath -ldflags "-X main.version=${{ github.ref_name }}" -o ../node-agent-${{ matrix.goos }}-${{ matrix.goarch }} ./cmd
+          go build -trimpath -ldflags "-X main.version=$AGENT_VERSION" -o ../node-agent-${{ matrix.goos }}-${{ matrix.goarch }} ./cmd
       - name: Upload artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: node-agent-${{ matrix.goos }}-${{ matrix.goarch }}
           path: node-agent-${{ matrix.goos }}-${{ matrix.goarch }}
@@ -36,30 +86,65 @@ jobs:
   docker:
     runs-on: ubuntu-latest
     needs: node-agent
+    permissions:
+      contents: read
+      packages: write
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
       - name: Login to GHCR
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Build and push API
-        uses: docker/build-push-action@v5
+        id: api_build
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
         with:
           context: .
           file: api-server/Dockerfile
           push: true
           build-args: |
             AGENT_VERSION=${{ github.ref_name }}
+            SERVER_VERSION=${{ github.ref_name }}
+            SERVER_REPOSITORY=${{ github.repository }}
+            SERVER_REVISION=${{ github.sha }}
           tags: ghcr.io/${{ github.repository }}/api:${{ github.ref_name }},ghcr.io/${{ github.repository }}/api:latest
       - name: Build and push Web
-        uses: docker/build-push-action@v5
+        id: web_build
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
         with:
           context: ./web
           file: web/Dockerfile
           push: true
           tags: ghcr.io/${{ github.repository }}/web:${{ github.ref_name }},ghcr.io/${{ github.repository }}/web:latest
+      - name: Record immutable image digests
+        env:
+          API_DIGEST: ${{ steps.api_build.outputs.digest }}
+          WEB_DIGEST: ${{ steps.web_build.outputs.digest }}
+        run: |
+          repo="$(printf '%s' "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')"
+          for digest in "$API_DIGEST" "$WEB_DIGEST"; do
+            printf '%s' "$digest" | grep -Eq '^sha256:[a-f0-9]{64}$' || {
+              echo "unexpected build digest: $digest" >&2
+              exit 1
+            }
+          done
+          jq -n --arg api "ghcr.io/${repo}/api@${API_DIGEST}" \
+                --arg web "ghcr.io/${repo}/web@${WEB_DIGEST}" \
+                --arg repository "$GITHUB_REPOSITORY" \
+                --arg ref "$GITHUB_REF" --arg sha "$GITHUB_SHA" \
+                --argjson run_id "$GITHUB_RUN_ID" --argjson run_attempt "$GITHUB_RUN_ATTEMPT" \
+                '{schema: 1, repository: $repository, ref: $ref, sha: $sha,
+                  run_id: $run_id, run_attempt: $run_attempt, api: $api, web: $web}' > image-digests.json
+          cat image-digests.json
+      - name: Upload digest artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: image-digests
+          path: image-digests.json
 
   release:
     runs-on: ubuntu-latest
@@ -70,10 +155,132 @@ jobs:
       # Pinned to v7 to match upload-artifact above: v8 decides whether to
       # unzip from the Content-Type header, and that pairing is not documented
       # as tested. A mismatch only surfaces when a tag is pushed.
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
         with:
           files: |
             node-agent-linux-amd64/node-agent-linux-amd64
             node-agent-linux-arm64/node-agent-linux-arm64
+            image-digests/image-digests.json
+
+  # This is deliberately a hard failure, not an enable variable or dispatch
+  # checkbox. External controls have NOT been proven. Remove only in a reviewed
+  # change with the evidence required by tools/release-publisher/README.md.
+  signing-readiness:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Refuse unproven external signing controls
+        run: |
+          echo 'Signing disabled: protected environment, trusted refs, key isolation and exclusive publication are not proven.' >&2
+          exit 1
+
+  sign-manifest:
+    needs: signing-readiness
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: release-signing
+    # One repository-wide ledger: do not key this lock by tag, branch, channel,
+    # run or sequence. It spans ledger read, signing and the completed upload.
+    concurrency:
+      group: proxima-release-envelope-publication
+      cancel-in-progress: false
+    permissions:
+      contents: write
+      actions: read
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      TAG: ${{ inputs.tag }}
+      SEQUENCE: ${{ inputs.sequence }}
+      BUILD_RUN_ID: ${{ inputs.build_run_id }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version: '1.25'
+          cache: false
+      - name: Build publisher
+        run: |
+          cd tools/release-publisher
+          GOWORK=off go build -o "$RUNNER_TEMP/release-publisher" .
+      - name: Verify the tag build and its immutable artifact
+        run: |
+          [[ "$TAG" =~ ^v[0-9][A-Za-z0-9._-]*$ ]]
+          [[ "$BUILD_RUN_ID" =~ ^[1-9][0-9]*$ ]]
+          # The build must use this same reviewed commit, including Dockerfiles,
+          # local actions, publisher and its local verifier dependency.
+          tag_sha=$(gh api "repos/$GITHUB_REPOSITORY/commits/$TAG" --jq .sha)
+          test "$tag_sha" = "$GITHUB_SHA"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$BUILD_RUN_ID" > build-run.json
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$BUILD_RUN_ID/artifacts?name=image-digests&per_page=100" > artifacts.json
+          jq -e '.total_count == 1 and (.artifacts | length) == 1' artifacts.json >/dev/null
+          jq '.artifacts[0]' artifacts.json > artifact.json
+          artifact_id=$(jq -er '.id | select(type == "number" and . > 0) | tostring' artifact.json)
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$artifact_id/zip" > digests.zip
+          "$RUNNER_TEMP/release-publisher" verify-build \
+            --repository "$GITHUB_REPOSITORY" --tag "$TAG" --sha "$GITHUB_SHA" \
+            --run-id "$BUILD_RUN_ID" --run build-run.json --artifact artifact.json \
+            --archive digests.zip --out image-digests.json
+      - name: Reject sequences at or below the published ledger
+        run: |
+          printf '%s' "$SEQUENCE" | grep -Eq '^[1-9][0-9]{0,15}$' || {
+            echo "sequence input is not a bounded positive decimal integer" >&2
+            exit 1
+          }
+          # Bound before shell arithmetic; test's overflow status inside an
+          # if-condition would otherwise be mistaken for a greater sequence.
+          test "$SEQUENCE" -ge 2
+          test "$SEQUENCE" -le 9007199254740991
+          mkdir -p ledger
+          # Embedded release assets may be truncated. Paginate both levels;
+          # failure on any page stops publication rather than lowering max.
+          release_ids=$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" --paginate --jq '.[].id')
+          i=0
+          for release_id in $release_ids; do
+            asset_ids=$(gh api "repos/$GITHUB_REPOSITORY/releases/$release_id/assets?per_page=100" --paginate \
+              --jq '.[] | select(.name == "release-envelope.json") | .id')
+            for id in $asset_ids; do
+              i=$((i+1))
+              gh api -H "Accept: application/octet-stream" \
+                "repos/$GITHUB_REPOSITORY/releases/assets/$id" > "ledger/e$i"
+            done
+          done
+          published=0
+          if compgen -G 'ledger/*' > /dev/null; then
+            published=$("$RUNNER_TEMP/release-publisher" max-sequence ledger/*)
+          fi
+          if [ "$SEQUENCE" -le "$published" ]; then
+            echo "sequence $SEQUENCE is not above the published ledger maximum $published" >&2
+            exit 1
+          fi
+          echo "sequence $SEQUENCE is above the published ledger maximum $published"
+      - name: Sign the release manifest
+        env:
+          PROXIMA_RELEASE_SIGNING_KEY: ${{ secrets.RELEASE_SIGNING_KEY }}
+          FROM_API: ${{ inputs.from_api }}
+          FROM_WEB: ${{ inputs.from_web }}
+          CHANNEL: ${{ inputs.channel }}
+          VALIDITY_HOURS: ${{ inputs.validity_hours }}
+          RELEASE_ID: ${{ inputs.release_id }}
+          ROLLBACK: ${{ inputs.rollback_compatible }}
+        run: |
+          "$RUNNER_TEMP/release-publisher" sign \
+            --from-api "$FROM_API" \
+            --from-web "$FROM_WEB" \
+            --to-api "$(jq -r '.api' image-digests.json)" \
+            --to-web "$(jq -r '.web' image-digests.json)" \
+            --tag "$TAG" \
+            --release-id "$RELEASE_ID" \
+            --channel "$CHANNEL" \
+            --sequence "$SEQUENCE" \
+            --validity "${VALIDITY_HOURS}h" \
+            --rollback-compatible="$ROLLBACK" \
+            --out release-envelope.json
+      - name: Publish the envelope as a release asset
+        run: |
+          gh release upload "$TAG" release-envelope.json --repo "$GITHUB_REPOSITORY"

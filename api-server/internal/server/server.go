@@ -18,6 +18,7 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/requestid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/proximavpn/proxima-vpn/api-server/internal/config"
+	"github.com/proximavpn/proxima-vpn/api-server/internal/handlers"
 	"github.com/proximavpn/proxima-vpn/api-server/internal/mail"
 	"github.com/proximavpn/proxima-vpn/api-server/internal/payments"
 	"github.com/proximavpn/proxima-vpn/api-server/internal/services"
@@ -41,6 +42,7 @@ type Server struct {
 	// testMailerCodeLookup is false unless explicitly enabled for automated e2e.
 	// Enabling it replaces SMTP with a fake sender; real mail is never exposed.
 	testMailerCodeLookup bool
+	releaseWatch         *handlers.ServerReleaseWatch
 }
 
 // fiberConfig builds the Fiber config, including the trusted-proxy settings
@@ -155,6 +157,14 @@ func NewServer(cfg *config.Config, db *pgxpool.Pool, rdb *redis.Client, backupSv
 		mailer:               mailer,
 		testMailerCodeLookup: testMailerCodeLookup,
 	}
+	if dir := os.Getenv("PROXIMA_RELEASE_WATCH_DIR"); dir != "" {
+		watch, err := handlers.NewServerReleaseWatch(dir, nil)
+		if err != nil {
+			log.Printf("server release watch disabled: %v", err)
+		} else {
+			s.releaseWatch = watch
+		}
+	}
 
 	s.registerRoutes()
 
@@ -163,6 +173,23 @@ func NewServer(cfg *config.Config, db *pgxpool.Pool, rdb *redis.Client, backupSv
 
 // Start listens on the configured port and handles graceful shutdown.
 func (s *Server) Start() error {
+	if s.releaseWatch != nil {
+		ctx, cancel := context.WithCancel(context.Background())
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			if err := s.releaseWatch.Run(ctx); err != nil {
+				log.Printf("server release watch stopped: %v", err)
+			}
+		}()
+		defer func() {
+			cancel()
+			<-done
+			if err := s.releaseWatch.Close(); err != nil {
+				log.Printf("server release watch close: %v", err)
+			}
+		}()
+	}
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 

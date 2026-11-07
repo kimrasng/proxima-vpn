@@ -374,6 +374,7 @@
       "users": "사용자",
       "announcements": "공지사항",
       "settings": "설정",
+      "serverUpdates": "서버 업데이트",
       "twoFactor": "2FA 보안",
       "group": {
         "infrastructure": "인프라",

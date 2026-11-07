@@ -90,6 +90,7 @@ const staticPageLabels: Record<string, string> = {
   "/admin/support": "admin.nav.support",
   "/admin/support/help": "admin.nav.supportHelp",
   "/admin/settings": "admin.nav.settings",
+  "/admin/server-updates": "admin.nav.serverUpdates",
   "/admin/2fa": "admin.nav.twoFactor",
   "/admin/admins": "admin.nav.admins",
 };
@@ -116,6 +117,7 @@ const helpTopicKeys: Record<string, string> = {
   "/admin/support": "admin.help.support",
   "/admin/support/help": "admin.help.supportHelp",
   "/admin/settings": "admin.help.settings",
+  "/admin/server-updates": "admin.nav.serverUpdates",
   "/admin/2fa": "admin.help.twoFactor",
   "/admin/admins": "admin.help.admins",
 };
@@ -245,6 +247,7 @@ function AdminLayoutShell() {
       title: t("admin.nav.group.system"),
       links: [
         { text: t("admin.nav.settings"), href: "/admin/settings" },
+        ...(me?.role === "owner" ? [{ text: t("admin.nav.serverUpdates"), href: "/admin/server-updates" }] : []),
         { text: t("admin.nav.oauthApps"), href: "/admin/oauth-apps" },
         { text: t("admin.nav.admins"), href: "/admin/admins" },
         { text: t("admin.nav.twoFactor"), href: "/admin/2fa" },

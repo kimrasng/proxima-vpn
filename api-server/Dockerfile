@@ -20,10 +20,16 @@ COPY node-agent/ node-agent/
 # Stamped into the node-agent binaries so self-update version comparisons mean
 # something. Pass --build-arg AGENT_VERSION=v1.2.3 when publishing a release.
 ARG AGENT_VERSION=dev
+ARG SERVER_VERSION=dev
+ARG SERVER_REPOSITORY=
+ARG SERVER_REVISION=
+ARG SERVER_BUILD_TIME=
 
 RUN --mount=type=cache,target=/root/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    cd api-server && CGO_ENABLED=0 GOOS=linux go build -trimpath -o /app/bin/api-server ./cmd
+    cd api-server && CGO_ENABLED=0 GOOS=linux go build -trimpath \
+      -ldflags "-X github.com/proximavpn/proxima-vpn/api-server/internal/buildinfo.Version=${SERVER_VERSION} -X github.com/proximavpn/proxima-vpn/api-server/internal/buildinfo.Repository=${SERVER_REPOSITORY} -X github.com/proximavpn/proxima-vpn/api-server/internal/buildinfo.Revision=${SERVER_REVISION} -X github.com/proximavpn/proxima-vpn/api-server/internal/buildinfo.BuildTime=${SERVER_BUILD_TIME}" \
+      -o /app/bin/api-server ./cmd
 
 RUN --mount=type=cache,target=/root/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \

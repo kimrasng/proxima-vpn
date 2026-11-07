@@ -374,6 +374,7 @@
       "users": "Users",
       "announcements": "Announcements",
       "settings": "Settings",
+      "serverUpdates": "Server updates",
       "twoFactor": "2FA Security",
       "group": {
         "infrastructure": "Infrastructure",

@@ -1,0 +1,29 @@
+[Unit]
+Description=Proxima approved local image updater
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=simple
+User=root
+Group=proxima-updater
+ExecStart=/usr/local/sbin/proxima-updater
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=120
+KillMode=control-group
+UMask=0077
+RuntimeDirectory=proxima-updater
+RuntimeDirectoryMode=0750
+RuntimeDirectoryPreserve=yes
+StateDirectory=proxima-updater
+StateDirectoryMode=0700
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+RestrictAddressFamilies=AF_UNIX AF_INET
+ReadWritePaths=/run/proxima-updater /var/lib/proxima-updater
+
+[Install]
+WantedBy=multi-user.target

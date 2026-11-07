@@ -59,3 +59,7 @@ scripts/e2e_test.sh
 /web/playwright-report/
 /web/blob-report/
 /web/e2e/.auth/
+
+# Built Go binaries
+release-publisher
+proxima-updater

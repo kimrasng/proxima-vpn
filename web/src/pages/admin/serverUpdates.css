@@ -1,0 +1,42 @@
+/* Cloudscape sets word-break on fields and checkbox labels themselves. Scope
+   the override to this page and its portaled modal, including those elements. */
+.server-updates,
+.server-updates [class] {
+  word-break: keep-all !important;
+  overflow-wrap: anywhere;
+}
+
+.server-updates__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-scaled-xs);
+}
+
+.server-updates__actions > * {
+  max-inline-size: 100%;
+}
+
+.server-updates__prepare-actions {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 688px) {
+  /* Cloudscape uses ID specificity guards for its logical input sizing. */
+  .server-updates button,
+  .server-updates input:not([type="checkbox"]) {
+    min-block-size: 44px !important;
+  }
+
+  .server-updates__actions > button {
+    flex-basis: 100%;
+    /* Match Cloudscape fullWidth alignment without changing desktop widths. */
+    text-align: center !important;
+  }
+
+  .server-updates__actions {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+}

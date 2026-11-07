@@ -374,6 +374,7 @@
       "users": "用户",
       "announcements": "公告",
       "settings": "设置",
+      "serverUpdates": "服务器更新",
       "twoFactor": "双因素认证",
       "group": {
         "infrastructure": "基础设施",

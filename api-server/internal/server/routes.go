@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"os"
 	"strings"
 	"time"
@@ -182,6 +183,25 @@ func (s *Server) registerRoutes() {
 	admin.Post("/reset-tickets", resetTicketHandler.Grant)
 
 	adminSettingsHandler := handlers.NewAdminSettingsHandler(s.db)
+	releaseLimiter := limiter.New(limiter.Config{
+		Max: 10, Expiration: time.Minute,
+		KeyGenerator: func(c *fiber.Ctx) string { return "server-release:" + c.IP() },
+		LimitReached: func(c *fiber.Ctx) error {
+			return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{"error": "too many release checks, try again in a minute"})
+		},
+	})
+	admin.Get("/system-updates/latest", middleware.RequireAdminOwner(), releaseLimiter, handlers.NewServerReleaseHandler(nil).Latest)
+	if s.releaseWatch != nil {
+		admin.Get("/system-updates/watch", middleware.RequireAdminOwner(), s.releaseWatch.State)
+		admin.Put("/system-updates/watch", middleware.RequireAdminOwner(), releaseLimiter, s.releaseWatch.Configure)
+	}
+	serverUpdateControl := handlers.NewServerUpdateControlHandler(s.db, services.NewActivityService(s.db))
+	admin.Get("/system-updates/status", middleware.RequireAdminOwner(), serverUpdateControl.Status)
+	admin.Get("/system-updates/preflight", middleware.RequireAdminOwner(), serverUpdateControl.Preflight)
+	admin.Get("/system-updates/candidate", middleware.RequireAdminOwner(), serverUpdateControl.Candidate)
+	admin.Get("/system-updates/prepare", middleware.RequireAdminOwner(), serverUpdateControl.PreparationStatus)
+	admin.Post("/system-updates/prepare", middleware.RequireAdminOwner(), loginLimiter, serverUpdateControl.Prepare)
+	admin.Post("/system-updates/apply", middleware.RequireAdminOwner(), loginLimiter, serverUpdateControl.Apply)
 	admin.Get("/settings", adminSettingsHandler.List)
 	admin.Put("/settings", adminSettingsHandler.Update)
 	settingsTestLimiter := limiter.New(limiter.Config{
@@ -546,6 +566,14 @@ func (s *Server) registerRoutes() {
 	webhooks.Post("/:provider", paymentWebhookHandler.Receive)
 
 	s.app.Get("/health", func(c *fiber.Ctx) error {
+		return c.JSON(fiber.Map{"status": "ok"})
+	})
+	s.app.Get("/ready", func(c *fiber.Ctx) error {
+		ctx, cancel := context.WithTimeout(c.UserContext(), 2*time.Second)
+		defer cancel()
+		if s.db == nil || s.redis == nil || s.db.Ping(ctx) != nil || s.redis.Ping(ctx).Err() != nil {
+			return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{"status": "not_ready"})
+		}
 		return c.JSON(fiber.Map{"status": "ok"})
 	})
 

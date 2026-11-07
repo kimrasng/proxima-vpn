@@ -29,6 +29,7 @@ const OrderDetail = lazy(() => import("./pages/admin/OrderDetail"));
 const AdminAnnouncements = lazy(() => import("./pages/admin/Announcements"));
 const AdminGuides = lazy(() => import("./pages/admin/Guides"));
 const Settings = lazy(() => import("./pages/admin/Settings"));
+const ServerUpdates = lazy(() => import("./pages/admin/ServerUpdates"));
 const TwoFactor = lazy(() => import("./pages/admin/TwoFactor"));
 const NodeInbounds = lazy(() => import("./pages/admin/NodeInbounds"));
 const NodeDetail = lazy(() => import("./pages/admin/NodeDetail"));
@@ -114,6 +115,7 @@ export const router = createBrowserRouter([
       { path: "/admin/support/:ticketId", element: <AdminSupportTicketDetail /> },
       { path: "/admin/guides", element: <AdminGuides /> },
       { path: "/admin/settings", element: <Settings /> },
+      { path: "/admin/server-updates", element: <ServerUpdates /> },
       { path: "/admin/2fa", element: <TwoFactor /> },
       { path: "/admin/admins", element: <AdminAccounts /> },
     ],
