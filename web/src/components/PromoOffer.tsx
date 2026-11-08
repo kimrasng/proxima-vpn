@@ -96,9 +96,11 @@ export function PromoOffer({ promo, durationDays, showCampaign = true, onDuratio
       </div>)}
     </ColumnLayout>
     <SpaceBetween direction="horizontal" size="xs">
-      {canAccept && <Button variant="primary" disabled={!selected} onClick={() => onAccept(days)}>
+      {/* Ineligible offers keep the CTA: clicking it opens the notice that
+          explains why, instead of silently hiding the action. */}
+      <Button variant="primary" disabled={!selected} onClick={() => onAccept(days)}>
         {promo.cta_label || t(trial ? "user.promo.cta.trial" : "user.promo.cta.discount")}
-      </Button>}
+      </Button>
       <Button variant="link" onClick={onDismiss}>{t("user.promo.notNow")}</Button>
     </SpaceBetween>
     <SpaceBetween size="xxs">
