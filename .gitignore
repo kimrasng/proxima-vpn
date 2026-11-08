@@ -63,5 +63,9 @@ scripts/e2e_test.sh
 # Built Go binaries
 tools/release-publisher/release-publisher
 tools/server-updater/proxima-updater
+
+# Local design drafts (senpi)
+.senpi/
+
 __pycache__/
 *.pyc
