@@ -135,6 +135,8 @@ jobs:
           cache-dependency-path: web/package-lock.json
       - name: Install dependencies
         run: cd web && npm ci
+      - name: Unit tests
+        run: cd web && npm run test:unit
       - name: Lint
         run: cd web && npm run lint
       # A key in en.json but missing from ko.json or zh.json renders as the raw
